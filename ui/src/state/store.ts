@@ -52,9 +52,18 @@ export interface State {
   accountId: string | null; // the account new orders go to
   books: Record<string, AccountBook>;
   firmKill: KillState;
+  /** Operational alerts from the server (Kite login, prices stopped, disk), active ones by key. */
+  ops: Record<string, OpsAlert>;
   messages: Message[]; // newest first
   stream: Status;
   sentTimes: number[]; // when we sent orders in the last minute (rate meter)
+}
+
+export interface OpsAlert {
+  key: string;
+  level: "INFO" | "WARN" | "ERROR";
+  text: string;
+  at: string;
 }
 
 export const MAX_MESSAGES = 500;
@@ -86,6 +95,7 @@ export class Store {
       accountId: null,
       books: {},
       firmKill: OFF,
+      ops: {},
       messages: [],
       stream: "stopped",
       sentTimes: [],
@@ -116,7 +126,7 @@ export class Store {
 
   setMe(me: Me | null): void {
     if (me === null) {
-      this.set({ me: null, accountId: null, books: {}, firmKill: OFF, sentTimes: [] });
+      this.set({ me: null, accountId: null, books: {}, firmKill: OFF, ops: {}, sentTimes: [] });
       return;
     }
     const books: Record<string, AccountBook> = {};
@@ -232,6 +242,14 @@ export class Store {
         this.applyAlgos(m.account_id, [m.algo]);
         const note = describeAlgoEvent(m.kind, m.detail, m.algo);
         if (note) this.addMessage(note.level, m.algo.instrument_id, note.text);
+        return;
+      }
+      case "ops": {
+        const ops = { ...this.state.ops };
+        if (m.active && m.level !== "OK") ops[m.key] = { key: m.key, level: m.level, text: m.text, at: m.at };
+        else delete ops[m.key];
+        this.set({ ops });
+        this.addMessage(m.level === "OK" ? "OK" : m.level, "", m.text);
         return;
       }
       case "error":

@@ -159,6 +159,7 @@ export type ServerMessage =
       message: string;
     }
   | { type: "algo"; account_id: string; kind: string; detail: string; algo: AlgoView }
+  | { type: "ops"; key: string; level: "INFO" | "WARN" | "ERROR" | "OK"; text: string; active: boolean; at: string }
   | { type: "error"; message: string }
   | { type: "pong" };
 

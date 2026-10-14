@@ -14,6 +14,7 @@ export function Bands() {
   const accountId = useStore((s) => s.accountId);
   const kill = useStore((s) => (s.accountId ? s.books[s.accountId]?.kill : undefined));
   const alerts = useStore((s) => (s.accountId ? s.books[s.accountId]?.alerts : undefined));
+  const ops = useStore((s) => s.ops);
 
   const bands = [];
   if (firm.engaged) {
@@ -35,6 +36,16 @@ export function Bands() {
           {kill.reason}
           {kill.by ? ` · by ${kill.by}` : ""} · working orders cancelled · positions kept · new orders blocked
         </span>
+      </div>,
+    );
+  }
+  // operational alerts from the server: errors first (Kite login, prices stopped, disk)
+  const opsAlerts = Object.values(ops).sort((a, b) => (a.level === b.level ? a.key.localeCompare(b.key) : a.level === "ERROR" ? -1 : 1));
+  for (const a of opsAlerts) {
+    bands.push(
+      <div key={`ops-${a.key}`} role={a.level === "ERROR" ? "alert" : "status"} className={`band ${a.level === "ERROR" ? "stopped" : "warn"}`}>
+        <b>{a.level === "ERROR" ? "ACTION NEEDED" : "HEADS UP"}</b>
+        <span>{a.text}</span>
       </div>,
     );
   }

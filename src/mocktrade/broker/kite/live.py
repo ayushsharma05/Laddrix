@@ -196,6 +196,17 @@ class KiteLive:
             with contextlib.suppress(Exception):
                 await link.http.aclose()
 
+    async def refresh_instruments(self) -> None:
+        """The morning job: today's instrument list, if an account is live (else at login)."""
+        for link in self._links.values():
+            if link.live:
+                await self._refresh_instruments(link)
+                return
+
+    @property
+    def any_live(self) -> bool:
+        return any(link.live for link in self._links.values())
+
     # --- prices ------------------------------------------------------------------------------
 
     async def _take_prices(self, link: _Link) -> None:

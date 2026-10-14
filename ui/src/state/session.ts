@@ -31,6 +31,7 @@ export class Session {
       stream.on("kill", (m) => store.applyMessage(m)),
       stream.on("position_alert", (m) => store.applyMessage(m)),
       stream.on("algo", (m) => store.applyMessage(m)),
+      stream.on("ops", (m) => store.applyMessage(m)),
       stream.on("error", (m) => store.applyMessage(m)),
     );
   }

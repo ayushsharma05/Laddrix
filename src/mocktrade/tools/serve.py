@@ -15,6 +15,10 @@ Settings (environment; secrets never on the command line):
                                           kite: live Kite prices; kite accounts trade for real
                                           after their daily login, paper accounts fill
                                           against live prices
+    MOCKTRADE_HOLIDAYS         (none)     exchange holidays, e.g. 2026-10-21,2026-11-10
+                                          (no morning reminders or price alerts on them)
+    MOCKTRADE_ALERT_WEBHOOK    (none)     https:// address that gets WARN/ERROR alerts as
+                                          JSON {"text": ...} (Slack, ntfy, Google Chat...)
     KITE_API_KEY, KITE_API_SECRET         the Kite Connect app (kite mode). One account with
                                           its own app: KITE_API_KEY_<ACCOUNT>, e.g.
                                           KITE_API_KEY_ACC_AYUSH (and ..._SECRET_...)
@@ -57,6 +61,10 @@ from mocktrade.marketdata.service import MarketData
 from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.metrics import freeze_heap, watch_loop_lag
+from mocktrade.ops.alerts import Alerts
+from mocktrade.ops.checks import Checks
+from mocktrade.ops.notify import WebhookNotifier
+from mocktrade.ops.scheduler import Scheduler, parse_holidays
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
@@ -82,6 +90,8 @@ class ServeSettings:
     ui_dir: Path = Path("ui/dist")
     prices: str = "sim"
     trusted_proxies: str = ""
+    holidays: frozenset = frozenset()  # exchange holidays (no morning jobs or alerts)
+    alert_webhook: str = ""  # alerts to a phone: Slack, ntfy, Google Chat... (JSON POST)
     kite_env: tuple[tuple[str, str], ...] = ()  # the KITE_* settings (kite mode)
 
     def kite_url(self, name: str, default: str) -> str:
@@ -138,6 +148,14 @@ class ServeSettings:
         kite_env = tuple(sorted((k, v) for k, v in env.items() if k.startswith("KITE_") and v))
         if prices == "kite" and not any(k.startswith("KITE_API_KEY") for k, _ in kite_env):
             problems.append("MOCKTRADE_PRICES=kite needs KITE_API_KEY and KITE_API_SECRET")
+        holidays: frozenset = frozenset()
+        try:
+            holidays = parse_holidays(env.get("MOCKTRADE_HOLIDAYS", ""))
+        except ValueError:
+            problems.append("MOCKTRADE_HOLIDAYS must be dates like 2026-10-21,2026-11-10")
+        hook = env.get("MOCKTRADE_ALERT_WEBHOOK", "")
+        if hook and not hook.startswith("https://"):
+            problems.append("MOCKTRADE_ALERT_WEBHOOK must be an https:// address")
         if problems:
             raise ConfigError("; ".join(problems))
         return cls(
@@ -149,6 +167,8 @@ class ServeSettings:
             ui_dir=Path(env.get("MOCKTRADE_UI", "ui/dist")),
             prices=prices,
             trusted_proxies=env.get("MOCKTRADE_TRUSTED_PROXIES", ""),
+            holidays=holidays,
+            alert_webhook=env.get("MOCKTRADE_ALERT_WEBHOOK", ""),
             kite_env=kite_env,
         )
 
@@ -166,8 +186,12 @@ class Assembly:
     running: list[str] = field(default_factory=list)  # account ids
     not_running: dict[str, str] = field(default_factory=dict)  # account id -> why
     kite: KiteLive | None = None
+    alerts: Alerts | None = None
+    notifier: WebhookNotifier | None = None
 
     async def close(self) -> None:
+        if self.notifier is not None:
+            await self.notifier.aclose()
         if self.kite is not None:
             await self.kite.aclose()
         for broker in self.brokers:
@@ -240,6 +264,32 @@ def build(settings: ServeSettings) -> Assembly:
         platform_ref.append(platform)
     jobs.append(platform.run)
     jobs.append(watch_loop_lag)
+
+    # daily operation: alerts to the screens, the audit trail and (optionally) a phone
+    alerts = Alerts()
+    alerts.subscribe(
+        lambda a: events.record_note(
+            "OPS_ALERT" if a.active else "OPS_CLEAR", "-", a.text, {"key": a.key, "level": a.level}
+        )
+    )
+    notifier = WebhookNotifier(settings.alert_webhook) if settings.alert_webhook else None
+    if notifier is not None:
+        alerts.subscribe(notifier)
+    checks = Checks(
+        alerts,
+        md,
+        accounts,
+        settings.data_dir,
+        broker_status=kite.status if kite else None,
+        prices_expected=(lambda: kite.any_live) if kite else (lambda: True),
+    )
+    scheduler = Scheduler(holidays=settings.holidays)
+    if kite is not None:
+        scheduler.daily("08:30", kite.refresh_instruments, "instrument refresh")
+        scheduler.every(60, checks.kite_login, between=("08:30", "15:30"), name="kite login")
+    scheduler.every(15, checks.prices, between=("09:16", "15:30"), name="prices")
+    scheduler.every(300, checks.disk, between=("00:00", "23:59"), name="disk")
+    jobs.append(scheduler.run)
     ui = settings.ui_dir if (settings.ui_dir / "index.html").exists() else None
     if ui is None:
         log.warning("no built screens in %s: serving the API only", settings.ui_dir)
@@ -249,9 +299,13 @@ def build(settings: ServeSettings) -> Assembly:
         ServerSettings(origin=settings.origin, cookie_secure=settings.cookie_secure),
         broker_login=kite.login if kite else None,
         broker_status=kite.status if kite else None,
+        alerts=alerts,
+        scheduler=scheduler,
         static_dir=ui,
     )
-    return Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)
+    built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)
+    built.alerts, built.notifier = alerts, notifier
+    return built
 
 
 async def _resync(account_id: str, orders) -> None:

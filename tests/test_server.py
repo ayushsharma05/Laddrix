@@ -697,3 +697,12 @@ async def test_metrics_are_for_admin_and_risk_and_time_each_step(world):
     assert 'mocktrade_broker_ms_count{op="place",broker="fake"} 1' in text
     for c in (riya, ayush, risk):
         await c.aclose()
+
+
+async def test_ops_view_is_for_admin_and_risk(world):
+    riya = await world.logged_in("riya")
+    assert (await riya.get("/api/ops")).status_code == 403
+    risk = await world.logged_in("risk")
+    assert (await risk.get("/api/ops")).json() == {"alerts": [], "jobs": []}
+    for c in (riya, risk):
+        await c.aclose()

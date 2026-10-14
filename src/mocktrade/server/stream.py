@@ -35,6 +35,7 @@ from mocktrade.domain.accounts import User, can_view
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import Subscription
 from mocktrade.metrics import METRICS, since_us
+from mocktrade.ops.alerts import Alert, Alerts, alert_to_dict
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import EventKind, OrderEvent
 from mocktrade.platform import AccountRuntime, Platform
@@ -89,6 +90,7 @@ class StreamHub:
         max_instruments: int = 200,
         recheck_s: float = 60.0,
         clock: Callable[[], float] = time.monotonic,
+        alerts: Alerts | None = None,
     ) -> None:
         self._clock = clock
         self._platform = platform
@@ -104,6 +106,9 @@ class StreamHub:
         platform.firm_switch.on_change(self._on_kill)
         for runtime in platform.accounts.values():
             self.attach(runtime)
+        self._alerts = alerts
+        if alerts is not None:
+            alerts.subscribe(self._on_ops)
 
     @property
     def connections(self) -> int:
@@ -152,6 +157,8 @@ class StreamHub:
                 "max_instruments": self._max_instruments,
             }
         )
+        for alert in self._alerts.active() if self._alerts else ():
+            connection.put(alert_to_dict(alert))  # what's wrong right now, at once
         tasks = [
             asyncio.create_task(self._send(websocket, connection)),
             asyncio.create_task(self._receive(websocket, connection)),
@@ -287,6 +294,11 @@ class StreamHub:
             connection.accounts = self._viewable(user)  # permissions can change
 
     # --- events from the platform ------------------------------------------------------------
+
+    def _on_ops(self, alert: Alert) -> None:
+        message = alert_to_dict(alert)
+        for connection in list(self._connections):
+            connection.put(message)  # operations concern everyone signed in
 
     def _on_order(self, event: OrderEvent) -> None:
         if event.kind in NOT_SENT:

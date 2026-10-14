@@ -19,6 +19,7 @@ from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.domain.orders import OrderStatus, OrderUpdate, Product, Side
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
+from mocktrade.ops.alerts import Alerts
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
@@ -68,8 +69,12 @@ class Live:
             self.platform.add_account(
                 account, FakeBroker(), ids=ClientIds("MT"), algo_types=BUILTIN
             )
+        self.alerts = Alerts()
         self.app = create_app(
-            self.platform, self.users, ServerSettings(origin=self.origin, cookie_secure=False)
+            self.platform,
+            self.users,
+            ServerSettings(origin=self.origin, cookie_secure=False),
+            alerts=self.alerts,
         )
         self.hub = self.app.state.hub
         self.hub.flush_s = 0.05  # faster than the real 250 ms, so tests are quick
@@ -438,3 +443,21 @@ def test_a_tick_is_encoded_once_with_the_same_fields_as_before():
     assert stream.tick_json(t) is text  # the same tick: encoded once, shared
     newer = t._replace(ltp_paise=2501010)
     assert json.loads(stream.tick_json(newer))["ltp_paise"] == 2501010
+
+
+async def test_ops_alerts_reach_every_screen_and_new_screens_see_the_active_ones(live):
+    live.alerts.raise_("broker_login:acc-ayush", "WARN", "Log in to Kite for acc-ayush")
+    client = await live.session()
+    async with live.stream(client) as ws:
+        first = await next_of(ws, "ops")  # active when the screen connected
+        assert (first["key"], first["level"], first["active"]) == (
+            "broker_login:acc-ayush",
+            "WARN",
+            True,
+        )
+        live.alerts.raise_("prices", "ERROR", "No prices for over a minute")
+        assert (await next_of(ws, "ops"))["key"] == "prices"
+        live.alerts.clear("prices", "prices are flowing again")
+        cleared = await next_of(ws, "ops")
+        assert (cleared["key"], cleared["level"], cleared["active"]) == ("prices", "OK", False)
+    await client.aclose()

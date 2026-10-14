@@ -34,6 +34,8 @@ from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import spec_to_dict
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Validity
 from mocktrade.metrics import METRICS, process_gauges, since_us
+from mocktrade.ops.alerts import Alerts, alert_to_dict
+from mocktrade.ops.scheduler import Scheduler
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
@@ -147,11 +149,15 @@ def create_app(
     *,
     broker_login: BrokerLogin | None = None,
     broker_status: Callable[[BrokerAccount], str | None] | None = None,
+    alerts: Alerts | None = None,
+    scheduler: Scheduler | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
     app = FastAPI(title="MockTrade", docs_url=None, redoc_url=None, openapi_url=None)
-    hub = StreamHub(platform, users, origin=settings.origin, cookie_name=settings.cookie_name)
+    hub = StreamHub(
+        platform, users, origin=settings.origin, cookie_name=settings.cookie_name, alerts=alerts
+    )
     app.state.hub = hub
     METRICS.gauge("stream_connections", lambda: hub.connections)
     METRICS.gauge("ticks_received", lambda: platform.market_data.ticks_received)
@@ -217,6 +223,19 @@ def create_app(
         if format == "prometheus":
             return Response(METRICS.prometheus(), media_type="text/plain; version=0.0.4")
         return METRICS.snapshot()
+
+    @app.get("/api/ops")
+    async def ops(user: Me) -> dict[str, Any]:
+        """What operations look like now: active alerts and the scheduled jobs that ran."""
+        if not _risk_or_admin(user):
+            raise HTTPException(403, "operations are for admin and risk users")
+        return {
+            "alerts": [alert_to_dict(a) for a in alerts.active()] if alerts else [],
+            "jobs": [
+                {"job": name, "at": at.isoformat()}
+                for name, at in (scheduler.ran if scheduler else [])
+            ][-50:],
+        }
 
     @app.delete("/api/metrics")
     async def reset_metrics(user: Me) -> dict[str, str]:
