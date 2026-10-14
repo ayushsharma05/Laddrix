@@ -123,3 +123,12 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 - #186 (#153): `tools/backup.py` (SQLite online backup, owner-only), `deploy/server-setup.sh` (Ubuntu hardening), `docs/runbooks/server.md` (Ayush's AWS, DNS and Kite steps, AMO IP check, restore). Ayush closes #153 after the IP check.
 - #187 (#154): measure first. A two-process load test with a fake Kite showed 62 µs of Python work per tick and ~100 ms GC pauses. Fixes: NamedTuples, one struct unpack per packet, orjson, `gc.freeze`, and chunked decoding that hands a frame on whole. Result: 21 µs per tick and 10–20 ms GC pauses. Kite → screen p50 65 ms at 1,000 contracts × 2 ticks/s, on a noisy VM. Re-measure on the Mumbai server.
 - #188 (#155): `ops/` (scheduler in India time on trading days, alerts with dedupe and an optional phone webhook, checks: the Kite login reminder escalating at 09:05, prices stopped, disk). The screens show ops bands. Runbooks: morning routine and incidents. K7 code complete; Ayush's AWS and real-day steps remain.
+
+## 21. K8 Options (14 Oct 2026)
+- #194 pricing (Black-76 off the future, IV with a safeguarded Newton, Greeks in traders' units; 16/16 mutations).
+- #195 chain service: REST plus a throttled stream; the simulator prices options with a smile.
+- #196 chain widget: mirrored columns, ATM, OI bars; double-click a tab to maximize.
+- #197 strategy builder: server templates, exact breakevens, "unlimited" detection, calendars; Alt-click legs from the chain.
+- #198 baskets: one cumulative check, buys first, stop on refusal, broker margin port. A new **covered-short** rule: spreads are allowed while naked shorts stay refused.
+- Each was checked in a real browser against the demo. Ayush repeated (mid-session): a professional Indian-market platform, no references to other vendors, replaceable parts, the backend provides and the frontend displays, speed everywhere. All already in `working-with-ayush.md`.
+
