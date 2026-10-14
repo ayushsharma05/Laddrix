@@ -370,6 +370,31 @@ async def test_an_orders_audit_history(world):
     await c.aclose()
 
 
+async def test_an_accounts_audit_trail_in_pages(world):
+    c = await world.logged_in()
+    for _ in range(3):
+        await c.post("/api/accounts/acc-ayush/orders", json=ORDER)
+    await c.post("/api/accounts/acc-ayush/stop", json={"reason": "break"})
+    await world.log.flush()
+    page = (await c.get("/api/accounts/acc-ayush/events", params={"limit": 4})).json()
+    kinds = [e["kind"] for e in page]
+    # STOP engages the switch first, then cancels the working orders: the cancels are newer
+    assert kinds.index("KILL_SWITCH") > kinds.index("CANCEL_SENT")
+    stop = page[kinds.index("KILL_SWITCH")]
+    assert stop["detail"] == "break" and stop["extra"]["by"] == "ayush"
+    seqs = [e["seq"] for e in page]
+    assert seqs == sorted(seqs, reverse=True)
+    older = (await c.get("/api/accounts/acc-ayush/events", params={"before_seq": seqs[-1]})).json()
+    assert all(e["seq"] < seqs[-1] for e in older)
+    assert {e["account_id"] for e in page + older} <= {"acc-ayush", "account acc-ayush", "firm"}
+    assert any(e["order"] and e["order"]["request"]["user_id"] == "ayush" for e in older)
+    await c.aclose()
+    # a plain trader can't read someone else's audit trail: the account doesn't exist for them
+    riya = await world.logged_in("riya")
+    assert (await riya.get("/api/accounts/acc-ayush/events")).status_code == 404
+    await riya.aclose()
+
+
 # --- positions ---
 
 

@@ -125,6 +125,32 @@ async def test_events_can_be_read_in_pages_and_by_account(log):
     ]
 
 
+async def test_audit_pages_are_newest_first_and_cover_the_kill_switches(log):
+    for i in range(6):
+        log.record(_event(f"A{i}", EventKind.SUBMITTED, T0, account_id="acc-1"))
+        log.record(_event(f"B{i}", EventKind.SUBMITTED, T0, account_id="acc-2"))
+    switch = KillSwitch("account acc-1", clock=clock_from())
+    switch.on_change(log.record_kill)
+    switch.engage("break", by="ayush")
+    await log.flush()
+    names = ["acc-1", "account acc-1", "firm"]
+
+    newest = log.page(names, limit=3)
+    assert [e.client_order_id or e.kind for e in newest] == [KILL_SWITCH, "A5", "A4"]
+    older = log.page(names, before_seq=newest[-1].seq, limit=10)
+    assert [e.client_order_id for e in older] == ["A3", "A2", "A1", "A0"]
+    assert log.page(names, before_seq=older[-1].seq) == []
+
+    log.record(_event("A6", EventKind.SUBMITTED, T0, account_id="acc-1"))
+    log.record(_event("A7", EventKind.SUBMITTED, T0, account_id="acc-1"))
+    await log.flush()
+    live = log.page(names, after_seq=newest[0].seq)
+    assert [e.client_order_id for e in live] == ["A7", "A6"]
+    # a capped catch-up takes the oldest missing events first, so paging on never skips any
+    assert [e.client_order_id for e in log.page(names, after_seq=newest[0].seq, limit=1)] == ["A6"]
+    assert log.page([], limit=5) == []
+
+
 async def test_everything_survives_closing_and_reopening(store, path):
     first = EventLog(path)
     first.start()

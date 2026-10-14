@@ -38,6 +38,7 @@ from mocktrade.server import security
 from mocktrade.server.formats import position_to_dict
 from mocktrade.server.stream import StreamHub
 from mocktrade.server.users import SESSION_MAX, LoginFailed, UserStore
+from mocktrade.store.events import StoredEvent
 
 log = logging.getLogger(__name__)
 
@@ -321,18 +322,31 @@ def create_app(
         if platform.event_log is None or running.orders.get(client_order_id) is None:
             raise HTTPException(404, "no such order")
         events = await asyncio.to_thread(platform.event_log.history, client_order_id)
-        return [
-            {
-                "seq": e.seq,
-                "ts": e.ts.isoformat(),
-                "kind": e.kind,
-                "detail": e.detail,
-                "order": view_to_dict(e.order) if e.order else None,
-                "fill": fill_to_dict(e.fill) if e.fill else None,
-            }
-            for e in events
-            if e.account_id == account_id
-        ]
+        return [_event(e) for e in events if e.account_id == account_id]
+
+    @app.get("/api/accounts/{account_id}/events")
+    async def account_events(
+        account_id: str,
+        user: Me,
+        before_seq: int | None = None,
+        after_seq: int | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """The account's audit trail, newest first: its orders, its kill switch and the
+        firm's (see EventLog.page for the paging)."""
+        runtime(account_id, user)
+        if platform.event_log is None:
+            return []
+        limit = max(1, min(limit, 1000))
+        names = [account_id, f"account {account_id}", "firm"]
+        events = await asyncio.to_thread(
+            platform.event_log.page,
+            names,
+            before_seq=before_seq,
+            after_seq=after_seq,
+            limit=limit,
+        )
+        return [_event(e) for e in events]
 
     # --- positions -----------------------------------------------------------------------------
 
@@ -484,6 +498,20 @@ def _instrument(i: Instrument) -> dict[str, Any]:
 
 def _risk_or_admin(user: User) -> bool:
     return user.has_role(Role.RISK) or user.has_role(Role.ADMIN)
+
+
+def _event(e: StoredEvent) -> dict[str, Any]:
+    return {
+        "seq": e.seq,
+        "ts": e.ts.isoformat(),
+        "account_id": e.account_id,
+        "kind": e.kind,
+        "client_order_id": e.client_order_id,
+        "detail": e.detail,
+        "order": view_to_dict(e.order) if e.order else None,
+        "fill": fill_to_dict(e.fill) if e.fill else None,
+        "extra": e.extra,
+    }
 
 
 def _me(user: User, users: UserStore, platform: Platform) -> dict[str, Any]:
