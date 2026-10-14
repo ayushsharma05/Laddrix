@@ -57,3 +57,16 @@ def mocker_free_request(nifty_fut):
         product=Product.NRML,
         price_paise=2501000,
     )
+
+
+@pytest.fixture(autouse=True, scope="session")
+def light_password_hashing():
+    """Argon2id is slow on purpose; tests use light settings so they stay fast.
+    Production keeps the strong defaults (security.use_hasher is never called there)."""
+    from argon2 import PasswordHasher
+
+    from mocktrade.server import security
+
+    previous = security.use_hasher(PasswordHasher(time_cost=1, memory_cost=8, parallelism=1))
+    yield
+    security.use_hasher(previous)
