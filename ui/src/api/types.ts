@@ -121,12 +121,15 @@ export interface PositionsSnapshot {
 }
 
 export interface AuditEvent {
-  seq: number;
+  seq: number; // position in the event log: later events have bigger numbers
   ts: string;
-  kind: string;
+  account_id: string; // the account, "account <id>" (its kill switch) or "firm"
+  kind: string; // an order event kind, KILL_SWITCH or POSITION_MISMATCH_…
+  client_order_id: string;
   detail: string;
   order: OrderView | null;
   fill: Fill | null;
+  extra: Record<string, unknown>; // e.g. {engaged, by} for kill switches
 }
 
 // --- stream messages (server -> browser) ---------------------------------------------------

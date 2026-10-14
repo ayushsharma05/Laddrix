@@ -1,5 +1,6 @@
 // The workspace a new user starts with: a Watch list on the left, ladders for the first
-// futures in the middle, and the order book, positions and messages along the bottom.
+// futures in the middle, and the order book, positions and audit trail (Messages in a tab
+// beside it) along the bottom, like canvas board 2.
 // Only widgets that exist are placed, so this grows as widgets are added.
 
 import type { DockviewApi } from "dockview-react";
@@ -73,7 +74,15 @@ export async function buildDefault(api: DockviewApi, pageName: string, instrumen
     watch ? { position: { direction: "below" } } : undefined,
   );
   const positions = add("positions", {}, book ? { position: { referencePanel: book.id, direction: "right" } } : undefined);
-  add("messages", {}, positions ? { position: { referencePanel: positions.id, direction: "right" } } : undefined);
+  const audit = add("audit", {}, positions ? { position: { referencePanel: positions.id, direction: "right" } } : undefined);
+  add("messages", {}, audit ? { position: { referencePanel: audit.id, direction: "within" } } : undefined);
+  if (audit) {
+    try {
+      audit.api.setActive(); // the audit trail shows; Messages waits in the tab next to it
+    } catch {
+      // a nicety
+    }
+  }
   if (book) {
     try {
       book.group.api.setSize({ height: 260 });
