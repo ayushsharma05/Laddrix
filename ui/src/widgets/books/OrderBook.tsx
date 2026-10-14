@@ -109,7 +109,7 @@ export function OrderBook({ params, setParams, publish, open }: WidgetProps<Orde
                 role="row"
                 aria-selected={selected === id}
                 className={`row book-row orders-row${selected === id ? " selected" : ""}`}
-                title={`${id}${o.broker_order_id ? ` · broker ${o.broker_order_id}` : ""} · double-click for its audit trail`}
+                title={`${id}${o.broker_order_id ? ` · broker ${o.broker_order_id}` : ""}${o.request.basket_id ? ` · basket ${o.request.basket_id}` : ""} · double-click for its audit trail`}
                 onClick={() => {
                   setSelected(id);
                   publish(o.request.instrument_id);

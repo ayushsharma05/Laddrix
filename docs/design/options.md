@@ -75,3 +75,29 @@
 - **Tests:** iron condor, straddle, ratio spread and butterfly checked by hand; the today curve
   meets the expiry payoff at the close; Greeks add up; calendars. A mutation check catches
   13 of 13 changes.
+
+## Baskets (`orders/basket.py`, #193)
+
+| API | |
+|---|---|
+| `POST /api/accounts/{a}/baskets/check` `{legs: [{instrument_id, side, lots, product?, price_paise?, at?}]}` | each leg's risk result, and the margin |
+| `POST /api/accounts/{a}/baskets/send` | 201 with the orders sent; 422 "nothing sent" if any leg fails the check |
+
+- **One check for all legs.** Every leg goes through the normal risk checks, and each leg sees
+  the legs before it as already working. If any leg fails, nothing is sent and the result
+  names the leg.
+- **Covered shorts.** By default an account can't open a naked short option. A short covered
+  by longs of the same underlying, type and expiry (held, working, or earlier legs of the
+  basket) has defined risk, so it is allowed. Spreads and condors work; naked shorts still
+  need `allow_option_selling`.
+- **Send order:** option buys first, so the protection is in place before the shorts. A leg
+  that is refused or unconfirmed stops the rest, and the result says which legs are working.
+- **Prices:** a leg's own limit, or "touch" (buy at the offer, sell at the bid) or "mid"
+  (rounded to the tick on the side that doesn't overpay). Every leg is a LIMIT order.
+- **Margin:** brokers that can quote it implement `MarginQuoter` (Kite: `POST /margins/basket`,
+  initial and final, giving the hedge benefit). The paper broker says it can't, rather than
+  guessing.
+- Each leg carries the basket id, which is stored with the order and shown in the order book,
+  and the audit trail records `BASKET_SENT` or `BASKET_STOPPED`.
+- **Screen:** the strategy builder's Trade panel (product, touch/mid, Check, Send N orders).
+  Changing anything requires a new check before sending.

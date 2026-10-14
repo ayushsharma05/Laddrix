@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Any, Literal, Protocol
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -40,6 +40,7 @@ from mocktrade.ops.scheduler import Scheduler
 from mocktrade.options.chain import ChainService
 from mocktrade.options.strategy import Strategies, StrategyError
 from mocktrade.options.strategy import templates as strategy_templates_list
+from mocktrade.orders.basket import BasketError, LegIn, check_to_dict
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
@@ -152,6 +153,19 @@ class StrategyLegIn(_Strict):
 
 class StrategyIn(_Strict):
     legs: list[StrategyLegIn] = Field(min_length=1, max_length=8)
+
+
+class BasketLegIn(_Strict):
+    instrument_id: str = Field(min_length=3, max_length=64)
+    side: Side
+    lots: int = Field(ge=1, le=1000)
+    product: Product = Product.NRML
+    price_paise: int | None = Field(default=None, gt=0)
+    at: Literal["touch", "mid"] = "touch"
+
+
+class BasketIn(_Strict):
+    legs: list[BasketLegIn] = Field(min_length=1, max_length=10)
 
 
 class StopIn(_Strict):
@@ -295,6 +309,38 @@ def create_app(
             return strategies.analyse(legs)
         except StrategyError as exc:
             raise HTTPException(422, str(exc)) from None
+
+    # --- baskets -------------------------------------------------------------------------------
+
+    def basket_legs(body: BasketIn) -> list[LegIn]:
+        return [LegIn(**leg.model_dump()) for leg in body.legs]
+
+    @app.post("/api/accounts/{account_id}/baskets/check")
+    async def basket_check(account_id: str, body: BasketIn, user: Me) -> dict[str, Any]:
+        running = runtime(account_id, user, trade=True)
+        try:
+            return check_to_dict(await running.baskets.check(basket_legs(body), user.id))
+        except BasketError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.post("/api/accounts/{account_id}/baskets/send")
+    async def basket_send(account_id: str, body: BasketIn, user: Me) -> JSONResponse:
+        running = runtime(account_id, user, trade=True)
+        try:
+            result = await running.baskets.send(basket_legs(body), user.id)
+        except BasketError as exc:
+            raise HTTPException(422, str(exc)) from None
+        if result["basket_id"] is None:  # a leg failed the check: nothing was sent
+            return JSONResponse({"detail": "nothing sent", **check_to_dict(result["check"])}, 422)
+        return JSONResponse(
+            {
+                "basket_id": result["basket_id"],
+                "sent": [view_to_dict(v) for v in result["sent"]],
+                "not_sent": result["not_sent"],
+                "stopped": result["stopped"],
+            },
+            201,
+        )
 
     @app.get("/api/ops")
     async def ops(user: Me) -> dict[str, Any]:

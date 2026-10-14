@@ -24,6 +24,7 @@ from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import OrderSpec
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
+from mocktrade.orders.basket import Baskets
 from mocktrade.orders.gate import Gates
 from mocktrade.orders.manager import OrderManager
 from mocktrade.orders.model import ClientIds
@@ -50,6 +51,7 @@ class AccountRuntime:
     reconciler: PositionReconciler
     loss_watch: DailyLossWatch | None
     algos: AlgoEngine
+    baskets: Baskets
 
 
 @dataclass
@@ -195,6 +197,7 @@ class Platform:
             day_pnl_paise=book.day_pnl_paise,
             switches=(self.firm_switch, switch),
             clock=clock,
+            positions=book.net_by_instrument,
         )
         throttle = throttle or OrderThrottle()
         orders = OrderManager(
@@ -231,8 +234,34 @@ class Platform:
                 )
             )
         algos = self._algo_engine(account.id, orders, switch, algo_types, clock)
+        basket_audit = None
+        if self.event_log is not None:
+            log = self.event_log
+
+            def basket_audit(kind: str, detail: str, extra: dict) -> None:
+                log.record_note(kind, account.id, detail, extra)
+
+        baskets = Baskets(
+            account.id,
+            orders,
+            risk,
+            broker,
+            self.instruments.get,
+            self.market_data.latest,
+            audit=basket_audit,
+        )
         runtime = AccountRuntime(
-            account, broker, orders, book, risk, throttle, switch, reconciler, loss_watch, algos
+            account,
+            broker,
+            orders,
+            book,
+            risk,
+            throttle,
+            switch,
+            reconciler,
+            loss_watch,
+            algos,
+            baskets,
         )
         self.accounts[account.id] = runtime
         return runtime

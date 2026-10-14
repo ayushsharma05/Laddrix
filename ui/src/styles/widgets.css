@@ -1145,3 +1145,32 @@ label.algo-field {
 .strategy-stats b {
   color: var(--text);
 }
+
+.basket {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: #1b2129;
+  border: 1px solid var(--border);
+}
+.basket-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.basket-bar select {
+  height: 22px;
+}
+.basket-check {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.btn.small.danger-confirm:not(:disabled) {
+  color: #fff;
+  background: var(--bid);
+  border-color: var(--work-buy);
+}
