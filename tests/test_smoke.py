@@ -1,2 +1,5 @@
-def test_smoke():
-  assert 1 + 1 == 2
+import mocktrade
+
+
+def test_package_imports():
+    assert mocktrade.__version__

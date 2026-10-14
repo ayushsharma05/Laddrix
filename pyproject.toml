@@ -1,0 +1,19 @@
+[project]
+name = "mocktrade"
+version = "0.1.0"
+description = "A multi-user, broker-agnostic trading platform for NSE/BSE (first broker: Zerodha Kite Connect)."
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

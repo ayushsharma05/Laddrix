@@ -218,3 +218,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# MockTrade: never commit secrets, tokens or local data
+.env
+*.env
+secrets/
+data/
+*.db
+*.sqlite3
+kite_token*
