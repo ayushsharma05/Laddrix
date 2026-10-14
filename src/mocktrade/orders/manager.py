@@ -311,6 +311,42 @@ class OrderManager:
             raise OrderError(f"order {client_order_id} is already {order.status.value.lower()}")
         return order
 
+    # --- restart ------------------------------------------------------------------------------
+
+    def restore(self, views: Iterable[OrderView]) -> int:
+        """Load orders saved before a restart (from the event log). Call before `run` and
+        then `reconcile` with the broker's list. Returns how many were loaded.
+
+        An order that was PENDING without a broker id may or may not have reached the
+        broker when we stopped, so it comes back UNCONFIRMED: reconcile decides.
+        """
+        loaded = 0
+        for view in views:
+            if view.client_order_id in self._orders or view.request.account_id != self.account_id:
+                continue
+            pending = view.pending
+            if view.status is S.PENDING and view.broker_order_id is None:
+                pending = Pending.UNCONFIRMED
+            order = _Order(
+                request=view.request,
+                created_at=view.created_at,
+                updated_at=view.updated_at,
+                broker_order_id=view.broker_order_id,
+                status=view.status,
+                filled_qty=view.filled_qty,
+                avg_price_paise=view.avg_price_paise,
+                reason=view.reason,
+                pending=pending,
+                sent=True,
+                cancel_requested=pending is Pending.CANCEL,
+                cancel_sent=pending is Pending.CANCEL,
+            )
+            self._orders[view.client_order_id] = order
+            if view.broker_order_id:
+                self._by_broker_id[view.broker_order_id] = order
+            loaded += 1
+        return loaded
+
     # --- broker updates ---------------------------------------------------------------------
 
     async def run(self) -> None:
