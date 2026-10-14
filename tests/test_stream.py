@@ -461,3 +461,66 @@ async def test_ops_alerts_reach_every_screen_and_new_screens_see_the_active_ones
         cleared = await next_of(ws, "ops")
         assert (cleared["key"], cleared["level"], cleared["active"]) == ("prices", "OK", False)
     await client.aclose()
+
+
+# --- option chains ---
+
+
+def _add_chain(live):
+    from datetime import date
+
+    from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
+
+    exp = date(2026, 10, 27)
+    for k in (24900, 25000, 25100):
+        for kind in (InstrumentKind.CALL, InstrumentKind.PUT):
+            live.store.add(
+                Instrument(
+                    Exchange.NFO, f"NIFTY26OCT{k}{kind.value}", kind, 5, 75, exp, k * 100, "NIFTY"
+                )
+            )
+    return exp.isoformat()
+
+
+async def test_an_option_chain_streams_at_once_then_at_most_once_per_interval(live):
+    expiry = _add_chain(live)
+    live.hub.chain_interval_s = 0.2
+    client = await live.session()
+    async with live.stream(client) as ws:
+        await ws.send(
+            json.dumps({"op": "chain", "underlying": "NIFTY", "expiry": expiry, "strikes": 1})
+        )
+        first = await next_of(ws, "chain")
+        assert first["underlying"] == "NIFTY" and first["atm_strike_paise"] == 2500000
+        assert [r["strike_paise"] for r in first["rows"]] == [2490000, 2500000, 2510000]
+        for n in range(30):  # a burst of prices for 0.6 s
+            live.md.on_tick(Tick(FUT, 2501000 + 10 * n))
+            await asyncio.sleep(0.02)
+        updates = await all_of(ws, "chain", quiet=0.5)
+        assert 2 <= len(updates) <= 5  # throttled, and the newest arrives
+        assert updates[-1]["forward_paise"] == 2501290
+        await ws.send(json.dumps({"op": "chain_stop", "underlying": "NIFTY", "expiry": expiry}))
+        await asyncio.sleep(0.1)
+        live.md.on_tick(Tick(FUT, 2502000))
+        assert await all_of(ws, "chain", quiet=0.5) == []
+    await client.aclose()
+
+
+async def test_chain_requests_are_checked(live):
+    expiry = _add_chain(live)
+    client = await live.session()
+    async with live.stream(client) as ws:
+        await ws.send(json.dumps({"op": "chain", "underlying": "NIFTY", "expiry": "2030-01-01"}))
+        assert "no options on NIFTY" in (await next_of(ws, "error"))["message"]
+        await ws.send(json.dumps({"op": "chain", "underlying": "NIFTY", "expiry": "soon"}))
+        assert "expiry date" in (await next_of(ws, "error"))["message"]
+        for under in ("NIFTY", "NIFTY"):  # the same chain twice replaces, it doesn't add
+            await ws.send(json.dumps({"op": "chain", "underlying": under, "expiry": expiry}))
+        await next_of(ws, "chain")
+    r = await client.get(f"/api/options/NIFTY/{expiry}/chain", params={"strikes": 1})
+    assert r.status_code == 200 and len(r.json()["rows"]) == 3
+    assert (await client.get("/api/options/NIFTY/expiries")).json() == [expiry]
+    assert (await client.get("/api/options")).json() == ["NIFTY"]
+    assert (await client.get("/api/options/NIFTY/2030-01-01/chain")).status_code == 404
+    assert (await client.get("/api/options/NIFTY/soon/chain")).status_code == 422
+    await client.aclose()

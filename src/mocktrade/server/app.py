@@ -19,6 +19,7 @@ import time
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any, Protocol
@@ -36,6 +37,7 @@ from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Vali
 from mocktrade.metrics import METRICS, process_gauges, since_us
 from mocktrade.ops.alerts import Alerts, alert_to_dict
 from mocktrade.ops.scheduler import Scheduler
+from mocktrade.options.chain import ChainService
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
@@ -155,8 +157,14 @@ def create_app(
     static_dir: Path | None = None,
 ) -> FastAPI:
     app = FastAPI(title="MockTrade", docs_url=None, redoc_url=None, openapi_url=None)
+    chains = ChainService(platform.instruments, platform.market_data)
     hub = StreamHub(
-        platform, users, origin=settings.origin, cookie_name=settings.cookie_name, alerts=alerts
+        platform,
+        users,
+        origin=settings.origin,
+        cookie_name=settings.cookie_name,
+        alerts=alerts,
+        chains=chains,
     )
     app.state.hub = hub
     METRICS.gauge("stream_connections", lambda: hub.connections)
@@ -223,6 +231,28 @@ def create_app(
         if format == "prometheus":
             return Response(METRICS.prometheus(), media_type="text/plain; version=0.0.4")
         return METRICS.snapshot()
+
+    # --- options -------------------------------------------------------------------------------
+
+    @app.get("/api/options")
+    async def option_underlyings(user: Me) -> list[str]:
+        return chains.underlyings()
+
+    @app.get("/api/options/{underlying}/expiries")
+    async def option_expiries(underlying: str, user: Me) -> list[str]:
+        return [e.isoformat() for e in chains.expiries(underlying)]
+
+    @app.get("/api/options/{underlying}/{expiry}/chain")
+    async def option_chain(
+        underlying: str, expiry: str, user: Me, strikes: int = 15
+    ) -> dict[str, Any]:
+        try:
+            day = date.fromisoformat(expiry)
+        except ValueError:
+            raise HTTPException(422, "expiry must be a date like 2026-10-27") from None
+        if day not in chains.expiries(underlying):
+            raise HTTPException(404, f"no options on {underlying} expiring {expiry}")
+        return chains.snapshot(underlying, day, max(1, min(strikes, 40)))
 
     @app.get("/api/ops")
     async def ops(user: Me) -> dict[str, Any]:

@@ -5,7 +5,9 @@ live only here, as a two-way mapping per broker, so the rest of MockTrade only
 ever sees our ids ("NSE:RELIANCE").
 """
 
-from mocktrade.domain.instruments import Instrument, InstrumentId
+from mocktrade.domain.instruments import Instrument, InstrumentId, InstrumentKind
+
+_DERIVATIVES = (InstrumentKind.FUTURE, InstrumentKind.CALL, InstrumentKind.PUT)
 
 
 class InstrumentStore:
@@ -13,6 +15,8 @@ class InstrumentStore:
         self._by_id: dict[InstrumentId, Instrument] = {}
         self._to_ours: dict[tuple[str, str], InstrumentId] = {}  # (broker, broker ref) -> our id
         self._to_broker: dict[tuple[str, InstrumentId], str] = {}  # (broker, our id) -> broker ref
+        # underlying -> its futures and options (the option chain reads these, not a full scan)
+        self._derivatives: dict[str, dict[InstrumentId, Instrument]] = {}
 
     def __len__(self) -> int:
         return len(self._by_id)
@@ -20,6 +24,8 @@ class InstrumentStore:
     def add(self, instrument: Instrument) -> None:
         """Add or replace an instrument (the daily refresh replaces yesterday's)."""
         self._by_id[instrument.id] = instrument
+        if instrument.underlying and instrument.kind in _DERIVATIVES:
+            self._derivatives.setdefault(instrument.underlying, {})[instrument.id] = instrument
 
     def get(self, instrument_id: InstrumentId) -> Instrument | None:
         return self._by_id.get(instrument_id)
@@ -41,6 +47,18 @@ class InstrumentStore:
     def to_broker(self, broker: str, instrument_id: InstrumentId) -> str | None:
         """The broker's identifier for our id, or None if that broker doesn't list it."""
         return self._to_broker.get((broker, instrument_id))
+
+    def derivatives(self, underlying: str) -> list[Instrument]:
+        """Every future and option on an underlying ("NIFTY")."""
+        return list(self._derivatives.get(underlying, {}).values())
+
+    def underlyings(self) -> list[str]:
+        """Underlyings that have options listed."""
+        return sorted(
+            u
+            for u, items in self._derivatives.items()
+            if any(i.kind is not InstrumentKind.FUTURE for i in items.values())
+        )
 
     def search(self, text: str, limit: int = 20) -> list[Instrument]:
         """Instruments whose symbol starts with `text` (case-insensitive), shortest first."""

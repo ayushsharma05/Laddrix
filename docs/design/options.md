@@ -27,3 +27,25 @@
 - **Tests:** a textbook value (Hull), put–call parity, Greeks against finite differences, and
   IV round trips from 10 minutes to 1 year, from deep ITM to deep OTM. A mutation check
   catches 16 of 16 formula changes.
+
+## Option chain (`options/chain.py`, #190)
+
+| API | |
+|---|---|
+| `GET /api/options` | underlyings with listed options |
+| `GET /api/options/{underlying}/expiries` | expiry dates, nearest first (expired ones never) |
+| `GET /api/options/{underlying}/{expiry}/chain?strikes=15` | a snapshot: ATM ± 15 strikes |
+| stream `{"op":"chain","underlying","expiry","strikes"}` → `{"type":"chain",…}` | at once, then at most once a second while anything in it changes; `chain_stop` ends it; 2 per screen |
+
+- **Each row (call and put):** LTP, bid/ask, volume, OI, change in OI, IV, delta, gamma, theta,
+  vega.
+- **The chain:** the forward, ATM strike, days to expiry, rate, PCR (by OI of the shown strikes),
+  max pain and ATM IV.
+- **Change in OI** is measured from the first OI seen today. Kite's feed has no previous-day
+  OI, and the screen says so.
+- **Streaming:** a chain subscribes only ATM ± N strikes plus the futures, through MarketData's
+  demand hook, and follows the ATM as the market moves. A NIFTY chain never uses up the
+  feed's 3000-token budget.
+- **The simulator** prices options from their future with Black-76 and a volatility smile,
+  plus open interest. So the demo's chain behaves like a real one: about 12% IV at the
+  money, a put skew, and put–call parity holding.

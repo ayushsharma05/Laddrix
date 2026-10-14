@@ -25,6 +25,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any, NamedTuple
 
 import orjson
@@ -36,6 +37,7 @@ from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import Subscription
 from mocktrade.metrics import METRICS, since_us
 from mocktrade.ops.alerts import Alert, Alerts, alert_to_dict
+from mocktrade.options.chain import ChainService, ChainWatch
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import EventKind, OrderEvent
 from mocktrade.platform import AccountRuntime, Platform
@@ -55,6 +57,9 @@ CLOSE_TOO_SLOW = 4408
 NOT_SENT = {EventKind.IGNORED}  # audit-only events stay in the event log
 
 
+MAX_CHAINS = 2  # option chains streaming per screen connection
+
+
 @dataclass(eq=False)  # each connection is its own object: compared by identity
 class _Connection:
     user: User
@@ -66,6 +71,7 @@ class _Connection:
     pnl: dict[str, int] = field(default_factory=dict)  # account -> day P&L, newest
     too_slow: asyncio.Event = field(default_factory=asyncio.Event)
     positions_changed: asyncio.Event = field(default_factory=asyncio.Event)
+    chains: dict[tuple[str, str], asyncio.Task] = field(default_factory=dict)  # option chains
 
     def put(self, message: "dict[str, Any] | _Raw", since_ns: int = 0) -> None:
         """Queue a message; `since_ns` is when its cause happened (default: now)."""
@@ -91,6 +97,7 @@ class StreamHub:
         recheck_s: float = 60.0,
         clock: Callable[[], float] = time.monotonic,
         alerts: Alerts | None = None,
+        chains: ChainService | None = None,
     ) -> None:
         self._clock = clock
         self._platform = platform
@@ -107,6 +114,8 @@ class StreamHub:
         for runtime in platform.accounts.values():
             self.attach(runtime)
         self._alerts = alerts
+        self._chains = chains
+        self.chain_interval_s = 1.0
         if alerts is not None:
             alerts.subscribe(self._on_ops)
 
@@ -181,6 +190,8 @@ class StreamHub:
             await asyncio.gather(*tasks, return_exceptions=True)
             self._connections.discard(connection)
             connection.ticks.close()
+            for chain in connection.chains.values():
+                chain.cancel()
 
     async def _send(self, websocket: WebSocket, connection: _Connection) -> None:
         while True:
@@ -209,8 +220,45 @@ class StreamHub:
                     connection.put({"type": "pong"})
                 elif op in ("subscribe", "unsubscribe"):
                     self._change_subscription(connection, op, message.get("instruments"))
+                elif op in ("chain", "chain_stop"):
+                    self._change_chain(connection, op, message)
                 else:
                     connection.put({"type": "error", "message": "unknown message"})
+
+    def _change_chain(self, connection: _Connection, op: str, message: dict) -> None:
+        """Start or stop an option chain: {"op": "chain", "underlying", "expiry", "strikes"}."""
+        underlying, expiry_text = message.get("underlying"), message.get("expiry")
+        key = (str(underlying), str(expiry_text))
+        old = connection.chains.pop(key, None)
+        if old is not None:
+            old.cancel()
+        if op == "chain_stop":
+            return
+        try:
+            expiry = date.fromisoformat(str(expiry_text))
+            strikes = int(message.get("strikes", 15))
+        except (TypeError, ValueError):
+            connection.put({"type": "error", "message": "chain needs an expiry date and strikes"})
+            return
+        if self._chains is None or expiry not in self._chains.expiries(str(underlying)):
+            connection.put({"type": "error", "message": f"no options on {underlying} {expiry}"})
+            return
+        if len(connection.chains) >= MAX_CHAINS:
+            connection.put({"type": "error", "message": f"at most {MAX_CHAINS} chains at a time"})
+            return
+        watch = self._chains.watch(str(underlying), expiry, max(1, min(strikes, 40)))
+        connection.chains[key] = asyncio.create_task(self._stream_chain(connection, watch))
+
+    async def _stream_chain(self, connection: _Connection, watch: ChainWatch) -> None:
+        """The chain at once, then at most once a second while anything in it changes:
+        IVs and Greeks don't need tick speed, and a 60-row chain is a big message."""
+        try:
+            while True:
+                connection.put({"type": "chain", **watch.snapshot()})
+                await asyncio.sleep(self.chain_interval_s)
+                await watch.subscription.wait()
+        finally:
+            watch.close()
 
     def _change_subscription(self, connection: _Connection, op: str, ids: Any) -> None:
         if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
