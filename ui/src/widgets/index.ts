@@ -8,3 +8,4 @@ import "./books/Messages";
 import "./ticket/Ticket";
 import "./algos/AlgoManager";
 import "./chain/OptionChain";
+import "./strategy/StrategyBuilder";

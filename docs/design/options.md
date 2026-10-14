@@ -49,3 +49,29 @@
 - **The simulator** prices options from their future with Black-76 and a volatility smile,
   plus open interest. So the demo's chain behaves like a real one: about 12% IV at the
   money, a put skew, and put–call parity holding.
+
+## Strategy builder (`options/strategy.py`, #192)
+
+| API | |
+|---|---|
+| `GET /api/options/strategies` | the templates (legs relative to the ATM) and their parameters |
+| `POST /api/options/strategy/build` `{code, underlying, expiry, width, lots}` | real contracts around the ATM, analysed |
+| `POST /api/options/strategy/analyse` `{legs: [{instrument_id, side, lots, price_paise?}]}` | the analysis |
+
+- **Templates:** long and short straddle, long and short strangle, bull call, bear put, bull put
+  and bear call spreads, iron condor, iron butterfly, call butterfly, and the 1×2 call ratio.
+  A new template is a server change only.
+- **Analysis (whole position, ₹):**
+  - payoff at expiry and today over ±2σ (always taking in every strike);
+  - exact breakevens (the expiry payoff is linear between strikes);
+  - max profit and max loss, "unlimited" when the slope above the top strike says so;
+  - net premium (credit or debit) and net Greeks.
+- **Calendars:** valued at the nearest expiry, with the later legs priced by Black-76 at their
+  current IV, so the payoff is a curve rather than a hockey stick.
+- **Screen:** template, width and lots, then Build. Legs can be flipped, resized or removed.
+  Alt-click in the option chain adds a buy leg (Alt+Shift a sell), and opens a builder if
+  none is open. The chart is the server's curves, scaled. The analysis refreshes every 3 s
+  while open.
+- **Tests:** iron condor, straddle, ratio spread and butterfly checked by hand; the today curve
+  meets the expiry payoff at the close; Greeks add up; calendars. A mutation check catches
+  13 of 13 changes.

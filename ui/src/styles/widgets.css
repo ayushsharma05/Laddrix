@@ -1029,3 +1029,119 @@ label.algo-field {
 .chain-foot b {
   color: var(--text);
 }
+
+/* --- strategy builder (K8.4) -------------------------------------------------------------------- */
+
+.strategy {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-variant-numeric: tabular-nums;
+}
+.strategy-bar select,
+.strategy-num input {
+  height: 22px;
+}
+.strategy-num {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.strategy-num input {
+  width: 34px;
+  padding: 0 4px;
+  color: var(--text);
+  background: var(--well);
+  border: 1px solid #3a4452;
+}
+.strategy-view {
+  padding: 3px 8px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.strategy-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px;
+}
+.strategy-leg {
+  display: grid;
+  grid-template-columns: 48px 70px 170px 90px 60px 22px;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  font-size: 12px;
+}
+.seg-side {
+  height: 20px;
+  font-weight: 700;
+  background: var(--chrome);
+  border: 1px solid #3a4452;
+  cursor: pointer;
+}
+.strategy-lots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.strategy-lots button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--text);
+  background: var(--chrome);
+  border: 1px solid #3a4452;
+  cursor: pointer;
+}
+.payoff {
+  width: 100%;
+  max-width: 1200px;
+  background: #1b2129;
+  border: 1px solid var(--border);
+}
+.payoff-profit {
+  fill: rgba(56, 193, 114, 0.12);
+}
+.payoff-zero {
+  stroke: #5c6776;
+  stroke-width: 1;
+}
+.payoff-forward {
+  stroke: #ffd666;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.payoff-be {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+.payoff-expiry {
+  fill: none;
+  stroke: #6fa8ff;
+  stroke-width: 2;
+}
+.payoff-today {
+  fill: none;
+  stroke: #c7a6ff;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.payoff-axis {
+  fill: var(--text-3);
+  font-size: 11px;
+}
+.strategy-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.strategy-stats b {
+  color: var(--text);
+}

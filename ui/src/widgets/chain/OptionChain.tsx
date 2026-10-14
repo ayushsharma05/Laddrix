@@ -8,7 +8,8 @@
 //
 // Every number comes from the server's chain (options/chain.py): this screen only draws it.
 // Click a call or put = send it to the link group (the linked ticket or ladder switches to
-// it); ↑/↓ move through strikes, ←/→ switch side, Enter sends the selected one.
+// it); Alt-click = add it as a buy leg to the strategy builder (Alt+Shift: a sell leg);
+// ↑/↓ move through strikes, ←/→ switch side, Enter sends the selected one.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChainRow, OptionChain as Chain } from "../../api/types";
@@ -26,8 +27,8 @@ export interface ChainParams extends BaseParams {
 
 type Side = "call" | "put";
 
-export function OptionChain({ params, setParams, publish }: WidgetProps<ChainParams>) {
-  const { rest, stream } = useApp();
+export function OptionChain({ params, setParams, publish, open }: WidgetProps<ChainParams>) {
+  const { rest, stream, store } = useApp();
   const [underlyings, setUnderlyings] = useState<string[]>([]);
   const [expiries, setExpiries] = useState<string[]>([]);
   const [chain, setChain] = useState<Chain | null>(null);
@@ -79,10 +80,17 @@ export function OptionChain({ params, setParams, publish }: WidgetProps<ChainPar
   }, [chain, strikes]);
   const rows = chain?.rows ?? [];
 
-  const choose = (row: ChainRow, side: Side) => {
+  const choose = (row: ChainRow, side: Side, e?: { altKey: boolean; shiftKey: boolean }) => {
     setSelected({ strike: row.strike_paise, side });
     const leg = row[side];
-    if (leg) publish(leg.instrument_id);
+    if (!leg) return;
+    if (e?.altKey) {
+      // Alt-click: a leg for the strategy builder (Alt+Shift: a sell)
+      store.sendToStrategy({ instrument_id: leg.instrument_id, side: e.shiftKey ? "SELL" : "BUY", lots: 1 });
+      if (!store.hasStrategyBuilder) open("strategy", { link: "none" });
+      return;
+    }
+    publish(leg.instrument_id);
   };
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -207,7 +215,7 @@ function LegCells(props: {
   chain: Chain;
   oiMax: number;
   selected: { strike: number; side: Side } | null;
-  onPick: (row: ChainRow, side: Side) => void;
+  onPick: (row: ChainRow, side: Side, e?: { altKey: boolean; shiftKey: boolean }) => void;
 }) {
   const { row, side, columns, chain, oiMax, selected, onPick } = props;
   const leg = row[side];
@@ -221,7 +229,8 @@ function LegCells(props: {
       style={{ ["--oi" as string]: `${share}%` }}
       disabled={!leg}
       aria-label={leg ? `${side === "call" ? "Call" : "Put"} ${strikeText(row.strike_paise)}` : undefined}
-      onClick={() => onPick(row, side)}
+      onClick={(e) => onPick(row, side, e)}
+      title="Click: to the linked ticket/ladder · Alt-click: buy leg for a strategy · Alt+Shift: sell leg"
     >
       {columns.map((c) => (
         <span key={c.key} className="num">

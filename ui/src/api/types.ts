@@ -285,3 +285,43 @@ export interface OptionChain {
   atm_iv: number | null;
   rows: ChainRow[];
 }
+
+export interface StrategyLegIn {
+  instrument_id: string;
+  side: Side;
+  lots: number;
+  price_paise?: number; // entry price; default: the live mid
+}
+
+export interface StrategyTemplate {
+  code: string;
+  name: string;
+  view: string;
+  legs: { side: Side; kind: string; offset: number; ratio: number }[];
+  params: { name: string; label: string; kind: string; min: number; max: number; default: number }[];
+}
+
+export interface StrategyAnalysis {
+  underlying: string;
+  expiry: string;
+  forward_paise: number;
+  prices: number[]; // rupees
+  payoff_expiry: number[]; // rupees, whole position
+  payoff_today: number[];
+  breakevens: number[];
+  max_profit: number | "unlimited";
+  max_loss: number | "unlimited";
+  net_premium: number; // + = credit
+  net_greeks: { delta: number; gamma: number; theta: number; vega: number };
+  legs: {
+    instrument_id: string;
+    side: Side;
+    lots: number;
+    lot_size: number;
+    strike_paise: number;
+    kind: string;
+    expiry: string;
+    price_paise: number;
+    iv: number | null;
+  }[];
+}

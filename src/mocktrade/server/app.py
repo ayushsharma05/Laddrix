@@ -38,6 +38,8 @@ from mocktrade.metrics import METRICS, process_gauges, since_us
 from mocktrade.ops.alerts import Alerts, alert_to_dict
 from mocktrade.ops.scheduler import Scheduler
 from mocktrade.options.chain import ChainService
+from mocktrade.options.strategy import Strategies, StrategyError
+from mocktrade.options.strategy import templates as strategy_templates_list
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
@@ -133,6 +135,25 @@ class AlgoIn(_Strict):
     params: dict[str, Any] = Field(default_factory=dict)  # checked against the algo's spec
 
 
+class StrategyBuildIn(_Strict):
+    code: str = Field(min_length=1, max_length=40)
+    underlying: str = Field(min_length=1, max_length=40)
+    expiry: date
+    width: int = Field(default=2, ge=1, le=20)
+    lots: int = Field(default=1, ge=1, le=100)
+
+
+class StrategyLegIn(_Strict):
+    instrument_id: str = Field(min_length=3, max_length=64)
+    side: Side
+    lots: int = Field(ge=1, le=1000)
+    price_paise: int | None = Field(default=None, gt=0)  # entry price; default: live mid
+
+
+class StrategyIn(_Strict):
+    legs: list[StrategyLegIn] = Field(min_length=1, max_length=8)
+
+
 class StopIn(_Strict):
     reason: str = Field(min_length=1, max_length=200)
 
@@ -158,6 +179,7 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="MockTrade", docs_url=None, redoc_url=None, openapi_url=None)
     chains = ChainService(platform.instruments, platform.market_data)
+    strategies = Strategies(chains)
     hub = StreamHub(
         platform,
         users,
@@ -253,6 +275,26 @@ def create_app(
         if day not in chains.expiries(underlying):
             raise HTTPException(404, f"no options on {underlying} expiring {expiry}")
         return chains.snapshot(underlying, day, max(1, min(strikes, 40)))
+
+    @app.get("/api/options/strategies")
+    async def strategy_templates(user: Me) -> list[dict[str, Any]]:
+        return strategy_templates_list()
+
+    @app.post("/api/options/strategy/build")
+    async def strategy_build(body: StrategyBuildIn, user: Me) -> dict[str, Any]:
+        try:
+            legs = strategies.build(body.code, body.underlying, body.expiry, body.width, body.lots)
+            return strategies.analyse(legs)
+        except StrategyError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.post("/api/options/strategy/analyse")
+    async def strategy_analyse(body: StrategyIn, user: Me) -> dict[str, Any]:
+        legs = [{**leg.model_dump(exclude_none=True), "side": leg.side.value} for leg in body.legs]
+        try:
+            return strategies.analyse(legs)
+        except StrategyError as exc:
+            raise HTTPException(422, str(exc)) from None
 
     @app.get("/api/ops")
     async def ops(user: Me) -> dict[str, Any]:

@@ -524,3 +524,38 @@ async def test_chain_requests_are_checked(live):
     assert (await client.get("/api/options/NIFTY/2030-01-01/chain")).status_code == 404
     assert (await client.get("/api/options/NIFTY/soon/chain")).status_code == 422
     await client.aclose()
+
+
+async def test_strategy_endpoints(live):
+    expiry = _add_chain(live)
+    for k, p in ((24900, 18000), (25000, 12000), (25100, 8000)):
+        live.md.on_tick(Tick(f"NFO:NIFTY26OCT{k}CE", p))
+        live.md.on_tick(Tick(f"NFO:NIFTY26OCT{k}PE", 12000 - (k - 25000)))
+    client = await live.session()
+    codes = [t["code"] for t in (await client.get("/api/options/strategies")).json()]
+    assert "IRON_CONDOR" in codes and "BULL_CALL_SPREAD" in codes
+    built = await client.post(
+        "/api/options/strategy/build",
+        json={"code": "BULL_CALL_SPREAD", "underlying": "NIFTY", "expiry": expiry, "width": 1},
+    )
+    assert built.status_code == 200, built.text
+    body = built.json()
+    assert [(lg["side"], lg["strike_paise"]) for lg in body["legs"]] == [
+        ("BUY", 2500000),
+        ("SELL", 2510000),
+    ]
+    assert body["net_premium"] == -(120 - 80) * 75 and body["max_profit"] == (100 - 40) * 75
+    legs = [{"instrument_id": "NFO:NIFTY26OCT25000CE", "side": "SELL", "lots": 2}]
+    r = await client.post("/api/options/strategy/analyse", json={"legs": legs})
+    assert r.status_code == 200 and r.json()["max_loss"] == "unlimited"
+    bad = await client.post(
+        "/api/options/strategy/analyse",
+        json={"legs": [{"instrument_id": FUT, "side": "BUY", "lots": 1}]},
+    )
+    assert bad.status_code == 422 and "not a listed option" in bad.json()["detail"]
+    too_wide = await client.post(
+        "/api/options/strategy/build",
+        json={"code": "IRON_CONDOR", "underlying": "NIFTY", "expiry": expiry, "width": 3},
+    )
+    assert too_wide.status_code == 422
+    await client.aclose()

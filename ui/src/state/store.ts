@@ -11,7 +11,7 @@
 // (docs/design/stream.md, "After every (re)connect").
 
 import type { Status } from "../api/stream";
-import type { AlgoView, Me, OrderView, Position, PositionsSnapshot, ServerMessage } from "../api/types";
+import type { AlgoView, Me, OrderView, Position, PositionsSnapshot, ServerMessage, StrategyLegIn } from "../api/types";
 import { price, qty, shortName } from "../lib/format";
 
 export type Level = "ERROR" | "WARN" | "INFO" | "OK";
@@ -54,6 +54,8 @@ export interface State {
   firmKill: KillState;
   /** Operational alerts from the server (Kite login, prices stopped, disk), active ones by key. */
   ops: Record<string, OpsAlert>;
+  /** Legs sent from the option chain (Alt-click) waiting for the strategy builder. */
+  strategyInbox: StrategyLegIn[];
   messages: Message[]; // newest first
   stream: Status;
   sentTimes: number[]; // when we sent orders in the last minute (rate meter)
@@ -96,6 +98,7 @@ export class Store {
       books: {},
       firmKill: OFF,
       ops: {},
+      strategyInbox: [],
       messages: [],
       stream: "stopped",
       sentTimes: [],
@@ -194,6 +197,31 @@ export class Store {
       if (newer(a.updated_at, merged[a.algo_id]?.updated_at)) merged[a.algo_id] = a;
     }
     this.setBook(accountId, { algos: merged });
+  }
+
+  // --- the strategy builder's inbox -----
+  private strategyBuilders = 0;
+
+  sendToStrategy(leg: StrategyLegIn): void {
+    this.set({ strategyInbox: [...this.state.strategyInbox, leg] });
+  }
+
+  takeStrategyInbox(): StrategyLegIn[] {
+    const legs = this.state.strategyInbox;
+    if (legs.length) this.set({ strategyInbox: [] });
+    return legs;
+  }
+
+  /** A builder is open (the chain opens one when none is). Returns the unregister. */
+  registerStrategyBuilder(): () => void {
+    this.strategyBuilders += 1;
+    return () => {
+      this.strategyBuilders -= 1;
+    };
+  }
+
+  get hasStrategyBuilder(): boolean {
+    return this.strategyBuilders > 0;
   }
 
   // --- the stream -----------------------------------------------------------------------------
