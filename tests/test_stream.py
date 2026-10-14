@@ -3,6 +3,7 @@
 import asyncio
 import json
 import socket
+import time
 from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlparse
 
@@ -184,6 +185,42 @@ async def test_prices_are_conflated_newest_wins(live):
         await asyncio.sleep(0.1)
         live.md.on_tick(Tick(FUT, 2501040))
         assert await all_of(ws, "ticks") == []
+    await client.aclose()
+
+
+async def test_a_price_change_after_a_quiet_spell_goes_out_at_once(live):
+    """No added latency: with the real 250 ms interval, a lone tick doesn't wait for a timer."""
+    live.hub.flush_s = 0.25
+    client = await live.session()
+    async with live.stream(client) as ws:
+        await ws.send(json.dumps({"op": "subscribe", "instruments": [FUT]}))
+        await next_of(ws, "ticks")  # the current price
+        delays = []
+        for n in range(5):
+            await asyncio.sleep(0.3)  # quiet: longer than the interval, like Kite's ~1 tick/s
+            sent = time.perf_counter()
+            live.md.on_tick(Tick(FUT, 2501010 + 10 * n))
+            batch = await next_of(ws, "ticks")
+            delays.append(time.perf_counter() - sent)
+            assert batch["ticks"][0]["ltp_paise"] == 2501010 + 10 * n
+    assert max(delays) < 0.05, delays  # a fixed 250 ms timer would average ~125 ms
+    await client.aclose()
+
+
+async def test_a_burst_still_sends_at_most_one_update_per_interval(live):
+    live.hub.flush_s = 0.25
+    client = await live.session()
+    async with live.stream(client) as ws:
+        await ws.send(json.dumps({"op": "subscribe", "instruments": [FUT]}))
+        await next_of(ws, "ticks")
+        start = time.perf_counter()
+        for n in range(30):  # 30 ticks over ~0.6 s
+            live.md.on_tick(Tick(FUT, 2502000 + 10 * n))
+            await asyncio.sleep(0.02)
+        batches = await all_of(ws, "ticks", quiet=0.4)
+        elapsed = time.perf_counter() - start
+    assert 2 <= len(batches) <= int(elapsed / 0.25) + 2  # throttled, not one per tick
+    assert batches[-1]["ticks"][0]["ltp_paise"] == 2502290  # the newest always arrives
     await client.aclose()
 
 

@@ -1,12 +1,14 @@
 """The live stream to the browser: one WebSocket per tab.
 
-    prices    ─► per-connection subscription (newest wins) ─┐ every 250 ms: one "ticks"
-    positions ─► newest per position                        ─┤ and one "positions" batch
+    prices    ─► per-connection subscription (newest wins) ─┐ at once if quiet, else at
+    positions ─► newest per position                        ─┤ most once per 250 ms
     orders, kill switches, alerts ─► sent at once, in order ─┴─► queue ─► one sender ─► socket
 
 Rules:
-- Prices and positions are conflated: at most one update per instrument (or
-  position) per 250 ms, the newest. Order events are NEVER conflated or dropped.
+- Prices and positions go out **at once** when nothing was sent in the last 250 ms (the
+  usual case: Kite sends about one tick per second per instrument), so we add no wait.
+  In a burst they are conflated: at most one update per instrument (or position) per
+  250 ms, the newest. Order events are NEVER conflated or dropped.
 - Each connection has a bounded queue. A browser too slow to keep up is
   disconnected ("too slow"), never silently skipped: the page reconnects and loads
   fresh snapshots from the API, so nothing is ever missing without it knowing.
@@ -20,6 +22,8 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -57,6 +61,7 @@ class _Connection:
     positions: dict[tuple[str, str, str], dict[str, Any]] = field(default_factory=dict)
     pnl: dict[str, int] = field(default_factory=dict)  # account -> day P&L, newest
     too_slow: asyncio.Event = field(default_factory=asyncio.Event)
+    positions_changed: asyncio.Event = field(default_factory=asyncio.Event)
 
     def put(self, message: dict[str, Any]) -> None:
         if self.too_slow.is_set():
@@ -79,7 +84,9 @@ class StreamHub:
         queue_limit: int = 2000,
         max_instruments: int = 200,
         recheck_s: float = 60.0,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
+        self._clock = clock
         self._platform = platform
         self._users = users
         self._origin = origin
@@ -208,12 +215,21 @@ class StreamHub:
         connection.ticks.add(new)
 
     async def _flush(self, connection: _Connection) -> None:
-        """Every flush interval: the newest price per instrument, the newest positions."""
+        """Send price and position changes as soon as they come, but never more than once per
+        flush interval: the first change after a quiet spell goes out at once (no added
+        latency); changes during a burst wait for the rest of the interval and only the
+        newest is sent (a slow browser is never flooded)."""
+        last = float("-inf")
         while True:
-            await asyncio.sleep(self.flush_s)
+            await self._changed(connection)
+            wait = last + self.flush_s - self._clock()
+            if wait > 0:
+                await asyncio.sleep(wait)  # a burst: collect, newest wins
+            last = self._clock()
             ticks = connection.ticks.drain()
             if ticks:
                 connection.put({"type": "ticks", "ticks": [_tick(t) for t in ticks]})
+            connection.positions_changed.clear()
             if connection.positions:
                 by_account: dict[str, list[dict[str, Any]]] = {}
                 for (account_id, _, _), position in connection.positions.items():
@@ -228,6 +244,21 @@ class StreamHub:
                             "day_pnl_paise": connection.pnl.get(account_id, 0),
                         }
                     )
+
+    @staticmethod
+    async def _changed(connection: _Connection) -> None:
+        """Wait until a price or a position has something new for this connection."""
+        if connection.positions:
+            return
+        waits = [
+            asyncio.ensure_future(connection.ticks.wait()),
+            asyncio.ensure_future(connection.positions_changed.wait()),
+        ]
+        try:
+            await asyncio.wait(waits, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            for w in waits:
+                w.cancel()
 
     async def _watch_session(self, connection: _Connection) -> None:
         """Returns (ending the stream) once the session is gone: logout, expiry, disabling."""
@@ -265,6 +296,7 @@ class StreamHub:
             if account_id in connection.accounts:
                 connection.positions[key] = data  # newest wins
                 connection.pnl[account_id] = pnl
+                connection.positions_changed.set()
 
     def _on_kill(self, name: str, state: KillState) -> None:
         message = {

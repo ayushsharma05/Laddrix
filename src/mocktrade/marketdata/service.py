@@ -52,6 +52,12 @@ class Subscription:
         self._ready.clear()
         return ticks
 
+    async def wait(self) -> None:
+        """Wait until there is something unread (without taking it), or the subscription closes."""
+        while not self._pending and not self.closed:
+            self._ready.clear()
+            await self._ready.wait()
+
     async def next_batch(self) -> list[Tick]:
         """Wait until something changes, then take every unread tick."""
         while not self._pending:

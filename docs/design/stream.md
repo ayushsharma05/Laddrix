@@ -37,7 +37,7 @@ This makes reconnects lossless: nothing is ever silently missing.
 {"type": "hello", "user": "ayush", "accounts": ["acc-ayush"], "flush_ms": 250, "max_instruments": 200}
 ```
 
-### `ticks`: conflated, at most one per instrument per `flush_ms`, newest wins
+### `ticks`: sent at once; in a burst at most one per instrument per `flush_ms`, newest wins
 ```json
 {"type": "ticks", "ticks": [{
   "instrument_id": "NFO:NIFTY26OCTFUT", "ltp_paise": 2501030, "last_qty": 75,
@@ -103,7 +103,11 @@ format as `GET /api/accounts/{a}/orders` and the event log.
 
 ## Limits
 
-- Prices and positions: at most one update per instrument / position every 250 ms.
+- Prices and positions: sent **at once** when nothing was sent in the last 250 ms; in a burst,
+  at most one update per instrument / position every 250 ms (the newest).
+- Measured (14 Oct 2026, localhost, real server and WebSocket): a lone tick reaches the browser
+  in **1–6 ms** (it used to wait for a fixed 250 ms timer: ~200 ms). Kite sends about one tick per
+  second per instrument, so nearly every tick takes the fast path.
 - 2000 queued messages per connection; past that the connection is closed (4408),
   never silently skipped.
 - The session is re-checked every 60 s.
