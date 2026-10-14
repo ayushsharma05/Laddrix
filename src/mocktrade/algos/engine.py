@@ -23,7 +23,7 @@ Every state change is audited in the event log and pushed to listeners (the scre
 import asyncio
 import contextlib
 import logging
-from collections.abc import Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -76,6 +76,7 @@ class AlgoView:
     children: tuple[str, ...]
     reason: str
     status: str  # what it's doing now, in words (from the strategy)
+    extra: dict[str, Any]  # the strategy's own figures for the screen (e.g. a spread's legs)
     created_at: datetime
     updated_at: datetime
 
@@ -120,6 +121,18 @@ class BaseStrategy:
     def on_resume(self, ctx: "AlgoContext") -> None:
         pass
 
+    def done(self, ctx: "AlgoContext") -> bool:
+        """Finished when the main leg is fully filled (a spread also waits for its hedge)."""
+        return ctx.filled(ctx.instrument_id) >= ctx.qty
+
+    def keep_on_stop(self, ctx: "AlgoContext", child: OrderView) -> bool:
+        """Children to leave working on pause/stop (a spread keeps its hedges)."""
+        return False
+
+    def on_finish(self, ctx: "AlgoContext") -> str | None:
+        """A warning to add when the algo ends (e.g. a spread left unhedged), or None."""
+        return None
+
 
 StrategyFactory = Callable[[dict[str, Any]], Strategy]
 
@@ -157,10 +170,12 @@ class _Parent:
     state: AlgoState = AlgoState.WORKING
     reason: str = ""
     status: str = ""
+    extra: dict[str, Any] = field(default_factory=dict)
     children: list[str] = field(default_factory=list)
     rejects_in_a_row: int = 0
     instruments: set[str] = field(default_factory=set)  # prices it wants (legs)
     final: AlgoState = AlgoState.STOPPED  # the state it ends in once its children are gone
+    gave_up: bool = False  # failing: nothing more is sent, not even hedges
     # Sent but not yet seen by the order manager (its SUBMITTED event registers them):
     in_flight: int = 0  # how many child orders
     in_flight_qty: int = 0  # their quantity on the main leg (counts against the parent)
@@ -240,12 +255,15 @@ class AlgoContext:
         order_type: OrderType = OrderType.LIMIT,
         validity: Validity = Validity.DAY,
         check_remaining: bool = True,
+        hedge: bool = False,
     ) -> bool:
         """Send a child order. False (and nothing sent) if the algo isn't working, is held,
         or the child would take the main leg past the parent's quantity."""
         p = self._parent
-        if p.state is not AlgoState.WORKING or self.held or qty <= 0:
+        if qty <= 0 or p.state.is_final or p.gave_up:
             return False
+        if not hedge and (p.state is not AlgoState.WORKING or self.held):
+            return False  # hedges (risk-reducing) still go out while paused or stopping
         leg = instrument_id or p.instrument_id
         if check_remaining and leg == p.instrument_id and qty > self.remaining():
             return False
@@ -277,19 +295,26 @@ class AlgoContext:
     ):
         if self._parent.state is not AlgoState.WORKING:
             return
+        manager = self._engine.manager
         self._engine.spawn(
             self._engine.quiet(
-                self._engine.manager.modify(client_order_id, price_paise=price_paise, qty=qty)
+                lambda: manager.modify(client_order_id, price_paise=price_paise, qty=qty)
             )
         )
 
     def cancel(self, client_order_id: str) -> None:
-        self._engine.spawn(self._engine.quiet(self._engine.manager.cancel(client_order_id)))
+        self._engine.spawn(self._engine.quiet(lambda: self._engine.manager.cancel(client_order_id)))
 
     def watch(self, *instrument_ids: str) -> None:
         """Get on_tick for these instruments too (e.g. a spread's other leg)."""
         self._parent.instruments.update(instrument_ids)
         self._engine.watch(instrument_ids)
+
+    def report(self, **figures: Any) -> None:
+        """Figures for the algo screen (e.g. legs filled, unhedged quantity)."""
+        if any(self._parent.extra.get(k) != v for k, v in figures.items()):
+            self._parent.extra.update(figures)
+            self._engine.changed(self._parent, "UPDATED")
 
     def say(self, status: str) -> None:
         """What the algo is doing now, in words, for the algo screen."""
@@ -454,7 +479,7 @@ class AlgoEngine:
             if o.request.parent_id is not None and o.request.parent_id not in self._parents
         ]
         for client_order_id in orphans:
-            await self.quiet(self.manager.cancel(client_order_id))
+            await self.quiet(lambda cid=client_order_id: self.manager.cancel(cid))
         return orphans
 
     # --- running ------------------------------------------------------------------------------
@@ -490,8 +515,10 @@ class AlgoEngine:
 
     async def settle(self) -> None:
         """Wait for every order call the strategies made (tests)."""
-        while self._tasks:
-            await asyncio.gather(*list(self._tasks))
+        while pending := [t for t in self._tasks if not t.done()]:
+            # only unfinished tasks: awaiting finished ones never yields to the event loop,
+            # so their clean-up callbacks would never run and this would spin forever
+            await asyncio.gather(*pending)
 
     # --- for the context and the strategies ----------------------------------------------------
 
@@ -501,10 +528,11 @@ class AlgoEngine:
         task.add_done_callback(self._tasks.discard)
 
     @staticmethod
-    async def quiet(coroutine) -> None:
-        """Modify/cancel from an algo: a refusal (already filled, too late) is not an error."""
+    async def quiet(make: Callable[[], Awaitable[Any]]) -> None:
+        """Modify/cancel from an algo: a refusal (already filled, too late) is not an error.
+        Takes a function that makes the call, so nothing is created if the task never runs."""
         with contextlib.suppress(OrderError):
-            await coroutine
+            await make()
 
     def watch(self, instrument_ids: Iterable[str]) -> None:
         self._subscription.add(instrument_ids)
@@ -528,6 +556,7 @@ class AlgoEngine:
             return
         p.reason = reason
         p.final = final
+        p.gave_up = final is AlgoState.FAILED
         p.state = AlgoState.STOPPING
         self._pull(p)
         self.changed(p, "STOPPING", reason)
@@ -544,15 +573,32 @@ class AlgoEngine:
         return p
 
     def _pull(self, p: _Parent) -> None:
+        ctx = AlgoContext(self, p)
         for child in self.children(p):
-            if not child.status.is_final and child.pending is not Pending.CANCEL:
-                self.spawn(self.quiet(self.manager.cancel(child.client_order_id)))
+            if child.status.is_final or child.pending is Pending.CANCEL:
+                continue
+            try:
+                keep = p.strategy.keep_on_stop(ctx, child)
+            except Exception:
+                log.exception("algo %s keep_on_stop failed", p.algo_id)
+                keep = False
+            if not keep:
+                cid = child.client_order_id
+                self.spawn(self.quiet(lambda cid=cid: self.manager.cancel(cid)))
 
     def _maybe_stopped(self, p: _Parent) -> None:
         """STOPPING ends once no child is working and none is still on its way in."""
         if p.state is not AlgoState.STOPPING or p.in_flight:
             return
         if not any(not c.status.is_final for c in self.children(p)):
+            try:
+                warning = p.strategy.on_finish(AlgoContext(self, p))
+            except Exception:
+                log.exception("algo %s on_finish failed", p.algo_id)
+                warning = None
+            if warning:
+                p.reason = f"{p.reason}; {warning}" if p.reason else warning
+                self.changed(p, "ALERT", warning)
             p.state = p.final
             self.changed(p, p.state.value, p.reason)
 
@@ -578,23 +624,28 @@ class AlgoEngine:
                 p.in_flight_qty = max(0, p.in_flight_qty - order.request.qty)
             if p.state is not AlgoState.WORKING:
                 # sent just before a pause or stop: pull it straight away
-                self.spawn(self.quiet(self.manager.cancel(order.client_order_id)))
+                self.spawn(self.quiet(lambda: self.manager.cancel(order.client_order_id)))
         if event.kind is EventKind.REJECTED:
             p.rejects_in_a_row += 1
-            if p.rejects_in_a_row >= MAX_REJECTS_IN_A_ROW and p.state is AlgoState.WORKING:
-                self.stop_parent(
-                    p,
-                    f"{MAX_REJECTS_IN_A_ROW} child orders refused in a row; last: {order.reason}",
-                    final=AlgoState.FAILED,
-                )
+            if p.rejects_in_a_row >= MAX_REJECTS_IN_A_ROW and not p.gave_up:
+                why = f"{MAX_REJECTS_IN_A_ROW} child orders refused in a row; last: {order.reason}"
+                if p.state is AlgoState.STOPPING:
+                    # already stopping (e.g. hedges refused under a kill switch): give up
+                    p.gave_up, p.final = True, AlgoState.FAILED
+                    p.reason = f"{p.reason}; {why}" if p.reason else why
+                else:
+                    self.stop_parent(p, why, final=AlgoState.FAILED)
         elif event.kind in (EventKind.SENT, EventKind.FILL):
             p.rejects_in_a_row = 0
-        if p.state is AlgoState.STOPPING:
-            self._maybe_stopped(p)
-            return
         if p.state.is_final:
             return
-        if event.kind is EventKind.FILL and self._main_filled(p) >= p.qty:
+        if p.state in (AlgoState.PAUSED, AlgoState.STOPPING):
+            # fills can still arrive (a cancel crossed a fill): let the strategy hedge them
+            self._call(p, lambda ctx: p.strategy.on_child(ctx, order, event))
+            self._maybe_stopped(p)
+            self.changed(p, "UPDATED", event.kind.value)
+            return
+        if event.kind is EventKind.FILL and self._is_done(p):
             p.reason = "fully filled"
             p.final = AlgoState.DONE
             p.state = AlgoState.STOPPING
@@ -606,6 +657,17 @@ class AlgoEngine:
         if p.state is AlgoState.WORKING:
             self._call(p, lambda ctx: p.strategy.on_child(ctx, order, event))
         self.changed(p, "UPDATED", event.kind.value)
+
+    def _is_done(self, p: _Parent) -> bool:
+        done = getattr(p.strategy, "done", None)
+        if done is None:  # a strategy without BaseStrategy's defaults
+            return self._main_filled(p) >= p.qty
+        try:
+            return bool(done(AlgoContext(self, p)))
+        except Exception as exc:
+            log.exception("algo %s done() failed", p.algo_id)
+            self.stop_parent(p, f"the algo's own code failed: {exc!r}", final=AlgoState.FAILED)
+            return False
 
     def _main_filled(self, p: _Parent) -> int:
         return sum(
@@ -632,6 +694,7 @@ class AlgoEngine:
             children=tuple(p.children),
             reason=p.reason,
             status=p.status,
+            extra=dict(p.extra),
             created_at=p.created_at,
             updated_at=p.updated_at,
         )

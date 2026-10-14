@@ -51,3 +51,28 @@ A big order as equal slices at regular times (time-sliced execution).
   after the plan ("catching up"), never as one big order. (Found by a paper run: risk refused
   ₹94 lakh slices and the first version tried to send everything left in one order.)
 - Pause pulls the working slices; resume sends again at once.
+
+## Spreader (`algos/spreader.py`)
+Trade leg A against leg B at a spread level (A − B), e.g. a NIFTY calendar spread.
+
+```
+buy the spread:  quote A at level + B's best bid   ─► A fills ─► sell B at its bid − pay-up ticks
+sell the spread: quote A at level + B's best ask   ─► A fills ─► buy  B at its ask + pay-up ticks
+B moves ─► re-quote A (24 modifications, then cancel and re-send)
+```
+
+| Setting | Meaning |
+|---|---|
+| Leg B | the other contract (same lot size as A) |
+| Spread (A − B) | the level, may be negative; the quote is rounded so the spread is never worse |
+| Pay-up | ticks the hedge may pay beyond the best price; it never chases further |
+
+- Hedges go out on **every** child update (a state change can report the fill before the FILL
+  event), and only for what isn't covered yet (no double hedges).
+- Pause and stop pull the quote but keep hedges working; a fill that crosses a cancel is still
+  hedged. Hedges may be sent while paused or stopping (they reduce risk).
+- Done only when both legs are complete. If it ends with anything unhedged it raises an
+  **ALERT** ("UNHEDGED: 75 on NFO:NIFTY26OCTFUT … hedge it by hand"), in its reason and the audit.
+- If the broker refuses 3 hedges in a row (e.g. a kill switch), it gives up and ends FAILED with
+  that alert, instead of retrying forever.
+- The screen shows legs filled, unhedged quantity, the spread actually traded and the legging time.
