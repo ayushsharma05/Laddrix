@@ -9,7 +9,7 @@ Everything a new Claude chat needs to continue this project exactly where the la
 
 ## How to continue (a new chat, when Ayush says "continue")
 
-1. Read the four files above (in order), then `CLAUDE.md`.
+1. Read the four files above (in order), then `CLAUDE.md` and `docs/design/product-vision.md`.
 2. **Where things live:** until PR #157 is merged, `CLAUDE.md` and `context/` exist only on the **`kite-architecture`** branch. The code is on stacked branches, one per issue: `k0-foundations` → `k1-live-prices` → `k2-paper-broker` → `k3-1-…` … → `k5-3-ui` → `k5-4-ladder` → `k5-5-screens` → (next). Each new issue = a new branch off the previous one + a PR whose base is that previous branch.
 3. Check the open PRs (CI green? review comments?) and fix anything red first.
 4. Take the "Next" item in `status.md`. Work like the earlier milestones: brainstorm the traps in a table → code → tests (Python `pytest`, `ruff check .`, `ruff format --check .`; UI `cd ui && npm ci && npm run typecheck && npm test && npm run build`) → mutation check → real-browser check against the demo server (`scripts/`) → self-review → push → PR with `Closes #N` and the PR body style used in #170–#172.
@@ -21,6 +21,7 @@ Everything a new Claude chat needs to continue this project exactly where the la
 
 | File or folder | What it is |
 | --- | --- |
+| `../docs/design/product-vision.md` | **Product vision**: principles (replaceable parts, backend provides / frontend displays), feature catalogue, roadmap K8–K13 |
 | `../docs/design/kite-architecture.md` | **Active design (Kite track)**: limits, components, adapter, languages, deployment |
 | [cme-wiki-guide.md](cme-wiki-guide.md) | Beginner guide to CME MDP 3.0 (prices) and iLink 3 (orders), with 3 diagrams |
 | [build-map/](build-map/) | The MockTrade Build Map: `MockTrade-Build-Map.html` (open in a browser) and the generator that rebuilds it |

@@ -42,11 +42,12 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | UI design pass (mockups) | canvas "MockTrade UI design" (claude.ai artifact) | ✅ dense trading terminal; ladder (board 0, interactive) + workspace (board 2) redone; other boards still "old style" |
 | K5.3 UI skeleton: workspace, login, watch list (#145) | #170 (base k5-2-stream) | ✅ CI green after a fix: `ui/src/lib/format.ts` had never been pushed (the Python `.gitignore` ignored every `lib/` folder); rebuilt with tests, `.gitignore` now ignores only `/lib/` |
 | K5.4 Ladder (#146) | #171 (base k5-3-ui) | ✅ CI green; 112 UI + 509 Python tests, 13/13 mutations caught, paper trading checked end to end in a real browser |
-| K5.5 Order book, positions, audit trail, messages (#147) | #172 (base k5-4-ladder) | ✅ 143 UI + 511 Python tests, 13/13 mutations caught, checked end to end in a real browser |
+| K5.5 Order book, positions, audit trail, messages (#147) | #172 (base k5-4-ladder) | ✅ CI green; 143 UI + 511 Python tests, 13/13 mutations caught, checked end to end in a real browser |
+| Order ticket + **order spec** (#173) | #175 (base k5-5-screens, branch k5-5b-ticket) | ✅ 179 UI + 529 Python tests; all order types checked in a real browser |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
-Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
@@ -68,6 +69,9 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 - Mutation testing now uses `scratchpad/mutate.py`-style harness that always restores files (a killed run once left a mutated line; the suite caught it).
 - Ladder (K5.4): PIQ is estimated in the browser with the paper broker's own queue rule (Kite doesn't report it), so paper and live agree; VAP is counted on the server from every tick (`marketdata/vap.py`, `GET /api/instruments/{id}/vap`) and continued from the stream. The browser makes client order ids (a lost "place" answer can't double-place). Cancels are allowed while trading is stopped (`cancelBlock` vs `tradingBlock` in `ui/src/state/gate.ts`). Optional confirm-over (Cfm) per ladder.
 - K5.5: `GET /api/accounts/{a}/events` = the account's audit trail newest first (`EventLog.page`), including its kill switch (`account <id>`) and the firm's. Audit exec types: SUBMITTED=Pending new, SENT=New, FILL=Fill/Partial fill, UPDATED=the new state (Working/Partial/Filled/Cancelled/Rejected), CANCEL_SENT=Pending cancel, MODIFY_SENT=Pending replace, KILL_SWITCH=STOP/Resume. Live audit catches up from the log 300 ms and 2 s after each order event and every 5 s (the log writes in a background thread). Order book and positions "drive" the link group (click = linked ladder switches). Grids scroll sideways in narrow windows. CSV export guards against spreadsheet formulas.
+- **Order spec (#175): backend provides, frontend displays.** `GET /api/accounts/{a}/instruments/{id}/order-spec` (`domain/order_spec.py`) lists the broker's order types by what they need (price/trigger: required|none, market protection: auto|none), validities, named rules (`stop_trigger`, `stop_limit`), `priced_by_click`, plus products, tick, lot, auto protection %. Broker adapters publish `order_spec()` (Kite and paper share `broker/rules.order_spec`); the order manager enforces it. Ticket and ladder draw from it (`useOrderSpec`), nothing hard-coded. Apply the same pattern to everything new (algo parameters, products, limits, permissions).
+- Paper refuses stops whose trigger the market already passed (Kite does too); SL trigger vs limit checked in `OrderRequest.validate`.
+- Ticket "confirm" is derived from the exact order (`armedFor === signature`), not reset by an effect: an effect-based reset caused a timing-dependent test failure.
 - Lesson (K5.3): before pushing, check `git status --ignored` for source files hidden by `.gitignore`.
 - Risk: reducing a position is always allowed (even past limits or the daily loss); worst-case position counts working orders; option selling to open is off by default.
 
@@ -76,11 +80,12 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-1. Ayush merges in order: #123 → #157 → #158 → … → #172.
-2. **Order ticket widget** (canvas board 3, `docs/design/ui.md` §4 "Order ticket"): contract, BUY/SELL, lots, price with −/+ tick buttons, LMT/MKT/SL/SL-M, TIF, product, value + worst-case position + distance from last, "confirm over" inline second click, Enter/Esc/↑↓. It has no issue yet: create one in milestone K5 (label `track: kite`, `comp:ui`) before coding. The default layout already asks for a `ticket` widget (it's skipped until it exists).
-3. Then K5.6 Electron desktop shell (#156), K6 algos (#148–#151, Algo Manager per canvas board 2), K7 deploy (#152–#155).
-4. Redo the remaining "old style" canvas boards (3 ticket, 4 stopped, 5 login, 7 phone) in terminal style when building those screens.
-5. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`.
+1. Ayush merges in order: #123 → #157 → #158 → … → #172 → #175.
+2. **K5.6 Electron desktop app (#156)**: `ui/desktop/`, pop-out widget windows keeping their props, security (context isolation, no Node in pages, our origin only), electron-builder Windows installer config. Ayush runs the installer on his laptop.
+3. K6 algos (#148–#151): engine → slicer → spreader → algo manager. Algo parameters must come from a server-published **algo spec** (same idea as the order spec).
+4. K7 deploy (#152–#155): Docker + Caddy → Mumbai server checklist → latency/load → morning routine + runbooks. AWS account, static IP and Kite IP whitelist are Ayush's steps.
+5. Then the roadmap in `docs/design/product-vision.md` (K8 options chain + strategy builder + baskets, K9 synthetic orders/GTT/iceberg/TWAP/VWAP, K10 accounts & charges & reports, K11 tick recorder/replay/backtest, K12 charts & alerts, K13 admin & phone): create each milestone's issues before coding.
+6. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`.
 
 ## Key facts the design depends on (checked 14 Oct 2026, re-check before going live)
 - Data ₹500/month per app; order APIs free.

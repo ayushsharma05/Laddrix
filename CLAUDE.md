@@ -5,6 +5,7 @@ Ayush's learning project: a personal, professional-style trading platform for **
 **Before anything else, read `context/README.md`** (it has a "How to continue" checklist). Until PR #157 merges, `CLAUDE.md` and `context/` live only on the `kite-architecture` branch. It has how Ayush wants to work, the full history, the current status and every diagram.
 
 The short version:
+- **Product direction (14 Oct):** a professional trading platform for the Indian market, its own product (may be deployed commercially later): never name or copy another vendor. Every component replaceable behind an interface. **Backend provides, frontend displays**: the server publishes what's possible (order spec etc.), the UI hard-codes no market rules. See `docs/design/product-vision.md`.
 - Ayush is new to programming and learns by doing. Use plain words, flowcharts and short answers, and explain every line of code.
 - **Claude writes the code** (Ayush asked on 14 Oct): professional code, extensive tests, self-review, one milestone per stacked PR. Explain by tracing real data, and send progress updates as you go. Take time: brainstorm each part before coding.
 - Every change goes through an issue, then a PR with `Closes #N`, then green CI.
