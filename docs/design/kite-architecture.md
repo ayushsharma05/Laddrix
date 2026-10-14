@@ -1,9 +1,42 @@
 # MockTrade on Kite Connect: architecture
 
-**Status:** accepted (14 Oct 2026). Replaces the COMEX/MockCME plan for MockTrade. MockCME is paused, not deleted.
+**Status:** accepted (14 Oct 2026), **extended the same day to multi-user and broker-agnostic** (§0). Replaces the COMEX/MockCME plan for MockTrade. MockCME is paused, not deleted.
 **Facts checked on:** 14 Oct 2026 (sources at the end). Kite's limits change, so re-check them before going live.
 
 MockTrade is a personal, professional-style trading platform for NSE and BSE. It has a price ladder, an order blotter, positions and P&L, an audit trail, and parent/child algo order management. It connects to the real market through Zerodha's **Kite Connect** API. A **paper broker** fills orders against live Kite prices, so everything can be tested without real money.
+
+---
+
+
+## 0. Multi-user and broker-agnostic (decided 14 Oct 2026)
+
+MockTrade is a **multi-user platform**. Each user logs in with their own credentials and 2FA, and links **their own broker account** through the broker's own login page. The **only** limits the platform has are the broker's and the exchange's. **Zerodha is one adapter, not the foundation:** other brokers, or direct exchange access later, plug in behind the same interfaces.
+
+![MockTrade one chart](../../context/images/mocktrade-one-chart.png)
+
+*The interactive version is `context/one-chart/one-chart.html`: open it in a browser and click any box.*
+
+**What changes because of multi-user:**
+
+| Area | Single-user design | Multi-user design |
+| --- | --- | --- |
+| Identity | One login | `User` with roles (admin, trader, risk); password + TOTP |
+| Broker | One Kite session | `BrokerAccount` per linked account; each has its own adapter instance, session token (encrypted), throttle and feed |
+| Risk | One set of limits | Limits at **user**, **account** and **firm** level; kill switch at each level |
+| Instruments | Kite tokens everywhere | **Our own instrument ids** (`NSE:RELIANCE`, `NFO:NIFTY26OCTFUT`); each broker's numbers live in a mapping table |
+| Market data | One feed | Feeds belong to an account; **entitlements** decide who may see which feed |
+| Storage | SQLite file | **PostgreSQL** in production (SQLite stays for tests and laptop dev), behind the same repository code |
+| Scaling | One process | Order managers are **sharded by broker account**, so each account lives in exactly one place and needs no locks |
+
+**Go-live gates for other users (researched 14 Oct 2026):**
+1. **Zerodha multi-user arrangement.** A retail Kite Connect app is bound to one client id; for multi-user platforms Zerodha asks you to email them with your platform's details.
+2. **Exchange empanelment as an algo provider.** Under SEBI's framework, platforms that serve other users are algo providers: empanelled with the exchanges, onboarded by the broker (the broker is the principal), and every algo order carries an exchange-issued ID.
+3. **Licensed market data.** Kite data can't be displayed to other users. Shared prices need an exchange-authorised data vendor, which plugs in as another feed handler.
+4. **Research Analyst registration** for any black-box algo (logic not disclosed) offered to others.
+
+Until these are done, MockTrade runs for **you and family accounts** (Zerodha allows family members under one developer profile, each with a separate API key), with each account using its own Kite app and its own feed.
+
+Sources for §0: https://kite.trade/forum/discussion/3935/can-multiple-users-use-one-kite-connect-app · https://kite.trade/forum/discussion/15842/how-do-i-provide-access-to-multiple-users-to-kite-connect-api-via-my-app · https://support.zerodha.com/category/trading-and-markets/general-kite/kite-api/articles/can-i-use-historical-and-live-data-taken-from-kite-connect-api-on-other-platforms · https://www.quantinsti.com/articles/algorithmic-trading-india/ · https://inthemoneybyzerodha.substack.com/p/sebi-algo-trading-changes-april-2026
 
 ---
 
@@ -214,12 +247,13 @@ Switching between real and paper is **one setting**. The rest of the program can
 | Kite REST calls | Official **`kiteconnect` SDK** (v5.2.2), called through `asyncio.to_thread` | It's maintained by Zerodha, already supports `market_protection`, and handles auth. It's synchronous, but at ≤ 10 calls/s a worker thread costs nothing. |
 | Kite WebSocket | **Our own asyncio client** (`websockets` library) + our own binary decoder | The SDK's ticker uses Twisted, a second event-loop system that fights asyncio. Our decoder is about 60 lines, and tests check it gives **the same answers as the SDK's parser** on the same bytes. |
 | Web server | **FastAPI + Uvicorn** | Async, typed, WebSocket support, automatic API docs. |
-| Database | **SQLite (WAL mode)**, standard library | One file, no server to run, survives crashes. One writer task. Move to PostgreSQL when we split into several processes. |
+| Database | **PostgreSQL** in production, **SQLite** for tests and laptop dev, through **SQLAlchemy 2** (async) | Multi-user data (users, accounts, limits, events) is relational and needs safe concurrent writers. SQLAlchemy lets the same code run on both, so tests stay fast. |
 | UI | **TypeScript + React + Vite**, built as **widgets** in a dockable workspace (**dockview**) | Professional trading front ends are workspaces of small windows (ladder, blotter, positions, algos) that traders arrange and save. React components map one-to-one to widgets. |
 | Desktop app | **Electron** shell around the same UI (later) | Desktop trading apps commonly use Electron: real OS windows that can be popped out onto other monitors, plus keyboard shortcuts. The same code also runs in a phone browser. **Tauri** is the lighter alternative (Rust shell, smaller memory); we can measure both. |
 | Packaging | **Docker Compose** | The same setup on the laptop and the server. |
 | HTTPS | **Caddy** | Gets and renews TLS certificates automatically, with no manual setup. |
 | Login security | Password + **TOTP** (`pyotp`) | Our server can place real orders, so it needs two locks. |
+| Event bus | In-process asyncio pub/sub first, **Redis Streams** when split into processes | Same interface either way, so the switch is configuration. |
 | Monitoring | JSON logs, `/health`, latency histograms at `/metrics` | Enough for one server. Grafana later, if needed. |
 
 **When would we switch language?** Only if a measurement shows a part using a large share of the CPU or adding noticeable delay. The plan then: (1) profile, (2) fix the algorithm, (3) try `orjson`/`uvloop`, (4) rewrite just that function in **Rust** as a Python extension (PyO3). We wouldn't rewrite the whole program.
