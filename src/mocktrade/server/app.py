@@ -19,7 +19,6 @@ from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from fractions import Fraction
 from typing import Annotated, Any, Protocol
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -31,9 +30,10 @@ from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Vali
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform
-from mocktrade.positions.book import PositionView
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.server import security
+from mocktrade.server.formats import position_to_dict
+from mocktrade.server.stream import StreamHub
 from mocktrade.server.users import SESSION_MAX, LoginFailed, UserStore
 
 log = logging.getLogger(__name__)
@@ -123,6 +123,9 @@ def create_app(
     monotonic: Callable[[], float] = time.monotonic,
 ) -> FastAPI:
     app = FastAPI(title="MockTrade", docs_url=None, redoc_url=None, openapi_url=None)
+    hub = StreamHub(platform, users, origin=settings.origin, cookie_name=settings.cookie_name)
+    app.state.hub = hub
+    app.add_api_websocket_route("/ws", hub.serve)
     login_attempts: dict[str, deque[float]] = {}
     login_states: dict[str, tuple[str, str, float]] = {}  # state -> (user, account, expiry)
 
@@ -280,7 +283,7 @@ def create_app(
         book = running.positions
         last = running.reconciler.last
         return {
-            "positions": [_position(p) for p in book.positions()],
+            "positions": [position_to_dict(p) for p in book.positions()],
             "realised_paise": book.realised_paise(),
             "unrealised_paise": book.unrealised_paise(),
             "day_pnl_paise": book.day_pnl_paise(),
@@ -419,32 +422,9 @@ def _me(user: User, users: UserStore, platform: Platform) -> dict[str, Any]:
     }
 
 
-def _position(p: PositionView) -> dict[str, Any]:
-    return {
-        "instrument_id": p.instrument_id,
-        "product": p.product.value,
-        "qty": p.qty,
-        "avg_price_paise": _decimal(p.avg_price_paise),
-        "ltp_paise": p.ltp_paise,
-        "realised_paise": p.realised_paise,
-        "unrealised_paise": p.unrealised_paise,
-        "pnl_paise": p.pnl_paise,
-        "buy_qty": p.buy_qty,
-        "sell_qty": p.sell_qty,
-        "buy_value_paise": p.buy_value_paise,
-        "sell_value_paise": p.sell_value_paise,
-    }
-
-
 def _failures(failures: dict[str, list[tuple[str, str]]]) -> list[dict[str, str]]:
     return [
         {"account_id": account_id, "client_order_id": cid, "reason": reason}
         for account_id, items in failures.items()
         for cid, reason in items
     ]
-
-
-def _decimal(value: Fraction) -> str:
-    """An exact average like 10007.5 paise as text, at most 4 decimals (1/3 can't be exact)."""
-    exact = Decimal(value.numerator) / Decimal(value.denominator)
-    return f"{exact.quantize(Decimal('0.0001')).normalize():f}"  # never "1E+4"
