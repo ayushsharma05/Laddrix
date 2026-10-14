@@ -28,6 +28,7 @@ Read this before replying. These are Ayush's own stated preferences, gathered ov
 - **It is its own product.** Ayush may deploy it professionally in the Indian market later. **Never name, copy or reference any other vendor's product** (no vendor names in code, docs, issues or context). Use generic industry terms (price ladder, order ticket, spreader, audit trail).
 - **Every component independent and replaceable** at any point (broker, data feed, storage, UI widgets, algos): talk only through interfaces, never reach into another module's internals.
 - **Backend provides, frontend displays.** The server describes what is possible (order types and their fields, validities, products, tick/lot rules, limits) and the UI renders from that description. Nothing market- or broker-specific is hard-coded in the UI: if a broker adds a sixth order type, only the backend changes.
+- **Fast from our side:** syncing and latency must be very fast; measure every hop, never add waits we don't need.
 - Claude acts as the whole expert team: software design, product management, UI/UX, web, backend, frontend, cloud engineering, CS research.
 - Full vision and feature catalogue: `docs/design/product-vision.md`.
 
