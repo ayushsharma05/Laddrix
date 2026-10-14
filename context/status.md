@@ -18,6 +18,25 @@ Decided 14 Oct 2026. MockTrade connects to the real Indian market through Zerodh
 
 Issue bodies were created by `context/backlog-scripts/kite_backlog.py` (+ `create_kite.py`). #145 was later rewritten (widget workspace) and #156 added (Electron) after Ayush asked for a desktop, widget-based front end.
 
+## Build progress (Claude now writes the code, at Ayush's request on 14 Oct)
+Ayush asked Claude to code the whole project professionally (extensive tests, careful code) while he follows along; he types "continue" when usage limits reset. PRs are stacked: each milestone's branch builds on the previous one.
+
+| Milestone | PR | Status |
+| --- | --- | --- |
+| K0 Foundations (#124–#127) | #158 (base main) | ✅ CI green, 50 tests |
+| K1 Live prices (#128–#132) | #159 (base k0-foundations) | ✅ CI green, 117 tests |
+| K2 Paper broker (#133–#135) | next | ⏳ |
+
+Merge order: #123 → #157 → #158 → #159 → … (GitHub retargets stacked PRs automatically when their base merges).
+
+**Design changes made while coding:**
+- Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
+- `.gitignore` ignores only the top-level `/data/` (it had hidden `tests/data/`).
+- CI uses actions/checkout@v5 and setup-python@v6 (Node 20 deprecation).
+- Decoder measured at ~17 µs per full packet (≈1 % of a CPU at 750 ticks/s).
+
+**UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
+
 ## Next
 1. Merge PR #123 (context folder), then the Kite architecture PR.
 2. **#124 K0.1**: package skeleton. Claude has given the code and line-by-line explanation (also verified: 15 tests + ruff pass for #124 + #125 together).

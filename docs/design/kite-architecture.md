@@ -244,7 +244,7 @@ Switching between real and paper is **one setting**. The rest of the program can
 | Part | Choice | Why (with numbers) |
 | --- | --- | --- |
 | Server, all modules | **Python 3.12 + asyncio** | Load estimate: 500 instruments × ~1.5 ticks/s ≈ 750 ticks/s × 184 bytes ≈ 140 KB/s. Decoding a packet with `struct` takes a few microseconds, which comes to well under 5 % of one CPU. Orders: at most 10/s. Python has 100× headroom, so a faster language would buy nothing visible. **We measure this in issue K7.3** before believing it. |
-| Kite REST calls | Official **`kiteconnect` SDK** (v5.2.2), called through `asyncio.to_thread` | It's maintained by Zerodha, already supports `market_protection`, and handles auth. It's synchronous, but at ≤ 10 calls/s a worker thread costs nothing. |
+| Kite REST calls | **Our own small async client** (httpx) | *Changed while coding (14 Oct):* the SDK is synchronous and drags in Twisted; Kite's REST API is simple form-encoded HTTP with JSON replies. The official SDK (v5.2.2) stays in the test suite as a reference implementation. |
 | Kite WebSocket | **Our own asyncio client** (`websockets` library) + our own binary decoder | The SDK's ticker uses Twisted, a second event-loop system that fights asyncio. Our decoder is about 60 lines, and tests check it gives **the same answers as the SDK's parser** on the same bytes. |
 | Web server | **FastAPI + Uvicorn** | Async, typed, WebSocket support, automatic API docs. |
 | Database | **PostgreSQL** in production, **SQLite** for tests and laptop dev, through **SQLAlchemy 2** (async) | Multi-user data (users, accounts, limits, events) is relational and needs safe concurrent writers. SQLAlchemy lets the same code run on both, so tests stay fast. |
@@ -281,7 +281,7 @@ Switching between real and paper is **one setting**. The rest of the program can
 
 | Step | Target | Note |
 | --- | --- | --- |
-| Tick bytes → decoded `Tick` | < 50 µs | Measured in a benchmark test |
+| Tick bytes → decoded `Tick` | < 50 µs | **Measured: ~17 µs** per full packet (benchmark test) |
 | Tick → browser update sent | < 20 ms | Including conflation wait: ≤ 250 ms by design |
 | Click → order request leaves the server | < 5 ms | Risk + throttle + event log |
 | Kite REST round trip | *measure* | Depends on Kite and the network, not us. Logged on every order. |
