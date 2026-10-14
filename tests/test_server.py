@@ -514,6 +514,22 @@ async def test_volume_at_price(world):
     await c.aclose()
 
 
+async def test_the_order_spec_for_an_account_and_instrument(world):
+    c = await world.logged_in()
+    spec = (await c.get(f"/api/accounts/acc-ayush/instruments/{FUT}/order-spec")).json()
+    assert [t["code"] for t in spec["order_types"]] == ["LIMIT", "MARKET", "SL", "SL-M"]
+    assert spec["products"] == ["NRML", "MIS"] and spec["lot_size"] == 75
+    assert (
+        await c.get("/api/accounts/acc-ayush/instruments/NSE:NOPE/order-spec")
+    ).status_code == 404
+    await c.aclose()
+    riya = await world.logged_in("riya")  # someone else's account doesn't exist for you
+    assert (
+        await riya.get(f"/api/accounts/acc-ayush/instruments/{FUT}/order-spec")
+    ).status_code == 404
+    await riya.aclose()
+
+
 async def test_layouts_are_saved_per_user(world):
     ayush = await world.logged_in("ayush")
     riya = await world.logged_in("riya")

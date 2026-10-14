@@ -32,6 +32,7 @@ from datetime import UTC, datetime
 
 from mocktrade.broker.base import Broker, BrokerError
 from mocktrade.domain.instruments import Instrument
+from mocktrade.domain.order_spec import OrderSpec, spec_problem
 from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderUpdate
 from mocktrade.orders.gate import OpenGate, OrderGate
 from mocktrade.orders.model import (
@@ -98,9 +99,11 @@ class OrderManager:
         *,
         ids: ClientIds,
         gate: OrderGate | None = None,
+        spec: Callable[[Instrument], OrderSpec] | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.account_id = account_id
+        self._spec = spec  # what the broker offers per instrument (order types, validities...)
         self._broker = broker
         self._instrument = instruments
         self._ids = ids
@@ -199,6 +202,10 @@ class OrderManager:
             request.validate(instrument)
         except ValueError as exc:
             return str(exc)
+        if self._spec is not None:
+            return spec_problem(
+                self._spec(instrument), request.order_type, request.validity, request.product
+            )
         return None
 
     # --- changing and cancelling ------------------------------------------------------------

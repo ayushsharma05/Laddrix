@@ -17,7 +17,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from mocktrade.broker.base import Broker
+from mocktrade.broker.rules import order_spec
 from mocktrade.domain.accounts import BrokerAccount
+from mocktrade.domain.instruments import Instrument
+from mocktrade.domain.order_spec import OrderSpec
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
 from mocktrade.orders.gate import Gates
@@ -131,6 +134,7 @@ class Platform:
             self.instruments.get,
             ids=ids,
             gate=Gates([risk, throttle]),
+            spec=spec_of(broker),
             clock=clock,
         )
         holder["orders"] = orders
@@ -162,3 +166,9 @@ class Platform:
         )
         self.accounts[account.id] = runtime
         return runtime
+
+
+def spec_of(broker: Broker) -> Callable[[Instrument], OrderSpec]:
+    """The broker's own order spec if it publishes one, else the standard NSE/BSE one."""
+    published = getattr(broker, "order_spec", None)
+    return published if callable(published) else order_spec

@@ -29,10 +29,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_view
 from mocktrade.domain.instruments import Instrument
+from mocktrade.domain.order_spec import spec_to_dict
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Validity
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import OrderError
-from mocktrade.platform import AccountRuntime, Platform
+from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.server import security
 from mocktrade.server.formats import position_to_dict
@@ -242,6 +243,17 @@ def create_app(
             raise HTTPException(404, "no such instrument")
         volume, levels = platform.market_data.vap.snapshot(instrument_id)
         return {"volume": volume, "levels": [[p, q] for p, q in sorted(levels.items())]}
+
+    @app.get("/api/accounts/{account_id}/instruments/{instrument_id}/order-spec")
+    async def get_order_spec(account_id: str, instrument_id: str, user: Me) -> dict[str, Any]:
+        """What can be ordered on this instrument through this account's broker: the order
+        types, what each needs, validities, products, tick and lot (domain/order_spec.py).
+        The screens draw their tickets from this; nothing broker-specific lives in the UI."""
+        running = runtime(account_id, user)
+        instrument = platform.instruments.get(instrument_id)
+        if instrument is None:
+            raise HTTPException(404, "no such instrument")
+        return spec_to_dict(spec_of(running.broker)(instrument))
 
     @app.get("/api/layouts")
     async def list_layouts(user: Me) -> list[dict[str, str]]:

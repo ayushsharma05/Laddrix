@@ -33,10 +33,12 @@ from dataclasses import dataclass, field, replace
 from mocktrade.broker.base import BrokerError, BrokerPosition
 from mocktrade.broker.rules import (
     MAX_MODIFICATIONS_PER_ORDER,
+    order_spec,
     protected_limit,
     stop_trigger_problem,
 )
 from mocktrade.domain.instruments import Instrument, InstrumentId
+from mocktrade.domain.order_spec import OrderSpec
 from mocktrade.domain.orders import (
     OrderRequest,
     OrderStatus,
@@ -113,6 +115,10 @@ class PaperBroker:
         self._runner: asyncio.Task | None = None
 
     # --- Broker interface --------------------------------------------------------------
+
+    def order_spec(self, instrument: Instrument) -> OrderSpec:
+        """Paper offers exactly what Kite offers, so paper can't be more lenient."""
+        return order_spec(instrument)
 
     async def place(self, request: OrderRequest) -> str:
         instrument = self._instruments.get(request.instrument_id)

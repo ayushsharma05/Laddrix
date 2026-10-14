@@ -32,6 +32,9 @@ import httpx
 from mocktrade.broker.base import BrokerError, BrokerPosition
 from mocktrade.broker.kite.http import KiteAuthError, KiteError, KiteHttp, KiteRateLimited
 from mocktrade.broker.kite.orders import modify_params, place_params, to_paise, to_update
+from mocktrade.broker.rules import order_spec
+from mocktrade.domain.instruments import Instrument
+from mocktrade.domain.order_spec import OrderSpec
 from mocktrade.domain.orders import OrderRequest, OrderUpdate
 
 log = logging.getLogger(__name__)
@@ -69,6 +72,10 @@ class KiteBroker:
         self.ignored_messages = 0
 
     # --- the Broker interface ------------------------------------------------------------------
+
+    def order_spec(self, instrument: Instrument) -> OrderSpec:
+        """The order types, validities and products Kite offers on this instrument."""
+        return order_spec(instrument)
 
     async def place(self, request: OrderRequest) -> str:
         variety = self.variety
