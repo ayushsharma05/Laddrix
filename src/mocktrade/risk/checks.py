@@ -217,12 +217,12 @@ class RiskGate:
     def _duplicate_problem(self, request: OrderRequest, others) -> str | None:
         """An identical manual order still working and placed moments ago is a double click.
         Refused orders don't count, so retrying after a refusal always works."""
-        if request.algo_id is not None:
+        if request.from_algo:
             return None  # algos send identical orders on purpose
         key = _duplicate_key(request)
         now = self._clock()
         for order in others:
-            if order.request.algo_id is None and _duplicate_key(order.request) == key:
+            if not order.request.from_algo and _duplicate_key(order.request) == key:
                 ago = (now - order.created_at).total_seconds()
                 if 0 <= ago < self.limits.duplicate_window_s:
                     return (

@@ -72,8 +72,13 @@ class OrderRequest:
     price_paise: int | None = None
     trigger_paise: int | None = None
     market_protection: Decimal | None = None  # percent; -1 = broker's automatic protection
-    algo_id: str | None = None  # exchange algo id when the order comes from an algo
-    parent_id: str | None = None  # the algo's parent order, if any
+    algo_id: str | None = None  # the EXCHANGE-issued algo id (SEBI framework), when we have one
+    parent_id: str | None = None  # our algo's parent order, if an algo sent this
+
+    @property
+    def from_algo(self) -> bool:
+        """Sent by an algo (ours, or one with an exchange algo id) rather than a person's click."""
+        return self.parent_id is not None or self.algo_id is not None
 
     def validate(self, instrument: Instrument) -> None:
         """Raise ValueError if this request breaks any order or exchange rule."""

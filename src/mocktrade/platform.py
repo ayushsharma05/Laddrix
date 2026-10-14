@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from mocktrade.algos.engine import AlgoEngine, AlgoEvent, AlgoType
 from mocktrade.broker.base import Broker
 from mocktrade.broker.rules import order_spec
 from mocktrade.domain.accounts import BrokerAccount
@@ -48,6 +49,7 @@ class AccountRuntime:
     switch: KillSwitch
     reconciler: PositionReconciler
     loss_watch: DailyLossWatch | None
+    algos: AlgoEngine
 
 
 @dataclass
@@ -76,9 +78,16 @@ class Platform:
         loops = [self._mark_loop()]
         for runtime in self.accounts.values():
             loops.append(runtime.orders.run())
+            loops.append(self._run_algos(runtime))
             if reconcile:
                 loops.append(runtime.reconciler.run())
         await asyncio.gather(*loops)
+
+    @staticmethod
+    async def _run_algos(runtime: AccountRuntime) -> None:
+        """Algos don't survive a restart: cancel their leftover children, then run."""
+        await runtime.algos.cancel_orphans()
+        await runtime.algos.run()
 
     async def _mark_loop(self) -> None:
         """Watch the prices of every instrument anyone holds; mark positions as they move."""
@@ -100,6 +109,65 @@ class Platform:
         finally:
             subscription.close()
 
+    def _algo_engine(
+        self,
+        account_id: str,
+        orders: OrderManager,
+        switch: KillSwitch,
+        types: tuple[AlgoType, ...],
+        clock: Callable[[], datetime],
+    ) -> AlgoEngine:
+        """The account's algos: blocked while a kill switch is on, stopped when one engages,
+        every state change audited."""
+
+        def blocked() -> str | None:
+            for s in (self.firm_switch, switch):
+                if s.engaged:
+                    return f"trading is stopped: {s.state.reason}"
+            return None
+
+        audit = None
+        if self.event_log is not None:
+            log = self.event_log
+
+            def audit(event: AlgoEvent) -> None:
+                a = event.algo
+                log.record_note(
+                    f"ALGO_{event.kind}",
+                    account_id,
+                    event.detail,
+                    {
+                        "algo_id": a.algo_id,
+                        "code": a.code,
+                        "instrument_id": a.instrument_id,
+                        "side": a.side.value,
+                        "qty": a.qty,
+                        "filled_qty": a.filled_qty,
+                        "params": a.params,
+                        "user_id": a.user_id,
+                    },
+                    ts=event.ts,
+                )
+
+        engine = AlgoEngine(
+            account_id,
+            orders,
+            self.market_data,
+            self.instruments.get,
+            types,
+            blocked=blocked,
+            clock=clock,
+            audit=audit,
+        )
+
+        def on_switch(_name: str, state) -> None:
+            if state.engaged:
+                engine.stop_all(f"trading stopped: {state.reason}")
+
+        switch.on_change(on_switch)
+        self.firm_switch.on_change(on_switch)
+        return engine
+
     def add_account(
         self,
         account: BrokerAccount,
@@ -109,6 +177,7 @@ class Platform:
         ids: ClientIds,
         auto_kill_on_loss: bool = False,
         throttle: OrderThrottle | None = None,
+        algo_types: tuple[AlgoType, ...] = (),
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> AccountRuntime:
         if account.id in self.accounts:
@@ -161,8 +230,9 @@ class Platform:
                     {"instrument_id": m.instrument_id, "ours": m.ours, "broker": m.broker},
                 )
             )
+        algos = self._algo_engine(account.id, orders, switch, algo_types, clock)
         runtime = AccountRuntime(
-            account, broker, orders, book, risk, throttle, switch, reconciler, loss_watch
+            account, broker, orders, book, risk, throttle, switch, reconciler, loss_watch, algos
         )
         self.accounts[account.id] = runtime
         return runtime
