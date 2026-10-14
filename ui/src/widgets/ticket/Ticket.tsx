@@ -332,7 +332,14 @@ function PriceField(props: { label: string; name: string; value: string; disable
         <button type="button" aria-label={`${props.label} one tick lower`} disabled={props.disabled} onClick={() => props.onStep(-1)}>
           −
         </button>
-        <input name={props.name} aria-label={props.label} inputMode="decimal" value={props.disabled ? "" : props.value} disabled={props.disabled} onChange={(e) => props.onChange(e.target.value)} />
+        <input name={props.name} aria-label={props.label} inputMode="decimal" value={props.disabled ? "" : props.value}
+          disabled={props.disabled}
+          onChange={(e) => props.onChange(e.target.value)}
+          onBlur={() => {
+            const paise = parsePrice(props.value); // "25178.6" -> "25,178.60" once typed
+            if (paise !== null) props.onChange(fmtPrice(paise));
+          }}
+        />
         <button type="button" aria-label={`${props.label} one tick higher`} disabled={props.disabled} onClick={() => props.onStep(1)}>
           +
         </button>

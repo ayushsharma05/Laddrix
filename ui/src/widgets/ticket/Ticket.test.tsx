@@ -92,6 +92,8 @@ describe("Order ticket", () => {
     expect(status()).toContain("above the last price");
     expect((send() as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText("Trigger"), { target: { value: "25015" } });
+    fireEvent.blur(screen.getByLabelText("Trigger"));
+    expect((screen.getByLabelText("Trigger") as HTMLInputElement).value).toBe("25,015.00"); // tidied once typed
     fireEvent.click(send());
     await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
     expect(posts(calls)[0]!.body).toMatchObject({ order_type: "SL", price_paise: 2502000, trigger_paise: 2501500 });
