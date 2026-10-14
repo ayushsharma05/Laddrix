@@ -1,6 +1,6 @@
 # Merge recovery — 15 October 2026 (India time)
 
-Recovery issue: #204. Requested by Ayush: recover the repo to Claude Code's last completed work, after PRs were merged in mixed order.
+Recovery issue: #204. Integration PR: #205. Requested by Ayush: recover the repo to Claude Code's last completed work, after PRs were merged in mixed order.
 
 ## Finding
 
@@ -47,7 +47,7 @@ No force push, history reset, deletion of source branches or code revert is need
 - Local UI: 225 tests, typecheck and production build passed.
 - Local desktop: 12 tests, typecheck and build passed (no Electron GUI run in this recovery).
 - Local Ruff: all checks pass, 167 maintained Python files formatted.
-- Local Python suite: see recovery PR for final result. Initial run had 846 passes and 21 environment-only failures because this runner configures a SOCKS proxy without the optional socksio package; loopback tests are rerun with local proxy exclusions and proxy support installed.
+- Local Python suite: **867 passed** in 24.59 seconds. Initial run had 846 passes and 21 environment-only failures because this runner configures a SOCKS proxy without the optional socksio package. Installing optional proxy support in the runner and excluding localhost/127.0.0.1 from the proxy resolved the failures; no application/test changes were needed.
 - Required GitHub checks before merge: Python lint/format/tests, UI audit/typecheck/tests/build, desktop audit/typecheck/tests/build, container build/compose/health/shutdown smoke.
 - No production trading logic, application tests or UI logic changed during recovery. Historical context/backlog-scripts, context/build-map and context/scripts are excluded explicitly from application Ruff checks; maintained CLI tools under src remain checked.
 
