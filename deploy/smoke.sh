@@ -8,7 +8,7 @@ key=$(docker run --rm "$IMAGE" python -m mocktrade.tools.users new-key | head -1
 docker rm -f mt >/dev/null 2>&1 || true
 docker run -d --name mt --read-only --tmpfs /tmp --cap-drop ALL \
   -e MOCKTRADE_SECRET_KEY="$key" -e MOCKTRADE_ORIGIN=https://localhost -p 8000:8000 "$IMAGE"
-for i in $(seq 1 30); do [ "$(docker inspect -f '{{.State.Health.Status}}' mt)" = healthy ] && break; sleep 1; done
+for _ in $(seq 1 30); do [ "$(docker inspect -f '{{.State.Health.Status}}' mt)" = healthy ] && break; sleep 1; done
 docker inspect -f 'health={{.State.Health.Status}}' mt
 curl -fsS --noproxy '*' localhost:8000/api/health; echo
 curl -fsS --noproxy '*' localhost:8000/ | grep -q '<div id="root">' && echo "screens served"

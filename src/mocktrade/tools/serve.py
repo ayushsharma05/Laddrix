@@ -34,6 +34,7 @@ import argparse
 import asyncio
 import contextlib
 import logging
+import os
 import signal
 import sys
 import time
@@ -317,6 +318,7 @@ def main(argv: list[str], env: Mapping[str, str]) -> int:
     except ConfigError as exc:
         print(f"settings: {exc}", file=sys.stderr)
         return 2
+    os.umask(0o077)  # databases and broker tokens: readable by this user only
     if args.check:
         print(
             f"settings OK: {settings.origin} on {settings.host}:{settings.port}, "

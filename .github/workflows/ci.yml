@@ -60,6 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - run: shellcheck deploy/*.sh
       - run: docker build -t mocktrade:ci .
       - name: compose file is valid
         run: |
