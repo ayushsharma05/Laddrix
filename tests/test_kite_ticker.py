@@ -173,3 +173,55 @@ async def test_subscription_rules():
     await ticker.subscribe([1, 2], mode="ltp")
     await ticker.subscribe([2], mode="full")
     assert ticker.subscriptions == {1: "ltp", 2: "full"}
+
+
+async def test_on_connect_runs_on_every_connection_and_bad_callbacks_never_drop_it():
+    async def script(fake, ws, n):
+        await ws.send(json.dumps({"type": "order", "data": {"order_id": str(n)}}))
+        if n == 0:
+            return  # drop the first connection: the ticker reconnects
+        await ws.wait_closed()
+
+    fake = FakeKite(script)
+    server, url = await start(fake)
+    connects, orders = [], []
+
+    def broken_order_handler(data):
+        orders.append(data)
+        raise RuntimeError("handler bug")
+
+    ticker = KiteTicker(
+        "k",
+        "t",
+        lambda ticks: None,
+        broken_order_handler,
+        on_connect=lambda: connects.append(len(connects)),
+        url=url,
+        sleep=no_sleep,
+    )
+    task = asyncio.create_task(ticker.run())
+    await wait_for(lambda: len(orders) == 2)
+    assert connects == [0, 1]  # reconcile hook ran on the reconnect too
+    assert ticker.connections == 2  # the failing handler didn't cause the drop
+    ticker.stop()
+    await asyncio.wait_for(task, 3)
+    server.close()
+
+
+async def test_prices_in_order_messages_stay_exact():
+    async def script(fake, ws, n):
+        await ws.send('{"type": "order", "data": {"average_price": 2501.15}}')
+        await ws.wait_closed()
+
+    fake = FakeKite(script)
+    server, url = await start(fake)
+    orders = []
+    ticker = KiteTicker("k", "t", lambda ticks: None, orders.append, url=url, sleep=no_sleep)
+    task = asyncio.create_task(ticker.run())
+    await wait_for(lambda: orders)
+    from decimal import Decimal
+
+    assert orders[0]["average_price"] == Decimal("2501.15")
+    ticker.stop()
+    await asyncio.wait_for(task, 3)
+    server.close()

@@ -11,6 +11,8 @@ Every request carries `X-Kite-Version: 3`; authenticated ones carry
 `Authorization: token <api_key>:<access_token>`.
 """
 
+import json
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -90,8 +92,10 @@ class KiteHttp:
 
 def _unwrap(response: httpx.Response) -> Any:
     try:
-        body = response.json()
+        body = json.loads(response.content, parse_float=Decimal)  # prices stay exact
     except ValueError:
+        body = {}
+    if not isinstance(body, dict):
         body = {}
     if response.status_code == 429:
         raise KiteRateLimited(body.get("message", "rate limited"), "NetworkException", 429)

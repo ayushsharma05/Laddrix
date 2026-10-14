@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable, Iterable
+from decimal import Decimal
 from typing import Any
 
 from websockets.asyncio.client import connect as ws_connect
@@ -42,6 +43,7 @@ class KiteTicker:
         on_ticks: TicksHandler,
         on_order: OrderHandler | None = None,
         *,
+        on_connect: Callable[[], None] | None = None,
         url: str = WS_URL,
         connect: Callable[..., Any] = ws_connect,
         stale_after_s: float = 10.0,
@@ -51,6 +53,7 @@ class KiteTicker:
         self._url = f"{url}?api_key={api_key}&access_token={access_token}"
         self._on_ticks = on_ticks
         self._on_order = on_order
+        self._on_connect = on_connect  # e.g. reconcile orders: updates may have been missed
         self._connect = connect
         self._stale_after_s = stale_after_s
         self._max_backoff_s = max_backoff_s
@@ -101,6 +104,7 @@ class KiteTicker:
                     backoff = 1.0
                     log.info("kite ticker connected (%d instruments)", len(self._modes))
                     await self._send_subscriptions(self._modes)
+                    self._call_safely(self._on_connect)
                     await self._read_until_closed(ws)
             except InvalidStatus as exc:
                 if exc.response.status_code in (401, 403):
@@ -141,17 +145,27 @@ class KiteTicker:
 
     def _handle_text(self, text: str) -> None:
         try:
-            message = json.loads(text)
+            message = json.loads(text, parse_float=Decimal)  # prices stay exact
         except ValueError:
             log.warning("unreadable text message from kite")
             return
         kind, data = message.get("type"), message.get("data")
         if kind == "order" and self._on_order is not None:
-            self._on_order(data)
+            self._call_safely(self._on_order, data)
         elif kind == "error":
             log.error("kite ticker error: %s", data)
         elif kind == "message":
             log.info("kite message: %s", data)
+
+    @staticmethod
+    def _call_safely(callback: Callable[..., None] | None, *args: Any) -> None:
+        """A failing callback is logged; it must never drop the price connection."""
+        if callback is None:
+            return
+        try:
+            callback(*args)
+        except Exception:
+            log.exception("kite ticker callback failed")
 
     async def _send_subscriptions(self, modes: dict[int, str]) -> None:
         if not modes:

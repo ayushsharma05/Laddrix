@@ -451,6 +451,11 @@ class OrderManager:
                 self._reject_locally(order, "the broker never received this order")
         return external
 
+    async def resync(self) -> list[OrderUpdate]:
+        """Fetch the broker's order book and reconcile with it (after a reconnect, at
+        startup, or a few seconds after an UNCONFIRMED order). Returns external orders."""
+        return self.reconcile(await self._broker.orders())
+
     # --- helpers ----------------------------------------------------------------------------
 
     def _mark_unconfirmed(self, order: _Order, detail: str) -> None:
