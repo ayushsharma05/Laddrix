@@ -74,6 +74,7 @@ class OrderRequest:
     market_protection: Decimal | None = None  # percent; -1 = broker's automatic protection
     algo_id: str | None = None  # the EXCHANGE-issued algo id (SEBI framework), when we have one
     parent_id: str | None = None  # our algo's parent order, if an algo sent this
+    basket_id: str | None = None  # sent together with other legs (orders/basket.py)
 
     @property
     def from_algo(self) -> bool:

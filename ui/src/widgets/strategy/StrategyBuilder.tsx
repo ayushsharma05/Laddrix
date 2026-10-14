@@ -12,7 +12,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/rest";
-import type { StrategyAnalysis, StrategyLegIn, StrategyTemplate } from "../../api/types";
+import type { BasketCheck, BasketSent, StrategyAnalysis, StrategyLegIn, StrategyTemplate } from "../../api/types";
+import { tradingBlock } from "../../state/gate";
 import { useApp, useStore } from "../../app/context";
 import { price, shortName } from "../../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
@@ -191,6 +192,7 @@ export function StrategyBuilder({ params, setParams }: WidgetProps<StrategyParam
             </div>
           )}
         </div>
+        {legs.length > 0 && <TradePanel legs={legs} />}
         {analysis && drawn && (
           <div className="strategy-result">
             <svg viewBox={`0 0 ${BOX.width} ${BOX.height}`} className="payoff" role="img" aria-label="Payoff chart">
@@ -250,6 +252,100 @@ export function StrategyBuilder({ params, setParams }: WidgetProps<StrategyParam
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Send the legs as one basket: check every leg and the margin first, then send. */
+function TradePanel({ legs }: { legs: StrategyLegIn[] }) {
+  const { rest, store } = useApp();
+  const accountId = useStore((s) => s.accountId);
+  const block = useStore((s) => tradingBlock(s, s.accountId));
+  const [product, setProduct] = useState("NRML");
+  const [at, setAt] = useState<"touch" | "mid">("touch");
+  const [check, setCheck] = useState<BasketCheck | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const key = JSON.stringify([legs, product, at, accountId]);
+  useEffect(() => {
+    setCheck(null); // anything changed: check again before sending
+    setNote("");
+  }, [key]);
+
+  const body = () => ({ legs: legs.map((l) => ({ instrument_id: l.instrument_id, side: l.side, lots: l.lots, product, at })) });
+  const base = accountId ? `/api/accounts/${encodeURIComponent(accountId)}/baskets` : "";
+
+  const runCheck = () => {
+    if (!base) return;
+    setBusy(true);
+    rest
+      .post<BasketCheck>(`${base}/check`, body())
+      .then(setCheck)
+      .catch((e: unknown) => setNote(errorText(e)))
+      .finally(() => setBusy(false));
+  };
+
+  const send = () => {
+    if (!base || !check?.ok || block) return;
+    setBusy(true);
+    rest
+      .post<BasketSent>(`${base}/send`, body())
+      .then((r) => {
+        store.applyOrders(accountId!, r.sent);
+        const text = r.stopped ? `Basket ${r.basket_id} stopped: ${r.stopped}` : `Basket ${r.basket_id}: ${r.sent.length} orders sent`;
+        store.addMessage(r.stopped ? "ERROR" : "OK", "", text);
+        setNote(text);
+        setCheck(null);
+      })
+      .catch((e: unknown) => setNote(errorText(e)))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="basket" aria-label="Trade as a basket">
+      <div className="basket-bar">
+        <b>Trade</b>
+        <span className="dim">{accountId ?? "no account"}</span>
+        <select aria-label="Product" value={product} onChange={(e) => setProduct(e.target.value)}>
+          <option>NRML</option>
+          <option>MIS</option>
+        </select>
+        <select aria-label="Price" value={at} onChange={(e) => setAt(e.target.value as "touch" | "mid")} title="Touch: buy at the offer, sell at the bid. Mid: between, may not fill">
+          <option value="touch">at the touch</option>
+          <option value="mid">at the mid</option>
+        </select>
+        <button type="button" className="btn small" disabled={busy || !accountId} onClick={runCheck}>
+          Check
+        </button>
+        {check?.ok && (
+          <button type="button" className="btn small danger-confirm" disabled={busy || !!block} title={block ?? undefined} onClick={send}>
+            Send {legs.length} orders
+          </button>
+        )}
+        {block && <span className="tone-bad">{block}</span>}
+      </div>
+      {check && (
+        <div className="basket-check" role="status">
+          {check.legs.map((l) => (
+            <div key={`${l.instrument_id}-${l.side}`} className={l.problem ? "tone-bad" : undefined}>
+              {l.problem ? "✕" : "✓"} {l.side} {l.qty} {shortName(l.instrument_id)} @ {price(l.price_paise)}
+              {l.problem ? `: ${l.problem}` : ""}
+            </div>
+          ))}
+          <div>
+            Margin:{" "}
+            {check.margin ? (
+              <b>
+                {money(check.margin.final_paise / 100, false)} (hedge benefit {money(check.margin.hedge_benefit_paise / 100, false)})
+              </b>
+            ) : (
+              <span className="dim">{check.margin_note}</span>
+            )}
+          </div>
+          {!check.ok && <div className="tone-bad">Nothing can be sent until every leg passes.</div>}
+        </div>
+      )}
+      {note && <div className="basket-note">{note}</div>}
     </div>
   );
 }

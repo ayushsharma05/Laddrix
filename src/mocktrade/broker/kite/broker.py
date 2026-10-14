@@ -29,9 +29,15 @@ from typing import Any
 
 import httpx
 
-from mocktrade.broker.base import BrokerError, BrokerPosition
+from mocktrade.broker.base import BasketMargin, BrokerError, BrokerPosition
 from mocktrade.broker.kite.http import KiteAuthError, KiteError, KiteHttp, KiteRateLimited
-from mocktrade.broker.kite.orders import modify_params, place_params, to_paise, to_update
+from mocktrade.broker.kite.orders import (
+    margin_params,
+    modify_params,
+    place_params,
+    to_paise,
+    to_update,
+)
 from mocktrade.broker.rules import order_spec
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import OrderSpec
@@ -130,6 +136,22 @@ class KiteBroker:
                 )
             )
         return result
+
+    async def basket_margin(self, requests: list[OrderRequest]) -> BasketMargin:
+        """Kite's margin for the orders together (POST /margins/basket): `final` includes
+        the hedge benefit, which is what Kite blocks when they're all in."""
+        body = [margin_params(r, self.variety) for r in requests]
+        try:
+            data = await self._http.request(
+                "POST", "/margins/basket", params={"consider_positions": "true"}, json_body=body
+            )
+        except (KiteError, httpx.HTTPError) as exc:
+            message = exc.message if isinstance(exc, KiteError) else repr(exc)
+            raise BrokerError(f"Kite margin check: {message}") from None
+        return BasketMargin(
+            initial_paise=to_paise((data.get("initial") or {}).get("total")),
+            final_paise=to_paise((data.get("final") or {}).get("total")),
+        )
 
     # --- order updates from the WebSocket -------------------------------------------------------
 

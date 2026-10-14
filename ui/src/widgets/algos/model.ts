@@ -14,7 +14,7 @@ export type FormValues = Record<string, FormValue>;
 
 const PRICED = new Set(["price", "price_offset"]);
 const WHOLE = new Set(["lots", "ticks", "count"]);
-const DECIMAL = new Set(["seconds", "percent"]);
+const DECIMAL = new Set(["seconds", "minutes", "percent"]);
 
 /** The form's starting values: each parameter's default, shown the way it is typed. */
 export function initialValues(spec: AlgoSpec): FormValues {
@@ -154,7 +154,8 @@ export const stateText = (s: AlgoState) => s.charAt(0) + s.slice(1).toLowerCase(
 export const progress = (a: AlgoView) => (a.qty > 0 ? Math.min(1, a.filled_qty / a.qty) : 0);
 
 /** An algo's own figures (`extra`), labelled and formatted by their names' units:
- *  `…_paise` is a price, `…_ms` milliseconds; the rest as they come. Empty values are left out. */
+ *  `…_paise` is a price, `…_ms` milliseconds, `…_pct` a percentage, `…_bps` basis points,
+ *  `…_at` a time of day; the rest as they come. Empty values are left out. */
 export function figures(extra: Record<string, unknown>, labels: Record<string, string> = {}): { label: string; text: string; alert: boolean }[] {
   const out: { label: string; text: string; alert: boolean }[] = [];
   for (const [key, value] of Object.entries(extra)) {
@@ -167,6 +168,14 @@ export function figures(extra: Record<string, unknown>, labels: Record<string, s
     } else if (key.endsWith("_ms") && typeof value === "number") {
       name = key.slice(0, -"_ms".length);
       text = `${value} ms`;
+    } else if (key.endsWith("_pct") && typeof value === "number") {
+      name = key.slice(0, -"_pct".length);
+      text = `${value}%`;
+    } else if (key.endsWith("_bps") && typeof value === "number") {
+      name = key.slice(0, -"_bps".length);
+      text = `${value > 0 ? "+" : ""}${value} bps`;
+    } else if (key.endsWith("_at") && typeof value === "string" && !Number.isNaN(Date.parse(value))) {
+      text = new Date(value).toLocaleTimeString("en-IN", { hour12: false, timeZone: "Asia/Kolkata" });
     } else if (typeof value === "string" && value.includes(":")) {
       text = value.split(":").pop()!; // an instrument id: its symbol is enough
     } else {

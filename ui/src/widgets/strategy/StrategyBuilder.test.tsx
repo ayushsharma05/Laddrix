@@ -38,6 +38,24 @@ function setup(params: Partial<StrategyParams> = {}) {
       posted.push(body);
       return { status: 200, body: analysis([{ instrument_id: CE(25000), side: "BUY", lots: 1 }, { instrument_id: CE(25200), side: "SELL", lots: 1 }]) };
     },
+    "POST /api/accounts/acc-a/baskets/check": (body: unknown) => {
+      posted.push(body);
+      const legs = (body as { legs: { instrument_id: string; side: "BUY" | "SELL"; lots: number }[] }).legs;
+      const naked = legs.some((l) => l.side === "SELL") && !legs.some((l) => l.side === "BUY");
+      return {
+        status: 200,
+        body: {
+          ok: !naked,
+          legs: legs.map((l) => ({ instrument_id: l.instrument_id, side: l.side, qty: 75 * l.lots, price_paise: 12010, problem: naked ? "selling options to open a short position is not enabled" : null })),
+          margin: null,
+          margin_note: "this broker doesn't quote margins (paper)",
+        },
+      };
+    },
+    "POST /api/accounts/acc-a/baskets/send": (body: unknown) => {
+      posted.push(body);
+      return { status: 201, body: { basket_id: "B261014ABC123", sent: [], not_sent: [], stopped: "" } };
+    },
     "POST /api/options/strategy/analyse": (body: unknown) => {
       const legs = (body as { legs: { instrument_id: string; side: "BUY" | "SELL"; lots: number }[] }).legs;
       if (legs.some((l) => l.instrument_id.includes("FUT"))) return { status: 422, body: { detail: "NIFTY26OCTFUT is not a listed option" } };
@@ -121,5 +139,34 @@ describe("Strategy builder", () => {
     act(() => app.store.sendToStrategy({ instrument_id: CE(25100), side: "SELL", lots: 1 }));
     await vi.waitFor(() => expect(setParams).toHaveBeenCalledWith({ legs: [{ instrument_id: CE(25100), side: "SELL", lots: 1 }] }));
     expect(app.store.getState().strategyInbox).toEqual([]);
+  });
+
+  it("trades the legs as a basket: check first, then send; a failed check sends nothing", async () => {
+    const { posted, app } = setup({ legs: [{ instrument_id: CE(25000), side: "BUY", lots: 1 }, { instrument_id: CE(25200), side: "SELL", lots: 1 }] });
+    app.store.setStream("open");
+    await screen.findByLabelText("Strategy figures");
+    expect(screen.queryByRole("button", { name: /^Send/ })).toBeNull(); // nothing to send before a check
+    fireEvent.change(screen.getByRole("combobox", { name: "Price" }), { target: { value: "mid" } });
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+    expect((await screen.findByRole("status")).textContent).toContain("this broker doesn't quote margins");
+    fireEvent.click(screen.getByRole("button", { name: "Send 2 orders" }));
+    await vi.waitFor(() => expect(app.store.getState().messages.some((m) => m.text === "Basket B261014ABC123: 0 orders sent")).toBe(true));
+    expect(posted.at(-1)).toEqual({
+      legs: [
+        { instrument_id: CE(25000), side: "BUY", lots: 1, product: "NRML", at: "mid" },
+        { instrument_id: CE(25200), side: "SELL", lots: 1, product: "NRML", at: "mid" },
+      ],
+    });
+  });
+
+  it("a leg that fails the check is named, and there is no Send", async () => {
+    const { app } = setup({ legs: [{ instrument_id: CE(25200), side: "SELL", lots: 1 }] });
+    app.store.setStream("open");
+    await screen.findByLabelText("Strategy figures");
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toContain("not enabled");
+    expect(status.textContent).toContain("Nothing can be sent until every leg passes.");
+    expect(screen.queryByRole("button", { name: /^Send/ })).toBeNull();
   });
 });

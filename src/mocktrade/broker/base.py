@@ -39,6 +39,21 @@ class BrokerPosition:
     avg_price_paise: int
 
 
+@dataclass(frozen=True)
+class BasketMargin:
+    """What the broker would block for a set of orders placed together."""
+
+    initial_paise: int  # each leg on its own, added up
+    final_paise: int  # with the hedge benefit: what is actually blocked
+
+
+@runtime_checkable
+class MarginQuoter(Protocol):
+    """A broker that can price a basket's margin before it is sent (optional)."""
+
+    async def basket_margin(self, requests: list[OrderRequest]) -> BasketMargin: ...
+
+
 @runtime_checkable
 class Broker(Protocol):
     """Everything MockTrade needs from a broker, for one account."""

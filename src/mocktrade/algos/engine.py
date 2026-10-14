@@ -232,12 +232,25 @@ class AlgoContext:
             if instrument_id is None or c.request.instrument_id == instrument_id
         )
 
+    def average_price(self, instrument_id: str | None = None) -> int | None:
+        """Average fill price on a leg (the main one by default), or None before any fill."""
+        leg = instrument_id or self._parent.instrument_id
+        fills = [(c.filled_qty, c.avg_price_paise) for c in self.children()
+                 if c.request.instrument_id == leg and c.filled_qty]  # fmt: skip
+        qty = sum(q for q, _ in fills)
+        return round(sum(q * p for q, p in fills) / qty) if qty else None
+
     def remaining(self) -> int:
         """Main leg: parent quantity not yet filled and not working."""
         main = self._parent.instrument_id
         working = sum(c.leaves_qty for c in self.working() if c.request.instrument_id == main)
         sent = self._parent.in_flight_qty  # sent a moment ago, not registered yet
         return max(0, self._parent.qty - self.filled(main) - working - sent)
+
+    @property
+    def sending(self) -> int:
+        """Main-leg quantity sent a moment ago that the order manager hasn't registered yet."""
+        return self._parent.in_flight_qty
 
     @property
     def held(self) -> bool:

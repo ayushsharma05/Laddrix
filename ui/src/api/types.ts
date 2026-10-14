@@ -22,6 +22,7 @@ export interface OrderRequest {
   market_protection: string | null;
   algo_id: string | null;
   parent_id: string | null;
+  basket_id?: string | null;
 }
 
 export interface OrderView {
@@ -202,6 +203,7 @@ export type AlgoParamKind =
   | "price_offset"
   | "ticks"
   | "seconds"
+  | "minutes"
   | "count"
   | "percent"
   | "choice"
@@ -224,6 +226,7 @@ export interface AlgoSpec {
   code: string;
   name: string;
   help: string;
+  family?: string; // how screens group algos: "execution", "protection"
   params: AlgoParamSpec[];
 }
 
@@ -324,4 +327,29 @@ export interface StrategyAnalysis {
     price_paise: number;
     iv: number | null;
   }[];
+}
+
+// --- baskets (POST /api/accounts/{a}/baskets/check | send) -------------------------------------
+
+export interface BasketLegIn {
+  instrument_id: string;
+  side: Side;
+  lots: number;
+  product?: string;
+  price_paise?: number;
+  at?: "touch" | "mid";
+}
+
+export interface BasketCheck {
+  ok: boolean;
+  legs: { instrument_id: string; side: Side; qty: number; price_paise: number; problem: string | null }[];
+  margin: { initial_paise: number; final_paise: number; hedge_benefit_paise: number } | null;
+  margin_note: string;
+}
+
+export interface BasketSent {
+  basket_id: string;
+  sent: OrderView[];
+  not_sent: { instrument_id: string; side: Side; qty: number; price_paise: number }[];
+  stopped: string;
 }
