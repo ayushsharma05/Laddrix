@@ -1,0 +1,32 @@
+flowchart TB
+    subgraph IN["New order"]
+        A["submit(request)<br/>same client id again? → return existing order"]
+    end
+    A --> R1{"Our rules<br/>lot · tick · instrument · account"}
+    R1 -- broken --> REJ["REJECTED + reason"]
+    R1 -- ok --> RG{"Risk gate<br/>kill switch · allowed · product · lots<br/>price band · value · worst-case position<br/>daily loss · open orders · double click"}
+    RG -- refused --> REJ
+    RG -- ok --> TH{"Throttle (sliding windows)<br/>8/s · 350/min · 4500/day<br/>cancels have 10/s reserved"}
+    TH -- "manual: full" --> REJ
+    TH -- "algo: wait its turn" --> TH
+    TH -- ok --> PL["broker.place()"]
+    PL -- "BrokerError (clear refusal)" --> REJ
+    PL -- "timeout · 5xx · DataException" --> UNC["PENDING · UNCONFIRMED<br/>never assumed rejected"]
+    PL -- "order id" --> SENT["SENT"]
+    subgraph UP["Broker updates"]
+        U["Kite order message / paper fill"] --> M{"match by client id (tag),<br/>else broker id, else park"}
+        M --> FW{"only forward?<br/>filled never shrinks"}
+        FW -- no --> IGN["IGNORED (kept for audit)"]
+        FW -- yes --> APPLY["OPEN → PARTIAL → FILLED / CANCELLED<br/>FILL events"]
+    end
+    SENT --> UP
+    UNC -- "reconcile (order book)" --> UP
+    RC["every reconnect / restart:<br/>resync() = reconcile with the order book"] --> UP
+    subgraph LOG["Event log"]
+        L["every event + kill switch change<br/>restart: rebuild · reconcile · continue ids"]
+    end
+    REJ -.-> L
+    SENT -.-> L
+    APPLY -.-> L
+    IGN -.-> L
+    KS["STOP: engage kill switch first,<br/>then cancel every working order"] -.-> RG
