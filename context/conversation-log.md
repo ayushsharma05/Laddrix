@@ -77,3 +77,8 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
   - #164 event log: SQLite writer thread, retries without loss, restart = rebuild + reconcile + continue ids.
   - #165 Kite adapter: which Kite errors mean "not placed" vs "unknown"; order fields checked against the official SDK; reconcile on every reconnect; amo_check tool for the go-live check.
 - Diagram: ![K3 orders and risk](images/k3-orders-and-risk.png)
+
+## 13. K4 positions and reconciliation (14 Oct 2026)
+- Ayush said "continue". Claude built K4 as two stacked PRs, same process (brainstorm table of traps → code → tests → mutation check → PR):
+  - #166 positions and P&L: exact fractions for averages like ₹100.075; realised + unrealised checked against the cash-flow formula on random fills; replays never double count; auto kill switch on the daily loss, once per day.
+  - #167 reconcile with the broker's positions: alert only after two checks in a row (a fill can be in flight), quick 10 s re-check, never auto-corrects, outside trades flagged.
