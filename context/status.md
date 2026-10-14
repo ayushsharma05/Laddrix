@@ -33,11 +33,13 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | K3.5 Kite order adapter (#140) | #165 (base k3-4-event-log) | ✅ CI green, 370 tests in total. Manual step left: AMO check on the server |
 | K4.1 Positions & P&L + auto kill on daily loss (#141) | #166 (base k3-5-kite-orders) | ✅ CI green, 43 tests |
 | K4.2 Reconcile positions with the broker (#142) | #167 (base k4-1-positions) | ✅ 424 tests in total |
-| K5 Server & screens (#143–#147, #156) | next | ⏳ K5.1 server + login and K5.2 stream are backend; UI design pass with mockups for approval before K5.3 UI code |
+| K5.1 Server + password/TOTP login + API (#143) | #168 (base k4-2-reconcile) | ✅ CI green; 21 security mutations checked |
+| K5.2 Browser stream (#144) | #169 (base k5-1-server) | ✅ CI green, 490 tests; contract in docs/design/stream.md |
+| UI design pass (mockups for approval) | next | ⏳ before K5.3 UI code |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
-Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
@@ -53,15 +55,18 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 - Positions: weighted average cost with **exact fractions** (no paise leak); applied by cumulative filled qty (replays never double count); carried positions seeded at the previous close (today's P&L starts at 0). P&L is gross (charges estimator later).
 - Auto kill switch on the daily loss (`DailyLossWatch`), once per day so a reset lets you close.
 - Position reconcile alerts only after **two checks in a row** (re-check in 10 s), so in-flight fills don't cause false alarms; never auto-corrects.
+- Server security: Argon2id (not bcrypt) + TOTP once-only codes; lockout 5/15 min; per-IP limit; __Host- cookie (HttpOnly, Secure, SameSite=Strict), only the token's hash stored; Origin check + JSON-only for changes; security headers; no /docs. User/accounts/sessions in SQLite (`server/users.py`); TOTP secrets encrypted with `MOCKTRADE_SECRET_KEY`.
+- `platform.py` wires each account (risk → throttle → manager → book → kill/loss watch → reconciler → event log).
+- Stream: prices/positions conflated (250 ms, newest wins), orders never; slow browser closed with 4408 (never silent gaps); reconnect = hello → snapshots → merge by updated_at.
+- Mutation testing now uses `scratchpad/mutate.py`-style harness that always restores files (a killed run once left a mutated line; the suite caught it).
 - Risk: reducing a position is always allowed (even past limits or the daily loss); worst-case position counts working orders; option selling to open is off by default.
 
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
 1. Ayush merges in order: #123 → #157 → #158 → … → #167.
-2. **K5.1 (#143)** server + password/TOTP login and **K5.2 (#144)** browser stream with conflation (backend).
-3. **UI design pass** (mockups for Ayush's approval) before K5.3 UI code.
-4. Then (positions, P&L, reconciliation), multi-user persistence, UI design pass with mockups (approval before UI code), K5–K7.
+2. **UI design pass**: design system, workspace model, every screen as mockups, for Ayush's approval before any UI code.
+3. Then K5.3 UI skeleton (#145) and the screens, then (positions, P&L, reconciliation), multi-user persistence, UI design pass with mockups (approval before UI code), K5–K7.
 4. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`.
 
 ## Key facts the design depends on (checked 14 Oct 2026, re-check before going live)
