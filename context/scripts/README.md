@@ -13,6 +13,8 @@
 | `mutate-pricing.py` | 16 formula mutations of `options/`; each must fail `tests/test_option_pricing.py` | `python3 context/scripts/mutate-pricing.py` |
 | `e2e-chain.cjs` | Real browser: open the Option Chain (Widgets), maximize/restore, click a put to drive the ticket, switch expiry | `node context/scripts/e2e-chain.cjs <out-dir>` |
 | `e2e-strategy.cjs` | Real browser: Strategy Builder, iron condor, payoff and figures, Alt-click a leg from the chain | `node context/scripts/e2e-strategy.cjs <out-dir>` |
+| `e2e-exec-algos.cjs` | Real browser: TWAP, iceberg (limit = TWAP price + ₹20) and POV from the algo form, each to Done. Needs a fresh demo (positions add up to the ±1500 limit) | `node context/scripts/e2e-exec-algos.cjs <out-dir>` |
+| `mutate-exec-algos.py` | 17 mutations of the K9.1 algos | `python3 context/scripts/mutate-exec-algos.py` |
 | `mutate-strategy.py` | 13 mutations of `options/strategy.py` | `python3 context/scripts/mutate-strategy.py` |
 | `e2e-popout.cjs` | Real browser: pop a ladder out, check it updates live, trade from it, dock it back | `node context/scripts/e2e-popout.cjs <out-dir>` |
 | `ui/desktop/e2e/desktop-smoke.cjs` | The real Electron app under a display: login, pop-out, Node-access probe, memory | `cd ui/desktop && xvfb-run -a node e2e/desktop-smoke.cjs <out-dir>` |

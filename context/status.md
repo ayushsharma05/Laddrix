@@ -60,10 +60,11 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | K8.3 Chain widget (#191) | #196 (base k8-2-chain, branch k8-3-chain-widget) | ✅ 214 UI tests; real browser: live chain, click drives the ticket, maximize (double-click a tab) |
 | K8.4 Strategy builder (#192) | #197 (base k8-3-chain-widget, branch k8-4-strategy) | ✅ 835 Python + 222 UI tests, 13/13 mutations; real browser: iron condor payoff, Alt-click legs from the chain |
 | K8.5 Baskets (#193) | #198 (base k8-4-strategy, branch k8-5-baskets) | ✅ 844 Python + 224 UI tests; covered-short risk rule; real browser: iron condor checked and sent as one basket |
+| K9.1 Execution algos (#199) | #203 (base k8-5-baskets, branch k9-1-exec-algos) | ✅ 867 Python + 225 UI; 17/17 mutations; real browser: TWAP, iceberg and POV run to Done |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
-Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → #179 → #180 → #181 → #182 → #184 → #185 → #186 → #187 → #188 → #194 → #195 → #196 → #197 → #198 → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → #179 → #180 → #181 → #182 → #184 → #185 → #186 → #187 → #188 → #194 → #195 → #196 → #197 → #198 → #203 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
@@ -101,10 +102,10 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-1. Ayush merges in order: #123 → #157 → #158 → … → #197 → #198.
+1. Ayush merges in order: #123 → #157 → #158 → … → #198 → #203.
 2. **K6 is complete** (#179–#182). Algo screen: `ui/src/widgets/algos/` (form drawn from `/algo-specs`, by param kind; `extra` figures formatted by unit suffix `_paise`/`_ms`); API and stream in `docs/design/algos.md` § "The algo screen". New algos need only a strategy + `AlgoSpec` registered as an `AlgoType` (BUILTIN in `algos/builtin.py`).
 3. Live Kite is wired (#185): `broker/kite/live.py` (KiteLive). Kite accounts run from boot without a token; the screen's "Log in to Kite" makes them live with no restart; one account's ticker carries prices; 6 AM logs out. Server entry point: `python -m mocktrade.tools.serve` (settings at the top of the file). Docker: `Dockerfile`, `deploy/` (compose, Caddyfile, README, smoke.sh). Testing Docker in a cloud session: start `dockerd`, pull from `mirror.gcr.io/library/<image>` (Docker Hub returns 429), and put the sandbox proxy CA into local base images only (conversation log 20).
-4. **K8 Options is complete** (#194–#198). **Now: K9 Orders+**. Create its issues first from `docs/design/product-vision.md`: server-side synthetic orders (trailing stop, OCO, bracket), broker GTT through the order spec, and iceberg/TWAP/VWAP algos (as `AlgoSpec`s, so the algo screen shows them with no UI change). Then K10–K13. Ayush's manual steps: `docs/runbooks/server.md` (AWS, Kite, AMO check), then a real trading day.
+4. **K8 Options is complete** (#194–#198). **Now: K9 Orders+** (issues #199–#202). #199 is done (PR #203). Next: #200, synthetic orders as algos with `family="protection"` (trailing stop, OCO exit, bracket; stops stay synthetic until triggered; on restart, raise an ops alert listing the lost ones). Then #201 GTT (`GttBook` port, Kite `/gtt/triggers`, paper simulation, GTT spec). Then #202 screens (ticket Advanced tab from the specs, GTT book, algo screen grouped by family). Then K10–K13. Ayush's manual steps: `docs/runbooks/server.md` (AWS, Kite, AMO check), then a real trading day.
 5. Then the roadmap in `docs/design/product-vision.md` (K8 options, K9 synthetic orders, K10 accounts & charges, K11 replay/backtest, K12 charts & alerts, K13 admin & phone): create each milestone's issues before coding.
 6. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`; build the desktop installer on Windows.
 
