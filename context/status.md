@@ -46,11 +46,11 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | Order ticket + **order spec** (#173) | #175 (base k5-5-screens, branch k5-5b-ticket) | ✅ 179 UI + 529 Python tests; all order types checked in a real browser |
 | K5.6 Desktop app + pop-out windows (#156) | #176 (base k5-5b-ticket, branch k5-6-desktop) | ✅ 181 UI + 12 desktop + 529 Python tests; real Electron run under xvfb (pop-out live, pages can't reach Node, ~600 MB app, ~20–25 MB per pop-out). Ayush: build the installer on Windows (`ui/desktop/README.md`) |
 | Stream sends changes at once (#177) | #178 (base k5-6-desktop, branch k5-7-fast-stream) | ✅ tick → browser ~200 ms → **1–6 ms**; the new latency test fails on the old code |
-| K6.1 Algo engine (#148) | PR on branch k6-1-algo-engine (base k5-7-fast-stream) | ✅ 545 Python tests, 12/12 mutations, paper-broker integration test |
+| K6.1 Algo engine (#148) | #179 (base k5-7-fast-stream, branch k6-1-algo-engine) | ✅ 545 Python tests, 12/12 mutations, paper-broker integration test |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
-Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → K6.1 PR → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → #179 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
