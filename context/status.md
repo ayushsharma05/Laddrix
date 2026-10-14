@@ -1,6 +1,8 @@
 # MockTrade status and next steps
 
-As of 14 Oct 2026. GitHub issues are the source of truth.
+As of 14 Oct 2026 (evening). GitHub issues are the source of truth.
+
+Ladder (K5.4) as built: ![K5.4 ladder](images/k5-4-ladder.png)
 
 ## Active track: Kite Connect (NSE/BSE)
 Decided 14 Oct 2026. MockTrade connects to the real Indian market through Zerodha Kite Connect. A paper broker fills orders against live Kite prices for testing without money. Design: `docs/design/kite-architecture.md` (diagrams in `context/images/kite-*.png`).
@@ -35,11 +37,13 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | K4.2 Reconcile positions with the broker (#142) | #167 (base k4-1-positions) | ✅ 424 tests in total |
 | K5.1 Server + password/TOTP login + API (#143) | #168 (base k4-2-reconcile) | ✅ CI green; 21 security mutations checked |
 | K5.2 Browser stream (#144) | #169 (base k5-1-server) | ✅ CI green, 490 tests; contract in docs/design/stream.md |
-| UI design pass (mockups for approval) | in progress: canvas "MockTrade UI design" (claude.ai artifact) | ⏳ direction changed to a dense trading terminal; ladder + workspace redone, other boards to redo after approval |
+| UI design pass (mockups) | canvas "MockTrade UI design" (claude.ai artifact) | ✅ dense trading terminal; ladder (board 0, interactive) + workspace (board 2) redone; other boards still "old style" |
+| K5.3 UI skeleton: workspace, login, watch list (#145) | #170 (base k5-2-stream) | ✅ CI green after a fix: `ui/src/lib/format.ts` had never been pushed (the Python `.gitignore` ignored every `lib/` folder); rebuilt with tests, `.gitignore` now ignores only `/lib/` |
+| K5.4 Ladder (#146) | #171 (base k5-3-ui) | ✅ 112 UI + 509 Python tests, 13/13 mutations caught, paper trading checked end to end in a real browser |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
-Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
@@ -59,6 +63,8 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 - `platform.py` wires each account (risk → throttle → manager → book → kill/loss watch → reconciler → event log).
 - Stream: prices/positions conflated (250 ms, newest wins), orders never; slow browser closed with 4408 (never silent gaps); reconnect = hello → snapshots → merge by updated_at.
 - Mutation testing now uses `scratchpad/mutate.py`-style harness that always restores files (a killed run once left a mutated line; the suite caught it).
+- Ladder (K5.4): PIQ is estimated in the browser with the paper broker's own queue rule (Kite doesn't report it), so paper and live agree; VAP is counted on the server from every tick (`marketdata/vap.py`, `GET /api/instruments/{id}/vap`) and continued from the stream. The browser makes client order ids (a lost "place" answer can't double-place). Cancels are allowed while trading is stopped (`cancelBlock` vs `tradingBlock` in `ui/src/state/gate.ts`). Optional confirm-over (Cfm) per ladder.
+- Lesson (K5.3): before pushing, check `git status --ignored` for source files hidden by `.gitignore`.
 - Risk: reducing a position is always allowed (even past limits or the daily loss); worst-case position counts working orders; option selling to open is off by default.
 
 **UI direction (Ayush, 14 Oct, after the first mockups):** the first mockups looked like an AI-designed website. The UI must look and work like a professional trading terminal: dense multi-window workspace, many small click-to-trade ladders (Work | Bids | Price | Asks | LTQ | VAP, qty preset buttons, L/M and TIF on the side; click bid = buy, ask = sell, Work = cancel), compact grids (orders, positions, audit trail), tiny window chrome, 11–12 px type. TT-style ladders are the public reference; don't copy any firm's layout or names. Very convenient for the user above all.
@@ -66,9 +72,9 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-1. Ayush merges in order: #123 → #157 → #158 → … → #167.
-2. **UI design pass**: design system, workspace model, every screen as mockups, for Ayush's approval before any UI code.
-3. Then K5.3 UI skeleton (#145) and the screens, then (positions, P&L, reconciliation), multi-user persistence, UI design pass with mockups (approval before UI code), K5–K7.
+1. Ayush merges in order: #123 → #157 → #158 → … → #171.
+2. **K5.5 Blotter, positions and audit screens (#147)**: order book (Working/Filled/Rejected tabs, cancel, cancel all), positions with reconcile state, audit trail with an order's timeline, Messages widget, then the order ticket. Build to canvas boards 3, 4 and 6, and redo those boards in terminal style first if they're still "old style".
+3. Then K5.6 Electron (#156), K6 algos (#148–#151), K7 deploy (#152–#155).
 4. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`.
 
 ## Key facts the design depends on (checked 14 Oct 2026, re-check before going live)
