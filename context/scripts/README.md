@@ -5,6 +5,8 @@
 | `e2e-ladder.cjs` | Real browser (Playwright): log in to the demo server, place/move/cancel from the ladder, a marketable buy fills, position updates, screenshots | `node context/scripts/e2e-ladder.cjs <out-dir>` |
 | `e2e-books.cjs` | Real browser: orders from the ladder, then order book tabs, positions, audit trail + timeline, cancel from the order book, Messages | `node context/scripts/e2e-books.cjs <out-dir>` |
 | `e2e-ticket.cjs` | Real browser: resets the saved layout, then LMT, MKT, SL-M and SL from the order ticket (including a refused stop) | `node context/scripts/e2e-ticket.cjs <out-dir>` |
+| `e2e-algos.cjs` | Real browser: starts a slicer and a spreader from the algo form, expands the spread, pause/resume/stop, reads Messages | `node context/scripts/e2e-algos.cjs <out-dir>` |
+| `mutate-algo-ui.py` | 12 mutations of the algo screen, its model and the store; each must fail a test | `cd ui && python3 ../context/scripts/mutate-algo-ui.py` |
 | `e2e-popout.cjs` | Real browser: pop a ladder out, check it updates live, trade from it, dock it back | `node context/scripts/e2e-popout.cjs <out-dir>` |
 | `ui/desktop/e2e/desktop-smoke.cjs` | The real Electron app under a display: login, pop-out, Node-access probe, memory | `cd ui/desktop && xvfb-run -a node e2e/desktop-smoke.cjs <out-dir>` |
 | `mutate-algo.py` | Breaks each algo-engine safety rule and checks a test fails | `python3 context/scripts/mutate-algo.py` (repo root) |
