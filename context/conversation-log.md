@@ -114,3 +114,8 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 - Ayush: "ensure syncing and latency are very fast from our side". Pop-outs already add no sync delay; next is the stream (send at once, conflate only bursts) and K7.3 measurements.
 - #178: the stream sends a change at once when nothing went out in the last 250 ms, so a single change arrives in 1–6 ms instead of about 200 ms. Order and algo messages are never conflated.
 - K6 algos: #179 engine, #180 slicer, #181 spreader (hedges on every update, never chases beyond the pay-up), #182 algo screen. The algo start form is drawn from each algo's spec, the same "backend provides, frontend displays" rule as the order spec. Started both algos from a real browser against the demo server: each ran to Done, and the spread hedge went out 86 ms after the first leg filled.
+
+## 20. K7 starts: a real server entry point and Docker (14 Oct 2026)
+- There was no production entry point, only the demo. #184 adds `tools/serve.py`: settings from the environment, paper accounts on simulated prices, and kite accounts listed as not running until #183 (opened as a new issue: live Kite wiring).
+- Found and fixed: uvicorn 0.53 re-raises SIGTERM after shutdown, which killed the process before the audit trail was flushed. Serve now exits 0 after a clean shutdown, and a test sends a real SIGTERM.
+- Docker was checked for real in the cloud session. `dockerd` runs there. Docker Hub returned 429, so images came from `mirror.gcr.io` and were tagged with their standard names. The sandbox's TLS proxy CA was added to the local base images only; the committed Dockerfile is clean. Script: `context/scripts/e2e-compose.cjs` (log in through Caddy and trade).
