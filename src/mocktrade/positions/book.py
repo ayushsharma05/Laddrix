@@ -188,6 +188,13 @@ class PositionBook:
         """Net quantity across products: the real exposure (used by risk checks)."""
         return sum(p.qty for (i, _), p in self._positions.items() if i == instrument_id)
 
+    def net_by_instrument(self) -> dict[InstrumentId, int]:
+        """Net quantity per instrument across products (what brokers report as net)."""
+        net: dict[InstrumentId, int] = {}
+        for (instrument_id, _), position in self._positions.items():
+            net[instrument_id] = net.get(instrument_id, 0) + position.qty
+        return net
+
     def realised_paise(self) -> int:
         return _round(sum((p.realised for p in self._positions.values()), Fraction(0)))
 

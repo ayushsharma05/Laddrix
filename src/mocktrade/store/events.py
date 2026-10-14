@@ -164,6 +164,21 @@ class EventLog:
         detail = state.reason if state.engaged else "reset"
         self._put((at.isoformat(), name, KILL_SWITCH, "", detail, json.dumps(payload)))
 
+    def record_note(
+        self,
+        kind: str,
+        account_id: str,
+        detail: str,
+        extra: dict[str, Any] | None = None,
+        ts: datetime | None = None,
+    ) -> None:
+        """Queue an audit note that isn't an order event, e.g. a position mismatch."""
+        if kind in {k.value for k in EventKind}:
+            raise ValueError(f"{kind} is an order event kind; use record()")
+        payload = {"v": SCHEMA, **(extra or {})}
+        stamp = (ts or datetime.now(UTC)).isoformat()
+        self._put((stamp, account_id, kind, "", detail, json.dumps(payload)))
+
     async def flush(self) -> None:
         """Wait until everything queued so far is safely written."""
         if self._thread is None:
