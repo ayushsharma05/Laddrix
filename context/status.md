@@ -48,10 +48,11 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | Stream sends changes at once (#177) | #178 (base k5-6-desktop, branch k5-7-fast-stream) | ✅ tick → browser ~200 ms → **1–6 ms**; the new latency test fails on the old code |
 | K6.1 Algo engine (#148) | #179 (base k5-7-fast-stream, branch k6-1-algo-engine) | ✅ 545 Python tests, 12/12 mutations, paper-broker integration test |
 | K6.2 Slicer (#149) | #180 (base k6-1-algo-engine, branch k6-2-slicer) | ✅ 555 Python tests, 8/8 mutations, 750 parent completed on paper |
+| K6.3 Spreader (#150) | #181 (base k6-2-slicer, branch k6-3-spreader) | ✅ 567 Python tests, 11/12 mutations, NIFTY calendar spread on paper |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
-Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → #179 → #180 → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → #179 → #180 → #181 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
@@ -77,6 +78,7 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 - **Pop-outs (#176):** a widget's window loads `/popout.html` and is drawn by the main page (dockview `addPopoutGroup`), so it shares the one WebSocket/store/link groups: zero sync delay. `/popout.html` has its own CSP (inline styles yes, scripts never). Desktop app = `ui/desktop/` (Electron 44, opens the server, https only; `src/security.ts` rules tested). Electron's binary download fails through Node here: fetch the zip with curl and unpack into `node_modules/electron/dist` + `path.txt` (see how it was done in the #176 session); CI skips the binary (`ELECTRON_SKIP_BINARY_DOWNLOAD=1`).
 - **Speed (Ayush, 14 Oct): "ensure syncing and latency are very fast from our side".** Measure every hop (K7.3) and remove waits we add: first change goes out at once, conflation only during bursts.
 - **Algo engine (K6.1):** `algos/engine.py` + `algos/spec.py`, design `docs/design/algos.md`. Children marked by `parent_id` (`OrderRequest.from_algo`); `algo_id` = exchange-issued id only (none yet). In-flight children count against the parent; a parent isn't final while one is in flight. `AccountRuntime.algos`; `Platform.add_account(algo_types=...)`.
+- **Spreader (#181):** hedges on every child update; keeps hedges on pause/stop; done only when both legs complete; UNHEDGED → ALERT event; 3 refusals in a row while stopping → give up (FAILED). Engine hooks `done()`, `keep_on_stop()`, `on_finish()`, `ctx.report()`, `ctx.send(hedge=True)`.
 - Stream (#178): wait for a change → send at once if nothing went out in the last 250 ms, else wait the rest and send the newest. Measured 1–6 ms tick → browser (was ~200 ms).
 - Paper refuses stops whose trigger the market already passed (Kite does too); SL trigger vs limit checked in `OrderRequest.validate`.
 - Ticket "confirm" is derived from the exact order (`armedFor === signature`), not reset by an effect: an effect-based reset caused a timing-dependent test failure.
@@ -89,7 +91,7 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 
 ## Next
 1. Ayush merges in order: #123 → #157 → #158 → … → #176 → #178.
-2. K6.3 spreader (#150) → K6.4 algo manager screen (#151). Strategies subclass `BaseStrategy` and act only through `AlgoContext`; each publishes an `AlgoSpec` (see `docs/design/algos.md`); register them as `AlgoType`s in the demo/platform wiring.
+2. **K6.4 algo manager screen (#151)**: server endpoints (list algo specs, start with params, pause/resume/stop, list algos) + stream `algo` messages (AlgoEvent) + an Algo Manager widget (canvas board 2: toolbar pause/resume/cancel, grid instrument/algo/side/price/qty/filled/state, expandable children) and a start form drawn from the algo spec. Spread rows show legs/unhedged/traded spread from `AlgoView.extra`; ALERT events go to Messages. Strategies subclass `BaseStrategy` and act only through `AlgoContext`; each publishes an `AlgoSpec` (see `docs/design/algos.md`); register them as `AlgoType`s in the demo/platform wiring.
 3. K7 deploy (#152–#155): Docker + Caddy → Mumbai server checklist → latency/load → morning routine + runbooks. AWS account, static IP and Kite IP whitelist are Ayush's steps.
 4. Then the roadmap in `docs/design/product-vision.md` (K8 options, K9 synthetic orders, K10 accounts & charges, K11 replay/backtest, K12 charts & alerts, K13 admin & phone): create each milestone's issues before coding.
 5. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`; build the desktop installer on Windows.
