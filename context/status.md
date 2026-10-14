@@ -57,10 +57,11 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | K7.4 Ops: scheduler, alerts, runbooks (#155) | #188 (base k7-3-metrics, branch k7-4-ops) | ✅ 627 Python + 202 UI tests; whole simulated trading day test; runbooks `morning.md`, `incidents.md` |
 | K8.1 Option pricing (#189) | #194 (base k7-4-ops, branch k8-1-pricing) | ✅ 813 Python tests, 16/16 mutations; Black-76 on the future, IV, Greeks in traders' units; `docs/design/options.md` |
 | K8.2 Option chain (#190) | #195 (base k8-1-pricing, branch k8-2-chain) | ✅ 822 Python tests; REST + throttled stream `{"op":"chain"}`; simulator prices options by Black-76 + smile; checked live on the demo |
+| K8.3 Chain widget (#191) | #196 (base k8-2-chain, branch k8-3-chain-widget) | ✅ 214 UI tests; real browser: live chain, click drives the ticket, maximize (double-click a tab) |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
-Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → #179 → #180 → #181 → #182 → #184 → #185 → #186 → #187 → #188 → #194 → #195 → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → #179 → #180 → #181 → #182 → #184 → #185 → #186 → #187 → #188 → #194 → #195 → #196 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
@@ -98,10 +99,10 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-1. Ayush merges in order: #123 → #157 → #158 → … → #194 → #195.
+1. Ayush merges in order: #123 → #157 → #158 → … → #195 → #196.
 2. **K6 is complete** (#179–#182). Algo screen: `ui/src/widgets/algos/` (form drawn from `/algo-specs`, by param kind; `extra` figures formatted by unit suffix `_paise`/`_ms`); API and stream in `docs/design/algos.md` § "The algo screen". New algos need only a strategy + `AlgoSpec` registered as an `AlgoType` (BUILTIN in `algos/builtin.py`).
 3. Live Kite is wired (#185): `broker/kite/live.py` (KiteLive). Kite accounts run from boot without a token; the screen's "Log in to Kite" makes them live with no restart; one account's ticker carries prices; 6 AM logs out. Server entry point: `python -m mocktrade.tools.serve` (settings at the top of the file). Docker: `Dockerfile`, `deploy/` (compose, Caddyfile, README, smoke.sh). Testing Docker in a cloud session: start `dockerd`, pull from `mirror.gcr.io/library/<image>` (Docker Hub returns 429), and put the sandbox proxy CA into local base images only (conversation log 20).
-4. **K7 code is complete** (#184–#188). Ayush's manual steps: `docs/runbooks/server.md` (AWS, DNS, Kite redirect + IP whitelist, AMO check → close #153), then a real trading day (→ tick #155). **Now: K8 Options**: #189 pricing (#194) and #190 chain (#195) done; next #191 chain widget. Issues: #189 pricing (Black-76 on the future, IV, Greeks), #190 chain service and API, #191 chain widget, #192 strategy builder, #193 baskets with margin. No milestone tool: Ayush can group them into a 'K8 Options' milestone. Speed notes: `docs/design/performance.md`.
+4. **K7 code is complete** (#184–#188). Ayush's manual steps: `docs/runbooks/server.md` (AWS, DNS, Kite redirect + IP whitelist, AMO check → close #153), then a real trading day (→ tick #155). **Now: K8 Options**: #189 pricing (#194), #190 chain (#195) and #191 chain widget (#196) done; next #192 strategy builder (alt-click in the chain adds a leg: not built yet). Issues: #189 pricing (Black-76 on the future, IV, Greeks), #190 chain service and API, #191 chain widget, #192 strategy builder, #193 baskets with margin. No milestone tool: Ayush can group them into a 'K8 Options' milestone. Speed notes: `docs/design/performance.md`.
 5. Then the roadmap in `docs/design/product-vision.md` (K8 options, K9 synthetic orders, K10 accounts & charges, K11 replay/backtest, K12 charts & alerts, K13 admin & phone): create each milestone's issues before coding.
 6. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`; build the desktop installer on Windows.
 
