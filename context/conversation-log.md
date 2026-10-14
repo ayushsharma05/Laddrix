@@ -87,3 +87,8 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 - #168 server: threat table first (passwords, code replay, brute force, cookies, CSRF, impersonation, fake broker callbacks, wrong Zerodha account, leaked DB). Tests found that failed-login counts were rolled back by the database, so the lockout never worked; fixed. A mutation run killed by a timeout left one line mutated; the suite caught it, and the mutation harness now always restores files.
 - #169 stream: prices conflated, orders never; slow browsers disconnected rather than silently skipped; contract written in docs/design/stream.md. Tested against a real uvicorn server.
 - Next: the UI design pass with mockups for Ayush's approval (promised earlier), before UI code.
+
+## 15. UI design pass: direction changed (14 Oct 2026)
+- Claude drew 7 mockups (design system, workspace, ticket states, stopped, login, audit, phone) on a design canvas.
+- Ayush: "looks more like an AI designed website, instead it should look like a trading platform"; trading must be very convenient; TT can be a reference (don't build exactly that). He shared screenshots of his firm's platform for reference only (not saved anywhere, never to be committed).
+- Claude rebuilt the ladder as a working, clickable prototype (simulated prices and fills) and the workspace as a dense terminal (5 ladders, market watch, orders, positions, audit trail grids). Remaining boards are marked "old style" until the direction is approved.

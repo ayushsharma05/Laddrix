@@ -35,7 +35,7 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | K4.2 Reconcile positions with the broker (#142) | #167 (base k4-1-positions) | ✅ 424 tests in total |
 | K5.1 Server + password/TOTP login + API (#143) | #168 (base k4-2-reconcile) | ✅ CI green; 21 security mutations checked |
 | K5.2 Browser stream (#144) | #169 (base k5-1-server) | ✅ CI green, 490 tests; contract in docs/design/stream.md |
-| UI design pass (mockups for approval) | next | ⏳ before K5.3 UI code |
+| UI design pass (mockups for approval) | in progress: canvas "MockTrade UI design" (claude.ai artifact) | ⏳ direction changed to a dense trading terminal; ladder + workspace redone, other boards to redo after approval |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
@@ -60,6 +60,8 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 - Stream: prices/positions conflated (250 ms, newest wins), orders never; slow browser closed with 4408 (never silent gaps); reconnect = hello → snapshots → merge by updated_at.
 - Mutation testing now uses `scratchpad/mutate.py`-style harness that always restores files (a killed run once left a mutated line; the suite caught it).
 - Risk: reducing a position is always allowed (even past limits or the daily loss); worst-case position counts working orders; option selling to open is off by default.
+
+**UI direction (Ayush, 14 Oct, after the first mockups):** the first mockups looked like an AI-designed website. The UI must look and work like a professional trading terminal: dense multi-window workspace, many small click-to-trade ladders (Work | Bids | Price | Asks | LTQ | VAP, qty preset buttons, L/M and TIF on the side; click bid = buy, ask = sell, Work = cancel), compact grids (orders, positions, audit trail), tiny window chrome, 11–12 px type. TT-style ladders are the public reference; don't copy any firm's layout or names. Very convenient for the user above all.
 
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
