@@ -1,0 +1,118 @@
+3	closed	Phase 0 · Setup	Clean up merged branches and adopt the pull-request-only rule
+4	closed	Phase 0 · Setup	Create the GitHub Projects board
+5	closed	Phase 0 · Setup	Set up your Windows laptop: Git, Python and VS Code
+6	closed	Phase 0 · Setup	Clone MockTrade and run the tests on your laptop
+7	closed	Phase 0 · Setup	Your first pull request from the laptop: fix test style and add requirements-dev.txt
+8	closed	Phase 1 · The trader	Learn: user stories and how product teams interview users
+9	closed	Phase 1 · The trader	Trader interview: answer the discovery questions
+10	closed	Phase 1 · The trader	Product brief: scope, core stories and hard numbers (docs/requirements/brief.md)
+11	closed	Phase 1 · The trader	Rank the stories and define what each release contains
+12	closed	Phase 2 · Hard numbers	Learn: latency, throughput, availability and recovery
+13	closed	Phase 2 · Hard numbers	Write the hard numbers (docs/requirements/hard-numbers.md)
+14	closed	Phase 3 · Study CME	Learn: how an exchange works inside
+15	closed	Phase 3 · Study CME	Read CME MDP 3.0 (market data) and write notes
+16	closed	Phase 3 · Study CME	Read CME iLink 3 (order entry) and write notes
+17	open	Phase 3 · Study CME	Write product facts for gold, silver and copper futures
+18	open	Phase 3 · Study CME	Get one day of real COMEX data (Databento) and describe it
+19	open	Phase 3 · Study CME	ADR-0001: which products MockTrade supports first
+20	open	Phase 4 · Business model	Write the glossary (docs/design/glossary.md)
+21	open	Phase 4 · Business model	Domain model: entities, fields and relationships
+22	open	Phase 4 · Business model	ADR-0002: the ID scheme
+23	open	Phase 5 · Architecture	Architecture document for MockTrade
+24	open	Phase 5 · Architecture	ADR-0003: programming language and runtime
+25	open	Phase 5 · Architecture	ADR-0004: how services talk to each other
+26	open	Phase 5 · Architecture	ADR-0005: storage
+27	open	Phase 5 · Architecture	ADR-0006: UI technology
+28	open	Phase 6 · Contracts	Message dictionary v1
+29	open	Phase 6 · Contracts	Order life story (state machine)
+30	open	Phase 6 · Contracts	Sequence diagrams for the six key journeys
+31	open	Phase 6 · Contracts	UI ↔ App Server API
+32	open	Phase 7 · Failures & budgets	Failure catalogue
+33	open	Phase 7 · Failures & budgets	Latency and capacity budget
+34	moved	Phase 8 · Test strategy	MockCME design
+35	open	Phase 8 · Test strategy	Test plan and v0.1 scenarios
+36	open	v0.1 · Walking skeleton	common: message classes and tests
+37	moved	v0.1 · Walking skeleton	MockCME: order book and price-time matching
+38	moved	v0.1 · Walking skeleton	MockCME: network interface
+39	open	v0.1 · Walking skeleton	SOR (runner): minimal version
+40	open	v0.1 · Walking skeleton	ROM (guard): minimal version
+41	open	v0.1 · Walking skeleton	App Server (reception desk): minimal version
+42	open	v0.1 · Walking skeleton	UI: order ticket and order list
+43	open	v0.1 · Walking skeleton	End-to-end test and release v0.1
+44	open	v0.2 · Safe orders	ROM: static validation
+45	open	v0.2 · Safe orders	ROM: risk limits
+46	open	v0.2 · Safe orders	Cancel and modify, end to end
+47	open	v0.2 · Safe orders	UI: rejects and order states
+48	open	v0.2 · Safe orders	Release v0.2
+49	moved	v0.3 · Real market	MockCME: replay real market data
+50	open	v0.3 · Real market	MDS (newsroom): book builder, subscriptions, throttler
+51	open	v0.3 · Real market	UI: price ladder with click-to-trade
+52	moved	v0.3 · Real market	MockCME: fill model for your orders against the replayed market
+53	open	v0.3 · Real market	Release v0.3
+54	open	v0.4 · Books	Accounts: positions and P&L from fills
+55	open	v0.4 · Books	Drop copy and reconciliation
+56	open	v0.4 · Books	ROM: persistence and restart recovery
+57	open	v0.4 · Books	UI: positions and P&L
+58	open	v0.4 · Books	Release v0.4
+59	open	v0.5 · Robots	Algo engine: event-driven lifecycle
+60	open	v0.5 · Robots	First algo: order slicer
+61	open	v0.5 · Robots	Spread definitions and implied prices
+62	open	v0.5 · Robots	Spread hedger with legging-risk handling
+63	open	v0.5 · Robots	UI: algo control (MASE-style)
+64	open	v0.5 · Robots	Release v0.5
+65	open	v1.0 · Production-grade	Structured logging in every service
+66	open	v1.0 · Production-grade	Health: running vs ready, plus metrics
+67	open	v1.0 · Production-grade	Grafana dashboard
+68	open	v1.0 · Production-grade	Docker Compose: London and Aurora groups with fake distance
+69	open	v1.0 · Production-grade	Failure drills
+70	open	v1.0 · Production-grade	Runbooks
+71	open	v1.0 · Production-grade	Docs complete and release v1.0
+73	moved	v0.6 · Multi-site & routing	Second mock exchange at a second site
+74	open	v0.6 · Multi-site & routing	Routing table: instrument → exchange → that site's guard
+75	open	v0.6 · Multi-site & routing	Runner: exchange session pool
+76	open	v0.6 · Multi-site & routing	Runner: exchange message throttle
+77	open	v0.6 · Multi-site & routing	Runner: disconnect handling and cancel-on-disconnect
+78	open	v0.6 · Multi-site & routing	Guard: round-robin across several runners
+79	open	v0.6 · Multi-site & routing	Guard: reconcile with the exchange
+80	open	v0.6 · Multi-site & routing	Guard: position reserve
+81	open	v0.6 · Multi-site & routing	Guard: expired contract handling
+82	open	v0.6 · Multi-site & routing	Guard: kill switch, daily loss limit and order-rate limit
+83	open	v0.6 · Multi-site & routing	Guard-to-guard link: firm-wide risk across sites
+84	open	v0.6 · Multi-site & routing	Participant ID registration
+85	open	v0.6 · Multi-site & routing	Release v0.6
+86	open	v0.7 · Platform services	Reference data service: instruments, products, spreads, strategies
+87	open	v0.7 · Platform services	Newsroom: data store and recent-data cache
+88	open	v0.7 · Platform services	Event log (careful lane)
+89	open	v0.7 · Platform services	Accounts as a stream pipeline
+90	open	v0.7 · Platform services	Drop copy readers per source
+91	open	v0.7 · Platform services	Firm order book copy and query API
+92	open	v0.7 · Platform services	Compliance alerts
+93	open	v0.7 · Platform services	End-of-day jobs
+94	open	v0.7 · Platform services	User setup: users, accounts, permissions and limits
+95	open	v0.7 · Platform services	Reception desk: multi-user login, sessions and permission check
+96	open	v0.7 · Platform services	Admin panel
+97	open	v0.7 · Platform services	Live broadcaster for orders, fills and positions
+98	open	v0.7 · Platform services	Shared settings service
+99	open	v0.7 · Platform services	Release v0.7
+100	open	v0.8 · Gateways, tools & screens	Newsroom feed adapters: two feed formats
+101	open	v0.8 · Gateways, tools & screens	Newsroom: gap detection and snapshot recovery
+102	open	v0.8 · Gateways, tools & screens	Practice mode: practice runner and simulator
+103	open	v0.8 · Gateways, tools & screens	Queue-position estimate on the ladder
+104	open	v0.8 · Gateways, tools & screens	FIX gateway and FIX risk adapter
+105	open	v0.8 · Gateways, tools & screens	Broker route: mock broker gateway and broker drop copy
+106	open	v0.8 · Gateways, tools & screens	Client SDK and an external algo app
+107	open	v0.8 · Gateways, tools & screens	Scripted strategies in a sandbox
+108	open	v0.8 · Gateways, tools & screens	Strategy upload tool
+109	open	v0.8 · Gateways, tools & screens	Spreader: quoting-leg selection and re-pricing
+110	open	v0.8 · Gateways, tools & screens	Screens: audit trail and hedge manager
+111	open	v0.8 · Gateways, tools & screens	Screens: multi-tab workspace with saved layouts
+112	open	v0.8 · Gateways, tools & screens	Release v0.8
+113	open	v1.0 · Production-grade	Several reception desks behind a load-balancing gate
+114	open	v1.0 · Production-grade	Environments: live-sim, dev and cert
+115	open	v1.0 · Production-grade	Deployment process: tags, approval and maintenance windows
+116	open	v1.0 · Production-grade	Status monitor page
+117	open	v1.0 · Production-grade	Central log search
+118	open	v1.0 · Production-grade	Shared service skeleton for every service
+119	open	v1.0 · Production-grade	Architecture coverage: every reference box built
+120	open	v0.3 · Real market	UI: Time & Sales window
+121	open	v0.4 · Books	UI: fill alerts and order-confirmation setting
