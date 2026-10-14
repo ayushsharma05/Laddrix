@@ -51,10 +51,11 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | K6.3 Spreader (#150) | #181 (base k6-2-slicer, branch k6-3-spreader) | ✅ 567 Python tests, 11/12 mutations, NIFTY calendar spread on paper |
 | K6.4 Algo screen (#151) | #182 (base k6-3-spreader, branch k6-4-algo-screen) | ✅ 572 Python + 197 UI tests, 12/12 UI mutations, slicer and spreader started from the browser and run to Done on paper |
 | K7.1 Docker + Caddy (#152) | #184 (base k6-4-algo-screen, branch k7-1-docker) | ✅ 583 Python tests; real `docker compose up`: HTTPS via Caddy, login + ladder fill over proxied WebSocket, clean SIGTERM exit 0 |
+| K7.1b Live Kite in serve (#183) | #185 (base k7-1-docker, branch k7-1b-live-kite) | ✅ 596 Python + 201 UI tests, fake-Kite tests 9, 12/12 mutations; real kite-mode run: strip + "Log in to Kite" to Zerodha with api_key/state |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
-Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → #179 → #180 → #181 → #182 → #184 → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → #179 → #180 → #181 → #182 → #184 → #185 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
@@ -92,10 +93,10 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-1. Ayush merges in order: #123 → #157 → #158 → … → #182 → #184.
+1. Ayush merges in order: #123 → #157 → #158 → … → #184 → #185.
 2. **K6 is complete** (#179–#182). Algo screen: `ui/src/widgets/algos/` (form drawn from `/algo-specs`, by param kind; `extra` figures formatted by unit suffix `_paise`/`_ms`); API and stream in `docs/design/algos.md` § "The algo screen". New algos need only a strategy + `AlgoSpec` registered as an `AlgoType` (BUILTIN in `algos/builtin.py`).
-3. **Now: #183 live Kite in `tools/serve.py`** (MOCKTRADE_PRICES=kite: instrument dump, ticker, KiteBroker per kite account, daily login from the screen starts them without restart; fake-Kite e2e test). Server entry point = `python -m mocktrade.tools.serve` (settings at the top of the file); Docker: `Dockerfile`, `deploy/compose.yaml`, `deploy/Caddyfile`, `deploy/README.md`, `deploy/smoke.sh`. Testing Docker in a cloud session: start `dockerd`; Docker Hub is rate-limited, pull from `mirror.gcr.io/library/<image>` and tag; the sandbox proxy CA must be baked into local base images (see conversation log 20).
-4. Then K7 (#153–#155): Docker + Caddy → Mumbai server checklist → latency/load → morning routine + runbooks. AWS account, static IP and Kite IP whitelist are Ayush's steps.
+3. Live Kite is wired (#185): `broker/kite/live.py` (KiteLive). Kite accounts run from boot without a token; the screen's "Log in to Kite" makes them live with no restart; one account's ticker carries prices; 6 AM logs out. Server entry point: `python -m mocktrade.tools.serve` (settings at the top of the file). Docker: `Dockerfile`, `deploy/` (compose, Caddyfile, README, smoke.sh). Testing Docker in a cloud session: start `dockerd`, pull from `mirror.gcr.io/library/<image>` (Docker Hub returns 429), and put the sandbox proxy CA into local base images only (conversation log 20).
+4. **Now: K7 (#153–#155)**: Docker + Caddy → Mumbai server checklist → latency/load → morning routine + runbooks. AWS account, static IP and Kite IP whitelist are Ayush's steps.
 5. Then the roadmap in `docs/design/product-vision.md` (K8 options, K9 synthetic orders, K10 accounts & charges, K11 replay/backtest, K12 charts & alerts, K13 admin & phone): create each milestone's issues before coding.
 6. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`; build the desktop installer on Windows.
 

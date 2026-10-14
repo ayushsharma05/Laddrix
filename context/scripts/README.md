@@ -8,6 +8,8 @@
 | `e2e-algos.cjs` | Real browser: starts a slicer and a spreader from the algo form, expands the spread, pause/resume/stop, reads Messages | `node context/scripts/e2e-algos.cjs <out-dir>` |
 | `mutate-algo-ui.py` | 12 mutations of the algo screen, its model and the store; each must fail a test | `cd ui && python3 ../context/scripts/mutate-algo-ui.py` |
 | `e2e-compose.cjs` | Real browser through Caddy (`https://localhost`, compose stack up): log in with the user's TOTP secret, buy from the ladder, positions and audit | `node context/scripts/e2e-compose.cjs <totp-secret>` |
+| `e2e-kite-login.cjs` | Real browser against `serve` in kite mode (no Kite needed): the strip says login is needed, and the button goes to Zerodha with api_key and state | `node context/scripts/e2e-kite-login.cjs <totp-secret>` |
+| `mutate-kite-live.py` | 12 mutations of `broker/kite/live.py`; each must fail `tests/test_kite_live.py` | `python3 context/scripts/mutate-kite-live.py` |
 | `e2e-popout.cjs` | Real browser: pop a ladder out, check it updates live, trade from it, dock it back | `node context/scripts/e2e-popout.cjs <out-dir>` |
 | `ui/desktop/e2e/desktop-smoke.cjs` | The real Electron app under a display: login, pop-out, Node-access probe, memory | `cd ui/desktop && xvfb-run -a node e2e/desktop-smoke.cjs <out-dir>` |
 | `mutate-algo.py` | Breaks each algo-engine safety rule and checks a test fails | `python3 context/scripts/mutate-algo.py` (repo root) |
