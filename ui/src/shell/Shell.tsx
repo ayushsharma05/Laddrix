@@ -1,0 +1,335 @@
+// The terminal around the widgets:
+//
+//   menu bar     MockTrade · account ▾                                   user · Log out
+//   toolbar      Widgets ▾ · Search (/) ······ lights · rate · Day P&L · Layouts ▾ · clock · Save · Lock · STOP
+//   env strip    PAPER · orders fill against live prices, nothing goes to the exchange
+//   bands        (only when needed)
+//   desktop      dockview widgets
+//   page tabs    Main | + ……………………………… working count · layout saved
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useApp, useNow, useStore } from "../app/context";
+import { Menu } from "../components/Menu";
+import { SearchBox } from "../components/SearchBox";
+import { clock, rupees } from "../lib/format";
+import { browserStorage, LayoutStore } from "../workspace/layouts";
+import { WorkspaceController } from "../workspace/controller";
+import { buildDefault } from "../workspace/defaults";
+import { allWidgets } from "../workspace/registry";
+import { Workspace } from "../workspace/Workspace";
+import { Bands, PRICES_OLD_MS } from "./Bands";
+import { StopDialog } from "./StopDialog";
+
+export const RATE_LIMIT_PER_MIN = 350; // the platform's own per-minute order limit (risk/throttle.py)
+
+export function Shell() {
+  const app = useApp();
+  const me = useStore((s) => s.me)!;
+  const controller = useMemo(
+    () =>
+      new WorkspaceController({
+        layouts: new LayoutStore(app.rest, browserStorage(), me.user.id),
+        buildDefault: (api, page) => buildDefault(api, page, app.instruments),
+        notify: (level, text) => app.store.addMessage(level, "", text),
+      }),
+    [app, me.user.id],
+  );
+  useEffect(() => () => controller.dispose(), [controller]);
+  const [dialog, setDialog] = useState<"stop" | "resume" | null>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const stopped = useStore((s) => Boolean(s.accountId && s.books[s.accountId]?.kill.engaged));
+
+  // keys that work anywhere: "/" search, Ctrl+Shift+K STOP, Ctrl+S save the layout
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (e.key === "/" && !typing) {
+        e.preventDefault();
+        search.current?.focus();
+      } else if (e.ctrlKey && e.shiftKey && (e.key === "K" || e.key === "k")) {
+        e.preventDefault();
+        setDialog("stop");
+      } else if (e.ctrlKey && !e.shiftKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        void controller.saveNow();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [controller]);
+
+  return (
+    <div className="terminal">
+      <MenuBar />
+      <div className="toolbar">
+        <Menu label="Widgets ▾">
+          {(close) =>
+            allWidgets().map((w) => (
+              <button
+                key={w.kind}
+                type="button"
+                role="menuitem"
+                className="menu-item"
+                onClick={() => {
+                  controller.addWidget(w.kind);
+                  close();
+                }}
+              >
+                <span className="strong">{w.title}</span>
+                <span className="dim">{w.description}</span>
+              </button>
+            ))
+          }
+        </Menu>
+        <SearchBox
+          ref={search}
+          className="toolbar-search"
+          placeholder="Search product  ( / )"
+          onPick={(i) => {
+            // the pink ladders and tickets switch to it; with none open, open a ladder
+            if (app.links.hasFollowers("pink")) app.links.publish("pink", i.id);
+            else controller.addWidget("ladder", { instrumentId: i.id, link: "pink" });
+          }}
+        />
+        <span className="grow" />
+        <StatusLights />
+        <span className="sep" />
+        <DayPnl />
+        <LayoutsMenu controller={controller} />
+        <Clock />
+        <button type="button" className="btn" title="Save the layout now (Ctrl+S)" onClick={() => void controller.saveNow()}>
+          Save
+        </button>
+        <LockButton controller={controller} />
+        {stopped ? (
+          <button type="button" className="btn stopped-btn" title="Trading is stopped: click to resume" onClick={() => setDialog("resume")}>
+            STOPPED
+          </button>
+        ) : (
+          <button type="button" className="btn stop" title="Stop trading (Ctrl+Shift+K)" onClick={() => setDialog("stop")}>
+            STOP
+          </button>
+        )}
+      </div>
+      <EnvStrip />
+      <Bands />
+      <Workspace controller={controller} />
+      {dialog && <StopDialog mode={dialog} onClose={() => setDialog(null)} />}
+    </div>
+  );
+}
+
+function MenuBar() {
+  const { session, store } = useApp();
+  const me = useStore((s) => s.me)!;
+  const accountId = useStore((s) => s.accountId);
+  return (
+    <nav className="menubar" aria-label="Menu">
+      <span className="brand">MockTrade</span>
+      <label className="account-pick">
+        <span className="dim">Account</span>
+        <select value={accountId ?? ""} onChange={(e) => store.selectAccount(e.target.value)} aria-label="Account for new orders">
+          {me.accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.id} · {a.broker}
+              {a.can_trade ? "" : " (view only)"}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className="grow" />
+      <span className="dim">
+        {me.user.name} · {me.user.roles.join(", ")}
+      </span>
+      <button type="button" className="link-btn" onClick={() => void session.logout()}>
+        Log out
+      </button>
+    </nav>
+  );
+}
+
+function EnvStrip() {
+  const me = useStore((s) => s.me);
+  const accountId = useStore((s) => s.accountId);
+  const account = me?.accounts.find((a) => a.id === accountId);
+  if (!account) return <div className="env-strip none">NO ACCOUNT · you can watch prices but not trade</div>;
+  if (account.broker === "paper") {
+    return (
+      <div className="env-strip paper">
+        PAPER · {account.id} · orders fill against live prices; nothing goes to the exchange
+      </div>
+    );
+  }
+  return (
+    <div className="env-strip live">
+      LIVE · {account.broker.toUpperCase()} · {account.broker_client_id} · orders go to the exchange
+    </div>
+  );
+}
+
+function StatusLights() {
+  const { stream, store } = useApp();
+  const now = useNow(1000);
+  const status = useStore((s) => s.stream);
+  const reconcile = useStore((s) => (s.accountId ? s.books[s.accountId]?.reconcile : null));
+  const alerts = useStore((s) => (s.accountId ? s.books[s.accountId]?.alerts : undefined));
+  useStore((s) => s.sentTimes);
+
+  const server = status === "open" ? "good" : "bad";
+  const age = stream.lastTickAt === null ? null : now - stream.lastTickAt;
+  const prices = status !== "open" ? "bad" : age === null ? "off" : age > PRICES_OLD_MS ? "pending" : "good";
+  const recon =
+    alerts && Object.keys(alerts).length > 0 ? "bad" : reconcile?.ok === true ? "good" : reconcile?.ok === false ? "pending" : "off";
+  const sent = store.sentLastMinute();
+  return (
+    <span className="lights">
+      <Light state={server} label="Server" title={`Connection to MockTrade: ${status}`} />
+      <Light
+        state={prices}
+        label="Prices"
+        title={age === null ? "No prices yet" : `Last price ${Math.round(age / 1000)} s ago`}
+      />
+      <Light
+        state={recon}
+        label="Recon"
+        title={
+          reconcile?.checked_at
+            ? `Positions checked against the broker at ${clock(reconcile.checked_at, false)}${reconcile.error ? `: ${reconcile.error}` : ""}`
+            : "Positions not checked against the broker yet"
+        }
+      />
+      <span className={`rate${sent > RATE_LIMIT_PER_MIN * 0.8 ? " pending" : ""}`} title="Orders sent in the last minute / the limit">
+        {sent}/{RATE_LIMIT_PER_MIN}·min
+      </span>
+    </span>
+  );
+}
+
+function Light({ state, label, title }: { state: string; label: string; title: string }) {
+  return (
+    <span className="light" title={title}>
+      <span className={`dot ${state}`} aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+function DayPnl() {
+  const pnl = useStore((s) => (s.accountId ? (s.books[s.accountId]?.dayPnl ?? 0) : 0));
+  return (
+    <span className="day-pnl" title="Today's profit and loss on this account (realised + unrealised)">
+      Day <b className={pnl > 0 ? "good" : pnl < 0 ? "bad" : ""}>{rupees(pnl, { sign: true })}</b>
+    </span>
+  );
+}
+
+function Clock() {
+  const now = useNow(1000);
+  return (
+    <span className="clock" title="India time">
+      {clock(new Date(now).toISOString(), false)}
+    </span>
+  );
+}
+
+function LockButton({ controller }: { controller: WorkspaceController }) {
+  const [locked, setLocked] = useState(controller.locked);
+  return (
+    <button
+      type="button"
+      className={locked ? "btn on" : "btn"}
+      aria-pressed={locked}
+      title={locked ? "Layout locked: widgets can't be moved or closed" : "Lock the layout"}
+      onClick={() => {
+        controller.setLocked(!locked);
+        setLocked(!locked);
+      }}
+    >
+      {locked ? "Locked" : "Lock"}
+    </button>
+  );
+}
+
+function LayoutsMenu({ controller }: { controller: WorkspaceController }) {
+  const { store } = useApp();
+  const [names, setNames] = useState<string[] | null>(null);
+  const [name, setName] = useState("");
+  const layouts = controller.layouts;
+  const refresh = () => {
+    setNames(null);
+    layouts.list().then(setNames, () => setNames([]));
+  };
+  return (
+    <Menu label="Layouts ▾" align="right" onOpen={refresh}>
+      {(close) => (
+        <div className="layouts-menu">
+          <form
+            className="row-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void controller.saveAs(name).then((ok) => {
+                if (ok) {
+                  setName("");
+                  refresh();
+                }
+              });
+            }}
+          >
+            <input
+              className="input"
+              placeholder="Save as…"
+              aria-label="Layout name"
+              maxLength={64}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <button type="submit" className="btn">
+              Save
+            </button>
+          </form>
+          <div className="menu-label">Saved layouts</div>
+          {names === null && <div className="menu-note">Loading…</div>}
+          {names?.length === 0 && <div className="menu-note">None yet</div>}
+          {names?.map((n) => (
+            <div key={n} className="menu-item split">
+              <button
+                type="button"
+                role="menuitem"
+                className="plain grow"
+                onClick={() => {
+                  close();
+                  void controller.open(n);
+                }}
+              >
+                {n}
+              </button>
+              <button
+                type="button"
+                className="plain dim"
+                aria-label={`Delete layout ${n}`}
+                title="Delete"
+                onClick={() =>
+                  void layouts.remove(n).then(refresh, (err: Error) => store.addMessage("ERROR", "", err.message))
+                }
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <div className="menu-sep" />
+          <button
+            type="button"
+            role="menuitem"
+            className="menu-item"
+            onClick={() => {
+              close();
+              void controller.reset();
+            }}
+          >
+            Reset to the starter layout
+          </button>
+        </div>
+      )}
+    </Menu>
+  );
+}

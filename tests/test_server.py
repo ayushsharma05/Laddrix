@@ -462,3 +462,68 @@ async def test_broker_login_state_expires(world):
     r = await c.get(f"/kite/callback?status=success&request_token=rt&state={state}")
     assert r.headers["location"] == "/?broker_login=failed"
     await c.aclose()
+
+
+# --- instruments and layouts ---------------------------------------------------------------------
+
+
+async def test_instrument_search_and_detail(world):
+    c = await world.logged_in()
+    found = (await c.get("/api/instruments", params={"q": "nifty"})).json()
+    assert [i["id"] for i in found] == [FUT]
+    detail = (await c.get(f"/api/instruments/{FUT}")).json()
+    assert (detail["lot_size"], detail["tick_paise"], detail["ltp_paise"]) == (75, 10, 2501000)
+    assert (await c.get("/api/instruments/NSE:NOPE")).status_code == 404
+    await c.aclose()
+
+
+async def test_layouts_are_saved_per_user(world):
+    ayush = await world.logged_in("ayush")
+    riya = await world.logged_in("riya")
+    layout = {"widgets": [{"type": "ladder", "instrument": FUT, "link": "pink"}]}
+    assert (await ayush.put("/api/layouts/Main", json={"layout": layout})).status_code == 200
+    assert (await ayush.get("/api/layouts/Main")).json()["layout"] == layout
+    assert [x["name"] for x in (await ayush.get("/api/layouts")).json()] == ["Main"]
+    assert (await riya.get("/api/layouts/Main")).status_code == 404  # her own layouts only
+    assert (await ayush.put("/api/layouts/bad%2Fname", json={"layout": {}})).status_code in (
+        404,
+        422,
+    )
+    huge = {"x": "y" * 300_000}
+    assert (await ayush.put("/api/layouts/Big", json={"layout": huge})).status_code == 422
+    assert (await ayush.delete("/api/layouts/Main")).status_code == 204
+    assert (await ayush.delete("/api/layouts/Main")).status_code == 404
+    for c in (ayush, riya):
+        await c.aclose()
+
+
+async def test_layout_count_is_capped(world, monkeypatch):
+    from mocktrade.server import users as users_module
+
+    monkeypatch.setattr(users_module, "MAX_LAYOUTS_PER_USER", 2)
+    c = await world.logged_in()
+    for name in ("A", "B"):
+        assert (await c.put(f"/api/layouts/{name}", json={"layout": {}})).status_code == 200
+    assert (await c.put("/api/layouts/C", json={"layout": {}})).status_code == 422
+    assert (await c.put("/api/layouts/A", json={"layout": {"v": 2}})).status_code == 200
+    await c.aclose()
+
+
+async def test_the_built_screens_are_served_without_shadowing_the_api(world, tmp_path):
+    ui = tmp_path / "dist"
+    (ui / "assets").mkdir(parents=True)
+    (ui / "index.html").write_text("<!doctype html><title>MockTrade</title>")
+    (ui / "assets" / "app-abc123.js").write_text("console.log(1)")
+    (tmp_path / "secret.txt").write_text("not for the web")
+    app = create_app(world.platform, world.users, ServerSettings(origin=ORIGIN), static_dir=ui)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://testserver"
+    ) as c:
+        assert "MockTrade" in (await c.get("/")).text
+        assert "MockTrade" in (await c.get("/workspace/main")).text  # app routes → index
+        asset = await c.get("/assets/app-abc123.js")
+        assert asset.text == "console.log(1)" and "immutable" in asset.headers["cache-control"]
+        assert "not for the web" not in (await c.get("/../secret.txt")).text
+        assert "not for the web" not in (await c.get("/%2e%2e/secret.txt")).text
+        assert (await c.get("/api/nothing-here")).status_code == 404
+        assert (await c.get("/api/me")).status_code == 401  # still the API

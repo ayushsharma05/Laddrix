@@ -13,19 +13,22 @@ same format as the event log (orders/codec.py).
 """
 
 import asyncio
+import json
 import logging
 import time
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 from typing import Annotated, Any, Protocol
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_view
+from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Validity
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import OrderError
@@ -111,6 +114,10 @@ class StopIn(_Strict):
     reason: str = Field(min_length=1, max_length=200)
 
 
+class LayoutIn(_Strict):
+    layout: dict[str, Any]  # the screens' own description of their widgets
+
+
 # --- the app -------------------------------------------------------------------------------
 
 
@@ -121,6 +128,7 @@ def create_app(
     *,
     broker_login: BrokerLogin | None = None,
     monotonic: Callable[[], float] = time.monotonic,
+    static_dir: Path | None = None,
 ) -> FastAPI:
     app = FastAPI(title="MockTrade", docs_url=None, redoc_url=None, openapi_url=None)
     hub = StreamHub(platform, users, origin=settings.origin, cookie_name=settings.cookie_name)
@@ -139,7 +147,11 @@ def create_app(
             if not request.headers.get("content-type", "").startswith("application/json"):
                 if request.method != "DELETE":
                     return _headers(JSONResponse({"detail": "send JSON"}, 415))
-        return _headers(await call_next(request))
+        response = await call_next(request)
+        if request.url.path.startswith("/assets/") and response.status_code == 200:
+            # built files carry a content hash in their name: safe to cache for a year
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return _headers(response)
 
     def current_user(request: Request) -> User:
         user = users.session_user(request.cookies.get(settings.cookie_name))
@@ -206,6 +218,45 @@ def create_app(
     @app.get("/api/me")
     async def me(user: Me) -> dict[str, Any]:
         return _me(user, users, platform)
+
+    # --- instruments and layouts -------------------------------------------------------------
+
+    @app.get("/api/instruments")
+    async def search_instruments(user: Me, q: str = "", limit: int = 20) -> list[dict[str, Any]]:
+        limit = max(1, min(limit, 50))
+        return [_instrument(i) for i in platform.instruments.search(q, limit)]
+
+    @app.get("/api/instruments/{instrument_id}")
+    async def get_instrument(instrument_id: str, user: Me) -> dict[str, Any]:
+        instrument = platform.instruments.get(instrument_id)
+        if instrument is None:
+            raise HTTPException(404, "no such instrument")
+        tick = platform.market_data.latest(instrument_id)
+        return {**_instrument(instrument), "ltp_paise": tick.ltp_paise if tick else None}
+
+    @app.get("/api/layouts")
+    async def list_layouts(user: Me) -> list[dict[str, str]]:
+        return [{"name": n, "updated_at": t} for n, t in users.layouts(user.id)]
+
+    @app.get("/api/layouts/{name}")
+    async def get_layout(name: str, user: Me) -> dict[str, Any]:
+        layout = users.get_layout(user.id, name)
+        if layout is None:
+            raise HTTPException(404, "no such layout")
+        return {"name": name, "layout": json.loads(layout)}
+
+    @app.put("/api/layouts/{name}")
+    async def save_layout(name: str, body: LayoutIn, user: Me) -> dict[str, str]:
+        try:
+            users.save_layout(user.id, name, json.dumps(body.layout, separators=(",", ":")))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+        return {"name": name}
+
+    @app.delete("/api/layouts/{name}", status_code=204)
+    async def delete_layout(name: str, user: Me) -> None:
+        if not users.delete_layout(user.id, name):
+            raise HTTPException(404, "no such layout")
 
     # --- orders ------------------------------------------------------------------------------
 
@@ -381,6 +432,21 @@ def create_app(
         audit("BROKER_LOGIN_OK", user.id, {}, entry[1])
         return RedirectResponse("/?broker_login=ok", status_code=303)
 
+    # --- the screens (the built UI), last so they never shadow the API -------------------------
+
+    if static_dir is not None:
+        root = static_dir.resolve()
+        index = root / "index.html"
+
+        @app.get("/{path:path}", include_in_schema=False)
+        async def screens(path: str) -> FileResponse:
+            if path.startswith(("api/", "ws", "kite/")):
+                raise HTTPException(404, "not found")
+            target = (root / path).resolve()
+            if path and target.is_file() and target.is_relative_to(root):
+                return FileResponse(target)
+            return FileResponse(index)  # the app handles its own routes
+
     return app
 
 
@@ -391,6 +457,21 @@ def _headers(response: Response) -> Response:
     for name, value in SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
     return response
+
+
+def _instrument(i: Instrument) -> dict[str, Any]:
+    return {
+        "id": i.id,
+        "exchange": i.exchange.value,
+        "symbol": i.symbol,
+        "kind": i.kind.value,
+        "tick_paise": i.tick_paise,
+        "lot_size": i.lot_size,
+        "expiry": i.expiry.isoformat() if i.expiry else None,
+        "strike_paise": i.strike_paise,
+        "underlying": i.underlying,
+        "tradable": i.tradable,
+    }
 
 
 def _risk_or_admin(user: User) -> bool:

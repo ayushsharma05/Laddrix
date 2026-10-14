@@ -1,0 +1,287 @@
+/* Design tokens (docs/design/ui.md §2) and the base every screen shares.
+   Text never scales with the window: fixed px sizes everywhere. */
+
+:root {
+  --menu: #12161b;
+  --desktop: #14181d;
+  --toolbar: #181d24;
+  --body: #1f262f;
+  --zebra: #232b35;
+  --chrome: #262e39;
+  --border: #39424f;
+  --border-dark: #10141a;
+  --well: #10141a;
+  --text: #dde3ea;
+  --text-2: #8d99a8;
+  --text-3: #aeb8c5;
+  --bid: #2068c9;
+  --bid-empty: #1a3a66;
+  --ask: #c8323c;
+  --ask-empty: #5a1e24;
+  --price: #c4c9d0;
+  --price-text: #14181d;
+  --last: #1e9e5a;
+  --work-buy: #2f7bff;
+  --work-sell: #e0464f;
+  --vap-bar: #34506f;
+  --primary: #0e9f7e;
+  --primary-border: #12b892;
+  --good: #4cc38a;
+  --bad: #f0646c;
+  --pending: #e8b931;
+  --buy-text: #6fa8ff;
+  --sell-text: #ff7b83;
+  --stop-bg: #4a1b20;
+  --stop-border: #e0464f;
+  --stopped-band: #6e1c22;
+  --live-strip: #1b4d3a;
+  --paper-strip: #6b5a12;
+  --select: #f2c94c;
+
+  --font: "Segoe UI", "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --row: 22px;
+  --ladder-row: 20px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--desktop);
+  color: var(--text);
+  font: 13px/1.3 var(--font);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 1px solid var(--buy-text);
+  outline-offset: -1px;
+}
+
+.grow {
+  flex: 1 1 auto;
+}
+.strong {
+  font-weight: 600;
+}
+.dim {
+  color: var(--text-2);
+}
+.good {
+  color: var(--good);
+}
+.bad {
+  color: var(--bad);
+}
+.pending {
+  color: var(--pending);
+}
+.buy-text {
+  color: var(--buy-text);
+}
+.sell-text {
+  color: var(--sell-text);
+}
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- controls ---------------------------------------------------------------------------- */
+
+.btn {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid #3a4452;
+  border-radius: 2px;
+  background: var(--chrome);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  background: #2e3846;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn.on {
+  background: #2f4b73;
+  border-color: #3d86f0;
+}
+.btn.primary {
+  background: var(--primary);
+  border-color: var(--primary-border);
+  color: #fff;
+  font-weight: 600;
+}
+.btn.stop {
+  padding: 0 14px;
+  border-color: var(--stop-border);
+  background: var(--stop-bg);
+  color: #ffc9cc;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.btn.stop:hover {
+  background: #5c2128;
+}
+.btn.stopped-btn,
+.btn.stop-now {
+  padding: 0 14px;
+  border-color: #ffb3b8;
+  background: var(--work-sell);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.icon-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.icon-btn:hover {
+  color: var(--text);
+}
+
+.link-btn {
+  border: 0;
+  background: none;
+  color: var(--buy-text);
+  cursor: pointer;
+  padding: 0;
+}
+
+.plain {
+  border: 0;
+  background: none;
+  padding: 0 4px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.input {
+  height: 26px;
+  padding: 0 8px;
+  background: var(--well);
+  border: 1px solid #3a4452;
+  border-radius: 0;
+  color: var(--text);
+}
+.input:focus {
+  border-color: #4f78b0;
+  outline: none;
+}
+
+select {
+  height: 22px;
+  background: var(--well);
+  border: 1px solid #3a4452;
+  color: var(--text);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.field .input {
+  height: 28px;
+  font-size: 13px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.alert {
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid;
+}
+.alert.bad {
+  background: #3d1418;
+  border-color: #7a2c33;
+  color: #ffc9cc;
+}
+.alert.warn {
+  background: #4a3a0a;
+  border-color: var(--pending);
+  color: #fff1bf;
+}
+
+.hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-2);
+}
+
+kbd {
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  background: var(--chrome);
+  font: inherit;
+  font-size: 12px;
+}
+
+/* --- a window outside dockview (login, dialogs) ------------------------------------------- */
+
+.window {
+  display: flex;
+  flex-direction: column;
+  background: var(--body);
+  border: 1px solid var(--border);
+}
+.window-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+
+.splash {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-2);
+}
+
+.empty-note {
+  padding: 10px;
+  color: var(--text-2);
+  font-size: 12px;
+}

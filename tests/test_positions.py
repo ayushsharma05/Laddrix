@@ -348,3 +348,31 @@ async def test_loss_watch_fires_at_exactly_the_limit(wired):
     assert watch.check()  # the risk gate already blocks at exactly the limit
     await watch.settle()
     assert switch.engaged
+
+
+async def test_platform_marks_held_positions_from_live_prices(nifty_fut):
+    import asyncio
+
+    from mocktrade.domain.accounts import BrokerAccount
+    from mocktrade.marketdata.service import MarketData
+    from mocktrade.platform import Platform
+    from mocktrade.risk.kill_switch import KillSwitch
+
+    store = InstrumentStore()
+    store.add(nifty_fut)
+    md = MarketData()
+    platform = Platform(store, md, KillSwitch("firm"))
+    runtime = platform.add_account(
+        BrokerAccount("acc-1", "paper", "P1", "u"), FakeBroker(), ids=ClientIds("MT")
+    )
+    runtime.positions.apply_fill(FUT, NRML, BUY, 75, 2501000)
+    task = asyncio.create_task(platform.run(reconcile=False))
+    for _ in range(20):
+        await asyncio.sleep(0)
+    md.on_tick(Tick(FUT, 2502000))
+    for _ in range(50):
+        if runtime.positions.get(FUT, NRML).unrealised_paise:
+            break
+        await asyncio.sleep(0.01)
+    assert runtime.positions.get(FUT, NRML).unrealised_paise == 75_000
+    task.cancel()

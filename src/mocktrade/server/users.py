@@ -50,7 +50,17 @@ CREATE TABLE IF NOT EXISTS sessions (
     last_seen TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sessions_by_user ON sessions (user_id);
+CREATE TABLE IF NOT EXISTS layouts (
+    user_id TEXT NOT NULL REFERENCES users(id),
+    name TEXT NOT NULL,
+    layout TEXT NOT NULL,               -- the screens' own JSON, stored as given
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, name)
+);
 """
+
+MAX_LAYOUT_BYTES = 256 * 1024
+MAX_LAYOUTS_PER_USER = 50
 
 
 class LoginFailed(Exception):
@@ -226,6 +236,52 @@ class UserStore:
                 db.execute(
                     "DELETE FROM sessions WHERE token_hash = ?", (security.token_digest(token),)
                 )
+
+    # --- saved workspace layouts --------------------------------------------------------------
+
+    def layouts(self, user_id: str) -> list[tuple[str, str]]:
+        """(name, updated_at) of each saved layout, newest first."""
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT name, updated_at FROM layouts WHERE user_id = ? ORDER BY updated_at DESC",
+                (user_id,),
+            ).fetchall()
+        return [(r["name"], r["updated_at"]) for r in rows]
+
+    def get_layout(self, user_id: str, name: str) -> str | None:
+        with self._db() as db:
+            row = db.execute(
+                "SELECT layout FROM layouts WHERE user_id = ? AND name = ?", (user_id, name)
+            ).fetchone()
+        return row["layout"] if row else None
+
+    def save_layout(self, user_id: str, name: str, layout: str) -> None:
+        if not name or len(name) > 40 or not name.replace(" ", "").replace("-", "").isalnum():
+            raise ValueError("layout name: 1-40 letters, digits, spaces or dashes")
+        if len(layout.encode()) > MAX_LAYOUT_BYTES:
+            raise ValueError(f"layout is larger than {MAX_LAYOUT_BYTES // 1024} KB")
+        with self._lock, self._db() as db:
+            exists = db.execute(
+                "SELECT 1 FROM layouts WHERE user_id = ? AND name = ?", (user_id, name)
+            ).fetchone()
+            count = db.execute(
+                "SELECT COUNT(*) FROM layouts WHERE user_id = ?", (user_id,)
+            ).fetchone()[0]
+            if not exists and count >= MAX_LAYOUTS_PER_USER:
+                raise ValueError(f"at most {MAX_LAYOUTS_PER_USER} saved layouts")
+            db.execute(
+                "INSERT INTO layouts (user_id, name, layout, updated_at) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT (user_id, name) DO UPDATE SET layout = excluded.layout, "
+                "updated_at = excluded.updated_at",
+                (user_id, name, layout, self._clock().isoformat()),
+            )
+
+    def delete_layout(self, user_id: str, name: str) -> bool:
+        with self._db() as db:
+            cursor = db.execute(
+                "DELETE FROM layouts WHERE user_id = ? AND name = ?", (user_id, name)
+            )
+        return cursor.rowcount > 0
 
     # --- inside -----------------------------------------------------------------------------
 

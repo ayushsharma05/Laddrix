@@ -11,6 +11,7 @@ The order of the gates matters: risk first (it refuses without using any of the
 rate limit), then the throttle (which counts what it lets through).
 """
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -65,6 +66,36 @@ class Platform:
         """Send a tick to every account's positions (market data listener)."""
         for runtime in self.accounts.values():
             runtime.positions.mark(tick)
+
+    async def run(self, *, reconcile: bool = True) -> None:
+        """Run every background loop until cancelled: each account's broker updates and
+        position checks, and marking positions to the latest prices."""
+        loops = [self._mark_loop()]
+        for runtime in self.accounts.values():
+            loops.append(runtime.orders.run())
+            if reconcile:
+                loops.append(runtime.reconciler.run())
+        await asyncio.gather(*loops)
+
+    async def _mark_loop(self) -> None:
+        """Watch the prices of every instrument anyone holds; mark positions as they move."""
+        subscription = self.market_data.subscribe()
+        try:
+            while True:
+                held = {
+                    p.instrument_id
+                    for runtime in self.accounts.values()
+                    for p in runtime.positions.positions()
+                }
+                subscription.add(held - subscription.instrument_ids)
+                try:
+                    batch = await asyncio.wait_for(subscription.next_batch(), 1.0)
+                except TimeoutError:
+                    continue
+                for tick in batch:
+                    self.mark(tick)
+        finally:
+            subscription.close()
 
     def add_account(
         self,
