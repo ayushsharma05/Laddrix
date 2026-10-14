@@ -1,0 +1,21 @@
+{
+  "name": "mocktrade-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MockTrade desktop app: the same screens in real windows that pop out onto any monitor",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
+    "typescript": "~5.9.0",
+    "vitest": "^5.0.4"
+  }
+}

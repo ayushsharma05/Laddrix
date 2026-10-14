@@ -137,3 +137,19 @@ def _timestamp(order: dict[str, Any]) -> datetime:
             except ValueError:
                 continue
     return datetime.now(UTC)
+
+
+def margin_params(request: OrderRequest, variety: str = "regular") -> dict[str, Any]:
+    """One order as Kite's basket-margin endpoint wants it (JSON, numbers not strings)."""
+    exchange, symbol = request.instrument_id.split(":", 1)
+    return {
+        "exchange": exchange,
+        "tradingsymbol": symbol,
+        "transaction_type": request.side.value,
+        "variety": variety,
+        "product": request.product.value,
+        "order_type": request.order_type.value,
+        "quantity": request.qty,
+        "price": float(to_kite_rupees(request.price_paise) or 0),
+        "trigger_price": float(to_kite_rupees(request.trigger_paise) or 0),
+    }

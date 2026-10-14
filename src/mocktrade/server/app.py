@@ -19,25 +19,37 @@ import time
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Any, Literal, Protocol
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from mocktrade.algos.engine import AlgoError
+from mocktrade.algos.spec import spec_to_dict as algo_spec_to_dict
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_view
 from mocktrade.domain.instruments import Instrument
+from mocktrade.domain.order_spec import spec_to_dict
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Validity
+from mocktrade.metrics import METRICS, process_gauges, since_us
+from mocktrade.ops.alerts import Alerts, alert_to_dict
+from mocktrade.ops.scheduler import Scheduler
+from mocktrade.options.chain import ChainService
+from mocktrade.options.strategy import Strategies, StrategyError
+from mocktrade.options.strategy import templates as strategy_templates_list
+from mocktrade.orders.basket import BasketError, LegIn, check_to_dict
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import OrderError
-from mocktrade.platform import AccountRuntime, Platform
+from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.server import security
-from mocktrade.server.formats import position_to_dict
+from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.stream import StreamHub
 from mocktrade.server.users import SESSION_MAX, LoginFailed, UserStore
+from mocktrade.store.events import StoredEvent
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +57,11 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 LOGIN_LIMIT_PER_IP = 20  # attempts per 15 minutes from one address
 LOGIN_WINDOW_S = 15 * 60
 STATE_TTL_S = 10 * 60
+
+POPOUT_CSP = (
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; "
+    "frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
+)
 
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -110,6 +127,47 @@ class ModifyIn(_Strict):
     trigger_paise: int | None = Field(default=None, gt=0)
 
 
+class AlgoIn(_Strict):
+    code: str = Field(min_length=1, max_length=32)
+    instrument_id: str = Field(min_length=3, max_length=64)
+    side: Side
+    qty: int = Field(gt=0)
+    product: Product = Product.NRML
+    params: dict[str, Any] = Field(default_factory=dict)  # checked against the algo's spec
+
+
+class StrategyBuildIn(_Strict):
+    code: str = Field(min_length=1, max_length=40)
+    underlying: str = Field(min_length=1, max_length=40)
+    expiry: date
+    width: int = Field(default=2, ge=1, le=20)
+    lots: int = Field(default=1, ge=1, le=100)
+
+
+class StrategyLegIn(_Strict):
+    instrument_id: str = Field(min_length=3, max_length=64)
+    side: Side
+    lots: int = Field(ge=1, le=1000)
+    price_paise: int | None = Field(default=None, gt=0)  # entry price; default: live mid
+
+
+class StrategyIn(_Strict):
+    legs: list[StrategyLegIn] = Field(min_length=1, max_length=8)
+
+
+class BasketLegIn(_Strict):
+    instrument_id: str = Field(min_length=3, max_length=64)
+    side: Side
+    lots: int = Field(ge=1, le=1000)
+    product: Product = Product.NRML
+    price_paise: int | None = Field(default=None, gt=0)
+    at: Literal["touch", "mid"] = "touch"
+
+
+class BasketIn(_Strict):
+    legs: list[BasketLegIn] = Field(min_length=1, max_length=10)
+
+
 class StopIn(_Strict):
     reason: str = Field(min_length=1, max_length=200)
 
@@ -127,12 +185,28 @@ def create_app(
     settings: ServerSettings,
     *,
     broker_login: BrokerLogin | None = None,
+    broker_status: Callable[[BrokerAccount], str | None] | None = None,
+    alerts: Alerts | None = None,
+    scheduler: Scheduler | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
     app = FastAPI(title="MockTrade", docs_url=None, redoc_url=None, openapi_url=None)
-    hub = StreamHub(platform, users, origin=settings.origin, cookie_name=settings.cookie_name)
+    chains = ChainService(platform.instruments, platform.market_data)
+    strategies = Strategies(chains)
+    hub = StreamHub(
+        platform,
+        users,
+        origin=settings.origin,
+        cookie_name=settings.cookie_name,
+        alerts=alerts,
+        chains=chains,
+    )
     app.state.hub = hub
+    METRICS.gauge("stream_connections", lambda: hub.connections)
+    METRICS.gauge("ticks_received", lambda: platform.market_data.ticks_received)
+    METRICS.gauge("instruments_watched", lambda: len(platform.market_data.watched()))
+    process_gauges(METRICS)
     app.add_api_websocket_route("/ws", hub.serve)
     login_attempts: dict[str, deque[float]] = {}
     login_states: dict[str, tuple[str, str, float]] = {}  # state -> (user, account, expiry)
@@ -141,6 +215,7 @@ def create_app(
 
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable[[Request], Awaitable[Response]]):
+        started = time.perf_counter_ns()
         if request.method in UNSAFE_METHODS and request.url.path.startswith("/api/"):
             if request.headers.get("origin") != settings.origin:
                 return _headers(JSONResponse({"detail": "request from another site"}, 403))
@@ -148,6 +223,10 @@ def create_app(
                 if request.method != "DELETE":
                     return _headers(JSONResponse({"detail": "send JSON"}, 415))
         response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            route = request.scope.get("route")
+            name = getattr(route, "path", "other")  # the template: no ids in metric names
+            METRICS.observe(f"http_us{{route={request.method} {name}}}", since_us(started))
         if request.url.path.startswith("/assets/") and response.status_code == 200:
             # built files carry a content hash in their name: safe to cache for a year
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -180,6 +259,111 @@ def create_app(
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/api/metrics", response_model=None)
+    async def metrics(user: Me, format: str = "json") -> dict[str, Any] | Response:
+        """How fast each step is (metrics.py). Admin and risk only."""
+        if not _risk_or_admin(user):
+            raise HTTPException(403, "metrics are for admin and risk users")
+        if format == "prometheus":
+            return Response(METRICS.prometheus(), media_type="text/plain; version=0.0.4")
+        return METRICS.snapshot()
+
+    # --- options -------------------------------------------------------------------------------
+
+    @app.get("/api/options")
+    async def option_underlyings(user: Me) -> list[str]:
+        return chains.underlyings()
+
+    @app.get("/api/options/{underlying}/expiries")
+    async def option_expiries(underlying: str, user: Me) -> list[str]:
+        return [e.isoformat() for e in chains.expiries(underlying)]
+
+    @app.get("/api/options/{underlying}/{expiry}/chain")
+    async def option_chain(
+        underlying: str, expiry: str, user: Me, strikes: int = 15
+    ) -> dict[str, Any]:
+        try:
+            day = date.fromisoformat(expiry)
+        except ValueError:
+            raise HTTPException(422, "expiry must be a date like 2026-10-27") from None
+        if day not in chains.expiries(underlying):
+            raise HTTPException(404, f"no options on {underlying} expiring {expiry}")
+        return chains.snapshot(underlying, day, max(1, min(strikes, 40)))
+
+    @app.get("/api/options/strategies")
+    async def strategy_templates(user: Me) -> list[dict[str, Any]]:
+        return strategy_templates_list()
+
+    @app.post("/api/options/strategy/build")
+    async def strategy_build(body: StrategyBuildIn, user: Me) -> dict[str, Any]:
+        try:
+            legs = strategies.build(body.code, body.underlying, body.expiry, body.width, body.lots)
+            return strategies.analyse(legs)
+        except StrategyError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.post("/api/options/strategy/analyse")
+    async def strategy_analyse(body: StrategyIn, user: Me) -> dict[str, Any]:
+        legs = [{**leg.model_dump(exclude_none=True), "side": leg.side.value} for leg in body.legs]
+        try:
+            return strategies.analyse(legs)
+        except StrategyError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    # --- baskets -------------------------------------------------------------------------------
+
+    def basket_legs(body: BasketIn) -> list[LegIn]:
+        return [LegIn(**leg.model_dump()) for leg in body.legs]
+
+    @app.post("/api/accounts/{account_id}/baskets/check")
+    async def basket_check(account_id: str, body: BasketIn, user: Me) -> dict[str, Any]:
+        running = runtime(account_id, user, trade=True)
+        try:
+            return check_to_dict(await running.baskets.check(basket_legs(body), user.id))
+        except BasketError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.post("/api/accounts/{account_id}/baskets/send")
+    async def basket_send(account_id: str, body: BasketIn, user: Me) -> JSONResponse:
+        running = runtime(account_id, user, trade=True)
+        try:
+            result = await running.baskets.send(basket_legs(body), user.id)
+        except BasketError as exc:
+            raise HTTPException(422, str(exc)) from None
+        if result["basket_id"] is None:  # a leg failed the check: nothing was sent
+            return JSONResponse({"detail": "nothing sent", **check_to_dict(result["check"])}, 422)
+        return JSONResponse(
+            {
+                "basket_id": result["basket_id"],
+                "sent": [view_to_dict(v) for v in result["sent"]],
+                "not_sent": result["not_sent"],
+                "stopped": result["stopped"],
+            },
+            201,
+        )
+
+    @app.get("/api/ops")
+    async def ops(user: Me) -> dict[str, Any]:
+        """What operations look like now: active alerts and the scheduled jobs that ran."""
+        if not _risk_or_admin(user):
+            raise HTTPException(403, "operations are for admin and risk users")
+        return {
+            "alerts": [alert_to_dict(a) for a in alerts.active()] if alerts else [],
+            "jobs": [
+                {"job": name, "at": at.isoformat()}
+                for name, at in (scheduler.ran if scheduler else [])
+            ][-50:],
+        }
+
+    @app.delete("/api/metrics")
+    async def reset_metrics(user: Me) -> dict[str, str]:
+        """Start measuring afresh (e.g. after a load test's warm-up). Admin only."""
+        if not user.has_role(Role.ADMIN):
+            raise HTTPException(403, "only an admin can reset metrics")
+        METRICS.reset()
+        audit("METRICS_RESET", user.id, {})
+        return {"status": "reset"}
+
     @app.post("/api/session")
     async def login(body: LoginIn, request: Request, response: Response) -> dict[str, Any]:
         ip = request.client.host if request.client else "?"
@@ -208,7 +392,7 @@ def create_app(
             samesite="strict",
         )
         audit("LOGIN_OK", user.id, {"ip": ip})
-        return _me(user, users, platform)
+        return _me(user, users, platform, broker_status)
 
     @app.delete("/api/session", status_code=204)
     async def logout(request: Request, response: Response) -> None:
@@ -217,7 +401,7 @@ def create_app(
 
     @app.get("/api/me")
     async def me(user: Me) -> dict[str, Any]:
-        return _me(user, users, platform)
+        return _me(user, users, platform, broker_status)
 
     # --- instruments and layouts -------------------------------------------------------------
 
@@ -233,6 +417,25 @@ def create_app(
             raise HTTPException(404, "no such instrument")
         tick = platform.market_data.latest(instrument_id)
         return {**_instrument(instrument), "ltp_paise": tick.ltp_paise if tick else None}
+
+    @app.get("/api/instruments/{instrument_id}/vap")
+    async def get_vap(instrument_id: str, user: Me) -> dict[str, Any]:
+        """Today's volume at each price (an estimate from snapshots, see marketdata/vap.py)."""
+        if platform.instruments.get(instrument_id) is None:
+            raise HTTPException(404, "no such instrument")
+        volume, levels = platform.market_data.vap.snapshot(instrument_id)
+        return {"volume": volume, "levels": [[p, q] for p, q in sorted(levels.items())]}
+
+    @app.get("/api/accounts/{account_id}/instruments/{instrument_id}/order-spec")
+    async def get_order_spec(account_id: str, instrument_id: str, user: Me) -> dict[str, Any]:
+        """What can be ordered on this instrument through this account's broker: the order
+        types, what each needs, validities, products, tick and lot (domain/order_spec.py).
+        The screens draw their tickets from this; nothing broker-specific lives in the UI."""
+        running = runtime(account_id, user)
+        instrument = platform.instruments.get(instrument_id)
+        if instrument is None:
+            raise HTTPException(404, "no such instrument")
+        return spec_to_dict(spec_of(running.broker)(instrument))
 
     @app.get("/api/layouts")
     async def list_layouts(user: Me) -> list[dict[str, str]]:
@@ -313,18 +516,72 @@ def create_app(
         if platform.event_log is None or running.orders.get(client_order_id) is None:
             raise HTTPException(404, "no such order")
         events = await asyncio.to_thread(platform.event_log.history, client_order_id)
-        return [
-            {
-                "seq": e.seq,
-                "ts": e.ts.isoformat(),
-                "kind": e.kind,
-                "detail": e.detail,
-                "order": view_to_dict(e.order) if e.order else None,
-                "fill": fill_to_dict(e.fill) if e.fill else None,
-            }
-            for e in events
-            if e.account_id == account_id
-        ]
+        return [_event(e) for e in events if e.account_id == account_id]
+
+    @app.get("/api/accounts/{account_id}/events")
+    async def account_events(
+        account_id: str,
+        user: Me,
+        before_seq: int | None = None,
+        after_seq: int | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """The account's audit trail, newest first: its orders, its kill switch and the
+        firm's (see EventLog.page for the paging)."""
+        runtime(account_id, user)
+        if platform.event_log is None:
+            return []
+        limit = max(1, min(limit, 1000))
+        names = [account_id, f"account {account_id}", "firm"]
+        events = await asyncio.to_thread(
+            platform.event_log.page,
+            names,
+            before_seq=before_seq,
+            after_seq=after_seq,
+            limit=limit,
+        )
+        return [_event(e) for e in events]
+
+    # --- algos -----------------------------------------------------------------------------
+    # Specs describe each algo's settings; the screen draws its form from them (algos/spec.py).
+
+    @app.get("/api/accounts/{account_id}/algo-specs")
+    async def algo_specs(account_id: str, user: Me) -> list[dict[str, Any]]:
+        return [algo_spec_to_dict(s) for s in runtime(account_id, user).algos.specs()]
+
+    @app.get("/api/accounts/{account_id}/algos")
+    async def list_algos(account_id: str, user: Me) -> list[dict[str, Any]]:
+        return [algo_to_dict(a) for a in runtime(account_id, user).algos.algos()]
+
+    @app.post("/api/accounts/{account_id}/algos", status_code=201)
+    async def start_algo(account_id: str, body: AlgoIn, user: Me) -> dict[str, Any]:
+        running = runtime(account_id, user, trade=True)
+        try:
+            view = running.algos.start(
+                body.code,
+                user_id=user.id,  # from the session, never from the body
+                instrument_id=body.instrument_id,
+                side=body.side,
+                qty=body.qty,
+                params=body.params,
+                product=body.product,
+            )
+        except AlgoError as exc:
+            raise HTTPException(422, exc.reason) from None
+        return algo_to_dict(view)
+
+    @app.post("/api/accounts/{account_id}/algos/{algo_id}/{action}")
+    async def control_algo(account_id: str, algo_id: str, action: str, user: Me) -> dict[str, Any]:
+        running = runtime(account_id, user, trade=True)
+        engine = running.algos
+        controls = {"pause": engine.pause, "resume": engine.resume, "stop": engine.stop}
+        if action not in controls:
+            raise HTTPException(404, "unknown action: use pause, resume or stop")
+        try:
+            view = controls[action](algo_id)
+        except AlgoError as exc:
+            raise HTTPException(409, exc.reason) from None
+        return algo_to_dict(view)
 
     # --- positions -----------------------------------------------------------------------------
 
@@ -444,6 +701,11 @@ def create_app(
                 raise HTTPException(404, "not found")
             target = (root / path).resolve()
             if path and target.is_file() and target.is_relative_to(root):
+                if path == "popout.html":
+                    # A popped-out widget's window: the main window copies its styles in as
+                    # <style> elements, so inline styles must be allowed here. No script runs
+                    # in it (the main window draws into it), so scripts stay forbidden.
+                    return FileResponse(target, headers={"Content-Security-Policy": POPOUT_CSP})
                 return FileResponse(target)
             return FileResponse(index)  # the app handles its own routes
 
@@ -478,7 +740,26 @@ def _risk_or_admin(user: User) -> bool:
     return user.has_role(Role.RISK) or user.has_role(Role.ADMIN)
 
 
-def _me(user: User, users: UserStore, platform: Platform) -> dict[str, Any]:
+def _event(e: StoredEvent) -> dict[str, Any]:
+    return {
+        "seq": e.seq,
+        "ts": e.ts.isoformat(),
+        "account_id": e.account_id,
+        "kind": e.kind,
+        "client_order_id": e.client_order_id,
+        "detail": e.detail,
+        "order": view_to_dict(e.order) if e.order else None,
+        "fill": fill_to_dict(e.fill) if e.fill else None,
+        "extra": e.extra,
+    }
+
+
+def _me(
+    user: User,
+    users: UserStore,
+    platform: Platform,
+    broker_status: Callable[[BrokerAccount], str | None] | None = None,
+) -> dict[str, Any]:
     accounts = []
     for account in users.accounts():
         if not can_view(user, account):
@@ -494,6 +775,8 @@ def _me(user: User, users: UserStore, platform: Platform) -> dict[str, Any]:
                 "running": running is not None,
                 "stopped": bool(state and state.engaged),
                 "stop_reason": state.reason if state and state.engaged else "",
+                # "live", "login_needed" (the broker's daily login), or None (no such step)
+                "broker_session": broker_status(account) if broker_status else None,
             }
         )
     return {

@@ -367,6 +367,33 @@ async def test_sell_stop_market_uses_protection_after_trigger(broker, market):
     assert (last.filled_qty, last.avg_price_paise) == (75, 2500400)  # 24,000 is beyond 1%
 
 
+@pytest.mark.parametrize(
+    ("side", "trigger"),
+    [(Side.BUY, 2501000), (Side.BUY, 2500000), (Side.SELL, 2501000), (Side.SELL, 2502000)],
+)
+async def test_a_stop_the_market_already_passed_is_refused_like_kite(broker, market, side, trigger):
+    """LTP is 25,010.00: a buy stop must trigger above it, a sell stop below it."""
+    _, md = market
+    md.on_tick(BOOK)
+    stop = order(
+        side=side,
+        order_type=OrderType.SL_M,
+        price=None,
+        trigger_paise=trigger,
+        market_protection=Decimal("-1"),
+    )
+    with pytest.raises(BrokerError, match="last traded price"):
+        await broker.place(stop)
+
+
+async def test_moving_a_stop_trigger_past_the_market_is_refused(broker, market):
+    _, md = market
+    stop = order(order_type=OrderType.SL, price=2502000, trigger_paise=2501500)
+    broker_id = await place(broker, md, stop)
+    with pytest.raises(BrokerError, match="last traded price"):
+        await broker.modify(broker_id, trigger_paise=2500900, price_paise=2501000)
+
+
 # --- modify -----------------------------------------------------------------------------
 
 

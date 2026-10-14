@@ -27,6 +27,26 @@ export function freshDoc(): WorkspaceDoc {
   return { version: 1, pages: [{ name: "Main", dock: null }], active: 0 };
 }
 
+/** The page a popped-out widget's window loads (ui/public/popout.html). */
+export const POPOUT_URL = "/popout.html";
+
+/** Where a popped-out window opens: over the widget, never smaller than the widget wants. */
+export function popoutBox(panel: { api: { component: string }; group?: { element?: Element } }): {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+} {
+  const rect = panel.group?.element?.getBoundingClientRect?.();
+  const want = widget(panel.api.component)?.size;
+  return {
+    left: Math.round(rect?.left ?? 80),
+    top: Math.round(rect?.top ?? 80),
+    width: Math.max(Math.round(rect?.width ?? 0), want?.width ?? 0, 360),
+    height: Math.max(Math.round(rect?.height ?? 0), want?.height ?? 0, 640),
+  };
+}
+
 let panelCounter = 0;
 export function newPanelId(kind: string): string {
   panelCounter += 1;
@@ -185,6 +205,34 @@ export class WorkspaceController {
       ...(def.size?.width ? { initialWidth: def.size.width } : {}),
       ...(def.size?.height ? { initialHeight: def.size.height } : {}),
     });
+  }
+
+  /**
+   * Move a widget into its own window (e.g. onto another monitor). The window belongs to this
+   * page: it shares the same live connection, store and link groups, so the widget keeps its
+   * settings and keeps updating. Closing the window docks the widget back.
+   */
+  async popOut(panelId: string): Promise<boolean> {
+    const api = this.api;
+    const panel = api?.getPanel(panelId);
+    if (!api || !panel) return false;
+    if (this.locked) {
+      this.opts.notify("INFO", "The layout is locked: unlock it to move widgets");
+      return false;
+    }
+    const opened = await api.addPopoutGroup(panel, { popoutUrl: POPOUT_URL, position: popoutBox(panel) });
+    if (!opened) {
+      this.opts.notify("WARN", "The window was blocked: allow pop-ups for MockTrade to pop widgets out");
+      return false;
+    }
+    this.changed();
+    return true;
+  }
+
+  /** Put a popped-out widget back into the workspace (closing its window does the same). */
+  dockBack(panelId: string): void {
+    const location = this.api?.getPanel(panelId)?.group.api.location;
+    if (location?.type === "popout") location.getWindow().close();
   }
 
   setLocked(locked: boolean): void {

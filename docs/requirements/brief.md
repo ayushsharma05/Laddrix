@@ -1,3 +1,5 @@
+> **Paused (14 Oct 2026):** this brief is for the COMEX/MockCME track. The active track is NSE/BSE on Kite Connect: see `docs/design/kite-architecture.md`.
+
 # MockTrade — Product brief
 
 MockTrade is a professional-style trading platform for COMEX metals futures that trades against a mock exchange replaying real market data. It is built for one spread trader first, with the architecture of a full multi-user, multi-site platform.

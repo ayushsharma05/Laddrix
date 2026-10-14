@@ -7,6 +7,7 @@ Numbers checked against Kite Connect on 14 Oct 2026 (docs/design/kite-architectu
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 
 from mocktrade.domain.instruments import Instrument
+from mocktrade.domain.order_spec import OrderSpec, standard_spec
 from mocktrade.domain.orders import Side
 
 MAX_MODIFICATIONS_PER_ORDER = 25
@@ -30,3 +31,25 @@ def protected_limit(
         raw = Decimal(ltp_paise) * (100 - pct) / 100
         ticks = (raw / tick).to_integral_value(rounding=ROUND_CEILING)
     return max(int(ticks) * tick, tick)
+
+
+def stop_trigger_problem(side: Side, trigger_paise: int, ltp_paise: int) -> str | None:
+    """Kite refuses a stop whose trigger the market has already passed: it would fire at once.
+
+    A buy stop waits for the price to rise, so its trigger must be above the last price;
+    a sell stop waits for it to fall, so its trigger must be below it.
+    """
+    if side is Side.BUY and trigger_paise <= ltp_paise:
+        return "trigger price for a stop-loss buy must be above the last traded price"
+    if side is Side.SELL and trigger_paise >= ltp_paise:
+        return "trigger price for a stop-loss sell must be below the last traded price"
+    return None
+
+
+def order_spec(instrument: Instrument) -> OrderSpec:
+    """What can be ordered on an instrument through Kite (and so through paper, too)."""
+    return standard_spec(
+        instrument,
+        auto_protection_pct=AUTO_MARKET_PROTECTION_PCT,
+        max_modifications=MAX_MODIFICATIONS_PER_ORDER,
+    )

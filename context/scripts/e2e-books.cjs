@@ -1,0 +1,47 @@
+const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { execSync } = require('child_process');
+const out = process.argv[2];
+const flat = (s) => s.replace(/\s+/g, ' ').trim();
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const page = await browser.newPage({ viewport: { width: 1680, height: 1000 } });
+  const errors = [];
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('http://localhost:8000/');
+  await page.getByLabel('Username').fill('demo');
+  await page.getByLabel('Password').fill('demo-password-123');
+  await page.getByLabel('Authenticator code').fill(execSync('cd /home/user/MockTrade && python3 -m mocktrade.tools.demo --code').toString().trim());
+  await page.keyboard.press('Enter');
+  const ladder = page.locator('.ladder').first();
+  await ladder.locator('.price.last').waitFor({ timeout: 20000 });
+  await page.waitForTimeout(1200);
+  const p0 = Number(await ladder.locator('.ladder-row[data-price]').nth(0).getAttribute('data-price'));
+  const p1 = Number(await ladder.locator('.ladder-row[data-price]').nth(1).getAttribute('data-price'));
+  const t = p0 - p1;
+  const bid = Number(await ladder.locator('.lc.bid.best').first().locator('xpath=..').getAttribute('data-price'));
+  await ladder.locator(`.ladder-row[data-price="${bid - 3 * t}"] .lc.bid`).click(); // rests
+  const ask = Number(await ladder.locator('.lc.ask.best').first().locator('xpath=..').getAttribute('data-price'));
+  await ladder.locator(`.ladder-row[data-price="${ask}"] .lc.bid`).click(); // fills
+  await page.waitForTimeout(3500);
+  const grid = (name) => page.getByRole('grid', { name });
+  console.log('order book tabs:', (await page.locator('.book-tab').allInnerTexts()).slice(0, 4).join(' | '));
+  console.log('working rows:', (await grid('Orders').getByRole('row').allInnerTexts()).map(flat).join(' / '));
+  console.log('positions:', (await grid('Positions').getByRole('row').allInnerTexts()).map(flat).join(' / '));
+  const audit = await grid('Audit trail').getByRole('row').allInnerTexts();
+  console.log('audit rows:', audit.length, '|', audit.slice(0, 6).map(flat).join(' / '));
+  await grid('Audit trail').getByRole('row').first().click();
+  await page.locator('.audit-timeline li').first().waitFor({ timeout: 5000 });
+  console.log('timeline:', (await page.locator('.audit-timeline li').allInnerTexts()).map(flat).join(' / '));
+  await page.screenshot({ path: `${out}/4-books.png` });
+  await grid('Orders').getByRole('button', { name: /^Cancel / }).first().click();
+  await page.waitForTimeout(2500);
+  console.log('after cancel, tabs:', (await page.locator('.book-tab').allInnerTexts()).slice(0, 4).join(' | '));
+  console.log('audit top:', flat(await grid('Audit trail').getByRole('row').first().innerText()));
+  await page.getByRole('tab', { name: /Messages/ }).click().catch(() => page.getByText('Messages', { exact: true }).first().click());
+  await page.waitForTimeout(500);
+  console.log('messages:', (await grid('Messages').getByRole('row').allInnerTexts()).slice(0, 4).map(flat).join(' / '));
+  await page.screenshot({ path: `${out}/5-messages.png` });
+  console.log('errors:', JSON.stringify(errors));
+  await browser.close();
+})().catch((e) => { console.error(e); process.exit(1); });

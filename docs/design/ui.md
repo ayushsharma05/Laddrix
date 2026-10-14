@@ -6,7 +6,7 @@ comes first: the common action is one click, the dangerous one is never one acci
 
 The visual reference is the "MockTrade UI design" canvas (8 boards: ladder, design system,
 workspace, order ticket and messages, stopped and alerts, sign-in and session start, audit
-trail, phone). It follows the patterns professional platforms share (TT-style ladders,
+trail, phone). It follows patterns common to professional trading terminals (price ladders,
 dockable widgets, audit trails); it copies no firm's screens or names.
 
 ## 1. Rules for every screen
@@ -84,21 +84,52 @@ Columns **Work | PIQ | Bids | Price | Asks | LTQ | VAP**; rows are prices on the
   protection. The request goes through the same risk checks; a refusal shows in the status line.
 - **Click Work** = select (yellow ring); again = cancel; another row's Work = move (modify the
   price, which goes to the back of the queue).
-- Work shows my working quantity per price (blue buy, red sell). PIQ shows the quantity ahead
-  of my order (exact in paper, an estimate for Kite, which doesn't report it).
-- Depth is Kite's 5 levels, best level bold. Price column grey, last price green. LTQ shows the
-  last trade size (green up-tick, red down-tick). VAP is today's volume at each price with a bar.
+- Work shows my working quantity per price (blue buy, red sell; italic while a cancel is pending).
+  PIQ shows the quantity ahead of my order, **estimated in the browser** with the paper broker's
+  own rule (join behind the depth shown at my price when I click; trades at my price eat the
+  queue; the queue is never longer than the depth shown minus me; a moved order goes to the
+  back). Kite doesn't report queue position, so paper and live use the same estimate.
+- Depth is Kite's 5 levels, best level bold, empty cells (never fake zeros) elsewhere. Price
+  column grey, last price green. LTQ shows the last trade size (green up-tick, red down-tick).
+  VAP is today's volume at each price with a bar: the server counts it from every tick
+  (`GET /api/instruments/{id}/vap`, `marketdata/vap.py`) and the ladder continues the count from
+  the stream, so it covers the whole day, not just since the ladder opened. It is an estimate:
+  Kite sends snapshots, so volume between two snapshots is put on the newer last price.
 - Status line: the last event for this ladder (sent, filled, refused with the reason…) and
-  the working quantity.
-- Keys (focused ladder): Space re-centre, Esc clear selection and lots, wheel ±1 lot,
+  the working quantity. Refusals also go to Messages.
+- **Confirm over** (sidebar "Cfm": Off, ₹1L, ₹5L, ₹25L): an order worth more needs a second
+  click on the same cell within 5 s; the status line says what will be sent and its value.
+- **CXL ALL** cancels this contract's working orders on the ladder's account. Cancels stay
+  allowed while trading is stopped (getting out must always work); only disconnects and
+  view-only accounts block them.
+- **Unconfirmed** orders on a contract block new clicks on it until the broker answers.
+- The browser makes each order's client id, so a lost answer to "place" can never turn into a
+  second order; the status line says to check the order book.
+- Keys (focused ladder): Space re-centre, Esc clear selection and lots, wheel over the prices
+  scrolls them (and turns auto-centre off), wheel over the lots box ±1 lot,
   Ctrl+click Bids/Asks joins the best price on that side.
 
 ### Order ticket
-Contract, BUY/SELL, lots, price with −/+ tick buttons, type (LMT/MKT/SL/SL-M), TIF, product,
-then value, worst-case position and distance from last price. Orders above the user's
-"confirm over" value need an inline second click (CONFIRM BUY 300), focus on Back. Market
-orders show "pays at most" and the worst value. Enter sends, Esc clears, ↑↓ moves the price
-one tick.
+Contract (follows its link group), BUY/SELL, lots (= qty), price and trigger with −/+ tick
+buttons, the order types the broker offers, TIF, product, account, "confirm over". Under it: value,
+worst-case position (position + working orders on that side + this order), distance from the
+last price, and for market orders "pays at most" (the protected worst price). Problems are
+found before the click and named in the status line (no price, off the tick grid, a stop
+trigger the market already passed, a stop-loss trigger on the wrong side of its limit, a
+validity or product the type doesn't allow). Over "confirm over", the button turns into
+CONFIRM BUY 300 with Back focused; changing anything about the order cancels the confirmation.
+Enter sends, Esc clears, ↑↓ move the focused price one tick.
+
+### Backend provides, frontend displays: the order spec
+The screens hard-code no order types, validities, products or market rules. For each account
+and contract the server publishes an **order spec** (`GET /api/accounts/{a}/instruments/{id}/order-spec`,
+`domain/order_spec.py`): each order type's code, label, name, help text, which fields it needs
+(price / trigger: required or none; market protection: auto or none), its validities, its extra
+rules (`stop_trigger`, `stop_limit`) and whether a ladder click can price it; plus products,
+tick, lot and the automatic protection band. The ticket draws its type buttons, fields, TIF and
+product lists from it; the ladder offers the click-priced types. A broker or exchange that adds
+an order type changes only the backend (its adapter publishes the new spec), and the order
+manager enforces the same spec, so the screen and the server can't disagree.
 
 ### Order book
 Tabs Working / Filled / Rejected with counts; columns Time, Contract, Side, Qty, Filled, Price,
@@ -145,5 +176,9 @@ where the thumb rests.
   subscription.
 - Prices update a ladder at most every 250 ms (the server conflates); order events are applied
   one by one.
-- Widgets get everything as props, so a widget can later pop out into its own desktop window
-  (Electron, K5.6) unchanged.
+- Widgets get everything as props, so any widget **pops out** into its own window unchanged
+  (⧉ on its tab; ⇲ or closing the window docks it back). The window loads `/popout.html` and
+  is drawn by the main page, so it shares the one WebSocket, store and link groups: no second
+  login, no sync delay. Pop-outs are saved in the layout. Works in the browser (pop-ups allowed)
+  and in the desktop app (`ui/desktop/`, Electron), where they are real app windows on any
+  monitor; each costs ~20–25 MB there (measured, see `ui/desktop/README.md`).

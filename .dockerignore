@@ -1,0 +1,15 @@
+# Only what the image needs; never secrets or local data.
+**
+!Dockerfile
+!pyproject.toml
+!README.md
+!src/
+!ui/
+ui/node_modules/
+ui/dist/
+ui/desktop/
+ui/test-results/
+**/__pycache__/
+**/*.pyc
+**/.env
+**/.env.*

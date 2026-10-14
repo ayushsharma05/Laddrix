@@ -142,7 +142,7 @@ class OrderThrottle:
     # --- the gate ---------------------------------------------------------------------------
 
     async def admit_new(self, request: OrderRequest) -> str | None:
-        return await self._admit(Kind.NEW, waits=request.algo_id is not None)
+        return await self._admit(Kind.NEW, waits=request.from_algo)
 
     async def admit_modify(self, order: OrderView, new: OrderRequest) -> str | None:
         self._reset_modifications_if_new_day()
@@ -152,7 +152,7 @@ class OrderThrottle:
                 f"this order has been modified {done} times, the most allowed: "
                 "cancel it and place a new one"
             )
-        reason = await self._admit(Kind.MODIFY, waits=new.algo_id is not None)
+        reason = await self._admit(Kind.MODIFY, waits=new.from_algo)
         if reason is None:  # counted when sent, even if the broker then refuses: errs safe
             self._modifications[order.client_order_id] = done + 1
         return reason

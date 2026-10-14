@@ -1,0 +1,191 @@
+<title>MockTrade One Chart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one wide schematic (scrolls sideways on phones) + a detail panel. Lanes run left-right like a trading floor plan. */
+:root {
+  --bg: #f3f5f8; --panel: #ffffff; --zone: #e8ecf2; --ink: #142030; --muted: #586679;
+  --line: #c2cbd7; --wire: #7d8ca0; --order: #2f6fd1; --price: #138a72; --careful: #8a5a14; --later: #9aa6b5;
+  --accent-soft: #fff3df; --accent: #c46a00;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0d1218; --panel: #141b23; --zone: #111820; --ink: #e4eaf1; --muted: #94a2b3;
+  --line: #2a3644; --wire: #6b7c90; --order: #5b93e6; --price: #3cbf9f; --careful: #d39a45; --later: #5d6b7b;
+  --accent-soft: #2e2210; --accent: #f29b2c; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0d1218; --panel: #141b23; --zone: #111820; --ink: #e4eaf1; --muted: #94a2b3;
+  --line: #2a3644; --wire: #6b7c90; --order: #5b93e6; --price: #3cbf9f; --careful: #d39a45; --later: #5d6b7b;
+  --accent-soft: #2e2210; --accent: #f29b2c; color-scheme: dark; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1760px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 40px; display: grid; gap: 14px; }
+h1 { font-family: var(--display); font-size: 28px; margin: 0; letter-spacing: .01em; }
+.lede { margin: 2px 0 0; color: var(--muted); max-width: 80ch; }
+.gates { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+.gates b { font-family: var(--display); text-transform: uppercase; letter-spacing: .07em; color: var(--accent); font-size: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--muted); align-items: center; }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 2.5px solid; vertical-align: middle; margin-right: 6px; }
+.legend .dash { display: inline-block; width: 20px; height: 12px; border: 1.5px dashed var(--later); border-radius: 3px; vertical-align: middle; margin-right: 6px; }
+.main { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1300px) { .main { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; } }
+.mapbox { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.mapbox svg { display: block; min-width: 1100px; width: 100%; height: auto; }
+aside { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+@media (min-width: 1300px) { aside { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow: auto; } }
+aside h2 { font-family: var(--display); font-size: 20px; margin: 0 0 6px; }
+aside h3 { font-family: var(--display); font-size: 12.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 14px 0 4px; }
+aside p, aside ul { margin: 0 0 6px; }
+aside ul { padding-left: 18px; }
+.zone rect { fill: var(--zone); stroke: var(--line); }
+.zt { font-family: var(--display); font-weight: 700; font-size: 14px; fill: var(--ink); letter-spacing: .02em; }
+.zs { font-size: 11px; fill: var(--muted); }
+.bx { cursor: pointer; }
+.bx rect.card { fill: var(--panel); stroke: var(--wire); stroke-width: 1.1; }
+.bx.later rect.card { stroke-dasharray: 5 4; stroke: var(--later); }
+.bx:hover rect.card, .bx:focus-visible rect.card { stroke: var(--ink); }
+.bx.sel rect.card { stroke: var(--accent); stroke-width: 2.4; }
+.bn { font-weight: 600; font-size: 12.5px; fill: var(--ink); }
+.bd { font-size: 10.8px; fill: var(--muted); }
+.tag { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
+.w path { fill: none; stroke-width: 2; }
+.w.o path { stroke: var(--order); } .w.p path { stroke: var(--price); } .w.c path { stroke: var(--careful); stroke-dasharray: 5 4; }
+.wl { font-size: 10.5px; font-weight: 600; }
+.wl.o { fill: var(--order); } .wl.p { fill: var(--price); } .wl.c { fill: var(--careful); }
+button:focus-visible, .bx:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>MockTrade One Chart</h1>
+    <p class="lede">The whole multi-user, broker-agnostic platform on one page. Orders flow left to right (blue), prices right to left (green), and everything is recorded in the careful lane (amber). Click any box for what it does, its tools and how it scales.</p>
+  </header>
+  <div class="gates"><b>Before other users go live</b>
+    <span>① Zerodha multi-user agreement</span><span>② Exchange empanelment as algo provider</span><span>③ Licensed data vendor for shared prices</span><span>④ SEBI Research Analyst for black-box algos</span><span>Until then: you + family accounts, each with its own Kite app</span></div>
+  <div class="legend">
+    <span><i style="border-color:var(--order)"></i>orders and receipts</span>
+    <span><i style="border-color:var(--price)"></i>prices</span>
+    <span><i style="border-color:var(--careful);border-top-style:dashed"></i>events to the careful lane</span>
+    <span><span class="dash"></span>later or needs registration</span>
+  </div>
+  <div class="main">
+    <div class="mapbox"><svg id="chart" role="img" aria-label="MockTrade architecture"></svg></div>
+    <aside id="panel" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script>
+const B = {
+  clients:   { t: 'Trader workspace', d: ['web · Electron · phone', 'dockable widgets'], tag: 'K5', info: { what: 'The screens: ladder, order ticket, blotter, positions, audit, algo control, admin. Each is a widget in a dockable workspace with saved layouts per user.', tools: 'TypeScript + React + dockview; Electron shell for pop-out windows (Tauri to compare).', scale: 'Static files served by the gateway or a CDN; one WebSocket per tab.', note: 'Shows only data the user is entitled to; never talks to a broker directly.' } },
+  gateway:   { t: 'Gateway', d: ['HTTPS/WSS, TLS', 'rate limits per user'], tag: 'K7', info: { what: 'The only door from the internet. Terminates TLS, forwards to the API and broadcaster, blocks abuse.', tools: 'Caddy (automatic certificates).', scale: 'Put a load balancer in front of several API instances later.', note: 'Only ports 443 and SSH are open on the server.' } },
+  auth:      { t: 'Auth & sessions', d: ['password + TOTP', 'roles, permissions'], tag: 'K5', info: { what: 'Users log in with password and an authenticator code. Roles: admin, trader, risk (read-only). Every request is checked against the user\'s permissions and the accounts they may trade.', tools: 'FastAPI dependencies, argon2 password hashes, pyotp.', scale: 'Stateless sessions (signed tokens) so any API instance can check them.', note: 'SEBI "no open APIs": every endpoint requires a logged-in user.' } },
+  api:       { t: 'Order entry API', d: ['REST: orders, algos', 'admin, workspace'], tag: 'K5', info: { what: 'Typed REST endpoints: place / modify / cancel, start / stop algos, admin actions, layouts. Validates input, then hands commands to the order manager.', tools: 'FastAPI + Pydantic.', scale: 'Stateless; run more copies behind the gateway.', note: 'Never calls a broker itself: everything goes through the order manager.' } },
+  oms:       { t: 'Order manager', d: ['order states, ids', 'per account'], tag: 'K3', info: { what: 'The heart. Owns every order\'s life (pending, open, partial, filled, cancelled, rejected), maps our ids to broker ids, applies broker updates in order and ignores duplicates.', tools: 'Python asyncio, pure state machine.', scale: 'Shard by broker account: each account lives in exactly one order manager, so no locks are needed.', note: 'Every change is published to the event bus before the screen sees it.' } },
+  risk:      { t: 'Risk guard', d: ['user · account · firm limits', 'fat-finger, kill switch'], tag: 'K3', info: { what: 'Pre-trade checks at three levels: user (max order size, allowed instruments), broker account (max position, daily loss) and firm (total exposure, global kill switch). Rejections come back with a clear reason.', tools: 'Small pure functions + limits from the admin database.', scale: 'Runs inside the order manager shard; firm-wide totals come from the positions service.', note: 'The first line of defence. The broker and exchange checks are the last.' } },
+  throttle:  { t: 'Throttle', d: ['per broker account', '8/s · 350/min · 4500/day'], tag: 'K3', info: { what: 'Token buckets per broker account (and per app key), kept below the broker\'s limits and SEBI\'s 10 orders/second threshold. Counts modifications per order (Kite: 25).', tools: 'Token bucket with an injected clock.', scale: 'Per-account state lives with the account\'s order manager shard.', note: 'Algos wait for a token; manual clicks get a clear "too fast" message.' } },
+  router:    { t: 'Router', d: ['account → connection', 'algo ID tagging'], tag: 'K3', info: { what: 'Sends each order to the right broker connection for its account, and stamps the identifiers the rules need (our order id in the broker tag, the exchange algo ID once registered).', tools: 'Python; routing table from the admin database.', scale: 'Adding a broker is adding an adapter and a routing row.', note: 'This is where "not tied to Zerodha" lives.' } },
+  adapters:  { t: 'Broker adapters', d: ['Kite · Paper · MockCME', 'Upstox / Dhan / FIX later'], tag: 'K0–K3', info: { what: 'One interface (place, modify, cancel, updates, orders, positions) with many implementations. Kite for real money, Paper for fake money against live prices, MockCME (our own exchange) for tests. Later: other brokers, or direct exchange access over FIX if you ever become a member or sponsored.', tools: 'Python Protocol; Kite via the official SDK in a worker thread.', scale: 'One connection per broker account; each adapter is independent.', note: 'Everything above this box is broker-agnostic.' } },
+  outside:   { t: 'Brokers & exchanges', d: ['Zerodha → NSE / BSE', 'other brokers later'], tag: 'outside', info: { what: 'Zerodha (and later other brokers) route orders to NSE/BSE and stream prices and order updates back.', tools: 'Kite Connect: REST for orders, WebSocket for ticks + order updates.', scale: 'Their limits are our only limits: 10 orders/s, 400/min, 5000/day per account, 25 modifications per order, 3000 instruments per WebSocket, about 1 tick/s per instrument, 5-level depth.', note: 'Orders only from the registered static IP; daily login; market_protection required on MARKET and SL-M orders.' } },
+  algos:     { t: 'Algo engine', d: ['parent → child orders', 'start · pause · stop'], tag: 'K6', info: { what: 'Runs strategies for users: slicer, iceberg, two-leg spread legger. A parent order is the intent; child orders go through the same order manager, risk and throttle as manual orders.', tools: 'Python asyncio; each strategy is a small class with on_tick / on_fill / on_timer.', scale: 'Separate process per group of users once CPU says so.', note: 'Algos offered to other users need exchange registration (unique algo ID), and black-box algos need SEBI RA registration.' } },
+  bcast:     { t: 'Broadcaster', d: ['live push to screens', 'entitlements, conflation'], tag: 'K5', info: { what: 'Pushes prices, orders, positions and alerts to each logged-in screen over WebSocket. At most about 4 price updates per second per instrument per screen; order updates are never dropped.', tools: 'FastAPI WebSockets; per-connection subscription sets.', scale: 'Many broadcaster instances, fed from the event bus.', note: 'Checks entitlements: a user only sees prices from a feed they may see.' } },
+  mdcache:   { t: 'Market data cache', d: ['latest tick + 5-level depth', 'per instrument'], tag: 'K1', info: { what: 'Holds only the newest state per instrument, keyed by our own instrument id. Feeds screens, algos, paper fills and P&L marks.', tools: 'In-memory dict; Redis later for many processes.', scale: '9000 instruments × 184 bytes is tiny; the limit is the feed, not us.', note: 'Prices stored as whole paise.' } },
+  normal:    { t: 'Normaliser', d: ['broker id → our id', 'one symbology'], tag: 'K1', info: { what: 'Translates each broker\'s instrument numbers into our own instrument ids (exchange + symbol), so nothing above depends on a broker\'s numbering.', tools: 'Lookup tables from the instrument master.', scale: 'Pure lookups, microseconds.', note: 'Key to switching brokers later.' } },
+  feeds:     { t: 'Feed handlers', d: ['Kite WebSocket (binary)', 'licensed vendor later'], tag: 'K1', info: { what: 'Keep live connections to price sources, decode their formats (Kite\'s big-endian binary), reconnect with backoff, resubscribe, watch heartbeats.', tools: 'Python asyncio + websockets + struct.', scale: 'Kite: 3 connections × 3000 instruments per app key.', note: 'Kite data is for the account holder only. Showing prices to other users needs an exchange-authorised data vendor feed, which plugs in here as another handler.' } },
+  bus:       { t: 'Event bus', d: ['every order, fill, alert'], tag: 'K3', info: { what: 'The careful lane\'s spine: an ordered stream of events that other services read at their own pace.', tools: 'In-process queue first; Redis Streams or NATS when split into processes.', scale: 'Partition by account.', note: 'Nothing is lost: events are written to the store before acknowledgement.' } },
+  store:     { t: 'Event store & audit', d: ['append-only history'], tag: 'K3', info: { what: 'Every event with timestamps, user, account and reason. Powers the audit screen and rebuilds state after a restart.', tools: 'SQLite (WAL) first, PostgreSQL for multi-process and multi-user.', scale: 'Postgres with partitions by month; read replicas for reports.', note: 'Regulators and you can explain every order end to end.' } },
+  positions: { t: 'Positions & P&L', d: ['per account, user, firm'], tag: 'K4', info: { what: 'Builds positions from fills and marks them to live prices: realised and unrealised P&L per account, per user and for the firm.', tools: 'Python, integer paise.', scale: 'Stream processing per account.', note: 'Feeds the risk guard\'s daily-loss and exposure checks.' } },
+  recon:     { t: 'Reconciliation', d: ['broker orders · trades · positions'], tag: 'K4', info: { what: 'The "drop copy" idea: regularly compare the broker\'s view (order book, trades, positions) with ours, and raise an alert on any difference.', tools: 'Scheduled jobs within broker rate limits.', scale: 'Per account, staggered.', note: 'Catches missed updates after disconnections.' } },
+  compliance:{ t: 'Compliance', d: ['OPS, algo IDs, alerts'], tag: 'K6', info: { what: 'Watches order rates per account, checks algo IDs on algo orders, flags unusual activity (self-trades, repeated rejects), keeps records for the broker and exchange.', tools: 'Rules over the event stream.', scale: 'Separate consumer of the bus.', note: 'Needed for any multi-user go-live.' } },
+  eod:       { t: 'Reports & EOD', d: ['daily P&L, statements'], tag: 'later', later: true, info: { what: 'End-of-day jobs: P&L statements, position snapshots, archiving, instrument refresh for tomorrow.', tools: 'Scheduled Python jobs.', scale: 'Off-peak batch work.', note: '' } },
+  refdata:   { t: 'Instrument master', d: ['our ids + broker mappings'], tag: 'K1', info: { what: 'One list of instruments with our own ids, tick size, lot size, expiry, plus each broker\'s identifiers. Refreshed every morning (Kite dump around 08:30).', tools: 'Python loader → database.', scale: 'A few hundred thousand rows, loaded once a day.', note: '' } },
+  users:     { t: 'Users, accounts, limits', d: ['admin console'], tag: 'K5', info: { what: 'Who can log in, which broker accounts they own or may trade, their roles and their risk limits. Set by an admin, never by code.', tools: 'Database tables + admin widgets.', scale: 'Standard relational data.', note: 'Each user links their own broker account through the broker\'s own login page.' } },
+  conns:     { t: 'Broker connections', d: ['per-account login + tokens', 'encrypted secrets'], tag: 'K1', info: { what: 'Keeps each broker account\'s session: the daily Kite login (by the account holder), its access token (encrypted), its app key and its static IP. Tells the router which accounts are live today.', tools: 'Encrypted columns (Fernet) + morning login flow per user.', scale: 'One row per account.', note: 'Tokens expire at 6 AM next day; each user logs in themselves (no automated logins).' } },
+  ops:       { t: 'Observability & deploy', d: ['metrics, logs, backups', 'Docker Compose'], tag: 'K7', info: { what: 'Health checks, latency histograms, structured logs, daily backups, one-command deploy. Environments: dev (paper), live.', tools: 'Docker Compose, Caddy, /metrics, JSON logs.', scale: 'Single Lightsail Mumbai server ($12/month) → split services → managed database.', note: '' } },
+};
+
+const CW = 150, GX = 26, X0 = 24;
+const cx = c => X0 + c * (CW + GX);
+const W = cx(9) + CW + X0;
+const rowO = 96, rowA = 236, rowP = 340, BH = 74;
+const pos = {
+  clients: [0, rowO, 1, rowP + BH - rowO], gateway: [1, rowO, 1, rowP + BH - rowO],
+  auth: [2, rowO, 1, BH], api: [3, rowO, 1, BH], oms: [4, rowO, 1, BH], risk: [5, rowO, 1, BH],
+  throttle: [6, rowO, 1, BH], router: [7, rowO, 1, BH], adapters: [8, rowO, 1, BH],
+  outside: [9, rowO, 1, rowP + BH - rowO],
+  algos: [4, rowA, 2, BH - 10],
+  bcast: [2, rowP, 2, BH], mdcache: [4, rowP, 1, BH], normal: [5, rowP, 1, BH], feeds: [8, rowP, 1, BH],
+};
+const bandY1 = rowP + BH + 64, bandH = 140;
+const bandY2 = bandY1 + bandH + 26;
+const careful = ['bus', 'store', 'positions', 'recon', 'compliance', 'eod'];
+const base = ['refdata', 'users', 'conns', 'ops'];
+const H = bandY2 + bandH + 20;
+
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+let s = `<defs>${['o', 'p', 'c'].map(k => `<marker id="m${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--${{ o: 'order', p: 'price', c: 'careful' }[k]})"/></marker>`).join('')}</defs>`;
+const zone = (x, y, w, h, t, sub) => `<g class="zone"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10"/><text class="zt" x="${x + 12}" y="${y + 20}">${esc(t)}</text><text class="zs" x="${x + 12}" y="${y + 35}">${esc(sub)}</text></g>`;
+s += zone(X0 - 10, rowO - 52, cx(1) + CW - X0 + 20, rowP + BH - rowO + 68, 'Users', 'anyone with a login');
+s += zone(cx(2) - 10, rowO - 52, cx(8) + CW - cx(2) + 20, rowP + BH - rowO + 68, 'MockTrade platform (our servers)', 'broker-agnostic core: fast lanes');
+s += zone(cx(9) - 10, rowO - 52, CW + 20, rowP + BH - rowO + 68, 'Outside', 'brokers, exchanges, vendors');
+s += zone(X0 - 10, bandY1 - 44, W - 2 * X0 + 20, bandH + 44, 'Careful lane', 'records everything, never loses anything, checks the fast lanes');
+s += zone(X0 - 10, bandY2 - 6, W - 2 * X0 + 20, bandH - 30, '', '');
+
+const wires = [];
+const W_ = (cls, d, label, lx, ly) => wires.push(`<g class="w ${cls}"><path d="${d}" marker-end="url(#m${cls})"/></g>` + (label ? `<text class="wl ${cls}" x="${lx}" y="${ly}" text-anchor="middle">${esc(label)}</text>` : ''));
+const r = k => { const [c, y, span, h] = pos[k]; return { x: cx(c), y, w: span * CW + (span - 1) * GX, h, cy: y + 30 }; };
+const order = ['gateway', 'auth', 'api', 'oms', 'risk', 'throttle', 'router', 'adapters', 'outside'];
+W_('o', `M${r('clients').x + CW} ${r('auth').cy}H${r('gateway').x}`, '', 0, 0);
+for (let i = 0; i < order.length - 1; i++) { const a = r(order[i]), b = r(order[i + 1]); W_('o', `M${a.x + a.w} ${a.cy}H${b.x}`, '', 0, 0); }
+const yR = rowO + BH + 22;
+W_('o', `M${r('outside').x} ${yR}H${r('bcast').x + 70}V${rowP}`, 'receipts back: accepted · filled · rejected → order manager and screens', (r('throttle').x + r('outside').x) / 2, yR - 6);
+W_('o', `M${r('oms').x + 40} ${yR}V${rowO + BH}`, '', 0, 0);
+W_('o', `M${r('oms').x + 115} ${rowA}V${rowO + BH}`, '', 0, 0);
+const pcy = rowP + 40;
+W_('p', `M${r('outside').x} ${pcy}H${r('feeds').x + CW}`, '', 0, 0);
+W_('p', `M${r('feeds').x} ${pcy}H${r('normal').x + CW}`, 'ticks', (r('feeds').x + r('normal').x + CW) / 2, pcy - 6);
+W_('p', `M${r('normal').x} ${pcy}H${r('mdcache').x + CW}`, '', 0, 0);
+W_('p', `M${r('mdcache').x} ${pcy}H${r('bcast').x + r('bcast').w}`, '', 0, 0);
+W_('p', `M${r('bcast').x} ${pcy}H${r('gateway').x + CW}`, '', 0, 0);
+W_('p', `M${r('gateway').x} ${pcy}H${r('clients').x + CW}`, '', 0, 0);
+W_('p', `M${r('mdcache').x + 115} ${rowP}V${rowA + BH - 10}`, '', 0, 0);
+W_('c', `M${r('oms').x} ${rowO + BH - 12}H${cx(4) - GX / 2}V${bandY1 - 6}`, 'every event', cx(4) - GX / 2 + 40, bandY1 - 14);
+s += wires.join('');
+
+const later = new Set(['eod']);
+function box(k, x, y, w, h) {
+  const b = B[k], cls = 'bx' + (b.later ? ' later' : '');
+  return `<g class="${cls}" data-k="${k}" tabindex="0" role="button" aria-label="${esc(b.t)}"><rect class="card" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/>`
+    + `<text class="bn" x="${x + 10}" y="${y + 20}">${esc(b.t)}</text>`
+    + b.d.map((l, i) => `<text class="bd" x="${x + 10}" y="${y + 37 + i * 14}">${esc(l)}</text>`).join('')
+    + `<text class="tag" x="${x + w - 8}" y="${y + h - 8}" text-anchor="end">${esc(b.tag)}</text></g>`;
+}
+for (const k of Object.keys(pos)) { const q = r(k); s += box(k, q.x, q.y, q.w, q.h); }
+const bw = (W - 2 * X0 - 5 * 14) / 6;
+careful.forEach((k, i) => { s += box(k, X0 + i * (bw + 14), bandY1 + 8, bw, 76); });
+const bw2 = (W - 2 * X0 - 3 * 14) / 4;
+base.forEach((k, i) => { s += box(k, X0 + i * (bw2 + 14), bandY2 + 6, bw2, 84); });
+const svg = document.getElementById('chart');
+svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+svg.innerHTML = s;
+
+const panel = document.getElementById('panel');
+const intro = () => {
+  panel.innerHTML = `<h2>How to read it</h2>
+  <p>Like a floor plan of a trading firm. <b style="color:var(--order)">Blue</b>: an order goes from your screen through the gateway, your login, the order manager, the risk guard, the throttle and the router, to the broker adapter, and out to Zerodha and NSE/BSE. Receipts come back to the order manager.</p>
+  <p><b style="color:var(--price)">Green</b>: prices come in from the broker feed, get translated to our own instrument ids, are cached, and are pushed to your screen, your algos and paper fills.</p>
+  <p><b style="color:var(--careful)">Amber</b>: everything that happens is recorded in the careful lane, which builds positions, checks the broker agrees, and watches the rules.</p>
+  <h3>Not tied to Zerodha</h3><p>Only two boxes know about Zerodha: the <b>broker adapter</b> and the <b>feed handler</b>. Swap or add them and the rest doesn't change, including for your own future exchange access.</p>
+  <h3>Tags</h3><p>The tag in each box's corner is the milestone that builds it (K0–K7).</p>`;
+};
+const show = k => {
+  const b = B[k], i = b.info;
+  document.querySelectorAll('.bx').forEach(el => el.classList.toggle('sel', el.dataset.k === k));
+  panel.innerHTML = `<h2>${esc(b.t)}</h2><p>${esc(i.what)}</p><h3>Tools</h3><p>${esc(i.tools)}</p><h3>How it scales</h3><p>${esc(i.scale)}</p>` + (i.note ? `<h3>Watch out</h3><p>${esc(i.note)}</p>` : '') + `<h3>Built in</h3><p>${esc(b.tag)}</p>`;
+  if (window.innerWidth < 1300) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+svg.addEventListener('click', e => { const g = e.target.closest('.bx'); if (g) show(g.dataset.k); });
+svg.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const g = e.target.closest('.bx'); if (g) { e.preventDefault(); show(g.dataset.k); } } });
+intro();
+</script>

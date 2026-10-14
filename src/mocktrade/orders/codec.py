@@ -31,6 +31,7 @@ def request_to_dict(r: OrderRequest) -> dict[str, Any]:
         "market_protection": None if r.market_protection is None else str(r.market_protection),
         "algo_id": r.algo_id,
         "parent_id": r.parent_id,
+        "basket_id": r.basket_id,
     }
 
 
@@ -51,6 +52,7 @@ def request_from_dict(d: dict[str, Any]) -> OrderRequest:
         market_protection=None if protection is None else Decimal(protection),
         algo_id=d.get("algo_id"),
         parent_id=d.get("parent_id"),
+        basket_id=d.get("basket_id"),  # absent in orders stored before baskets
     )
 
 

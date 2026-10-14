@@ -87,3 +87,26 @@ def test_final_statuses():
 def test_side_sign():
     assert Side.BUY.sign == 1 and Side.SELL.sign == -1
     assert Validity.IOC.value == "IOC"
+
+
+@pytest.mark.parametrize(
+    ("side", "price", "trigger", "ok"),
+    [
+        (Side.BUY, 2501000, 2500500, True),  # buy stop: trigger at or below the limit
+        (Side.BUY, 2501000, 2501000, True),
+        (Side.BUY, 2501000, 2501500, False),  # the limit could never be reached
+        (Side.SELL, 2500000, 2500500, True),  # sell stop: trigger at or above the limit
+        (Side.SELL, 2500000, 2499500, False),
+    ],
+)
+def test_stop_loss_trigger_must_be_on_the_right_side_of_the_limit(
+    limit_buy, nifty_fut, side, price, trigger, ok
+):
+    request = replace(
+        limit_buy, side=side, order_type=OrderType.SL, price_paise=price, trigger_paise=trigger
+    )
+    if ok:
+        request.validate(nifty_fut)
+    else:
+        with pytest.raises(ValueError, match="trigger must not be"):
+            request.validate(nifty_fut)

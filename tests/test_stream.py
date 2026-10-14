@@ -3,6 +3,7 @@
 import asyncio
 import json
 import socket
+import time
 from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlparse
 
@@ -12,11 +13,13 @@ import uvicorn
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidStatus
 
+from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.fake import FakeBroker
 from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.domain.orders import OrderStatus, OrderUpdate, Product, Side
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
+from mocktrade.ops.alerts import Alerts
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
@@ -63,9 +66,15 @@ class Live:
         self.md.on_tick(Tick(FUT, 2501000))
         self.platform = Platform(self.store, self.md, KillSwitch("firm"))
         for account in self.users.accounts():
-            self.platform.add_account(account, FakeBroker(), ids=ClientIds("MT"))
+            self.platform.add_account(
+                account, FakeBroker(), ids=ClientIds("MT"), algo_types=BUILTIN
+            )
+        self.alerts = Alerts()
         self.app = create_app(
-            self.platform, self.users, ServerSettings(origin=self.origin, cookie_secure=False)
+            self.platform,
+            self.users,
+            ServerSettings(origin=self.origin, cookie_secure=False),
+            alerts=self.alerts,
         )
         self.hub = self.app.state.hub
         self.hub.flush_s = 0.05  # faster than the real 250 ms, so tests are quick
@@ -187,6 +196,42 @@ async def test_prices_are_conflated_newest_wins(live):
     await client.aclose()
 
 
+async def test_a_price_change_after_a_quiet_spell_goes_out_at_once(live):
+    """No added latency: with the real 250 ms interval, a lone tick doesn't wait for a timer."""
+    live.hub.flush_s = 0.25
+    client = await live.session()
+    async with live.stream(client) as ws:
+        await ws.send(json.dumps({"op": "subscribe", "instruments": [FUT]}))
+        await next_of(ws, "ticks")  # the current price
+        delays = []
+        for n in range(5):
+            await asyncio.sleep(0.3)  # quiet: longer than the interval, like Kite's ~1 tick/s
+            sent = time.perf_counter()
+            live.md.on_tick(Tick(FUT, 2501010 + 10 * n))
+            batch = await next_of(ws, "ticks")
+            delays.append(time.perf_counter() - sent)
+            assert batch["ticks"][0]["ltp_paise"] == 2501010 + 10 * n
+    assert max(delays) < 0.05, delays  # a fixed 250 ms timer would average ~125 ms
+    await client.aclose()
+
+
+async def test_a_burst_still_sends_at_most_one_update_per_interval(live):
+    live.hub.flush_s = 0.25
+    client = await live.session()
+    async with live.stream(client) as ws:
+        await ws.send(json.dumps({"op": "subscribe", "instruments": [FUT]}))
+        await next_of(ws, "ticks")
+        start = time.perf_counter()
+        for n in range(30):  # 30 ticks over ~0.6 s
+            live.md.on_tick(Tick(FUT, 2502000 + 10 * n))
+            await asyncio.sleep(0.02)
+        batches = await all_of(ws, "ticks", quiet=0.4)
+        elapsed = time.perf_counter() - start
+    assert 2 <= len(batches) <= int(elapsed / 0.25) + 2  # throttled, not one per tick
+    assert batches[-1]["ticks"][0]["ltp_paise"] == 2502290  # the newest always arrives
+    await client.aclose()
+
+
 async def test_subscription_mistakes_get_clear_errors(live):
     client = await live.session()
     live.hub._max_instruments = 1
@@ -282,6 +327,25 @@ async def test_positions_are_conflated_with_the_days_pnl(live):
     await client.aclose()
 
 
+async def test_algo_changes_are_pushed_in_order(live):
+    client = await live.session()
+    algos = live.platform.accounts["acc-ayush"].algos
+    async with live.stream(client) as ws:
+        await next_of(ws, "hello")
+        algo = algos.start(
+            "SLICER", user_id="ayush", instrument_id=FUT, side=Side.BUY, qty=150,
+            params={"slices": 2, "interval_s": 60},
+        )  # fmt: skip
+        await algos.settle()
+        algos.stop(algo.algo_id, "done")
+        messages = await all_of(ws, "algo")
+    kinds = [m["kind"] for m in messages]
+    assert kinds[0] == "STARTED" and "STOPPING" in kinds
+    assert messages[0]["algo"]["algo_id"] == algo.algo_id
+    assert messages[-1]["algo"]["reason"] == "done"
+    await client.aclose()
+
+
 async def test_kill_switch_changes_are_pushed(live):
     client = await live.session()
     async with live.stream(client) as ws:
@@ -340,4 +404,158 @@ async def test_connections_are_cleaned_up_when_the_tab_closes(live):
             break
         await asyncio.sleep(0.02)
     assert live.hub.connections == 0 and FUT not in live.md.watched()
+    await client.aclose()
+
+
+def test_a_tick_is_encoded_once_with_the_same_fields_as_before():
+    import json
+    from datetime import UTC, datetime
+
+    from mocktrade.domain.ticks import DepthLevel, Tick
+    from mocktrade.server import stream
+
+    t = Tick(
+        "NFO:NIFTY26OCTFUT",
+        2501000,
+        volume=12345,
+        exchange_time=datetime(2026, 10, 14, 4, 0, 1, 250000, tzinfo=UTC),
+        bids=(DepthLevel(2500990, 150, 2),),
+        asks=(DepthLevel(2501010, 225, 3),),
+    )
+    text = stream.tick_json(t)
+    assert json.loads(text) == {
+        "instrument_id": "NFO:NIFTY26OCTFUT",
+        "ltp_paise": 2501000,
+        "last_qty": None,
+        "volume": 12345,
+        "avg_price_paise": None,
+        "buy_qty": None,
+        "sell_qty": None,
+        "open_paise": None,
+        "high_paise": None,
+        "low_paise": None,
+        "close_paise": None,
+        "open_interest": None,
+        "exchange_time": "2026-10-14T04:00:01.250000+00:00",
+        "bids": [[2500990, 150, 2]],
+        "asks": [[2501010, 225, 3]],
+    }
+    assert stream.tick_json(t) is text  # the same tick: encoded once, shared
+    newer = t._replace(ltp_paise=2501010)
+    assert json.loads(stream.tick_json(newer))["ltp_paise"] == 2501010
+
+
+async def test_ops_alerts_reach_every_screen_and_new_screens_see_the_active_ones(live):
+    live.alerts.raise_("broker_login:acc-ayush", "WARN", "Log in to Kite for acc-ayush")
+    client = await live.session()
+    async with live.stream(client) as ws:
+        first = await next_of(ws, "ops")  # active when the screen connected
+        assert (first["key"], first["level"], first["active"]) == (
+            "broker_login:acc-ayush",
+            "WARN",
+            True,
+        )
+        live.alerts.raise_("prices", "ERROR", "No prices for over a minute")
+        assert (await next_of(ws, "ops"))["key"] == "prices"
+        live.alerts.clear("prices", "prices are flowing again")
+        cleared = await next_of(ws, "ops")
+        assert (cleared["key"], cleared["level"], cleared["active"]) == ("prices", "OK", False)
+    await client.aclose()
+
+
+# --- option chains ---
+
+
+def _add_chain(live):
+    from datetime import date
+
+    from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
+
+    exp = date(2026, 10, 27)
+    for k in (24900, 25000, 25100):
+        for kind in (InstrumentKind.CALL, InstrumentKind.PUT):
+            live.store.add(
+                Instrument(
+                    Exchange.NFO, f"NIFTY26OCT{k}{kind.value}", kind, 5, 75, exp, k * 100, "NIFTY"
+                )
+            )
+    return exp.isoformat()
+
+
+async def test_an_option_chain_streams_at_once_then_at_most_once_per_interval(live):
+    expiry = _add_chain(live)
+    live.hub.chain_interval_s = 0.2
+    client = await live.session()
+    async with live.stream(client) as ws:
+        await ws.send(
+            json.dumps({"op": "chain", "underlying": "NIFTY", "expiry": expiry, "strikes": 1})
+        )
+        first = await next_of(ws, "chain")
+        assert first["underlying"] == "NIFTY" and first["atm_strike_paise"] == 2500000
+        assert [r["strike_paise"] for r in first["rows"]] == [2490000, 2500000, 2510000]
+        for n in range(30):  # a burst of prices for 0.6 s
+            live.md.on_tick(Tick(FUT, 2501000 + 10 * n))
+            await asyncio.sleep(0.02)
+        updates = await all_of(ws, "chain", quiet=0.5)
+        assert 2 <= len(updates) <= 5  # throttled, and the newest arrives
+        assert updates[-1]["forward_paise"] == 2501290
+        await ws.send(json.dumps({"op": "chain_stop", "underlying": "NIFTY", "expiry": expiry}))
+        await asyncio.sleep(0.1)
+        live.md.on_tick(Tick(FUT, 2502000))
+        assert await all_of(ws, "chain", quiet=0.5) == []
+    await client.aclose()
+
+
+async def test_chain_requests_are_checked(live):
+    expiry = _add_chain(live)
+    client = await live.session()
+    async with live.stream(client) as ws:
+        await ws.send(json.dumps({"op": "chain", "underlying": "NIFTY", "expiry": "2030-01-01"}))
+        assert "no options on NIFTY" in (await next_of(ws, "error"))["message"]
+        await ws.send(json.dumps({"op": "chain", "underlying": "NIFTY", "expiry": "soon"}))
+        assert "expiry date" in (await next_of(ws, "error"))["message"]
+        for under in ("NIFTY", "NIFTY"):  # the same chain twice replaces, it doesn't add
+            await ws.send(json.dumps({"op": "chain", "underlying": under, "expiry": expiry}))
+        await next_of(ws, "chain")
+    r = await client.get(f"/api/options/NIFTY/{expiry}/chain", params={"strikes": 1})
+    assert r.status_code == 200 and len(r.json()["rows"]) == 3
+    assert (await client.get("/api/options/NIFTY/expiries")).json() == [expiry]
+    assert (await client.get("/api/options")).json() == ["NIFTY"]
+    assert (await client.get("/api/options/NIFTY/2030-01-01/chain")).status_code == 404
+    assert (await client.get("/api/options/NIFTY/soon/chain")).status_code == 422
+    await client.aclose()
+
+
+async def test_strategy_endpoints(live):
+    expiry = _add_chain(live)
+    for k, p in ((24900, 18000), (25000, 12000), (25100, 8000)):
+        live.md.on_tick(Tick(f"NFO:NIFTY26OCT{k}CE", p))
+        live.md.on_tick(Tick(f"NFO:NIFTY26OCT{k}PE", 12000 - (k - 25000)))
+    client = await live.session()
+    codes = [t["code"] for t in (await client.get("/api/options/strategies")).json()]
+    assert "IRON_CONDOR" in codes and "BULL_CALL_SPREAD" in codes
+    built = await client.post(
+        "/api/options/strategy/build",
+        json={"code": "BULL_CALL_SPREAD", "underlying": "NIFTY", "expiry": expiry, "width": 1},
+    )
+    assert built.status_code == 200, built.text
+    body = built.json()
+    assert [(lg["side"], lg["strike_paise"]) for lg in body["legs"]] == [
+        ("BUY", 2500000),
+        ("SELL", 2510000),
+    ]
+    assert body["net_premium"] == -(120 - 80) * 75 and body["max_profit"] == (100 - 40) * 75
+    legs = [{"instrument_id": "NFO:NIFTY26OCT25000CE", "side": "SELL", "lots": 2}]
+    r = await client.post("/api/options/strategy/analyse", json={"legs": legs})
+    assert r.status_code == 200 and r.json()["max_loss"] == "unlimited"
+    bad = await client.post(
+        "/api/options/strategy/analyse",
+        json={"legs": [{"instrument_id": FUT, "side": "BUY", "lots": 1}]},
+    )
+    assert bad.status_code == 422 and "not a listed option" in bad.json()["detail"]
+    too_wide = await client.post(
+        "/api/options/strategy/build",
+        json={"code": "IRON_CONDOR", "underlying": "NIFTY", "expiry": expiry, "width": 3},
+    )
+    assert too_wide.status_code == 422
     await client.aclose()

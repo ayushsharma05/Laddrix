@@ -1,5 +1,6 @@
 """Shared test data: a few realistic instruments, users and accounts."""
 
+import os
 from datetime import date
 
 import pytest
@@ -70,3 +71,12 @@ def light_password_hashing():
     previous = security.use_hasher(PasswordHasher(time_cost=1, memory_cost=8, parallelism=1))
     yield
     security.use_hasher(previous)
+
+
+@pytest.fixture(autouse=True)
+def _keep_umask():
+    """Tools set the process umask (serve, backup); never let that leak into other tests."""
+    old = os.umask(0o022)
+    os.umask(old)
+    yield
+    os.umask(old)
