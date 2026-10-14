@@ -785,3 +785,119 @@ button.lc:disabled {
 .ticket .ladder-status {
   margin-top: auto;
 }
+
+/* --- algo manager (K6.4) ------------------------------------------------------------------------ */
+
+.algos-row {
+  grid-template-columns: 22px 56px 64px minmax(110px, 1.4fr) 42px 56px 64px 84px 60px 70px minmax(140px, 2fr);
+}
+.book-scroll:has(.algos-row) {
+  --min-row: 840px;
+}
+.algos-row.finished > span {
+  opacity: 0.7;
+}
+/* filled, with a bar showing how much of the parent is done */
+.algo-filled {
+  background: linear-gradient(to right, rgba(111, 168, 255, 0.18) var(--done, 0%), transparent var(--done, 0%));
+}
+.algo-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.algo-detail {
+  padding: 4px 8px 6px 28px;
+  font-size: 12px;
+  background: #1b2129;
+  border-bottom: 1px solid var(--border);
+}
+.algo-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  padding: 2px 0;
+}
+.algo-child {
+  display: grid;
+  grid-template-columns: 104px 80px 42px 56px minmax(110px, 1fr) 84px minmax(90px, 1fr);
+  gap: 0 6px;
+  padding: 1px 0;
+}
+.algo-form {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  max-height: 60%;
+  overflow: auto;
+  border-bottom: 1px solid var(--border);
+  background: #1b2129;
+}
+.algo-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 14px;
+}
+.algo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.algo-field input:not([type="checkbox"]) {
+  height: 24px;
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--well);
+  border: 1px solid #3a4452;
+}
+.algo-field.wide {
+  min-width: 200px;
+}
+.algo-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  white-space: nowrap;
+}
+label.algo-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.algo-field .ticket-sides .side {
+  width: 60px;
+  height: 24px;
+}
+.algo-help {
+  flex: 1 1 200px;
+  font-size: 12px;
+  padding-bottom: 4px;
+}
+.algo-picked {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+.algo-problems {
+  margin: 0;
+  padding: 4px 8px 4px 22px;
+  font-size: 12px;
+  color: var(--bad);
+  border: 1px solid #7a2c33;
+}
+.algo-form .ticket-send {
+  flex: 0 1 auto;
+  height: 28px;
+  padding: 0 14px;
+}

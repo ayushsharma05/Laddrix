@@ -156,6 +156,7 @@ export type ServerMessage =
       broker: number;
       message: string;
     }
+  | { type: "algo"; account_id: string; kind: string; detail: string; algo: AlgoView }
   | { type: "error"; message: string }
   | { type: "pong" };
 
@@ -186,4 +187,61 @@ export interface OrderSpec {
   products: string[];
   auto_protection_pct: string; // decimal text, e.g. "2"
   max_modifications: number;
+}
+
+// --- algos (GET …/algo-specs, …/algos; stream "algo") -------------------------------------------
+// Every algo describes its settings; the start form is drawn from this, nothing hard-coded.
+
+export type AlgoParamKind =
+  | "lots"
+  | "price"
+  | "price_offset"
+  | "ticks"
+  | "seconds"
+  | "count"
+  | "percent"
+  | "choice"
+  | "flag"
+  | "instrument";
+
+export interface AlgoParamSpec {
+  name: string;
+  label: string;
+  kind: AlgoParamKind | string; // an unknown kind is shown as a plain text box
+  help: string;
+  required: boolean;
+  default: unknown;
+  min: number | null;
+  max: number | null;
+  choices: string[];
+}
+
+export interface AlgoSpec {
+  code: string;
+  name: string;
+  help: string;
+  params: AlgoParamSpec[];
+}
+
+export type AlgoState = "WORKING" | "PAUSED" | "STOPPING" | "DONE" | "STOPPED" | "FAILED";
+
+export interface AlgoView {
+  algo_id: string;
+  code: string;
+  account_id: string;
+  user_id: string;
+  instrument_id: string;
+  side: Side;
+  qty: number;
+  params: Record<string, unknown>;
+  state: AlgoState;
+  filled_qty: number;
+  avg_price_paise: number;
+  working_qty: number;
+  children: string[];
+  reason: string;
+  status: string;
+  extra: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }

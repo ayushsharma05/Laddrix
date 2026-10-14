@@ -67,12 +67,20 @@ export async function buildDefault(api: DockviewApi, pageName: string, instrumen
     ticketAnchor ? { position: { referencePanel: ticketAnchor.id, direction: "right" } } : undefined,
   );
 
-  // the bottom row: order book | positions | messages
+  // the bottom row: order book (+ algos tab) | positions | audit trail (+ messages tab)
   const book = add(
     "orders",
     {},
     watch ? { position: { direction: "below" } } : undefined,
   );
+  add("algos", {}, book ? { position: { referencePanel: book.id, direction: "within" } } : undefined);
+  if (book) {
+    try {
+      book.api.setActive(); // the order book shows; Algos waits in the tab next to it
+    } catch {
+      // a nicety
+    }
+  }
   const positions = add("positions", {}, book ? { position: { referencePanel: book.id, direction: "right" } } : undefined);
   const audit = add("audit", {}, positions ? { position: { referencePanel: positions.id, direction: "right" } } : undefined);
   add("messages", {}, audit ? { position: { referencePanel: audit.id, direction: "within" } } : undefined);

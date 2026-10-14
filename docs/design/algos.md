@@ -76,3 +76,37 @@ B moves ─► re-quote A (24 modifications, then cancel and re-send)
 - If the broker refuses 3 hedges in a row (e.g. a kill switch), it gives up and ends FAILED with
   that alert, instead of retrying forever.
 - The screen shows legs filled, unhedged quantity, the spread actually traded and the legging time.
+
+## The algo screen (`ui/src/widgets/algos/`, K6.4)
+
+```
+[New algo ▾]  Pause  Resume  Stop                                            Stop all (2)
+▸ Algo  Type    Contract       Side  Qty  Filled  Avg        Working  State    Status
+▾ A2    SPREAD  NIFTY26OCTFUT  BUY    75      75  25,010.00        0  Done     fully filled
+    Leg B NIFTY26NOVFUT · Unhedged 0 · Traded spread −139.10 · Max legging 87 ms
+    Spread (A − B) −50.00 · Pay-up 2
+    09:14:24.699 D2610143 BUY  75 NIFTY26OCTFUT 25,099.10 Filled
+    09:14:24.788 D2610144 SELL 75 NIFTY26NOVFUT 25,148.90 Filled
+```
+
+| API | |
+|---|---|
+| `GET /api/accounts/{a}/algo-specs` | what each algo needs (the form is drawn from it) |
+| `GET /api/accounts/{a}/algos` | today's algos (loaded at sign-in, then kept live by the stream) |
+| `POST /api/accounts/{a}/algos` | start: `{code, instrument_id, side, qty, product?, params}` → 201, a refusal → 422 |
+| `POST /api/accounts/{a}/algos/{id}/pause\|resume\|stop` | → the algo; not allowed in its state → 409 |
+| stream `{"type":"algo", account_id, kind, detail, algo}` | every change, never conflated |
+
+- **Backend provides, frontend displays.** The form has one input per parameter, chosen by
+  its kind (whole numbers, rupee prices, signed offsets, seconds, choices, flags, contract
+  search). An unknown kind gets a plain text box and the server decides. A new algo needs no
+  screen change.
+- An algo's own figures (`extra`) are shown by name, formatted by their unit suffix:
+  `…_paise` is a price and `…_ms` is milliseconds. A non-zero `unhedged` is shown in red.
+  Settings use the labels from the algo's spec.
+- Starting, pausing and resuming pass the same trading gate as orders. **Stop** stays allowed
+  while trading is stopped, because getting out must always work, the same as cancel.
+- Messages: started, done, stopped, failed and every **ALERT** (errors in red); routine
+  updates appear only on this screen.
+- In the default layout the screen is a tab next to the Order Book. Clicking a row sends its
+  contract to the link group.

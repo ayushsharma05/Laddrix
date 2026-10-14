@@ -223,5 +223,5 @@ class Spreader(BaseStrategy):
             leg_b_filled=b_filled,
             unhedged=a_filled - b_filled,
             traded_spread_paise=traded,
-            legging_ms_max=round(max(self.legging_ms)) if self.legging_ms else None,
+            max_legging_ms=round(max(self.legging_ms)) if self.legging_ms else None,
         )

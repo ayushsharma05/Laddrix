@@ -11,7 +11,7 @@
 // (docs/design/stream.md, "After every (re)connect").
 
 import type { Status } from "../api/stream";
-import type { Me, OrderView, Position, PositionsSnapshot, ServerMessage } from "../api/types";
+import type { AlgoView, Me, OrderView, Position, PositionsSnapshot, ServerMessage } from "../api/types";
 import { price, qty, shortName } from "../lib/format";
 
 export type Level = "ERROR" | "WARN" | "INFO" | "OK";
@@ -44,6 +44,7 @@ export interface AccountBook {
   reconcile: PositionsSnapshot["reconcile"] | null;
   alerts: Record<string, PositionAlert>; // by instrument_id
   kill: KillState;
+  algos: Record<string, AlgoView>; // by algo_id
 }
 
 export interface State {
@@ -60,7 +61,7 @@ export const MAX_MESSAGES = 500;
 const OFF: KillState = { engaged: false, reason: "", by: "" };
 
 export function emptyBook(): AccountBook {
-  return { orders: {}, positions: {}, dayPnl: 0, reconcile: null, alerts: {}, kill: OFF };
+  return { orders: {}, positions: {}, dayPnl: 0, reconcile: null, alerts: {}, kill: OFF, algos: {} };
 }
 
 export function positionKey(p: { instrument_id: string; product: string }): string {
@@ -177,6 +178,14 @@ export class Store {
     });
   }
 
+  applyAlgos(accountId: string, algos: AlgoView[]): void {
+    const merged = { ...this.book(accountId).algos };
+    for (const a of algos) {
+      if (newer(a.updated_at, merged[a.algo_id]?.updated_at)) merged[a.algo_id] = a;
+    }
+    this.setBook(accountId, { algos: merged });
+  }
+
   // --- the stream -----------------------------------------------------------------------------
 
   applyMessage(m: ServerMessage): void {
@@ -218,6 +227,12 @@ export class Store {
           this.addMessage("OK", m.instrument_id, `${shortName(m.instrument_id)}: positions match the broker again`);
         }
         return this.setBook(m.account_id, { alerts });
+      }
+      case "algo": {
+        this.applyAlgos(m.account_id, [m.algo]);
+        const note = describeAlgoEvent(m.kind, m.detail, m.algo);
+        if (note) this.addMessage(note.level, m.algo.instrument_id, note.text);
+        return;
       }
       case "error":
         this.addMessage("ERROR", "", m.message);
@@ -299,5 +314,24 @@ export function describeOrderEvent(
       return null;
     default:
       return null; // SUBMITTED, SENT, MODIFY_SENT, CANCEL_SENT: the order book shows these
+  }
+}
+
+/** The Messages line for an algo event, or null for routine updates. */
+export function describeAlgoEvent(kind: string, detail: string, a: AlgoView): { level: Level; text: string } | null {
+  const what = `${a.algo_id} ${a.code} ${a.side} ${qty(a.qty)} ${shortName(a.instrument_id)}`;
+  switch (kind) {
+    case "STARTED":
+      return { level: "INFO", text: `${what} started` };
+    case "ALERT":
+      return { level: "ERROR", text: `${what}: ${detail}` };
+    case "DONE":
+      return { level: "OK", text: `${what} done: ${qty(a.filled_qty)} filled @ ${price(a.avg_price_paise)}` };
+    case "STOPPED":
+      return { level: "INFO", text: `${what} stopped: ${a.reason}` };
+    case "FAILED":
+      return { level: "ERROR", text: `${what} failed: ${a.reason}` };
+    default:
+      return null; // UPDATED, PAUSED, RESUMED, STOPPING: the algo manager shows these
   }
 }

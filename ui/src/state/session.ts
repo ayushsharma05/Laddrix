@@ -8,7 +8,7 @@
 
 import { ApiError, type Rest } from "../api/rest";
 import type { StreamClient } from "../api/stream";
-import type { Me, OrderView, PositionsSnapshot } from "../api/types";
+import type { AlgoView, Me, OrderView, PositionsSnapshot } from "../api/types";
 import type { Store } from "./store";
 
 export class Session {
@@ -30,6 +30,7 @@ export class Session {
       stream.on("positions", (m) => store.applyMessage(m)),
       stream.on("kill", (m) => store.applyMessage(m)),
       stream.on("position_alert", (m) => store.applyMessage(m)),
+      stream.on("algo", (m) => store.applyMessage(m)),
       stream.on("error", (m) => store.applyMessage(m)),
     );
   }
@@ -80,12 +81,14 @@ export class Session {
       await Promise.all(
         me.accounts.map(async (account) => {
           const base = `/api/accounts/${encodeURIComponent(account.id)}`;
-          const [orders, positions] = await Promise.all([
+          const [orders, positions, algos] = await Promise.all([
             this.rest.get<OrderView[]>(`${base}/orders`),
             this.rest.get<PositionsSnapshot>(`${base}/positions`),
+            this.rest.get<AlgoView[]>(`${base}/algos`).catch(() => [] as AlgoView[]), // a nicety
           ]);
           this.store.applyOrders(account.id, orders);
           this.store.applyPositions(account.id, positions);
+          this.store.applyAlgos(account.id, algos);
         }),
       );
     } catch (err) {

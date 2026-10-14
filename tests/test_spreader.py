@@ -144,7 +144,7 @@ async def test_the_hedge_goes_out_right_after_the_quote_fills_within_the_payup(w
     view = world.engine.get(algo.algo_id)
     assert view.state is AlgoState.DONE  # done only when both legs are complete
     assert view.extra["traded_spread_paise"] == -13000
-    assert view.extra["unhedged"] == 0 and view.extra["legging_ms_max"] == 180
+    assert view.extra["unhedged"] == 0 and view.extra["max_legging_ms"] == 180
 
 
 async def test_partial_fills_are_hedged_as_they_come(world):

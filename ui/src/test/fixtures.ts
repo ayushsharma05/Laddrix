@@ -1,5 +1,5 @@
 // Shared test data.
-import type { Me, Need, OrderSpec, OrderTypeSpec, OrderView } from "../api/types";
+import type { AlgoView, Me, Need, OrderSpec, OrderTypeSpec, OrderView } from "../api/types";
 
 export const ME: Me = {
   user: { id: "ayush", name: "Ayush", roles: ["trader"] },
@@ -60,6 +60,31 @@ export function orderSpec(instrumentId = "NFO:NIFTY26OCTFUT", extra: Partial<Ord
     products: ["NRML", "MIS"],
     auto_protection_pct: "2",
     max_modifications: 25,
+    ...extra,
+  };
+}
+
+/** An algo as the API sends it (GET …/algos, stream "algo"). */
+export function algo(id: string, extra: Partial<AlgoView> = {}): AlgoView {
+  return {
+    algo_id: id,
+    code: "SLICER",
+    account_id: "acc-a",
+    user_id: "ayush",
+    instrument_id: "NFO:NIFTY26OCTFUT",
+    side: "BUY",
+    qty: 750,
+    params: { slices: 10 },
+    state: "WORKING",
+    filled_qty: 0,
+    avg_price_paise: 0,
+    working_qty: 75,
+    children: [],
+    reason: "",
+    status: "",
+    extra: {},
+    created_at: "2026-10-14T04:40:00+00:00",
+    updated_at: "2026-10-14T04:40:00+00:00",
     ...extra,
   };
 }
