@@ -25,23 +25,25 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | --- | --- | --- |
 | K0 Foundations (#124–#127) | #158 (base main) | ✅ CI green, 50 tests |
 | K1 Live prices (#128–#132) | #159 (base k0-foundations) | ✅ CI green, 117 tests |
-| K2 Paper broker (#133–#135) | next | ⏳ |
+| K2 Paper broker (#133–#135) | #160 (base k1-live-prices) | ✅ 167 tests; each fill rule mutation-checked |
+| K3 Orders & risk (#136–#140) | next | ⏳ brainstorm first |
 
-Merge order: #123 → #157 → #158 → #159 → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
 - `.gitignore` ignores only the top-level `/data/` (it had hidden `tests/data/`).
 - CI uses actions/checkout@v5 and setup-python@v6 (Node 20 deprecation).
 - Decoder measured at ~17 µs per full packet (≈1 % of a CPU at 750 ticks/s).
+- Paper broker is conservative on purpose: fills at shown depth only, queue position from depth, volume counts only after we join, no price improvement for resting orders, triggered stops arrive as new orders. Shared rules (market protection, 25-modify cap) live in `broker/rules.py` so paper can't be more lenient than Kite.
 
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-1. Merge PR #123 (context folder), then the Kite architecture PR.
-2. **#124 K0.1**: package skeleton. Claude has given the code and line-by-line explanation (also verified: 15 tests + ruff pass for #124 + #125 together).
-3. Then #125 (money + instruments), #126, #127.
-4. Before K1: create the Kite Connect app (₹500/month data plan) at developers.kite.trade.
+1. Ayush merges in order: #123 → #157 → #158 → #159 → #160.
+2. **K3 (#136–#140)**: order manager state machine, throttle (8/s, 350/min, 4500/day per account), risk checks + kill switch, event log, Kite order adapter. Brainstorm → design → code → tests → self-review → PR, one part at a time.
+3. Then K4 (positions, P&L, reconciliation), multi-user persistence, UI design pass with mockups (approval before UI code), K5–K7.
+4. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`.
 
 ## Key facts the design depends on (checked 14 Oct 2026, re-check before going live)
 - Data ₹500/month per app; order APIs free.

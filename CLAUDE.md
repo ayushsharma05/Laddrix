@@ -6,7 +6,7 @@ Ayush's learning project: a personal, professional-style trading platform for **
 
 The short version:
 - Ayush is new to programming and learns by doing. Use plain words, flowcharts and short answers, and explain every line of code.
-- **He types the code.** For each issue give the professional code and tests, verified to run, and explain it by tracing real data line by line. You also plan, write issues and review.
+- **Claude writes the code** (Ayush asked on 14 Oct): professional code, extensive tests, self-review, one milestone per stacked PR. Explain by tracing real data, and send progress updates as you go. Take time: brainstorm each part before coding.
 - Every change goes through an issue, then a PR with `Closes #N`, then green CI.
 - **Never commit company details** from his employer: no names, internal systems, code or screenshots. Use generic names.
 - Next issue = the lowest open issue in the earliest open **K** milestone (K0 → K7), label `track: kite`.
