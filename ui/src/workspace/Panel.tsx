@@ -112,8 +112,14 @@ export function WidgetTab({ api, params }: IDockviewPanelHeaderProps<BaseParams>
     api.updateParameters({ ...params, link: nextLink(link) });
     controller.changed();
   };
+  // double-click a tab: fill the workspace with this widget; again to put it back
+  const toggleMaximized = () => {
+    if (where === "popout") return;
+    if (api.isMaximized()) api.exitMaximized();
+    else api.maximize();
+  };
   return (
-    <div className="tab">
+    <div className="tab" onDoubleClick={toggleMaximized} title="Double-click to maximize or restore">
       {def && def.link !== "none" && (
         <button
           type="button"

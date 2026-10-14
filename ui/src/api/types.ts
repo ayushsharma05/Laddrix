@@ -160,6 +160,7 @@ export type ServerMessage =
     }
   | { type: "algo"; account_id: string; kind: string; detail: string; algo: AlgoView }
   | { type: "ops"; key: string; level: "INFO" | "WARN" | "ERROR" | "OK"; text: string; active: boolean; at: string }
+  | ({ type: "chain" } & OptionChain)
   | { type: "error"; message: string }
   | { type: "pong" };
 
@@ -247,4 +248,40 @@ export interface AlgoView {
   extra: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+}
+
+// --- options (GET /api/options/…, stream "chain") ---------------------------------------------
+
+export interface ChainLeg {
+  instrument_id: string;
+  ltp_paise: number | null;
+  bid_paise: number | null;
+  ask_paise: number | null;
+  volume: number | null;
+  oi: number | null;
+  oi_change: number | null; // since the first OI seen today
+  iv: number | null; // a fraction: 0.12 = 12%
+  delta: number | null;
+  gamma: number | null;
+  theta: number | null; // rupees per calendar day
+  vega: number | null; // rupees per IV point
+}
+
+export interface ChainRow {
+  strike_paise: number;
+  call: ChainLeg | null;
+  put: ChainLeg | null;
+}
+
+export interface OptionChain {
+  underlying: string;
+  expiry: string; // YYYY-MM-DD
+  forward_paise: number | null;
+  atm_strike_paise: number | null;
+  days_to_expiry: number;
+  rate: number;
+  pcr: number | null;
+  max_pain_paise: number | null;
+  atm_iv: number | null;
+  rows: ChainRow[];
 }

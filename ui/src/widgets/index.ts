@@ -7,3 +7,4 @@ import "./books/AuditTrail";
 import "./books/Messages";
 import "./ticket/Ticket";
 import "./algos/AlgoManager";
+import "./chain/OptionChain";

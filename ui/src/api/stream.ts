@@ -9,7 +9,13 @@
 //   "open" again so screens reload their snapshots (nothing is silently missing).
 // - Close 4401 (logged out) stops for good: the app shows the login screen.
 
-import type { ServerMessage, Tick } from "./types";
+import type { OptionChain, ServerMessage, Tick } from "./types";
+
+export interface ChainRequest {
+  underlying: string;
+  expiry: string;
+  strikes: number;
+}
 
 export type Status = "connecting" | "open" | "reconnecting" | "logged-out" | "stopped";
 
@@ -44,6 +50,7 @@ export class StreamClient {
   private listeners = new Map<string, Set<(m: ServerMessage) => void>>();
   private statusListeners = new Set<(s: Status) => void>();
   private latest = new Map<string, Tick>(); // newest tick per watched instrument
+  private chains = new Map<string, { req: ChainRequest; listeners: Set<(c: OptionChain) => void> }>();
   private attempt = 0;
   private timer: Timer | null = null;
   private wanted = false;
@@ -97,6 +104,29 @@ export class StreamClient {
     };
   }
 
+  /**
+   * Watch an option chain (the server sends it at once, then at most once a second). Widgets
+   * watching the same underlying + expiry share one server chain; the strikes asked last win.
+   */
+  subscribeChain(req: ChainRequest, listener: (c: OptionChain) => void): () => void {
+    const key = `${req.underlying}|${req.expiry}`;
+    let entry = this.chains.get(key);
+    if (!entry) this.chains.set(key, (entry = { req, listeners: new Set() }));
+    const changed = entry.req.strikes !== req.strikes || entry.listeners.size === 0;
+    entry.req = req;
+    entry.listeners.add(listener);
+    if (changed) this.send({ op: "chain", ...req });
+    return () => {
+      const current = this.chains.get(key);
+      if (!current) return;
+      current.listeners.delete(listener);
+      if (current.listeners.size === 0) {
+        this.chains.delete(key);
+        this.send({ op: "chain_stop", underlying: req.underlying, expiry: req.expiry });
+      }
+    };
+  }
+
   /** Instruments with at least one watcher (for tests and the status bar). */
   watched(): string[] {
     return [...this.refs.keys()];
@@ -124,6 +154,7 @@ export class StreamClient {
       this.attempt = 0;
       const ids = [...this.refs.keys()];
       if (ids.length) socket.send(JSON.stringify({ op: "subscribe", instruments: ids }));
+      for (const { req } of this.chains.values()) socket.send(JSON.stringify({ op: "chain", ...req }));
       this.setStatus("open");
     };
     socket.onmessage = (ev) => this.dispatch(String(ev.data));
@@ -160,6 +191,15 @@ export class StreamClient {
         if (!this.refs.has(tick.instrument_id)) continue; // a late tick after unsubscribing
         this.latest.set(tick.instrument_id, tick);
         for (const listener of this.tickListeners.get(tick.instrument_id) ?? []) listener(tick);
+      }
+    }
+    if (message.type === "chain") {
+      for (const listener of this.chains.get(`${message.underlying}|${message.expiry}`)?.listeners ?? []) {
+        try {
+          listener(message);
+        } catch (err) {
+          console.error("chain listener failed", err);
+        }
       }
     }
     for (const listener of this.listeners.get(message.type) ?? []) {

@@ -901,3 +901,131 @@ label.algo-field {
   height: 28px;
   padding: 0 14px;
 }
+
+/* --- option chain (K8.3) ------------------------------------------------------------------------ */
+
+.chain {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-variant-numeric: tabular-nums;
+}
+.chain-bar select {
+  height: 22px;
+}
+.chain-expiries {
+  display: flex;
+  gap: 2px;
+}
+.chain-strikes {
+  height: 22px;
+}
+.chain-strikes span {
+  min-width: 26px;
+  text-align: center;
+  line-height: 22px;
+  font-size: 12px;
+}
+.chain-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: #1b2129;
+}
+.chain-row {
+  display: grid;
+  grid-template-columns: 1fr 84px 1fr;
+  align-items: stretch;
+  font-size: 12px;
+}
+.book-scroll:has(.chain-row) {
+  --min-row: 760px;
+}
+.chain-side-head {
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.chain-side-head.calls {
+  color: var(--buy-text);
+}
+.chain-side-head.puts {
+  color: #ffb3b8;
+}
+.chain-head {
+  height: auto; /* two lines: CALLS/PUTS and the column names */
+  background: var(--chrome); /* opaque: rows scroll underneath */
+}
+.chain-head > * {
+  padding: 0;
+  border-right: 0;
+}
+.chain-cells {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(52px, 92px));
+  gap: 0 6px;
+  padding: 0 6px;
+}
+/* numbers packed towards the strike on both sides */
+.chain-row > .chain-cells:first-child {
+  justify-content: end;
+}
+.chain-row > .chain-cells:last-child {
+  justify-content: start;
+}
+.chain-strike {
+  text-align: center;
+  font-weight: 700;
+  background: #232a34;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+.chain-leg {
+  height: 22px;
+  align-items: center;
+  font: inherit;
+  color: var(--text);
+  text-align: right;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+/* OI bar: how this strike's open interest compares with the largest shown */
+.chain-leg.call {
+  background: linear-gradient(to left, rgba(111, 168, 255, 0.16) var(--oi, 0%), transparent var(--oi, 0%));
+}
+.chain-leg.put {
+  background: linear-gradient(to right, rgba(240, 100, 108, 0.16) var(--oi, 0%), transparent var(--oi, 0%));
+}
+.chain-leg.itm {
+  background-color: rgba(255, 214, 102, 0.07);
+}
+.chain-leg:hover:not(:disabled),
+.chain-leg.selected {
+  outline: 1px solid var(--select);
+  outline-offset: -1px;
+}
+.chain-row.atm .chain-strike {
+  color: #111;
+  background: #ffd666;
+}
+.chain-row.atm {
+  border-top: 1px solid #ffd66655;
+  border-bottom: 1px solid #ffd66655;
+}
+.chain-foot {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  border-top: 1px solid var(--border);
+}
+.chain-foot b {
+  color: var(--text);
+}
