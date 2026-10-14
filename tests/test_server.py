@@ -10,10 +10,11 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import pytest
 
+from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.fake import FakeBroker
 from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.domain.orders import OrderStatus, OrderUpdate, Product, Side
-from mocktrade.domain.ticks import Tick
+from mocktrade.domain.ticks import DepthLevel, Tick
 from mocktrade.marketdata.service import MarketData
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
@@ -64,7 +65,11 @@ class World:
         for account in self.users.accounts():
             self.brokers[account.id] = FakeBroker()
             self.platform.add_account(
-                account, self.brokers[account.id], ids=ClientIds("MT"), clock=self.clock
+                account,
+                self.brokers[account.id],
+                ids=ClientIds("MT"),
+                clock=self.clock,
+                algo_types=BUILTIN,
             )
         self.login_calls = []
         self.app = create_app(
@@ -392,6 +397,88 @@ async def test_an_accounts_audit_trail_in_pages(world):
     # a plain trader can't read someone else's audit trail: the account doesn't exist for them
     riya = await world.logged_in("riya")
     assert (await riya.get("/api/accounts/acc-ayush/events")).status_code == 404
+    await riya.aclose()
+
+
+# --- algos ---
+
+
+async def test_algo_specs_describe_each_algos_settings(world):
+    c = await world.logged_in()
+    specs = (await c.get("/api/accounts/acc-ayush/algo-specs")).json()
+    assert [s["code"] for s in specs] == ["SLICER", "SPREAD"]
+    slicer = specs[0]
+    assert [p["name"] for p in slicer["params"]] == ["slices", "interval_s", "mode", "limit_paise"]
+    assert slicer["params"][2] == {
+        "name": "mode",
+        "label": "Price",
+        "kind": "choice",
+        "help": slicer["params"][2]["help"],
+        "required": True,
+        "default": "join",
+        "min": None,
+        "max": None,
+        "choices": ["join", "cross"],
+    }
+    await c.aclose()
+
+
+async def test_start_pause_resume_stop_an_algo(world):
+    c = await world.logged_in()
+    body = {
+        "code": "SLICER",
+        "instrument_id": FUT,
+        "side": "BUY",
+        "qty": 150,
+        "params": {"slices": 2, "interval_s": 60},
+    }
+    world.platform.market_data.on_tick(
+        Tick(FUT, 2501000, bids=(DepthLevel(2501000, 150, 2),), asks=(DepthLevel(2501010, 75, 1),))
+    )
+    started = await c.post("/api/accounts/acc-ayush/algos", json=body)
+    assert started.status_code == 201, started.text
+    algo = started.json()
+    assert (algo["state"], algo["user_id"], algo["params"]["mode"]) == ("WORKING", "ayush", "join")
+    await world.platform.accounts["acc-ayush"].algos.settle()
+    listed = (await c.get("/api/accounts/acc-ayush/algos")).json()
+    assert [a["algo_id"] for a in listed] == [algo["algo_id"]] and len(listed[0]["children"]) == 1
+    base = f"/api/accounts/acc-ayush/algos/{algo['algo_id']}"
+    assert (await c.post(f"{base}/pause", json={})).json()["state"] == "PAUSED"
+    assert (await c.post(f"{base}/resume", json={})).json()["state"] == "WORKING"
+    assert (await c.post(f"{base}/stop", json={})).json()["state"] in ("STOPPING", "STOPPED")
+    assert (await c.post(f"{base}/explode", json={})).status_code == 404
+    await c.aclose()
+
+
+async def test_bad_algo_settings_come_back_as_readable_reasons(world):
+    c = await world.logged_in()
+    r = await c.post(
+        "/api/accounts/acc-ayush/algos",
+        json={"code": "SLICER", "instrument_id": FUT, "side": "BUY", "qty": 100, "params": {}},
+    )
+    assert r.status_code == 422
+    reason = r.json()["detail"]
+    assert "Slices is required" in reason and "lot" in reason
+    r = await c.post(
+        "/api/accounts/acc-ayush/algos",
+        json={"code": "NOPE", "instrument_id": FUT, "side": "BUY", "qty": 75, "params": {}},
+    )
+    assert r.json()["detail"] == "there is no algo called 'NOPE'"
+    assert (await c.post("/api/accounts/acc-ayush/algos/A99/stop", json={})).status_code == 409
+    await c.aclose()
+
+
+async def test_algos_follow_the_same_permissions_as_orders(world):
+    risk = await world.logged_in("risk")  # may watch, may not trade
+    assert (await risk.get("/api/accounts/acc-ayush/algos")).status_code == 200
+    r = await risk.post(
+        "/api/accounts/acc-ayush/algos",
+        json={"code": "SLICER", "instrument_id": FUT, "side": "BUY", "qty": 75, "params": {}},
+    )
+    assert r.status_code == 403
+    await risk.aclose()
+    riya = await world.logged_in("riya")
+    assert (await riya.get("/api/accounts/acc-ayush/algos")).status_code == 404
     await riya.aclose()
 
 

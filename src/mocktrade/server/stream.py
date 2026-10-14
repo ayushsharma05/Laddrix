@@ -29,6 +29,7 @@ from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
+from mocktrade.algos.engine import AlgoEvent
 from mocktrade.domain.accounts import User, can_view
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import Subscription
@@ -38,7 +39,7 @@ from mocktrade.platform import AccountRuntime, Platform
 from mocktrade.positions.book import PositionView
 from mocktrade.positions.reconcile import Mismatch
 from mocktrade.risk.kill_switch import KillState
-from mocktrade.server.formats import position_to_dict
+from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.users import UserStore
 
 log = logging.getLogger(__name__)
@@ -117,6 +118,7 @@ class StreamHub:
         runtime.reconciler.subscribe(
             lambda what, mismatch: self._on_alert(account_id, what, mismatch)
         )
+        runtime.algos.subscribe(self._on_algo)
 
     # --- one browser tab ----------------------------------------------------------------------
 
@@ -297,6 +299,19 @@ class StreamHub:
                 connection.positions[key] = data  # newest wins
                 connection.pnl[account_id] = pnl
                 connection.positions_changed.set()
+
+    def _on_algo(self, event: AlgoEvent) -> None:
+        """Algo changes: like order events, never conflated or dropped."""
+        message = {
+            "type": "algo",
+            "account_id": event.algo.account_id,
+            "kind": event.kind,
+            "detail": event.detail,
+            "algo": algo_to_dict(event.algo),
+        }
+        for connection in list(self._connections):
+            if event.algo.account_id in connection.accounts:
+                connection.put(message)
 
     def _on_kill(self, name: str, state: KillState) -> None:
         message = {

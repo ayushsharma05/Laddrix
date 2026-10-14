@@ -27,6 +27,8 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from mocktrade.algos.engine import AlgoError
+from mocktrade.algos.spec import spec_to_dict as algo_spec_to_dict
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_view
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import spec_to_dict
@@ -36,7 +38,7 @@ from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.server import security
-from mocktrade.server.formats import position_to_dict
+from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.stream import StreamHub
 from mocktrade.server.users import SESSION_MAX, LoginFailed, UserStore
 from mocktrade.store.events import StoredEvent
@@ -115,6 +117,15 @@ class ModifyIn(_Strict):
     qty: int | None = Field(default=None, gt=0)
     price_paise: int | None = Field(default=None, gt=0)
     trigger_paise: int | None = Field(default=None, gt=0)
+
+
+class AlgoIn(_Strict):
+    code: str = Field(min_length=1, max_length=32)
+    instrument_id: str = Field(min_length=3, max_length=64)
+    side: Side
+    qty: int = Field(gt=0)
+    product: Product = Product.NRML
+    params: dict[str, Any] = Field(default_factory=dict)  # checked against the algo's spec
 
 
 class StopIn(_Strict):
@@ -364,6 +375,47 @@ def create_app(
             limit=limit,
         )
         return [_event(e) for e in events]
+
+    # --- algos -----------------------------------------------------------------------------
+    # Specs describe each algo's settings; the screen draws its form from them (algos/spec.py).
+
+    @app.get("/api/accounts/{account_id}/algo-specs")
+    async def algo_specs(account_id: str, user: Me) -> list[dict[str, Any]]:
+        return [algo_spec_to_dict(s) for s in runtime(account_id, user).algos.specs()]
+
+    @app.get("/api/accounts/{account_id}/algos")
+    async def list_algos(account_id: str, user: Me) -> list[dict[str, Any]]:
+        return [algo_to_dict(a) for a in runtime(account_id, user).algos.algos()]
+
+    @app.post("/api/accounts/{account_id}/algos", status_code=201)
+    async def start_algo(account_id: str, body: AlgoIn, user: Me) -> dict[str, Any]:
+        running = runtime(account_id, user, trade=True)
+        try:
+            view = running.algos.start(
+                body.code,
+                user_id=user.id,  # from the session, never from the body
+                instrument_id=body.instrument_id,
+                side=body.side,
+                qty=body.qty,
+                params=body.params,
+                product=body.product,
+            )
+        except AlgoError as exc:
+            raise HTTPException(422, exc.reason) from None
+        return algo_to_dict(view)
+
+    @app.post("/api/accounts/{account_id}/algos/{algo_id}/{action}")
+    async def control_algo(account_id: str, algo_id: str, action: str, user: Me) -> dict[str, Any]:
+        running = runtime(account_id, user, trade=True)
+        engine = running.algos
+        controls = {"pause": engine.pause, "resume": engine.resume, "stop": engine.stop}
+        if action not in controls:
+            raise HTTPException(404, "unknown action: use pause, resume or stop")
+        try:
+            view = controls[action](algo_id)
+        except AlgoError as exc:
+            raise HTTPException(409, exc.reason) from None
+        return algo_to_dict(view)
 
     # --- positions -----------------------------------------------------------------------------
 

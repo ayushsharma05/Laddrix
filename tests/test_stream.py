@@ -13,6 +13,7 @@ import uvicorn
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidStatus
 
+from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.fake import FakeBroker
 from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.domain.orders import OrderStatus, OrderUpdate, Product, Side
@@ -64,7 +65,9 @@ class Live:
         self.md.on_tick(Tick(FUT, 2501000))
         self.platform = Platform(self.store, self.md, KillSwitch("firm"))
         for account in self.users.accounts():
-            self.platform.add_account(account, FakeBroker(), ids=ClientIds("MT"))
+            self.platform.add_account(
+                account, FakeBroker(), ids=ClientIds("MT"), algo_types=BUILTIN
+            )
         self.app = create_app(
             self.platform, self.users, ServerSettings(origin=self.origin, cookie_secure=False)
         )
@@ -316,6 +319,25 @@ async def test_positions_are_conflated_with_the_days_pnl(live):
     (position,) = batches[0]["positions"]
     assert (position["qty"], position["unrealised_paise"]) == (225, 22500)
     assert batches[0]["day_pnl_paise"] == 22500
+    await client.aclose()
+
+
+async def test_algo_changes_are_pushed_in_order(live):
+    client = await live.session()
+    algos = live.platform.accounts["acc-ayush"].algos
+    async with live.stream(client) as ws:
+        await next_of(ws, "hello")
+        algo = algos.start(
+            "SLICER", user_id="ayush", instrument_id=FUT, side=Side.BUY, qty=150,
+            params={"slices": 2, "interval_s": 60},
+        )  # fmt: skip
+        await algos.settle()
+        algos.stop(algo.algo_id, "done")
+        messages = await all_of(ws, "algo")
+    kinds = [m["kind"] for m in messages]
+    assert kinds[0] == "STARTED" and "STOPPING" in kinds
+    assert messages[0]["algo"]["algo_id"] == algo.algo_id
+    assert messages[-1]["algo"]["reason"] == "done"
     await client.aclose()
 
 
