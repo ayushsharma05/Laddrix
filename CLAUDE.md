@@ -1,15 +1,16 @@
 # MockTrade
 
-Ayush's learning project: a professional-style trading platform for COMEX metals futures (GC, SI, HG, plus multi-leg spreads) that trades against a mock exchange replaying real data. The exchange itself is the separate repo `ayushsharma05/MockCME`.
+Ayush's learning project: a personal, professional-style trading platform for **NSE/BSE on Zerodha Kite Connect** (REST for orders, WebSocket for live ticks), with a paper-trading broker that fills against live Kite prices. Since 14 Oct 2026 this **Kite track** is active; the earlier COMEX/MockCME track is paused (issues labelled `paused: cme-track`). Design: `docs/design/kite-architecture.md`.
 
 **Before anything else, read `context/README.md`.** It has how Ayush wants to work, the full history, the current status and every diagram.
 
 The short version:
 - Ayush is new to programming and learns by doing. Use plain words, flowcharts and short answers, and explain every line of code.
-- **He writes the code.** You plan, write issues, review and coach.
+- **He types the code.** For each issue give the professional code and tests, verified to run, and explain it by tracing real data line by line. You also plan, write issues and review.
 - Every change goes through an issue, then a PR with `Closes #N`, then green CI.
 - **Never commit company details** from his employer: no names, internal systems, code or screenshots. Use generic names.
-- Next issue = the earliest open milestone, then the lowest open number.
+- Next issue = the lowest open issue in the earliest open **K** milestone (K0 → K7), label `track: kite`.
+- Kite limits and SEBI rules drive the design (rate limits, static IP for orders, market_protection ≠ 0, 10 OPS). Re-check them before going live.
 
 ## Keep the context folder up to date (standing rule from Ayush)
 Any chat can hit its limit without warning, so **don't wait to be asked**. Whenever a session changes something (an issue closed, a decision made, a PR merged, a new diagram or file), before ending your reply:

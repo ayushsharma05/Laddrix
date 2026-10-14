@@ -11,6 +11,7 @@ Everything a new Claude chat needs to continue this project exactly where the la
 
 | File or folder | What it is |
 | --- | --- |
+| `../docs/design/kite-architecture.md` | **Active design (Kite track)**: limits, components, adapter, languages, deployment |
 | [cme-wiki-guide.md](cme-wiki-guide.md) | Beginner guide to CME MDP 3.0 (prices) and iLink 3 (orders), with 3 diagrams |
 | [build-map/](build-map/) | The MockTrade Build Map: `MockTrade-Build-Map.html` (open in a browser) and the generator that rebuilds it |
 | [images/](images/) | Every diagram from the conversation, as PNG |
