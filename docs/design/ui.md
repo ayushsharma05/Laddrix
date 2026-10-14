@@ -84,13 +84,29 @@ Columns **Work | PIQ | Bids | Price | Asks | LTQ | VAP**; rows are prices on the
   protection. The request goes through the same risk checks; a refusal shows in the status line.
 - **Click Work** = select (yellow ring); again = cancel; another row's Work = move (modify the
   price, which goes to the back of the queue).
-- Work shows my working quantity per price (blue buy, red sell). PIQ shows the quantity ahead
-  of my order (exact in paper, an estimate for Kite, which doesn't report it).
-- Depth is Kite's 5 levels, best level bold. Price column grey, last price green. LTQ shows the
-  last trade size (green up-tick, red down-tick). VAP is today's volume at each price with a bar.
+- Work shows my working quantity per price (blue buy, red sell; italic while a cancel is pending).
+  PIQ shows the quantity ahead of my order, **estimated in the browser** with the paper broker's
+  own rule (join behind the depth shown at my price when I click; trades at my price eat the
+  queue; the queue is never longer than the depth shown minus me; a moved order goes to the
+  back). Kite doesn't report queue position, so paper and live use the same estimate.
+- Depth is Kite's 5 levels, best level bold, empty cells (never fake zeros) elsewhere. Price
+  column grey, last price green. LTQ shows the last trade size (green up-tick, red down-tick).
+  VAP is today's volume at each price with a bar: the server counts it from every tick
+  (`GET /api/instruments/{id}/vap`, `marketdata/vap.py`) and the ladder continues the count from
+  the stream, so it covers the whole day, not just since the ladder opened. It is an estimate:
+  Kite sends snapshots, so volume between two snapshots is put on the newer last price.
 - Status line: the last event for this ladder (sent, filled, refused with the reason…) and
-  the working quantity.
-- Keys (focused ladder): Space re-centre, Esc clear selection and lots, wheel ±1 lot,
+  the working quantity. Refusals also go to Messages.
+- **Confirm over** (sidebar "Cfm": Off, ₹1L, ₹5L, ₹25L): an order worth more needs a second
+  click on the same cell within 5 s; the status line says what will be sent and its value.
+- **CXL ALL** cancels this contract's working orders on the ladder's account. Cancels stay
+  allowed while trading is stopped (getting out must always work); only disconnects and
+  view-only accounts block them.
+- **Unconfirmed** orders on a contract block new clicks on it until the broker answers.
+- The browser makes each order's client id, so a lost answer to "place" can never turn into a
+  second order; the status line says to check the order book.
+- Keys (focused ladder): Space re-centre, Esc clear selection and lots, wheel over the prices
+  scrolls them (and turns auto-centre off), wheel over the lots box ±1 lot,
   Ctrl+click Bids/Asks joins the best price on that side.
 
 ### Order ticket
