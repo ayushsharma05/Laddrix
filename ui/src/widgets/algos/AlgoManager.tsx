@@ -409,6 +409,8 @@ function StartForm({ accountId, specs, defaultInstrument, onStarted, onCancel }:
   );
 }
 
+const UNITS: Record<string, string> = { seconds: "s", minutes: "min", percent: "%", ticks: "ticks" };
+
 /** One parameter's input, chosen by its kind. An unknown kind gets a plain text box. */
 function ParamInput({ param: p, value, onChange }: { param: AlgoParamSpec; value: string | boolean | undefined; onChange: (v: string | boolean) => void }) {
   const label = (
@@ -457,7 +459,7 @@ function ParamInput({ param: p, value, onChange }: { param: AlgoParamSpec; value
     );
   }
   const priced = p.kind === "price" || p.kind === "price_offset";
-  const unit = priced ? "₹" : p.kind === "seconds" ? "s" : p.kind === "percent" ? "%" : p.kind === "ticks" ? "ticks" : "";
+  const unit = priced ? "₹" : (UNITS[p.kind] ?? "");
   return (
     <div className="algo-field" title={p.help}>
       {label}
@@ -465,7 +467,7 @@ function ParamInput({ param: p, value, onChange }: { param: AlgoParamSpec; value
         {priced && <span className="dim">{unit}</span>}
         <input
           aria-label={p.label}
-          inputMode={priced || p.kind === "seconds" || p.kind === "percent" ? "decimal" : "numeric"}
+          inputMode={priced || p.kind === "seconds" || p.kind === "minutes" || p.kind === "percent" ? "decimal" : "numeric"}
           value={text}
           placeholder={p.required ? "" : "–"}
           size={priced ? 9 : 4}

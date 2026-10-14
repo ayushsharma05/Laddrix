@@ -409,7 +409,8 @@ async def test_an_accounts_audit_trail_in_pages(world):
 async def test_algo_specs_describe_each_algos_settings(world):
     c = await world.logged_in()
     specs = (await c.get("/api/accounts/acc-ayush/algo-specs")).json()
-    assert [s["code"] for s in specs] == ["SLICER", "SPREAD"]
+    assert [s["code"] for s in specs] == ["SLICER", "TWAP", "VWAP", "POV", "ICEBERG", "SPREAD"]
+    assert {s["family"] for s in specs} == {"execution"}
     slicer = specs[0]
     assert [p["name"] for p in slicer["params"]] == ["slices", "interval_s", "mode", "limit_paise"]
     assert slicer["params"][2] == {

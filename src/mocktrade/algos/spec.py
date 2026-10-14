@@ -17,6 +17,7 @@ class ParamKind(Enum):
     PRICE_OFFSET = "price_offset"  # paise, may be negative (e.g. a spread level)
     TICKS = "ticks"  # a number of ticks (e.g. pay-up)
     SECONDS = "seconds"
+    MINUTES = "minutes"
     COUNT = "count"
     PERCENT = "percent"
     CHOICE = "choice"
@@ -43,6 +44,7 @@ class AlgoSpec:
     name: str  # "Slicer"
     help: str  # one sentence
     params: tuple[ParamSpec, ...] = field(default_factory=tuple)
+    family: str = "execution"  # how screens group algos: "execution" (work an order), "protection"
 
 
 def check_params(spec: AlgoSpec, raw: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
@@ -85,7 +87,7 @@ def _coerce(p: ParamSpec, value: Any) -> Any:
         if p.kind is ParamKind.CHOICE and value not in p.choices:
             raise ValueError(f"must be one of {', '.join(p.choices)}")
         return value
-    if p.kind in (ParamKind.SECONDS, ParamKind.PERCENT):
+    if p.kind in (ParamKind.SECONDS, ParamKind.MINUTES, ParamKind.PERCENT):
         if isinstance(value, bool) or not isinstance(value, int | float):
             raise ValueError("must be a number")
         return float(value)
@@ -99,6 +101,7 @@ def spec_to_dict(spec: AlgoSpec) -> dict[str, Any]:
         "code": spec.code,
         "name": spec.name,
         "help": spec.help,
+        "family": spec.family,
         "params": [
             {
                 "name": p.name,

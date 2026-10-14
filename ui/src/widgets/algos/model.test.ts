@@ -32,6 +32,7 @@ describe("algo form", () => {
   it("checks kinds, required and limits; leaves out empty optional settings", () => {
     expect(parseParam(param("n", "count"), "2.5")).toEqual({ ok: false, problem: "n must be a whole number" });
     expect(parseParam(param("n", "seconds"), "2.5")).toEqual({ ok: true, value: 2.5 });
+    expect(parseParam(param("n", "minutes"), "7.5")).toEqual({ ok: true, value: 7.5 });
     expect(parseParam(param("n", "count"), " ")).toEqual({ ok: false, problem: "n is required" });
     expect(parseParam(param("n", "count", { required: false }), "")).toEqual({ ok: true, skip: true });
     expect(parseParam(param("n", "ticks", { max: 50 }), "51")).toEqual({ ok: false, problem: "n must be at most 50" });
@@ -87,6 +88,16 @@ describe("algo grid", () => {
       { label: "Unhedged", text: "75", alert: true },
       { label: "Traded spread", text: "−12.50", alert: false },
       { label: "Max legging", text: "4 ms", alert: false },
+    ]);
+  });
+
+  it("schedule figures: percentages, basis points and a time of day in India", () => {
+    const f = figures({ schedule_pct: 40.5, vs_vwap_bps: 3.2, ends_at: "2026-10-14T10:00:00+00:00", better_bps: -1 });
+    expect(f).toEqual([
+      { label: "Schedule", text: "40.5%", alert: false },
+      { label: "Vs vwap", text: "+3.2 bps", alert: false },
+      { label: "Ends at", text: "15:30:00", alert: false },
+      { label: "Better", text: "-1 bps", alert: false },
     ]);
   });
 });
