@@ -1,1 +1,5 @@
+-e .
 pytest
+pytest-asyncio
+ruff
+kiteconnect==5.2.2  # only as a reference implementation in tests

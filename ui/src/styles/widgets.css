@@ -1,0 +1,197 @@
+/* Widgets inside dockview: the theme (tabs act as title bars) and the shared grid look. */
+
+.dockview-theme-mocktrade {
+  --dv-paneview-active-outline-color: #3d86f0;
+  --dv-tabs-and-actions-container-font-size: 13px;
+  --dv-tabs-and-actions-container-height: 24px;
+  --dv-drag-over-background-color: rgba(61, 134, 240, 0.18);
+  --dv-drag-over-border-color: #3d86f0;
+  --dv-tabs-container-scrollbar-color: #4a5566;
+  --dv-icon-hover-background-color: rgba(255, 255, 255, 0.08);
+  --dv-floating-box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+  --dv-overlay-z-index: 999;
+  --dv-tab-font-size: 13px;
+  --dv-border-radius: 0px;
+  --dv-tab-margin: 0;
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: #3d86f0;
+  --dv-active-sash-transition-duration: 0.1s;
+  --dv-active-sash-transition-delay: 0.3s;
+  --dv-group-view-background-color: var(--body);
+  --dv-tabs-and-actions-container-background-color: var(--chrome);
+  --dv-activegroup-visiblepanel-tab-background-color: #313b48;
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--chrome);
+  --dv-inactivegroup-visiblepanel-tab-background-color: #2b3440;
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--chrome);
+  --dv-tab-divider-color: var(--border);
+  --dv-activegroup-visiblepanel-tab-color: var(--text);
+  --dv-activegroup-hiddenpanel-tab-color: var(--text-2);
+  --dv-inactivegroup-visiblepanel-tab-color: #c6ceda;
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--text-2);
+  --dv-separator-border: transparent;
+  --dv-paneview-header-border-color: var(--border);
+  --dv-scrollbar-background-color: rgba(255, 255, 255, 0.18);
+  background: var(--desktop);
+}
+.dockview-theme-mocktrade .dv-groupview {
+  border: 1px solid var(--border);
+}
+.dockview-theme-mocktrade .dv-tabs-and-actions-container {
+  border-bottom: 1px solid var(--border);
+}
+
+/* the tab: link colour square, title, close */
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 4px 0 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.tab-title {
+  font-weight: 600;
+}
+.tab-link {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.tab-close {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.tab-close:hover {
+  opacity: 1;
+  color: var(--text);
+}
+
+.widget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* --- grids: fixed 22 px rows, zebra, sticky header ----------------------------------------- */
+
+.grid-head {
+  flex: 0 0 auto;
+  height: 22px;
+  line-height: 22px;
+  font-size: 12px;
+  color: var(--text-3);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+.grid-head > * {
+  padding: 0 6px;
+  border-right: 1px solid #313a46;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.grid-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+.row {
+  height: var(--row);
+  line-height: var(--row);
+  cursor: default;
+}
+.row > * {
+  padding: 0 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.grid-body .row:nth-child(even) {
+  background: var(--zebra);
+}
+.grid-body .row:hover {
+  background: #2a3440;
+}
+.grid-body .row.selected {
+  background: #2f4b73;
+}
+
+/* --- watch list ------------------------------------------------------------------------------ */
+
+.watch {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  outline: none;
+}
+.watch-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) 84px 72px 68px 18px;
+}
+.watch-row .wide {
+  display: none;
+}
+@container (min-width: 520px) {
+  .watch-row {
+    grid-template-columns: minmax(110px, 1fr) 84px 72px 68px 84px 84px 62px 18px;
+  }
+  .watch-row .wide {
+    display: block;
+  }
+}
+.watch-row .name {
+  font-weight: 500;
+}
+.watch-row .ltp {
+  font-weight: 600;
+  transition: background-color 0.4s;
+}
+.watch-row .flash-up {
+  background: rgba(76, 195, 138, 0.28);
+  transition: none;
+}
+.watch-row .flash-down {
+  background: rgba(240, 100, 108, 0.28);
+  transition: none;
+}
+.row-remove {
+  width: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  visibility: hidden;
+}
+.row:hover .row-remove {
+  visibility: visible;
+}
+.row-remove:hover {
+  color: var(--bad);
+}
+.watch-add {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+}
+.watch-add input {
+  border: 0;
+  height: 24px;
+}
+.watch-add .search-results {
+  top: auto;
+  bottom: calc(100% + 2px);
+}

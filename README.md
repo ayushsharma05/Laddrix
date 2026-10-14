@@ -1,24 +1,29 @@
 # MockTrade
 
-MockTrade is a modular mock trading platform for experimenting with market data, order routing, risk checks, matching, account/P&L, and trading UI flows.
+A multi-user, broker-agnostic trading platform for NSE and BSE, designed the way a professional trading-platform team would build it: a price ladder, order blotter, positions and P&L, audit trail and parent/child algo management, with a paper broker that fills against live prices.
 
-## Repository layout
+The first broker is **Zerodha Kite Connect**. Every broker plugs in behind one adapter interface, so others (or direct exchange access) can be added without changing the core.
 
-- `docs/` – requirements, exchange notes, design docs, ADRs, test plans, and runbooks
-- `common/` – shared message definitions, IDs, clock, and logging utilities
-- `services/` – backend services (`mockcme`, `mds`, `appserver`, `rom`, `sor`, `accounts`, `algos`)
-- `ui/` – trader-facing UI
-- `tests/` – cross-component integration tests
-- `deploy/` – deployment assets (e.g., Docker Compose)
-- `.github/workflows/` – CI workflows
+- **Architecture:** [docs/design/kite-architecture.md](docs/design/kite-architecture.md) and the one-chart in [context/one-chart/](context/one-chart/)
+- **Plan:** GitHub issues with the `track: kite` label, milestones K0 to K7
 
-## How to run
+## Run the tests
 
-This repository is currently scaffolded with the complete target structure.
+```
+python -m venv .venv
+.venv\Scripts\activate        # Windows (Mac/Linux: source .venv/bin/activate)
+pip install -r requirements-dev.txt
+ruff check .
+pytest
+```
 
-1. Add service implementations inside `services/`.
-2. Add UI code inside `ui/`.
-3. Add deployment manifests inside `deploy/`.
-4. Add CI workflows inside `.github/workflows/`.
+## Code layout
 
-As runnable code is added, keep run instructions in this README and in per-component README files.
+```
+src/mocktrade/
+  domain/   shared types: money in paise, instruments, users and accounts, orders
+  broker/   the broker interface and its adapters (fake, paper, kite)
+tests/      one test file per module
+```
+
+More packages (market data, order manager, risk, positions, algos, server) arrive milestone by milestone.
