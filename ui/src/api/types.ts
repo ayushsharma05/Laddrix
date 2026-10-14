@@ -203,6 +203,7 @@ export type AlgoParamKind =
   | "price_offset"
   | "ticks"
   | "seconds"
+  | "minutes"
   | "count"
   | "percent"
   | "choice"
@@ -225,6 +226,7 @@ export interface AlgoSpec {
   code: string;
   name: string;
   help: string;
+  family?: string; // how screens group algos: "execution", "protection"
   params: AlgoParamSpec[];
 }
 

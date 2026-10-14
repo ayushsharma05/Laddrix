@@ -77,6 +77,45 @@ B moves ─► re-quote A (24 modifications, then cancel and re-send)
   that alert, instead of retrying forever.
 - The screen shows legs filled, unhedged quantity, the spread actually traded and the legging time.
 
+## Execution algos (K9.1): iceberg, TWAP, VWAP, POV
+Shared parts live in `algos/execution.py`: where to price a child (`touch`: join our side or
+cross to the other, never beyond the limit) and keeping working children at that price
+(`Chaser`: 24 modifications, then cancel; the quantity goes out again later). Each algo counts
+children it has sent but the order manager hasn't registered yet (`ctx.sending`), so a fast
+second event never sends a second order. (Found by the first iceberg test: two slices at once.)
+
+**Iceberg** (`algos/iceberg.py`): only one slice is ever in the market, at the trader's limit.
+A filled slice is replaced at once; a refused or cancelled one waits for the next heartbeat
+(three refusals in a row fail the algo, as for every algo). "Vary size" moves each slice's
+size by up to that share of the display size, in whole lots, so the refills are harder to spot.
+
+**TWAP / VWAP** (`algos/schedule.py`): the schedule says how many lots should be filled by
+now; every decision (the interval moved by up to ±20%, so it isn't a clock others can see):
+
+| Situation | What it does |
+|---|---|
+| behind by more than "Catch up at" (share of the order) | crosses the spread for what's due, and moves resting children there |
+| otherwise | rests what's due at our side's best price |
+| window over, "cross" | takes the rest at the other side (never past the limit) |
+| window over, "leave" | stops, the rest unfilled, and says how many lots |
+
+- TWAP follows time; VWAP follows a **volume curve**: minute weights from 09:15 IST (data, not
+  code). Today a typical NSE U-shape (busy open and close, quiet lunch); K11 can measure it
+  from recorded days. A window started at the open fills more than half in its first half.
+- A window running past 15:30 is cut at the close; a VWAP window outside market hours has no
+  volume to follow, so it follows time. Both say so in the status.
+- VWAP reports the market's VWAP over its own window, from the feed's day volume and average
+  price (`(V1·P1 − V0·P0) / (V1 − V0)`), and our price against it in basis points (positive =
+  worse for us, for buys and sells alike).
+
+**POV** (`algos/pov.py`): every 2 s, the share × market volume since the start (our own fills
+are part of it) less what's filled and working; whole lots, at most "Max per order" a child.
+A quiet market means a slow algo: it never trades ahead of the volume to finish sooner.
+
+The screen needed no change for any of them beyond one new setting kind (`minutes`) and
+figure units by name (`…_pct`, `…_bps`, `…_at`). Specs now carry a `family` ("execution";
+K9.2 adds "protection") for the screens to group by.
+
 ## The algo screen (`ui/src/widgets/algos/`, K6.4)
 
 ```
