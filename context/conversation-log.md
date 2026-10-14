@@ -90,7 +90,7 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 
 ## 15. UI design pass: direction changed (14 Oct 2026)
 - Claude drew 7 mockups (design system, workspace, ticket states, stopped, login, audit, phone) on a design canvas.
-- Ayush: "looks more like an AI designed website, instead it should look like a trading platform"; trading must be very convenient; TT can be a reference (don't build exactly that). He shared screenshots of his firm's platform for reference only (not saved anywhere, never to be committed).
+- Ayush: "looks more like an AI designed website, instead it should look like a trading platform"; trading must be very convenient; common professional ladder designs are the reference, never copied. He shared screenshots of his firm's platform for reference only (not saved anywhere, never to be committed).
 - Claude rebuilt the ladder as a working, clickable prototype (simulated prices and fills) and the workspace as a dense terminal (5 ladders, market watch, orders, positions, audit trail grids). Remaining boards are marked "old style" until the direction is approved.
 
 ## 16. K5.3 skeleton and K5.4 ladder, continued in a cloud session (14 Oct 2026)
@@ -101,3 +101,9 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 ## 17. K5.5 screens, and keeping context current (14 Oct 2026)
 - Ayush said "continue". K5.5 (#172): Order Book, Positions, Audit Trail (with each order's timeline, live catch-up, CSV) and Messages, built to canvas board 2; a new server endpoint pages the account's audit trail. Same process: traps table, tests, 13/13 mutations, real-browser check. The browser check found two things fixed before the PR: fills showed as two identical "Filled" rows (now "Fill" for the trade, "Filled" for the state), and narrow windows squeezed columns (now they scroll sideways).
 - Ayush asked that context be updated at every important point, because each chat hits its limit (1M tokens here) and the next chat must continue from "continue" alone. Added a "How to continue" checklist to `context/README.md`, the check scripts in `context/scripts/`, and a continuity section in `working-with-ayush.md`.
+
+## 18. "Complete the whole project" and the product direction (14 Oct 2026)
+- Ayush asked to complete the whole project, designed like the platform a top professional trading-software company would build for India, paying only for the Zerodha API. Every component independent and replaceable. Claude acts as the whole expert team.
+- He then said: don't copy or mention any other vendor; MockTrade is its own product and may be deployed professionally in India later. All vendor mentions were removed from the repo and context.
+- And: "backend provides, frontend displays". The UI must not hard-code order types or other market rules: the server publishes an order spec (types, required fields, validities, products, rules) and the screens render from it. Applied first to the order ticket and ladder (#173).
+- Plan agreed: order ticket (#173) → Electron (#156) → K6 algos (#148–#151) → K7 deploy (#152–#155), one stacked PR each, context updated at every PR; then a product-vision catalogue of what a professional Indian-market platform provides, turned into new milestones.
