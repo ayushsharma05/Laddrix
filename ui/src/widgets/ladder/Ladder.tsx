@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/rest";
 import type { Instrument, OrderView, Side, Tick } from "../../api/types";
-import { useApp, useInstrument, useStore } from "../../app/context";
+import { useApp, useInstrument, useOrderSpec, useStore } from "../../app/context";
 import { SearchBox } from "../../components/SearchBox";
 import { change, price, qty as fmtQty, rupees, shortName, shortVolume } from "../../lib/format";
 import { cancelBlock, tradingBlock } from "../../state/gate";
@@ -25,20 +25,19 @@ import {
   needsRecentre,
   orderValue,
   priceOf,
-  productsFor,
+  clickTypes,
   QueueTracker,
   rowPrices,
   snap,
   unconfirmed,
   VapCounter,
   workingOrders,
-  type LadderType,
   type Tif,
 } from "./model";
 
 export interface LadderParams extends BaseParams {
   lots: number;
-  type: LadderType;
+  type: string; // an order type code from the order spec ("LIMIT", "MARKET"…)
   tif: Tif;
   product?: string; // unset: the first that fits the instrument
   accountId?: string; // unset: the account picked in the toolbar
@@ -180,8 +179,14 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
       : note;
 
   // --- the trading actions -----------------------------------------------------------------------
-  const products = productsFor(instrument);
-  const product = params.product && products.includes(params.product) ? params.product : products[0]!;
+  // what a click can place, from the server's order spec (nothing hard-coded here)
+  const spec = useOrderSpec(accountId, id);
+  const types = clickTypes(spec);
+  const orderType = types.find((t) => t.code === params.type || t.label === params.type) ?? types[0] ?? null;
+  const tifs = orderType?.validities ?? [];
+  const tif = params.tif && tifs.includes(params.tif) ? params.tif : (tifs[0] ?? "DAY");
+  const products = spec?.products ?? [];
+  const product = params.product && products.includes(params.product) ? params.product : (products[0] ?? "");
   const lots = Math.max(0, params.lots ?? 1);
   const [selected, setSelected] = useState<number | null>(null);
   const [armed, setArmed] = useState<Armed | null>(null);
@@ -198,6 +203,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
       if (why) return warn(`not sent: ${why}`);
       if (!accountId) return;
       if (!instrument.tradable) return warn(`not sent: ${instrument.symbol} can't be traded`);
+      if (!orderType || !product) return warn("not sent: what can be ordered here hasn't loaded yet");
       if (lots <= 0) return warn("not sent: quantity is 0, click a lot button first");
       if (unconfirmed(state.books[accountId]?.orders ?? {}, id).length) {
         return warn("not sent: an earlier order's outcome is unknown; waiting for the broker's order book");
@@ -209,9 +215,9 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
         if (best === undefined) return warn("not sent: no best price to join");
         px = best;
       }
-      const body = buildOrder({ instrument, side, lots, price: px, type: params.type ?? "LMT", tif: params.tif ?? "DAY", product });
+      const body = buildOrder({ instrument, side, lots, price: px, type: orderType, tif, product });
       const value = orderValue(body, ltp);
-      const what = `${side} ${fmtQty(body.qty)} ${instrument.symbol} @ ${body.price_paise === null ? "MKT" : price(body.price_paise)}`;
+      const what = `${side} ${fmtQty(body.qty)} ${instrument.symbol} @ ${body.price_paise === null ? orderType.label : price(body.price_paise)}`;
       const threshold = params.confirmOverPaise ?? 0;
       if (threshold > 0 && value > threshold) {
         const now = Date.now();
@@ -235,7 +241,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
           }
         });
     },
-    [store, accountId, warn, info, instrument, lots, id, tick, params.type, params.tif, params.confirmOverPaise, product, ltp, armed, queue, rest],
+    [store, accountId, warn, info, instrument, lots, id, tick, orderType, tif, params.confirmOverPaise, product, ltp, armed, queue, rest],
   );
 
   const cancelOrders = useCallback(
@@ -376,16 +382,20 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
           </label>
           <label>
             Type
-            <select value={params.type ?? "LMT"} onChange={(e) => setParams({ type: e.target.value as LadderType })}>
-              <option value="LMT">LMT</option>
-              <option value="MKT">MKT</option>
+            <select value={orderType?.code ?? ""} title={orderType?.help} onChange={(e) => setParams({ type: e.target.value })}>
+              {types.map((t) => (
+                <option key={t.code} value={t.code} title={t.help}>
+                  {t.label}
+                </option>
+              ))}
             </select>
           </label>
           <label>
             TIF
-            <select value={params.tif ?? "DAY"} onChange={(e) => setParams({ tif: e.target.value as Tif })}>
-              <option value="DAY">DAY</option>
-              <option value="IOC">IOC</option>
+            <select value={tif} onChange={(e) => setParams({ tif: e.target.value })}>
+              {tifs.map((v) => (
+                <option key={v}>{v}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -545,7 +555,7 @@ registerWidget<LadderParams>({
   title: "Ladder",
   description: "Price ladder: click Bids to buy, Asks to sell, Work to cancel or move",
   component: Ladder,
-  defaults: () => ({ link: "pink", lots: 1, type: "LMT", tif: "DAY", confirmOverPaise: 0 }),
+  defaults: () => ({ link: "pink", lots: 1, type: "LIMIT", tif: "DAY", confirmOverPaise: 0 }),
   link: "follows",
   tabTitle: (p) => (p.instrumentId ? shortName(p.instrumentId) : undefined),
   size: { width: 470 },

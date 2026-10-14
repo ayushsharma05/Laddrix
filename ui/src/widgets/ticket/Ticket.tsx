@@ -9,32 +9,32 @@
 // Enter sends, Esc clears, ↑/↓ move the price one tick. The same gate as the ladder
 // (tradingBlock) runs before every send, and the server checks everything again.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/rest";
-import type { Instrument, OrderView, Side } from "../../api/types";
-import { useApp, useInstrument, useStore, useTick } from "../../app/context";
+import type { Instrument, OrderSpec, OrderView, Side } from "../../api/types";
+import { useApp, useInstrument, useOrderSpec, useStore, useTick } from "../../app/context";
 import { SearchBox } from "../../components/SearchBox";
 import { price as fmtPrice, qty as fmtQty, rupees, shortName } from "../../lib/format";
 import { tradingBlock } from "../../state/gate";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
 import { CONFIRM_CHOICES } from "../ladder/Ladder";
-import { leaves, productsFor, snap, unconfirmed, workingOrders, type Tif } from "../ladder/model";
+import { leaves, snap, unconfirmed, workingOrders } from "../ladder/model";
 import {
   buildTicketOrder,
   needsPrice,
   needsTrigger,
   parsePrice,
+  pickType,
+  pickValidity,
   stepPrice,
   summarise,
   ticketProblem,
-  TICKET_TYPES,
-  type TicketType,
 } from "./model";
 
 export interface TicketParams extends BaseParams {
   lots: number;
-  type: TicketType;
-  tif: Tif;
+  type: string; // an order type code from the order spec ("LIMIT", "SL-M"…)
+  tif: string;
   product?: string;
   accountId?: string;
   confirmOverPaise: number;
@@ -52,34 +52,52 @@ export function Ticket(props: WidgetProps<TicketParams>) {
     );
   }
   if (!instrument) return <div className="empty-note">Loading {shortName(id)}…</div>;
-  return <TicketBody key={id} {...props} instrument={instrument} />;
+  return <TicketWithSpec key={id} {...props} instrument={instrument} />;
+}
+
+/** The ticket is drawn from the server's order spec: wait for it (per account + contract). */
+function TicketWithSpec(props: WidgetProps<TicketParams> & { instrument: Instrument }) {
+  const me = useStore((s) => s.me);
+  const globalAccount = useStore((s) => s.accountId);
+  const saved = props.params.accountId;
+  const accountId = saved && me?.accounts.some((a) => a.id === saved) ? saved : globalAccount;
+  const spec = useOrderSpec(accountId, props.instrument.id);
+  if (!spec) return <div className="empty-note">Loading what can be ordered on {props.instrument.symbol}…</div>;
+  if (!spec.order_types.length) return <div className="empty-note">{props.instrument.symbol} can't be traded: it has prices only.</div>;
+  return <TicketBody {...props} accountId={accountId} spec={spec} />;
 }
 
 const toText = (paise: number | null) => (paise === null ? "" : fmtPrice(paise));
 
-function TicketBody({ params, setParams, instrument }: WidgetProps<TicketParams> & { instrument: Instrument }) {
+function TicketBody({
+  params,
+  setParams,
+  instrument,
+  accountId,
+  spec,
+}: WidgetProps<TicketParams> & { instrument: Instrument; accountId: string | null; spec: OrderSpec }) {
   const { rest, store } = useApp();
   const id = instrument.id;
   const tick = useTick(id);
   const me = useStore((s) => s.me);
-  const globalAccount = useStore((s) => s.accountId);
-  const accountId = params.accountId && me?.accounts.some((a) => a.id === params.accountId) ? params.accountId : globalAccount;
   const orders = useStore((s) => (accountId ? s.books[accountId]?.orders : undefined));
   const positions = useStore((s) => (accountId ? s.books[accountId]?.positions : undefined));
   const blocked = useStore((s) => tradingBlock(s, accountId));
 
-  const type = params.type ?? "LMT";
-  const tif = params.tif ?? "DAY";
+  const type = pickType(spec, params.type)!; // TicketWithSpec makes sure there is one
+  const tif = pickValidity(type, params.tif);
   const lots = Math.max(0, params.lots ?? 1);
-  const products = productsFor(instrument);
-  const product = params.product && products.includes(params.product) ? params.product : products[0]!;
-  const tickSize = instrument.tick_paise;
+  const products = spec.products;
+  const product = params.product && products.includes(params.product) ? params.product : (products[0] ?? "");
+  const tickSize = spec.tick_paise;
   const ltp = tick?.ltp_paise ?? instrument.ltp_paise ?? null;
 
   const [side, setSide] = useState<Side>("BUY");
   const [priceText, setPriceText] = useState("");
   const [triggerText, setTriggerText] = useState("");
-  const [armed, setArmed] = useState(false);
+  // "Confirm" belongs to one exact order: armed only while nothing about it has changed.
+  // (Derived, not reset by an effect, so no render can ever confirm a different order.)
+  const [armedFor, setArmedFor] = useState<string | null>(null);
   const [note, setNote] = useState<{ level: "INFO" | "WARN"; text: string } | null>(null);
   const backRef = useRef<HTMLButtonElement>(null);
 
@@ -90,7 +108,7 @@ function TicketBody({ params, setParams, instrument }: WidgetProps<TicketParams>
 
   const price = parsePrice(priceText);
   const trigger = parsePrice(triggerText);
-  const input = { instrument, side, lots, type, price, trigger, tif, product };
+  const input = { spec, type, symbol: instrument.symbol, side, lots, price, trigger, validity: tif, product };
   const problem = ticketProblem(input, ltp);
 
   const position = useMemo(
@@ -102,13 +120,14 @@ function TicketBody({ params, setParams, instrument }: WidgetProps<TicketParams>
     [orders, id, side],
   );
   const summary = summarise(input, ltp, position, workingSameSide);
-  const qty = lots * instrument.lot_size;
-  const what = `${side} ${fmtQty(qty)} ${instrument.symbol}${needsPrice(type) && price !== null ? ` @ ${fmtPrice(price)}` : ` ${type}`}${needsTrigger(type) && trigger !== null ? ` trigger ${fmtPrice(trigger)}` : ""}`;
+  const qty = lots * spec.lot_size;
+  const what = `${side} ${fmtQty(qty)} ${instrument.symbol}${needsPrice(type) && price !== null ? ` @ ${fmtPrice(price)}` : ` ${type.label}`}${needsTrigger(type) && trigger !== null ? ` trigger ${fmtPrice(trigger)}` : ""}`;
 
-  // any change to the order disarms a pending confirmation
-  useEffect(() => setArmed(false), [side, priceText, triggerText, lots, type, tif, product, accountId]);
-  useEffect(() => {
-    if (armed) backRef.current?.focus();
+  const signature = JSON.stringify([side, priceText, triggerText, lots, type.code, tif, product, accountId]);
+  const armed = armedFor === signature;
+  const setArmed = (on: boolean) => setArmedFor(on ? signature : null);
+  useLayoutEffect(() => {
+    if (armed) backRef.current?.focus(); // focus before paint: Enter can't confirm by accident
   }, [armed]);
 
   const warn = useCallback(
@@ -135,7 +154,7 @@ function TicketBody({ params, setParams, instrument }: WidgetProps<TicketParams>
       return;
     }
     setArmed(false);
-    const body = buildTicketOrder(input);
+    const body = buildTicketOrder(input, id);
     store.noteSent();
     setNote({ level: "INFO", text: `${what} ${tif} sent` });
     rest
@@ -182,7 +201,7 @@ function TicketBody({ params, setParams, instrument }: WidgetProps<TicketParams>
     >
       <div className="ticket-head">
         <b>{instrument.symbol}</b>
-        <span className="dim">{instrument.exchange} · lot {instrument.lot_size} · tick {fmtPrice(tickSize)}</span>
+        <span className="dim">{instrument.exchange} · lot {spec.lot_size} · tick {fmtPrice(tickSize)}</span>
         <span className="book-spacer" />
         <span>
           LTP <b>{ltp !== null ? fmtPrice(ltp) : "–"}</b>
@@ -222,9 +241,16 @@ function TicketBody({ params, setParams, instrument }: WidgetProps<TicketParams>
         </div>
 
         <div className="ticket-types" role="group" aria-label="Order type">
-          {TICKET_TYPES.map((t) => (
-            <button key={t} type="button" className={`book-tab${type === t ? " on" : ""}`} aria-pressed={type === t} onClick={() => setParams({ type: t })}>
-              {t}
+          {spec.order_types.map((t) => (
+            <button
+              key={t.code}
+              type="button"
+              className={`book-tab${type.code === t.code ? " on" : ""}`}
+              aria-pressed={type.code === t.code}
+              title={`${t.name}: ${t.help}`}
+              onClick={() => setParams({ type: t.code })}
+            >
+              {t.label}
             </button>
           ))}
         </div>
@@ -234,9 +260,10 @@ function TicketBody({ params, setParams, instrument }: WidgetProps<TicketParams>
 
         <label className="ticket-field">
           TIF
-          <select value={tif} onChange={(e) => setParams({ tif: e.target.value as Tif })}>
-            <option>DAY</option>
-            <option>IOC</option>
+          <select value={tif} onChange={(e) => setParams({ tif: e.target.value })}>
+            {type.validities.map((v) => (
+              <option key={v}>{v}</option>
+            ))}
           </select>
         </label>
         <label className="ticket-field">
@@ -351,9 +378,9 @@ function PriceField(props: { label: string; name: string; value: string; disable
 registerWidget<TicketParams>({
   kind: "ticket",
   title: "Order Ticket",
-  description: "Any order type (LMT, MKT, SL, SL-M) with its value and worst-case position",
+  description: "Every order type the broker offers, with its value and worst-case position",
   component: Ticket,
-  defaults: () => ({ link: "pink", lots: 1, type: "LMT", tif: "DAY", confirmOverPaise: 0 }),
+  defaults: () => ({ link: "pink", lots: 1, type: "LIMIT", tif: "DAY", confirmOverPaise: 0 }),
   link: "follows",
   tabTitle: (p) => (p.instrumentId ? `Ticket · ${shortName(p.instrumentId)}` : undefined),
   size: { width: 420 },

@@ -111,13 +111,25 @@ Columns **Work | PIQ | Bids | Price | Asks | LTQ | VAP**; rows are prices on the
 
 ### Order ticket
 Contract (follows its link group), BUY/SELL, lots (= qty), price and trigger with −/+ tick
-buttons, type LMT / MKT / SL / SL-M, TIF, product, account, "confirm over". Under it: value,
+buttons, the order types the broker offers, TIF, product, account, "confirm over". Under it: value,
 worst-case position (position + working orders on that side + this order), distance from the
 last price, and for market orders "pays at most" (the protected worst price). Problems are
 found before the click and named in the status line (no price, off the tick grid, a stop
-trigger the market already passed, a stop-loss trigger on the wrong side of its limit, IOC on
-a stop). Over "confirm over", the button turns into CONFIRM BUY 300 with Back focused.
+trigger the market already passed, a stop-loss trigger on the wrong side of its limit, a
+validity or product the type doesn't allow). Over "confirm over", the button turns into
+CONFIRM BUY 300 with Back focused; changing anything about the order cancels the confirmation.
 Enter sends, Esc clears, ↑↓ move the focused price one tick.
+
+### Backend provides, frontend displays: the order spec
+The screens hard-code no order types, validities, products or market rules. For each account
+and contract the server publishes an **order spec** (`GET /api/accounts/{a}/instruments/{id}/order-spec`,
+`domain/order_spec.py`): each order type's code, label, name, help text, which fields it needs
+(price / trigger: required or none; market protection: auto or none), its validities, its extra
+rules (`stop_trigger`, `stop_limit`) and whether a ladder click can price it; plus products,
+tick, lot and the automatic protection band. The ticket draws its type buttons, fields, TIF and
+product lists from it; the ladder offers the click-priced types. A broker or exchange that adds
+an order type changes only the backend (its adapter publishes the new spec), and the order
+manager enforces the same spec, so the screen and the server can't disagree.
 
 ### Order book
 Tabs Working / Filled / Rejected with counts; columns Time, Contract, Side, Qty, Filled, Price,

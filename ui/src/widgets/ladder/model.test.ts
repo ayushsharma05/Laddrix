@@ -1,4 +1,4 @@
-import { order } from "../../test/fixtures";
+import { order, orderSpec } from "../../test/fixtures";
 import { tick } from "../../test/fakes";
 import type { Instrument, OrderView } from "../../api/types";
 import {
@@ -7,7 +7,7 @@ import {
   needsRecentre,
   newClientOrderId,
   orderValue,
-  productsFor,
+  clickTypes,
   QueueTracker,
   queueAt,
   rowPrices,
@@ -231,9 +231,12 @@ describe("rows", () => {
   });
 });
 
+const SPEC = orderSpec();
+const [LIMIT, MARKET] = SPEC.order_types;
+
 describe("building an order", () => {
   it("a limit: lots × lot size at the row's price, on the grid", () => {
-    const body = buildOrder({ instrument: NIFTY, side: "BUY", lots: 2, price: 2501000, type: "LMT", tif: "DAY", product: "NRML", clientOrderId: "X1" });
+    const body = buildOrder({ instrument: NIFTY, side: "BUY", lots: 2, price: 2501000, type: LIMIT!, tif: "DAY", product: "NRML", clientOrderId: "X1" });
     expect(body).toEqual({
       client_order_id: "X1",
       instrument_id: ID,
@@ -250,7 +253,7 @@ describe("building an order", () => {
   });
 
   it("a market order has no price and always carries market protection", () => {
-    const body = buildOrder({ instrument: NIFTY, side: "SELL", lots: 1, price: 2501000, type: "MKT", tif: "IOC", product: "MIS" });
+    const body = buildOrder({ instrument: NIFTY, side: "SELL", lots: 1, price: 2501000, type: MARKET!, tif: "IOC", product: "MIS" });
     expect(body).toMatchObject({ order_type: "MARKET", price_paise: null, market_protection: -1, validity: "IOC", qty: 75 });
     expect(orderValue(body, 2501010)).toBe(75 * 2501010);
   });
@@ -265,9 +268,11 @@ describe("building an order", () => {
     expect(ids.size).toBe(500);
   });
 
-  it("offers the products that fit the instrument", () => {
-    expect(productsFor({ kind: "EQ" })).toEqual(["CNC", "MIS"]);
-    expect(productsFor({ kind: "FUT" })).toEqual(["NRML", "MIS"]);
-    expect(productsFor({ kind: "CE" })).toEqual(["NRML", "MIS"]);
+  it("offers only what a click can price, from the server's spec", () => {
+    expect(clickTypes(SPEC).map((t) => t.label)).toEqual(["LMT", "MKT"]);
+    expect(clickTypes(null)).toEqual([]);
+    // a broker that adds a click-priced type shows up without a UI change
+    const more = { ...SPEC, order_types: [...SPEC.order_types, { ...LIMIT!, code: "LIMIT_POST_ONLY", label: "POST" }] };
+    expect(clickTypes(more).map((t) => t.label)).toEqual(["LMT", "MKT", "POST"]);
   });
 });

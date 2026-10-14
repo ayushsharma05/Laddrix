@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { OrderView } from "../../api/types";
 import { AppProvider, createApp } from "../../app/context";
 import { fakeRest, fakeStream, tick } from "../../test/fakes";
-import { ME, order } from "../../test/fixtures";
+import { ME, order, orderSpec } from "../../test/fixtures";
 import { Ticket, type TicketParams } from "./Ticket";
 
 const ID = "NFO:NIFTY26OCTFUT";
@@ -17,6 +17,8 @@ function setup(params: Partial<TicketParams> = {}, routes: Record<string, unknow
   const server = fakeRest({
     [`GET /api/instruments/${encodeURIComponent(ID)}`]: NIFTY,
     "POST /api/accounts/acc-a/orders": (body: unknown) => ({ status: 201, body: accepted(body as Record<string, unknown>) }),
+    [`GET /api/accounts/acc-a/instruments/${encodeURIComponent(ID)}/order-spec`]: orderSpec(ID),
+    [`GET /api/accounts/acc-view/instruments/${encodeURIComponent(ID)}/order-spec`]: orderSpec(ID),
     ...routes,
   });
   const { stream, socket } = fakeStream();
@@ -60,6 +62,22 @@ const send = () => screen.getByRole("button", { name: /^(BUY|SELL) / });
 const status = () => (document.querySelector(".ladder-status") as HTMLElement).textContent ?? "";
 
 describe("Order ticket", () => {
+  it("draws its order types from the server's spec, so a new type needs no UI change", async () => {
+    const spec = orderSpec(ID);
+    const iceberg = { ...spec.order_types[0]!, code: "ICEBERG", label: "ICE", name: "Iceberg", validities: ["DAY"] };
+    setup({ type: "ICEBERG" }, { [`GET /api/accounts/acc-a/instruments/${encodeURIComponent(ID)}/order-spec`]: { ...spec, order_types: [...spec.order_types, iceberg] } });
+    await ready();
+    expect(screen.getByRole("group", { name: "Order type" }).textContent).toBe("LMTMKTSLSL-MICE");
+    expect(screen.getByRole("button", { name: "ICE" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("shows only what the broker offers: no stops, no stop buttons", async () => {
+    const spec = orderSpec(ID);
+    setup({}, { [`GET /api/accounts/acc-a/instruments/${encodeURIComponent(ID)}/order-spec`]: { ...spec, order_types: spec.order_types.slice(0, 2) } });
+    await ready();
+    expect(screen.getByRole("group", { name: "Order type" }).textContent).toBe("LMTMKT");
+  });
+
   it("starts at the last price and sends a limit order", async () => {
     const { calls } = setup();
     const price = await ready();
@@ -130,8 +148,10 @@ describe("Order ticket", () => {
     expect(status()).toContain("Trading paused: trading is stopped on acc-a");
     act(() => socket().receive({ type: "kill", scope: "account acc-a", engaged: false, reason: "", by: "ayush", at: null }));
     rerender({ accountId: "acc-view" });
+    await ready(); // the view-only account's spec loads first
     fireEvent.keyDown(screen.getByLabelText("Price"), { key: "Enter" });
     rerender({ accountId: "acc-a" });
+    await ready();
     act(() => app.store.applyOrders("acc-a", [order("u1", "PENDING", "2026-10-14T04:41:00+00:00", { pending: "UNCONFIRMED" })]));
     fireEvent.keyDown(screen.getByLabelText("Price"), { key: "Enter" });
     expect(posts(calls)).toHaveLength(0);

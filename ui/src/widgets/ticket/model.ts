@@ -1,19 +1,16 @@
 // The order ticket's rules (docs/design/ui.md §4 "Order ticket"), apart from React so each
-// can be tested on its own. The server checks everything again; these are here so the
-// trader sees the problem before the click, in words, with the field to fix.
+// can be tested on its own. Nothing here knows which order types exist: they come from the
+// server's order spec (domain/order_spec.py), so a broker that adds or drops a type changes
+// the ticket without a new release. The server checks everything again; these are here so
+// the trader sees a problem before the click, in words, with the field to fix.
 
-import type { Instrument, Side } from "../../api/types";
-import { newClientOrderId, snap, type OrderBody, type Tif } from "../ladder/model";
+import type { OrderSpec, OrderTypeSpec, Side } from "../../api/types";
+import { newClientOrderId, snap, type OrderBody } from "../ladder/model";
 
-export type TicketType = "LMT" | "MKT" | "SL" | "SL-M";
-
-export const TICKET_TYPES: TicketType[] = ["LMT", "MKT", "SL", "SL-M"];
-export const needsPrice = (t: TicketType) => t === "LMT" || t === "SL";
-export const needsTrigger = (t: TicketType) => t === "SL" || t === "SL-M";
-const ORDER_TYPE: Record<TicketType, OrderBody["order_type"]> = { LMT: "LIMIT", MKT: "MARKET", SL: "SL", "SL-M": "SL-M" };
-
-/** What "-1 (automatic) market protection" means in paper trading (broker/rules.py). */
-export const AUTO_PROTECTION_PCT = 2;
+export const needsPrice = (t: OrderTypeSpec) => t.price === "required";
+export const needsTrigger = (t: OrderTypeSpec) => t.trigger === "required";
+/** Trades without a price of its own (market, stop-market): priced by protection instead. */
+export const isMarketLike = (t: OrderTypeSpec) => t.price === "none" && t.market_protection === "auto";
 
 /** "25,010.1" or "25010.10" -> 2501010 paise; null for anything that isn't a price. */
 export function parsePrice(text: string): number | null {
@@ -29,61 +26,75 @@ export function stepPrice(price: number, tickPaise: number, ticks: number): numb
   return Math.max(tickPaise, snap(price, tickPaise) + ticks * tickPaise);
 }
 
+/** The order type the ticket shows: the saved one if the spec still offers it, else the first. */
+export function pickType(spec: OrderSpec, saved: string | undefined): OrderTypeSpec | null {
+  return spec.order_types.find((t) => t.code === saved || t.label === saved) ?? spec.order_types[0] ?? null;
+}
+
+/** A validity the type allows: the saved one if allowed, else the type's first. */
+export function pickValidity(type: OrderTypeSpec, saved: string | undefined): string {
+  return saved && type.validities.includes(saved) ? saved : (type.validities[0] ?? "DAY");
+}
+
 export interface TicketInput {
-  instrument: Instrument;
+  spec: OrderSpec;
+  type: OrderTypeSpec;
+  symbol: string;
   side: Side;
   lots: number;
-  type: TicketType;
   price: number | null;
   trigger: number | null;
-  tif: Tif;
+  validity: string;
   product: string;
 }
 
+const tickText = (tick: number) => (tick / 100).toFixed(2);
+
 /** Why this ticket can't be sent as it stands, or null. `ltp` checks stops the market already passed. */
 export function ticketProblem(t: TicketInput, ltp: number | null): string | null {
-  if (!t.instrument.tradable) return `${t.instrument.symbol} can't be traded`;
+  const { spec, type } = t;
+  if (!spec.tradable) return `${t.symbol} can't be traded`;
   if (!(t.lots > 0)) return "quantity is 0: set the lots";
-  if (needsPrice(t.type)) {
+  if (needsPrice(type)) {
     if (t.price === null) return "enter a price";
-    if (t.price % t.instrument.tick_paise !== 0) return `price must be a multiple of the tick (${(t.instrument.tick_paise / 100).toFixed(2)})`;
+    if (t.price % spec.tick_paise !== 0) return `price must be a multiple of the tick (${tickText(spec.tick_paise)})`;
   }
-  if (needsTrigger(t.type)) {
+  if (needsTrigger(type)) {
     if (t.trigger === null) return "enter a trigger price";
-    if (t.trigger % t.instrument.tick_paise !== 0) return `trigger must be a multiple of the tick (${(t.instrument.tick_paise / 100).toFixed(2)})`;
-    if (t.type === "SL" && t.price !== null) {
-      if (t.side === "BUY" && t.trigger > t.price) return "stop-loss buy: the trigger must not be above the limit price";
-      if (t.side === "SELL" && t.trigger < t.price) return "stop-loss sell: the trigger must not be below the limit price";
-    }
-    if (ltp !== null) {
-      if (t.side === "BUY" && t.trigger <= ltp) return "a buy stop's trigger must be above the last price (it would fire at once)";
-      if (t.side === "SELL" && t.trigger >= ltp) return "a sell stop's trigger must be below the last price (it would fire at once)";
-    }
+    if (t.trigger % spec.tick_paise !== 0) return `trigger must be a multiple of the tick (${tickText(spec.tick_paise)})`;
   }
-  if ((t.type === "SL" || t.type === "SL-M") && t.tif === "IOC") return "stop orders wait for their trigger: use DAY, not IOC";
+  if (type.rules.includes("stop_limit") && t.price !== null && t.trigger !== null) {
+    if (t.side === "BUY" && t.trigger > t.price) return "stop-loss buy: the trigger must not be above the limit price";
+    if (t.side === "SELL" && t.trigger < t.price) return "stop-loss sell: the trigger must not be below the limit price";
+  }
+  if (type.rules.includes("stop_trigger") && t.trigger !== null && ltp !== null) {
+    if (t.side === "BUY" && t.trigger <= ltp) return "a buy stop's trigger must be above the last price (it would fire at once)";
+    if (t.side === "SELL" && t.trigger >= ltp) return "a sell stop's trigger must be below the last price (it would fire at once)";
+  }
+  if (!type.validities.includes(t.validity)) return `${type.name} orders can't be ${t.validity} (allowed: ${type.validities.join(", ")})`;
+  if (!spec.products.includes(t.product)) return `product ${t.product} isn't offered here (allowed: ${spec.products.join(", ")})`;
   return null;
 }
 
-export function buildTicketOrder(t: TicketInput, clientOrderId: string = newClientOrderId()): OrderBody {
-  const market = t.type === "MKT" || t.type === "SL-M";
+export function buildTicketOrder(t: TicketInput, instrumentId: string, clientOrderId: string = newClientOrderId()): OrderBody {
   return {
     client_order_id: clientOrderId,
-    instrument_id: t.instrument.id,
+    instrument_id: instrumentId,
     side: t.side,
-    qty: t.lots * t.instrument.lot_size,
-    order_type: ORDER_TYPE[t.type],
+    qty: t.lots * t.spec.lot_size,
+    order_type: t.type.code,
     product: t.product,
-    validity: t.tif,
+    validity: t.validity,
     price_paise: needsPrice(t.type) ? t.price : null,
     trigger_paise: needsTrigger(t.type) ? t.trigger : null,
-    // Kite refuses market orders without protection (0 is not allowed): -1 = automatic band
-    market_protection: market ? -1 : null,
+    // -1 = the exchange's automatic protection band (Kite refuses 0)
+    market_protection: t.type.market_protection === "auto" ? -1 : null,
   };
 }
 
-/** The worst price a market order may trade at with automatic protection, on the grid. */
-export function paysAtMost(side: Side, reference: number, tickPaise: number): number {
-  const raw = (reference * (100 + (side === "BUY" ? AUTO_PROTECTION_PCT : -AUTO_PROTECTION_PCT))) / 100;
+/** The worst price a protected market order may trade at, on the grid. */
+export function paysAtMost(side: Side, reference: number, tickPaise: number, protectionPct: number): number {
+  const raw = (reference * (100 + (side === "BUY" ? protectionPct : -protectionPct))) / 100;
   const ticks = side === "BUY" ? Math.floor(raw / tickPaise) : Math.ceil(raw / tickPaise);
   return Math.max(ticks * tickPaise, tickPaise);
 }
@@ -92,7 +103,7 @@ export interface Summary {
   value: number | null; // paise: what the order is worth at its price (or the protected worst for market)
   worstPosition: number; // position if this and every working order on the same side fill
   distancePct: number | null; // the order's price vs the last price, + = above
-  worstPrice: number | null; // market orders: the protected limit
+  worstPrice: number | null; // market-like orders: the protected limit
 }
 
 /**
@@ -100,11 +111,12 @@ export interface Summary {
  * `position` = net position now; `workingSameSide` = what's still working on this side.
  */
 export function summarise(t: TicketInput, ltp: number | null, position: number, workingSameSide: number): Summary {
-  const qty = t.lots * t.instrument.lot_size;
-  const market = t.type === "MKT" || t.type === "SL-M";
-  const reference = t.type === "SL-M" ? t.trigger : ltp;
-  const worstPrice = market && reference !== null ? paysAtMost(t.side, reference, t.instrument.tick_paise) : null;
-  const priced = market ? worstPrice : t.price;
+  const qty = t.lots * t.spec.lot_size;
+  const market = isMarketLike(t.type);
+  const reference = needsTrigger(t.type) ? t.trigger : ltp;
+  const worstPrice =
+    market && reference !== null ? paysAtMost(t.side, reference, t.spec.tick_paise, Number(t.spec.auto_protection_pct)) : null;
+  const priced = market ? worstPrice : needsPrice(t.type) ? t.price : ltp;
   const signed = t.side === "BUY" ? qty + workingSameSide : -(qty + workingSameSide);
   return {
     value: priced !== null ? priced * qty : null,

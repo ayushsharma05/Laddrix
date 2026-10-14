@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { OrderView } from "../../api/types";
 import { AppProvider, createApp } from "../../app/context";
 import { fakeRest, fakeStream, tick } from "../../test/fakes";
-import { ME, order } from "../../test/fixtures";
+import { ME, order, orderSpec } from "../../test/fixtures";
 import { Ladder, type LadderParams } from "./Ladder";
 
 const ID = "NFO:NIFTY26OCTFUT";
@@ -31,6 +31,8 @@ function setup(params: Partial<LadderParams> = {}, routes: Record<string, unknow
     [`GET /api/instruments/${encodeURIComponent(ID)}`]: NIFTY,
     [`GET /api/instruments/${encodeURIComponent(ID)}/vap`]: { volume: 2000, levels: [[2501000, 600]] },
     "POST /api/accounts/acc-a/orders": (body: unknown) => ({ status: 201, body: accepted(body as Record<string, unknown>) }),
+    [`GET /api/accounts/acc-a/instruments/${encodeURIComponent(ID)}/order-spec`]: orderSpec(ID),
+    [`GET /api/accounts/acc-view/instruments/${encodeURIComponent(ID)}/order-spec`]: orderSpec(ID),
     ...routes,
   });
   const { stream, socket } = fakeStream();
@@ -62,6 +64,12 @@ function setup(params: Partial<LadderParams> = {}, routes: Record<string, unknow
   return { ...server, ...props, app, socket, push, rerender };
 }
 
+/** Prices are on screen and the order spec has arrived (the Type list is filled). */
+async function ready() {
+  await screen.findByText("25,010.00", { selector: ".price" });
+  await vi.waitFor(() => expect((screen.getByLabelText("Type") as HTMLSelectElement).options.length).toBeGreaterThan(0));
+}
+
 const row = (p: string) => screen.getByText(p, { selector: ".price" }).closest("[role=row]") as HTMLElement;
 const statusLine = () => document.querySelector(".ladder-status") as HTMLElement;
 const posts = (calls: { method: string; path: string; body: unknown }[]) => calls.filter((c) => c.method !== "GET");
@@ -69,7 +77,7 @@ const posts = (calls: { method: string; path: string; body: unknown }[]) => call
 describe("Ladder", () => {
   it("lays out prices on the tick grid around the last price, with depth and VAP", async () => {
     const { push } = setup();
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     const prices = [...document.querySelectorAll(".ladder-rows .price")].map((e) => e.textContent);
     expect(prices).toHaveLength(30);
@@ -85,7 +93,7 @@ describe("Ladder", () => {
 
   it("click Bids buys the lots box at that price; click Asks sells", async () => {
     const { push, calls } = setup({ lots: 2 });
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     fireEvent.click(screen.getByLabelText("Buy at 25,009.90"));
     fireEvent.click(screen.getByLabelText("Sell at 25,010.20"));
@@ -100,7 +108,7 @@ describe("Ladder", () => {
 
   it("shows my working order on its row, and the queue ahead of it counts down", async () => {
     const { push, app } = setup({ lots: 1 });
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     fireEvent.click(screen.getByLabelText("Buy at 25,009.90")); // 300 ahead
     await vi.waitFor(() => expect(row("25,009.90").querySelector(".work")!.textContent).toBe("75"));
@@ -113,7 +121,7 @@ describe("Ladder", () => {
 
   it("MKT sends no price and always market protection; Ctrl+click joins the best price", async () => {
     const { push, calls, rerender } = setup({ lots: 1, type: "MKT" });
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     fireEvent.click(screen.getByLabelText("Buy at 25,009.90"));
     rerender({ type: "LMT" });
@@ -125,7 +133,7 @@ describe("Ladder", () => {
 
   it("refuses at once, and says why, when the lots box is 0", async () => {
     const { push, calls, app } = setup({ lots: 0 });
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     fireEvent.click(screen.getByLabelText("Buy at 25,010.00"));
     expect(posts(calls)).toHaveLength(0);
@@ -135,7 +143,7 @@ describe("Ladder", () => {
 
   it("never sends while trading is stopped, and says so", async () => {
     const { push, calls, socket } = setup();
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     act(() => socket().receive({ type: "kill", scope: "account acc-a", engaged: true, reason: "break", by: "ayush", at: null }));
     const buy = screen.getByLabelText("Buy at 25,010.00") as HTMLButtonElement;
@@ -147,7 +155,7 @@ describe("Ladder", () => {
 
   it("a view-only account can't send from the ladder", async () => {
     const { push, calls } = setup({ accountId: "acc-view" });
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     fireEvent.click(screen.getByLabelText("Buy at 25,010.00"));
     expect(posts(calls)).toHaveLength(0);
@@ -156,7 +164,7 @@ describe("Ladder", () => {
 
   it("nothing more is sent on a contract while an order's outcome is unknown", async () => {
     const { push, calls, app } = setup();
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     const lost = order("u1", "PENDING", "2026-10-14T04:41:00+00:00", { pending: "UNCONFIRMED" });
     act(() => app.store.applyOrders("acc-a", [lost]));
@@ -171,7 +179,7 @@ describe("Ladder", () => {
       "PATCH /api/accounts/acc-a/orders/w1": order("w1", "OPEN", "2026-10-14T04:42:00+00:00"),
     };
     const { push, calls, app } = setup({}, routes);
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     const w1 = order("w1", "OPEN", "2026-10-14T04:41:00+00:00"); // BUY 75 @ 25,010.00
     act(() => app.store.applyOrders("acc-a", [w1]));
@@ -193,7 +201,7 @@ describe("Ladder", () => {
       "DELETE /api/accounts/acc-a/orders/w2": order("w2", "CANCELLED", "2026-10-14T04:42:00+00:00"),
     };
     const { push, calls, app, socket } = setup({}, routes);
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     const other = order("x1", "OPEN", "2026-10-14T04:41:00+00:00");
     act(() =>
@@ -213,7 +221,7 @@ describe("Ladder", () => {
   it("orders over the confirm value need a second click on the same cell", async () => {
     // 2 lots × 75 × ₹25,010 = ₹37,51,500: over ₹1L
     const { push, calls } = setup({ confirmOverPaise: 1_00_000_00 });
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     fireEvent.click(screen.getByLabelText("Buy at 25,010.00"));
     expect(posts(calls)).toHaveLength(0);
@@ -226,7 +234,7 @@ describe("Ladder", () => {
 
   it("the server's refusal shows in the status line", async () => {
     const { push, socket } = setup();
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     const rejected = order("r1", "REJECTED", "2026-10-14T04:41:00+00:00", { reason: "price is more than 5% from the last price" });
     act(() => socket().receive({ type: "order", account_id: "acc-a", kind: "REJECTED", detail: "", order: rejected, fill: null }));
@@ -235,7 +243,7 @@ describe("Ladder", () => {
 
   it("a lost answer to 'place' says to check the order book", async () => {
     const { push } = setup({}, { "POST /api/accounts/acc-a/orders": () => ({ status: 0 }) });
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     fireEvent.click(screen.getByLabelText("Buy at 25,010.00"));
     await vi.waitFor(() => expect(statusLine().textContent).toContain("no answer from MockTrade, check the order book"));
@@ -243,7 +251,7 @@ describe("Ladder", () => {
 
   it("lot buttons add, 0 and Esc clear", async () => {
     const { setParams } = setup({ lots: 2 });
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     fireEvent.click(screen.getByText("+5"));
     expect(setParams).toHaveBeenLastCalledWith({ lots: 7 });
     fireEvent.click(screen.getByText("0", { selector: "button" }));
@@ -255,7 +263,7 @@ describe("Ladder", () => {
 
   it("auto-centre follows a big move; scrolling turns it off", async () => {
     const { push } = setup();
-    await screen.findByText("25,010.00", { selector: ".price" });
+    await ready();
     push();
     push({ ...BOOK, ltp_paise: 2502000, bids: [], asks: [] }); // 100 rows away
     expect(document.querySelector(".price.last")!.textContent).toBe("25,020.00");

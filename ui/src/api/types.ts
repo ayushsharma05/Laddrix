@@ -158,3 +158,32 @@ export type ServerMessage =
     }
   | { type: "error"; message: string }
   | { type: "pong" };
+
+// --- what can be ordered (GET /api/accounts/{a}/instruments/{id}/order-spec) -----------------
+// The server describes order types and their fields; screens draw from this and hard-code none.
+
+export type Need = "required" | "none" | "auto";
+
+export interface OrderTypeSpec {
+  code: string; // sent as order_type, e.g. "LIMIT", "SL-M"
+  label: string; // short, for buttons: "LMT"
+  name: string; // in words: "Stop-loss market"
+  help: string;
+  price: Need;
+  trigger: Need;
+  market_protection: Need;
+  validities: string[];
+  rules: string[]; // e.g. "stop_trigger", "stop_limit"
+  priced_by_click: boolean; // a ladder click can place it
+}
+
+export interface OrderSpec {
+  instrument_id: string;
+  tradable: boolean;
+  tick_paise: number;
+  lot_size: number;
+  order_types: OrderTypeSpec[];
+  products: string[];
+  auto_protection_pct: string; // decimal text, e.g. "2"
+  max_modifications: number;
+}

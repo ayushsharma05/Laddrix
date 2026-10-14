@@ -7,7 +7,7 @@
 //
 // Every price here is whole paise; rows are always multiples of the instrument's tick size.
 
-import type { Instrument, OrderView, Side, Tick } from "../../api/types";
+import type { Instrument, OrderSpec, OrderTypeSpec, OrderView, Side, Tick } from "../../api/types";
 
 // --- the price grid ------------------------------------------------------------------------------
 
@@ -285,18 +285,19 @@ export function buildRows({ prices, tick, working, queue, vap }: RowInputs): Lad
 }
 
 // --- building an order ---------------------------------------------------------------------------
+// Order types come from the server's order spec: the ladder offers the ones a click can price
+// (`priced_by_click`, today limit and market) and knows nothing else about them.
 
-export type LadderType = "LMT" | "MKT";
-export type Tif = "DAY" | "IOC";
+export type Tif = string;
 
 export interface OrderBody {
   client_order_id: string;
   instrument_id: string;
   side: Side;
   qty: number;
-  order_type: "LIMIT" | "MARKET" | "SL" | "SL-M";
+  order_type: string;
   product: string;
-  validity: Tif;
+  validity: string;
   price_paise: number | null;
   trigger_paise: number | null;
   market_protection: number | null;
@@ -320,34 +321,33 @@ export function newClientOrderId(now: number = Date.now(), random: () => number 
 }
 
 export function buildOrder(args: {
-  instrument: Instrument;
+  instrument: Pick<Instrument, "id" | "lot_size" | "tick_paise">;
   side: Side;
   lots: number;
   price: number;
-  type: LadderType;
-  tif: Tif;
+  type: OrderTypeSpec;
+  tif: string;
   product: string;
   clientOrderId?: string;
 }): OrderBody {
-  const market = args.type === "MKT";
   return {
     client_order_id: args.clientOrderId ?? newClientOrderId(),
     instrument_id: args.instrument.id,
     side: args.side,
     qty: args.lots * args.instrument.lot_size,
-    order_type: market ? "MARKET" : "LIMIT",
+    order_type: args.type.code,
     product: args.product,
     validity: args.tif,
-    price_paise: market ? null : snap(args.price, args.instrument.tick_paise),
+    price_paise: args.type.price === "required" ? snap(args.price, args.instrument.tick_paise) : null,
     trigger_paise: null,
     // Kite refuses market orders without protection (0 is not allowed): -1 = the exchange's automatic band.
-    market_protection: market ? -1 : null,
+    market_protection: args.type.market_protection === "auto" ? -1 : null,
   };
 }
 
-/** Products that make sense for the instrument: delivery (CNC) for shares, NRML for F&O; MIS for both. */
-export function productsFor(instrument: Pick<Instrument, "kind">): string[] {
-  return instrument.kind === "EQ" ? ["CNC", "MIS"] : ["NRML", "MIS"];
+/** The order types a ladder click can place, from the spec (today limit and market). */
+export function clickTypes(spec: OrderSpec | null): OrderTypeSpec[] {
+  return spec ? spec.order_types.filter((t) => t.priced_by_click && t.trigger !== "required") : [];
 }
 
 /** Value of an order in paise (for the "confirm over" rule): qty × price, or × last price for MKT. */

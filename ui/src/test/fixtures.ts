@@ -1,5 +1,5 @@
 // Shared test data.
-import type { Me, OrderView } from "../api/types";
+import type { Me, Need, OrderSpec, OrderTypeSpec, OrderView } from "../api/types";
 
 export const ME: Me = {
   user: { id: "ayush", name: "Ayush", roles: ["trader"] },
@@ -40,3 +40,26 @@ export function order(id: string, status: OrderView["status"], updated: string, 
   };
 }
 
+
+/** The server's standard NSE/BSE order spec (domain/order_spec.py), as the API sends it. */
+export function orderSpec(instrumentId = "NFO:NIFTY26OCTFUT", extra: Partial<OrderSpec> = {}): OrderSpec {
+  const t = (code: string, label: string, name: string, price: Need, trigger: Need, mp: Need, validities: string[], rules: string[], click: boolean): OrderTypeSpec => ({
+    code, label, name, help: `${name} help`, price, trigger, market_protection: mp, validities, rules, priced_by_click: click,
+  });
+  return {
+    instrument_id: instrumentId,
+    tradable: true,
+    tick_paise: 10,
+    lot_size: 75,
+    order_types: [
+      t("LIMIT", "LMT", "Limit", "required", "none", "none", ["DAY", "IOC"], [], true),
+      t("MARKET", "MKT", "Market", "none", "none", "auto", ["DAY", "IOC"], [], true),
+      t("SL", "SL", "Stop-loss limit", "required", "required", "none", ["DAY"], ["stop_trigger", "stop_limit"], false),
+      t("SL-M", "SL-M", "Stop-loss market", "none", "required", "auto", ["DAY"], ["stop_trigger"], false),
+    ],
+    products: ["NRML", "MIS"],
+    auto_protection_pct: "2",
+    max_modifications: 25,
+    ...extra,
+  };
+}
