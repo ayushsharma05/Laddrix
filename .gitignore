@@ -223,7 +223,7 @@ __marimo__/
 .env
 *.env
 secrets/
-data/
+/data/
 *.db
 *.sqlite3
 kite_token*
