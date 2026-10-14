@@ -48,6 +48,11 @@ LOGIN_LIMIT_PER_IP = 20  # attempts per 15 minutes from one address
 LOGIN_WINDOW_S = 15 * 60
 STATE_TTL_S = 10 * 60
 
+POPOUT_CSP = (
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; "
+    "frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
+)
+
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; "
@@ -478,6 +483,11 @@ def create_app(
                 raise HTTPException(404, "not found")
             target = (root / path).resolve()
             if path and target.is_file() and target.is_relative_to(root):
+                if path == "popout.html":
+                    # A popped-out widget's window: the main window copies its styles in as
+                    # <style> elements, so inline styles must be allowed here. No script runs
+                    # in it (the main window draws into it), so scripts stay forbidden.
+                    return FileResponse(target, headers={"Content-Security-Policy": POPOUT_CSP})
                 return FileResponse(target)
             return FileResponse(index)  # the app handles its own routes
 

@@ -567,6 +567,7 @@ async def test_the_built_screens_are_served_without_shadowing_the_api(world, tmp
     (ui / "assets").mkdir(parents=True)
     (ui / "index.html").write_text("<!doctype html><title>MockTrade</title>")
     (ui / "assets" / "app-abc123.js").write_text("console.log(1)")
+    (ui / "popout.html").write_text("<!doctype html><body></body>")
     (tmp_path / "secret.txt").write_text("not for the web")
     app = create_app(world.platform, world.users, ServerSettings(origin=ORIGIN), static_dir=ui)
     async with httpx.AsyncClient(
@@ -578,5 +579,9 @@ async def test_the_built_screens_are_served_without_shadowing_the_api(world, tmp
         assert asset.text == "console.log(1)" and "immutable" in asset.headers["cache-control"]
         assert "not for the web" not in (await c.get("/../secret.txt")).text
         assert "not for the web" not in (await c.get("/%2e%2e/secret.txt")).text
+        # a popped-out widget's window: inline styles allowed (copied in), scripts never
+        popout = (await c.get("/popout.html")).headers["content-security-policy"]
+        assert "style-src 'self' 'unsafe-inline'" in popout and "script-src 'none'" in popout
+        assert "unsafe-inline" not in (await c.get("/")).headers["content-security-policy"]
         assert (await c.get("/api/nothing-here")).status_code == 404
         assert (await c.get("/api/me")).status_code == 401  # still the API

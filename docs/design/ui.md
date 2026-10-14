@@ -176,5 +176,9 @@ where the thumb rests.
   subscription.
 - Prices update a ladder at most every 250 ms (the server conflates); order events are applied
   one by one.
-- Widgets get everything as props, so a widget can later pop out into its own desktop window
-  (Electron, K5.6) unchanged.
+- Widgets get everything as props, so any widget **pops out** into its own window unchanged
+  (⧉ on its tab; ⇲ or closing the window docks it back). The window loads `/popout.html` and
+  is drawn by the main page, so it shares the one WebSocket, store and link groups: no second
+  login, no sync delay. Pop-outs are saved in the layout. Works in the browser (pop-ups allowed)
+  and in the desktop app (`ui/desktop/`, Electron), where they are real app windows on any
+  monitor; each costs ~20–25 MB there (measured, see `ui/desktop/README.md`).

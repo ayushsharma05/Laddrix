@@ -38,8 +38,36 @@ function fakeDock() {
       layoutListener = fn;
       return { dispose: () => {} };
     },
+    // pop-out windows: which panels are out, and whether the browser allows the window
+    popoutAllowed: true,
+    popped: new Map<string, { closed: boolean }>(),
+    popoutCalls: [] as { id: string; url: string | undefined; size: number[] | null }[],
+    getPanel(id: string) {
+      const found = panels.find((p) => p.id === id);
+      if (!found) return undefined;
+      const win = api.popped.get(id);
+      return {
+        id,
+        api: { component: found.component },
+        params: found.params,
+        group: {
+          api: {
+            location: win
+              ? { type: "popout", getWindow: () => ({ close: () => { win.closed = true; api.popped.delete(id); } }) }
+              : { type: "grid" },
+          },
+        },
+      };
+    },
+    async addPopoutGroup(panel: { id: string }, options?: { popoutUrl?: string; position?: { width: number; height: number } }) {
+      api.popoutCalls.push({ id: panel.id, url: options?.popoutUrl, size: options?.position ? [options.position.width, options.position.height] : null });
+      if (!api.popoutAllowed) return false;
+      api.popped.set(panel.id, { closed: false });
+      layoutListener?.();
+      return true;
+    },
   };
-  return { api: api as unknown as DockviewApi, panels: () => panels, move: () => layoutListener?.() };
+  return { api: api as unknown as DockviewApi, raw: api, panels: () => panels, move: () => layoutListener?.() };
 }
 
 function setup(saved?: WorkspaceDoc) {
@@ -79,6 +107,35 @@ function setup(saved?: WorkspaceDoc) {
 }
 
 describe("WorkspaceController", () => {
+  it("pops a widget out into its own window with the same settings, and docks it back", async () => {
+    const { controller, notes } = setup();
+    const dock = fakeDock();
+    await controller.start(dock.api);
+    controller.addWidget("probe", { n: 5 });
+    const id = dock.panels()[1]!.id;
+    expect(await controller.popOut(id)).toBe(true);
+    expect(dock.raw.popoutCalls).toEqual([{ id, url: "/popout.html", size: [360, 640] }]); // never too small to use
+    expect(dock.panels().find((p) => p.id === id)!.params).toMatchObject({ n: 5 }); // props kept
+    expect(controller.saveState).toBe("unsaved"); // the window is part of the saved layout
+    controller.dockBack(id);
+    expect(dock.raw.popped.has(id)).toBe(false);
+    expect(dock.panels().find((p) => p.id === id)!.params).toMatchObject({ n: 5 });
+    expect(notes).toEqual([]);
+  });
+
+  it("says so when the browser blocks the window, and not while the layout is locked", async () => {
+    const { controller, notes } = setup();
+    const dock = fakeDock();
+    await controller.start(dock.api);
+    dock.raw.popoutAllowed = false;
+    expect(await controller.popOut("probe-main")).toBe(false);
+    expect(notes.pop()).toContain("allow pop-ups");
+    controller.setLocked(true);
+    expect(await controller.popOut("probe-main")).toBe(false);
+    expect(dock.raw.popoutCalls).toHaveLength(1);
+    expect(await controller.popOut("nope")).toBe(false);
+  });
+
   it("builds the starter page the first time and autosaves after changes", async () => {
     const { controller, kept, built, flush } = setup();
     const dock = fakeDock();

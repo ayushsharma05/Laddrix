@@ -21,6 +21,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    include: ["src/**/*.test.{ts,tsx}"], // the desktop app (ui/desktop) runs its own tests
     setupFiles: ["src/test/setup.ts"],
     css: false,
   },

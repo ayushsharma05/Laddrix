@@ -35,3 +35,23 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  desktop:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui/desktop
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1" # the rules are tested without starting Electron
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/desktop/package-lock.json
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
