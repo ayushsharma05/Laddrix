@@ -37,6 +37,21 @@ docker compose -f deploy/compose.yaml restart app     # accounts are started whe
 Open <https://localhost>. For `localhost`, Caddy uses its own local certificate, so the
 browser warns once.
 
+## Live Kite (`MOCKTRADE_PRICES=kite`)
+
+1. In Kite's developer console, set the app's redirect URL to `https://<your domain>/kite/callback`.
+   Register the server's static IP (orders are accepted only from it).
+2. In `deploy/.env`, set `MOCKTRADE_PRICES=kite`, `KITE_API_KEY` and `KITE_API_SECRET`.
+3. Add the account: `... users add-account acc-ayush kite AB1234 --owner ayush`. The third
+   value is the Zerodha client id. Then restart the app.
+4. Every morning, the account holder clicks **Log in to Kite** on the account strip and logs in
+   on Zerodha's own page. MockTrade never sees the Zerodha password. Prices, orders and order
+   updates start at once, with no restart. The login lasts until 6 AM the next day; after that
+   the strip asks again and new orders are refused until then.
+
+The first login of the day downloads Kite's instrument list. It is cached in the data volume,
+so contracts can be searched after a restart even before that day's login.
+
 ## Every day
 
 | Task | Command |
@@ -52,7 +67,6 @@ code 0 and logs `stopped cleanly`.
 
 ## What is not here yet
 
-- Live Kite prices and orders (`MOCKTRADE_PRICES=kite`): #183. Until then, kite accounts are
-  listed as not running. They are never traded on paper without notice.
+- A check with a real Zerodha account (only Ayush can run it) is in the runbook (#155).
 - The Mumbai server, static IP and hardening checklist: #153. Latency and load measurements:
   #154. Morning routine, alerts and runbooks: #155.

@@ -77,6 +77,7 @@ class World:
             self.users,
             ServerSettings(origin=ORIGIN),
             broker_login=self,
+            broker_status=lambda account: "login_needed" if account.id == "acc-ayush" else None,
             monotonic=self.clock.mono,
         )
 
@@ -179,6 +180,8 @@ async def test_login_sets_a_locked_down_cookie(world):
         me = (await c.get("/api/me")).json()
     assert me["user"] == {"id": "ayush", "name": "Ayush", "roles": ["admin", "trader"]}
     assert [a["id"] for a in me["accounts"]] == ["acc-ayush", "acc-riya"]  # admin sees all
+    # the broker's daily login, so the screen can offer it
+    assert [a["broker_session"] for a in me["accounts"]] == ["login_needed", None]
 
 
 @pytest.mark.parametrize(

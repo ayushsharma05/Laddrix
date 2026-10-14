@@ -8,11 +8,14 @@ for an instrument arrive before it reads, it gets only the newest one
 """
 
 import asyncio
-from collections.abc import Iterable
+import logging
+from collections.abc import Callable, Iterable
 
 from mocktrade.domain.instruments import InstrumentId
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.vap import VolumeAtPrice
+
+log = logging.getLogger(__name__)
 
 
 class Subscription:
@@ -78,6 +81,7 @@ class MarketData:
         self._latest: dict[InstrumentId, Tick] = {}
         self._watchers: dict[InstrumentId, set[Subscription]] = {}
         self.ticks_received = 0
+        self._on_demand: list[Callable[[InstrumentId], None]] = []
         self.vap = VolumeAtPrice()  # today's volume at each price (the ladder's VAP column)
 
     def latest(self, instrument_id: InstrumentId) -> Tick | None:
@@ -100,9 +104,22 @@ class MarketData:
         """Every instrument at least one subscriber is watching (what feeds must stream)."""
         return {i for i, subs in self._watchers.items() if subs}
 
+    def on_demand(self, callback: Callable[[InstrumentId], None]) -> None:
+        """`callback(id)` when an instrument gets its first watcher: a feed subscribes to it
+        at once (no polling delay before the first price)."""
+        self._on_demand.append(callback)
+
     def _index(self, subscription: Subscription, ids: Iterable[InstrumentId]) -> None:
         for instrument_id in ids:
-            self._watchers.setdefault(instrument_id, set()).add(subscription)
+            watchers = self._watchers.setdefault(instrument_id, set())
+            first = not watchers
+            watchers.add(subscription)
+            if first:
+                for callback in self._on_demand:
+                    try:
+                        callback(instrument_id)
+                    except Exception:
+                        log.exception("on_demand callback failed for %s", instrument_id)
 
     def _unindex(self, subscription: Subscription, ids: Iterable[InstrumentId]) -> None:
         for instrument_id in ids:

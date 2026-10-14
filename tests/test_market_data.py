@@ -72,3 +72,16 @@ async def test_closing_wakes_a_waiting_reader():
     await asyncio.sleep(0)
     sub.close()
     assert await asyncio.wait_for(waiter, 1) == []
+
+
+def test_a_feed_hears_when_an_instrument_gets_its_first_watcher():
+    md = MarketData()
+    asked = []
+    md.on_demand(asked.append)
+    md.on_demand(lambda _id: 1 / 0)  # a failing listener never breaks subscribing
+    a = md.subscribe(["NSE:A"])
+    md.subscribe(["NSE:A", "NSE:B"])  # A already watched: only B is new
+    assert asked == ["NSE:A", "NSE:B"]
+    a.close()
+    md.subscribe(["NSE:A"])  # still watched by the second: not new
+    assert asked == ["NSE:A", "NSE:B"]

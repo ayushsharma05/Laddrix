@@ -11,10 +11,18 @@ Settings (environment; secrets never on the command line):
     MOCKTRADE_HOST             127.0.0.1  0.0.0.0 inside a container
     MOCKTRADE_PORT             8000
     MOCKTRADE_UI               ui/dist    the built screens
-    MOCKTRADE_PRICES           sim        simulated prices, paper trading only (kite: #183)
+    MOCKTRADE_PRICES           sim        sim: simulated prices, paper accounts only
+                                          kite: live Kite prices; kite accounts trade for real
+                                          after their daily login, paper accounts fill
+                                          against live prices
+    KITE_API_KEY, KITE_API_SECRET         the Kite Connect app (kite mode). One account with
+                                          its own app: KITE_API_KEY_<ACCOUNT>, e.g.
+                                          KITE_API_KEY_ACC_AYUSH (and ..._SECRET_...)
     MOCKTRADE_TRUSTED_PROXIES  (none)     the reverse proxy's addresses: only its
                                           X-Forwarded-For is believed, so login limits
                                           see the real client
+
+In Kite's developer console, the app's redirect URL is <MOCKTRADE_ORIGIN>/kite/callback.
 
 This file only assembles parts (users, prices, brokers, platform, web server); each part is
 replaceable on its own. Accounts are started by their broker: "paper" accounts trade against
@@ -38,8 +46,10 @@ import uvicorn
 from fastapi import FastAPI
 
 from mocktrade.algos.builtin import BUILTIN
+from mocktrade.broker.kite.live import KiteLive
 from mocktrade.broker.paper import PaperBroker
-from mocktrade.config import ConfigError, environment
+from mocktrade.config import ConfigError, KiteSettings, environment
+from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.marketdata.service import MarketData
 from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
@@ -54,7 +64,7 @@ from mocktrade.store.events import EventLog
 
 log = logging.getLogger("mocktrade.serve")
 
-PRICE_SOURCES = ("sim",)  # "kite": #183
+PRICE_SOURCES = ("sim", "kite")
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
@@ -68,6 +78,20 @@ class ServeSettings:
     ui_dir: Path = Path("ui/dist")
     prices: str = "sim"
     trusted_proxies: str = ""
+    kite_env: tuple[tuple[str, str], ...] = ()  # the KITE_* settings (kite mode)
+
+    def kite_app(self, account: BrokerAccount) -> KiteSettings:
+        """The account's own Kite app if it has one, else the shared one."""
+        env = dict(self.kite_env)
+        suffix = "_" + "".join(c if c.isalnum() else "_" for c in account.id.upper())
+        key = env.get(f"KITE_API_KEY{suffix}") or env.get("KITE_API_KEY")
+        secret = env.get(f"KITE_API_SECRET{suffix}") or env.get("KITE_API_SECRET")
+        if not key or not secret:
+            raise ConfigError(
+                f"account {account.id}: no Kite app (set KITE_API_KEY and KITE_API_SECRET, "
+                f"or KITE_API_KEY{suffix} and KITE_API_SECRET{suffix})"
+            )
+        return KiteSettings(key, secret, self.data_dir / f"kite_token_{account.id}.json")
 
     @property
     def cookie_secure(self) -> bool:
@@ -102,8 +126,10 @@ class ServeSettings:
         if prices not in PRICE_SOURCES:
             problems.append(
                 f"MOCKTRADE_PRICES must be one of {', '.join(PRICE_SOURCES)}, got {prices!r}"
-                + (" (live Kite prices come with #183)" if prices == "kite" else "")
             )
+        kite_env = tuple(sorted((k, v) for k, v in env.items() if k.startswith("KITE_") and v))
+        if prices == "kite" and not any(k.startswith("KITE_API_KEY") for k, _ in kite_env):
+            problems.append("MOCKTRADE_PRICES=kite needs KITE_API_KEY and KITE_API_SECRET")
         if problems:
             raise ConfigError("; ".join(problems))
         return cls(
@@ -115,6 +141,7 @@ class ServeSettings:
             ui_dir=Path(env.get("MOCKTRADE_UI", "ui/dist")),
             prices=prices,
             trusted_proxies=env.get("MOCKTRADE_TRUSTED_PROXIES", ""),
+            kite_env=kite_env,
         )
 
 
@@ -130,8 +157,11 @@ class Assembly:
     brokers: list = field(default_factory=list)
     running: list[str] = field(default_factory=list)  # account ids
     not_running: dict[str, str] = field(default_factory=dict)  # account id -> why
+    kite: KiteLive | None = None
 
     async def close(self) -> None:
+        if self.kite is not None:
+            await self.kite.aclose()
         for broker in self.brokers:
             with contextlib.suppress(Exception):
                 await broker.aclose()
@@ -139,17 +169,41 @@ class Assembly:
 
 
 def build(settings: ServeSettings) -> Assembly:
+    """Assemble the server. Raises ConfigError (naming the setting) before starting anything
+    if an account can't be run as configured."""
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     users = UserStore(settings.data_dir / "users.db", SecretBox(settings.secret_key))
     instruments = InstrumentStore()
     md = MarketData()
     jobs = []
-    # prices: the simulator (the only source until #183 adds Kite)
-    for instrument, _ in INSTRUMENTS:
-        instruments.add(instrument)
-    simulator = MarketSimulator(md, dict(INSTRUMENTS))
-    simulator.step()  # every contract has a price before the first order
-    jobs.append(simulator.run)
+    kite: KiteLive | None = None
+    accounts = users.accounts()
+    if settings.prices == "kite":
+        for account in accounts:  # every kite account has an app before anything starts
+            if account.broker == "kite":
+                settings.kite_app(account)
+        platform_ref: list[Platform] = []
+
+        def resync(account_id: str) -> None:
+            running = platform_ref[0].account(account_id) if platform_ref else None
+            if running is not None:
+                asyncio.ensure_future(_resync(account_id, running.orders))
+
+        kite = KiteLive(
+            settings.kite_app,
+            settings.data_dir,
+            instruments,
+            md,
+            instruments_cache=settings.data_dir / "kite_instruments.csv",
+            on_reconnect=resync,
+        )
+        jobs.append(kite.start_and_run)
+    else:
+        for instrument, _ in INSTRUMENTS:
+            instruments.add(instrument)
+        simulator = MarketSimulator(md, dict(INSTRUMENTS))
+        simulator.step()  # every contract has a price before the first order
+        jobs.append(simulator.run)
 
     events = EventLog(settings.data_dir / "events.db")
     events.start()
@@ -159,16 +213,21 @@ def build(settings: ServeSettings) -> Assembly:
     not_running: dict[str, str] = {}
     day = f"S{time.strftime('%y%m%d')}"
     ids = ClientIds(day, events.last_counter(day))  # one sequence for the day, all accounts
-    for account in users.accounts():
-        if account.broker != "paper":
-            not_running[account.id] = f"{account.broker} accounts need MOCKTRADE_PRICES=kite (#183)"
+    for account in accounts:
+        if account.broker == "paper":
+            broker = PaperBroker(md, instruments, name="paper")
+            broker.start()
+            brokers.append(broker)
+        elif account.broker == "kite" and kite is not None:
+            broker = kite.add_account(account)  # refuses orders until its daily login
+        else:
+            not_running[account.id] = f"{account.broker} accounts need MOCKTRADE_PRICES=kite"
             log.warning("account %s not started: %s", account.id, not_running[account.id])
             continue
-        broker = PaperBroker(md, instruments, name="paper")
-        broker.start()
-        brokers.append(broker)
         platform.add_account(account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN)
         running.append(account.id)
+    if kite is not None:
+        platform_ref.append(platform)
     jobs.append(platform.run)
     ui = settings.ui_dir if (settings.ui_dir / "index.html").exists() else None
     if ui is None:
@@ -177,9 +236,21 @@ def build(settings: ServeSettings) -> Assembly:
         platform,
         users,
         ServerSettings(origin=settings.origin, cookie_secure=settings.cookie_secure),
+        broker_login=kite.login if kite else None,
+        broker_status=kite.status if kite else None,
         static_dir=ui,
     )
-    return Assembly(app, platform, users, events, jobs, brokers, running, not_running)
+    return Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)
+
+
+async def _resync(account_id: str, orders) -> None:
+    """After a broker reconnect: take the broker's order book as the truth again."""
+    try:
+        changed = await orders.resync()
+        if changed:
+            log.info("account %s: %d orders updated after reconnect", account_id, len(changed))
+    except Exception as exc:
+        log.warning("account %s: resync after reconnect failed: %r", account_id, exc)
 
 
 class _Server(uvicorn.Server):
@@ -252,7 +323,11 @@ def main(argv: list[str], env: Mapping[str, str]) -> int:
             f"data in {settings.data_dir}, prices {settings.prices}"
         )
         return 0
-    asyncio.run(run(settings))
+    try:
+        asyncio.run(run(settings))
+    except ConfigError as exc:
+        print(f"settings: {exc}", file=sys.stderr)
+        return 2
     return 0
 
 

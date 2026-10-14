@@ -1,6 +1,6 @@
 import type { Position, PositionsSnapshot } from "../api/types";
 import { ME, order } from "../test/fixtures";
-import { tradingBlock } from "./gate";
+import { cancelBlock, tradingBlock } from "./gate";
 import { describeOrderEvent, MAX_MESSAGES, Store } from "./store";
 
 function position(qty: number, updated: string): Position {
@@ -193,6 +193,15 @@ describe("tradingBlock", () => {
     expect(tradingBlock(s.getState())).toBe("trading is stopped on acc-a: break");
     s.applyMessage({ type: "kill", scope: "firm", engaged: true, reason: "exchange issue", by: "risk", at: null });
     expect(tradingBlock(s.getState())).toBe("all trading is stopped: exchange issue");
+  });
+
+  it("blocks new orders until the broker's daily login, but not cancels", () => {
+    const s = new Store();
+    s.setMe({ ...ME, accounts: ME.accounts.map((a) => (a.id === "acc-a" ? { ...a, broker: "kite", broker_session: "login_needed" as const } : a)) });
+    s.setStream("open");
+    s.selectAccount("acc-a");
+    expect(tradingBlock(s.getState())).toBe("log in to Kite first: today's login is missing or expired");
+    expect(cancelBlock(s.getState())).toBeNull();
   });
 
   it("blocks an account that isn't running on the server", () => {

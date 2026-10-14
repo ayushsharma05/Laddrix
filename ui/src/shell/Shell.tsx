@@ -18,6 +18,7 @@ import { buildDefault } from "../workspace/defaults";
 import { allWidgets } from "../workspace/registry";
 import { Workspace } from "../workspace/Workspace";
 import { Bands, PRICES_OLD_MS } from "./Bands";
+import { EnvStrip } from "./EnvStrip";
 import { StopDialog } from "./StopDialog";
 
 export const RATE_LIMIT_PER_MIN = 350; // the platform's own per-minute order limit (risk/throttle.py)
@@ -38,6 +39,17 @@ export function Shell() {
   const [dialog, setDialog] = useState<"stop" | "resume" | null>(null);
   const search = useRef<HTMLInputElement>(null);
   const stopped = useStore((s) => Boolean(s.accountId && s.books[s.accountId]?.kill.engaged));
+
+  // back from the broker's own login page (/kite/callback redirects to /?broker_login=…)
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const result = url.searchParams.get("broker_login");
+    if (!result) return;
+    if (result === "ok") app.store.addMessage("OK", "", "Logged in to the broker for today");
+    else app.store.addMessage("ERROR", "", "Broker login failed: try again from the account strip");
+    url.searchParams.delete("broker_login");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, [app]);
 
   // keys that work anywhere: "/" search, Ctrl+Shift+K STOP, Ctrl+S save the layout
   useEffect(() => {
@@ -145,25 +157,6 @@ function MenuBar() {
         Log out
       </button>
     </nav>
-  );
-}
-
-function EnvStrip() {
-  const me = useStore((s) => s.me);
-  const accountId = useStore((s) => s.accountId);
-  const account = me?.accounts.find((a) => a.id === accountId);
-  if (!account) return <div className="env-strip none">NO ACCOUNT · you can watch prices but not trade</div>;
-  if (account.broker === "paper") {
-    return (
-      <div className="env-strip paper">
-        PAPER · {account.id} · orders fill against live prices; nothing goes to the exchange
-      </div>
-    );
-  }
-  return (
-    <div className="env-strip live">
-      LIVE · {account.broker.toUpperCase()} · {account.broker_client_id} · orders go to the exchange
-    </div>
   );
 }
 

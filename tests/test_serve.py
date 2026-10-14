@@ -32,11 +32,38 @@ def test_plain_http_only_on_this_machine():
 
 def test_every_problem_is_named_at_once():
     with pytest.raises(ConfigError) as caught:
-        ServeSettings.from_env({"MOCKTRADE_PORT": "eighty", "MOCKTRADE_PRICES": "kite"})
+        ServeSettings.from_env({"MOCKTRADE_PORT": "eighty", "MOCKTRADE_PRICES": "live"})
     text = str(caught.value)
     for name in ("MOCKTRADE_SECRET_KEY", "MOCKTRADE_ORIGIN", "MOCKTRADE_PORT", "MOCKTRADE_PRICES"):
         assert name in text
-    assert "#183" in text  # says when live Kite prices arrive
+
+
+def test_kite_mode_needs_a_kite_app():
+    with pytest.raises(ConfigError, match="needs KITE_API_KEY"):
+        ServeSettings.from_env(env(MOCKTRADE_PRICES="kite"))
+    s = ServeSettings.from_env(
+        env(
+            MOCKTRADE_PRICES="kite",
+            KITE_API_KEY="shared",
+            KITE_API_SECRET="s1",
+            KITE_API_KEY_ACC_AYUSH="own",
+            KITE_API_SECRET_ACC_AYUSH="s2",
+        )
+    )
+    assert s.kite_app(BrokerAccount("acc-ayush", "kite", "AB1234", "ayush")).api_key == "own"
+    other = s.kite_app(BrokerAccount("acc-2", "kite", "CD5678", "x"))
+    assert (other.api_key, other.api_secret) == ("shared", "s1")
+
+
+def test_a_kite_account_without_an_app_stops_the_start(tmp_path):
+    users = UserStore(tmp_path / "users.db", SecretBox(KEY))
+    users.create_user("ayush", "Ayush", "a-long-password-1", {Role.TRADER})
+    users.add_account(BrokerAccount("acc-kite", "kite", "AB1234", "ayush"))
+    s = ServeSettings.from_env(
+        env(MOCKTRADE_DATA=str(tmp_path), MOCKTRADE_PRICES="kite", KITE_API_KEY_ACC_OTHER="k")
+    )
+    with pytest.raises(ConfigError, match="acc-kite: no Kite app"):
+        build(s)
 
 
 @pytest.mark.parametrize(
@@ -73,7 +100,7 @@ async def test_paper_accounts_run_and_others_are_listed_not_run(tmp_path):
     try:
         assert built.running == ["acc-paper"]
         assert built.platform.account("acc-kite") is None  # never traded on paper by surprise
-        assert "#183" in built.not_running["acc-kite"]
+        assert "MOCKTRADE_PRICES=kite" in built.not_running["acc-kite"]
         transport = httpx.ASGITransport(app=built.app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             assert (await client.get("/api/health")).json() == {"status": "ok"}
@@ -140,3 +167,27 @@ def test_sigterm_stops_cleanly_with_the_audit_trail_flushed(tmp_path):
             proc.kill()
     assert proc.returncode == 0, out
     assert "stopped cleanly" in out
+
+
+async def test_kite_mode_runs_kite_accounts_waiting_for_their_login(tmp_path):
+    data = tmp_path / "data"
+    data.mkdir()
+    users = UserStore(data / "users.db", SecretBox(KEY))
+    users.create_user("ayush", "Ayush", "a-long-password-1", {Role.TRADER})
+    users.add_account(BrokerAccount("acc-kite", "kite", "AB1234", "ayush"))
+    users.add_account(BrokerAccount("acc-paper", "paper", "P1", "ayush"))
+    settings = ServeSettings.from_env(
+        env(
+            MOCKTRADE_DATA=str(data), MOCKTRADE_PRICES="kite", KITE_API_KEY="k", KITE_API_SECRET="s"
+        )
+    )
+    built = build(settings)
+    try:
+        assert sorted(built.running) == ["acc-kite", "acc-paper"] and built.not_running == {}
+        assert built.kite.status(users.get_account("acc-kite")) == "login_needed"
+        assert built.kite.status(users.get_account("acc-paper")) is None
+        assert len(built.platform.instruments) == 0  # no simulated contracts in kite mode
+        await built.kite.start()  # no saved login, no cached list: waits for the login
+        assert built.kite.prices_from is None
+    finally:
+        await built.close()

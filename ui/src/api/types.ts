@@ -99,6 +99,8 @@ export interface AccountSummary {
   running: boolean;
   stopped: boolean;
   stop_reason: string;
+  /** The broker's own daily login: "live", "login_needed", or null when it has none. */
+  broker_session?: "live" | "login_needed" | null;
 }
 
 export interface Me {

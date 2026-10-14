@@ -118,6 +118,21 @@
   background: var(--paper-strip);
   color: #fff1bf;
 }
+.env-strip.login-needed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 24px;
+  line-height: 24px;
+  background: #5a2a14;
+  color: #ffd9c2;
+}
+.env-strip .strip-action {
+  height: 18px;
+  padding: 0 8px;
+  font-size: 11px;
+  letter-spacing: 0;
+}
 .env-strip.none {
   background: var(--chrome);
   color: var(--text-2);

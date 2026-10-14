@@ -22,8 +22,15 @@ export function cancelBlock(s: State, accountId: string | null = s.accountId): s
 export function tradingBlock(s: State, accountId: string | null = s.accountId): string | null {
   const blocked = cancelBlock(s, accountId);
   if (blocked) return blocked;
+  const account = s.me?.accounts.find((a) => a.id === accountId);
+  if (account?.broker_session === "login_needed") return `log in to ${brokerName(account.broker)} first: today's login is missing or expired`;
   if (s.firmKill.engaged) return `all trading is stopped${s.firmKill.reason ? `: ${s.firmKill.reason}` : ""}`;
   const kill = accountId ? s.books[accountId]?.kill : undefined;
   if (kill?.engaged) return `trading is stopped on ${accountId}${kill.reason ? `: ${kill.reason}` : ""}`;
   return null;
+}
+
+/** "kite" -> "Kite" (for sentences). */
+export function brokerName(broker: string): string {
+  return broker.charAt(0).toUpperCase() + broker.slice(1);
 }

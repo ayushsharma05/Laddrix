@@ -145,6 +145,7 @@ def create_app(
     settings: ServerSettings,
     *,
     broker_login: BrokerLogin | None = None,
+    broker_status: Callable[[BrokerAccount], str | None] | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -226,7 +227,7 @@ def create_app(
             samesite="strict",
         )
         audit("LOGIN_OK", user.id, {"ip": ip})
-        return _me(user, users, platform)
+        return _me(user, users, platform, broker_status)
 
     @app.delete("/api/session", status_code=204)
     async def logout(request: Request, response: Response) -> None:
@@ -235,7 +236,7 @@ def create_app(
 
     @app.get("/api/me")
     async def me(user: Me) -> dict[str, Any]:
-        return _me(user, users, platform)
+        return _me(user, users, platform, broker_status)
 
     # --- instruments and layouts -------------------------------------------------------------
 
@@ -588,7 +589,12 @@ def _event(e: StoredEvent) -> dict[str, Any]:
     }
 
 
-def _me(user: User, users: UserStore, platform: Platform) -> dict[str, Any]:
+def _me(
+    user: User,
+    users: UserStore,
+    platform: Platform,
+    broker_status: Callable[[BrokerAccount], str | None] | None = None,
+) -> dict[str, Any]:
     accounts = []
     for account in users.accounts():
         if not can_view(user, account):
@@ -604,6 +610,8 @@ def _me(user: User, users: UserStore, platform: Platform) -> dict[str, Any]:
                 "running": running is not None,
                 "stopped": bool(state and state.engaged),
                 "stop_reason": state.reason if state and state.engaged else "",
+                # "live", "login_needed" (the broker's daily login), or None (no such step)
+                "broker_session": broker_status(account) if broker_status else None,
             }
         )
     return {
