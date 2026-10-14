@@ -12,6 +12,7 @@ from collections.abc import Iterable
 
 from mocktrade.domain.instruments import InstrumentId
 from mocktrade.domain.ticks import Tick
+from mocktrade.marketdata.vap import VolumeAtPrice
 
 
 class Subscription:
@@ -71,6 +72,7 @@ class MarketData:
         self._latest: dict[InstrumentId, Tick] = {}
         self._watchers: dict[InstrumentId, set[Subscription]] = {}
         self.ticks_received = 0
+        self.vap = VolumeAtPrice()  # today's volume at each price (the ladder's VAP column)
 
     def latest(self, instrument_id: InstrumentId) -> Tick | None:
         return self._latest.get(instrument_id)
@@ -79,6 +81,7 @@ class MarketData:
         """Store the newest tick and tell everyone watching that instrument."""
         self.ticks_received += 1
         self._latest[tick.instrument_id] = tick
+        self.vap.on_tick(tick)
         for subscription in self._watchers.get(tick.instrument_id, ()):
             subscription._offer(tick)
 

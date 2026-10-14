@@ -234,6 +234,14 @@ def create_app(
         tick = platform.market_data.latest(instrument_id)
         return {**_instrument(instrument), "ltp_paise": tick.ltp_paise if tick else None}
 
+    @app.get("/api/instruments/{instrument_id}/vap")
+    async def get_vap(instrument_id: str, user: Me) -> dict[str, Any]:
+        """Today's volume at each price (an estimate from snapshots, see marketdata/vap.py)."""
+        if platform.instruments.get(instrument_id) is None:
+            raise HTTPException(404, "no such instrument")
+        volume, levels = platform.market_data.vap.snapshot(instrument_id)
+        return {"volume": volume, "levels": [[p, q] for p, q in sorted(levels.items())]}
+
     @app.get("/api/layouts")
     async def list_layouts(user: Me) -> list[dict[str, str]]:
         return [{"name": n, "updated_at": t} for n, t in users.layouts(user.id)]

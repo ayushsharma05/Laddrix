@@ -477,6 +477,18 @@ async def test_instrument_search_and_detail(world):
     await c.aclose()
 
 
+async def test_volume_at_price(world):
+    c = await world.logged_in()
+    md = world.platform.market_data
+    md.on_tick(Tick(FUT, 2501000, volume=1000))
+    md.on_tick(Tick(FUT, 2501010, volume=1150))
+    md.on_tick(Tick(FUT, 2501000, volume=1225))
+    body = (await c.get(f"/api/instruments/{FUT}/vap")).json()
+    assert body == {"volume": 1225, "levels": [[2501000, 75], [2501010, 150]]}
+    assert (await c.get("/api/instruments/NSE:NOPE/vap")).status_code == 404
+    await c.aclose()
+
+
 async def test_layouts_are_saved_per_user(world):
     ayush = await world.logged_in("ayush")
     riya = await world.logged_in("riya")
