@@ -12,6 +12,8 @@
 | `mutate-kite-live.py` | 12 mutations of `broker/kite/live.py`; each must fail `tests/test_kite_live.py` | `python3 context/scripts/mutate-kite-live.py` |
 | `mutate-pricing.py` | 16 formula mutations of `options/`; each must fail `tests/test_option_pricing.py` | `python3 context/scripts/mutate-pricing.py` |
 | `e2e-chain.cjs` | Real browser: open the Option Chain (Widgets), maximize/restore, click a put to drive the ticket, switch expiry | `node context/scripts/e2e-chain.cjs <out-dir>` |
+| `e2e-strategy.cjs` | Real browser: Strategy Builder, iron condor, payoff and figures, Alt-click a leg from the chain | `node context/scripts/e2e-strategy.cjs <out-dir>` |
+| `mutate-strategy.py` | 13 mutations of `options/strategy.py` | `python3 context/scripts/mutate-strategy.py` |
 | `e2e-popout.cjs` | Real browser: pop a ladder out, check it updates live, trade from it, dock it back | `node context/scripts/e2e-popout.cjs <out-dir>` |
 | `ui/desktop/e2e/desktop-smoke.cjs` | The real Electron app under a display: login, pop-out, Node-access probe, memory | `cd ui/desktop && xvfb-run -a node e2e/desktop-smoke.cjs <out-dir>` |
 | `mutate-algo.py` | Breaks each algo-engine safety rule and checks a test fails | `python3 context/scripts/mutate-algo.py` (repo root) |
