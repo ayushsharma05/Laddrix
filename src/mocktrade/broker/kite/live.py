@@ -29,14 +29,15 @@ from mocktrade.broker.kite import token_store
 from mocktrade.broker.kite.broker import KiteBroker
 from mocktrade.broker.kite.daily_login import KiteDailyLogin
 from mocktrade.broker.kite.feed import KiteFeed
-from mocktrade.broker.kite.http import KiteHttp
+from mocktrade.broker.kite.http import BASE_URL, KiteHttp
 from mocktrade.broker.kite.instruments import load_kite_instruments
 from mocktrade.broker.kite.session import KiteSession
-from mocktrade.broker.kite.ticker import KiteTicker
+from mocktrade.broker.kite.ticker import WS_URL, KiteTicker
 from mocktrade.config import KiteSettings
 from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.domain.instruments import InstrumentId
 from mocktrade.marketdata.service import MarketData
+from mocktrade.metrics import freeze_heap
 from mocktrade.refdata.store import InstrumentStore
 
 log = logging.getLogger(__name__)
@@ -72,8 +73,10 @@ class KiteLive:
         *,
         instruments_cache: Path,
         on_reconnect: Callable[[str], None] | None = None,
-        http_factory: Callable[..., KiteHttp] = KiteHttp,
-        ticker_factory: Callable[..., KiteTicker] = KiteTicker,
+        http_factory: Callable[..., KiteHttp] | None = None,
+        ticker_factory: Callable[..., KiteTicker] | None = None,
+        api_url: str = BASE_URL,  # another address only for a Kite simulator (load tests)
+        ws_url: str = WS_URL,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._apps = apps
@@ -81,15 +84,22 @@ class KiteLive:
         self._md = market_data
         self._cache = instruments_cache
         self._on_reconnect = on_reconnect
-        self._http_factory = http_factory
-        self._ticker_factory = ticker_factory
+        self._http_factory = http_factory or (
+            lambda key, token=None: KiteHttp(key, token, base_url=api_url)
+        )
+        self._ticker_factory = ticker_factory or (
+            lambda *args, **kwargs: KiteTicker(*args, url=ws_url, **kwargs)
+        )
         self._clock = clock
         self._feed = KiteFeed(store, market_data)
         self._links: dict[str, _Link] = {}
         self._prices: _Link | None = None  # the live account whose ticker carries prices
         self._instruments_day: str | None = None  # the day the instrument list is from
         self.login = KiteDailyLogin(
-            apps, token_dir, on_session=self.go_live, http_factory=lambda key: http_factory(key)
+            apps,
+            token_dir,
+            on_session=self.go_live,
+            http_factory=lambda key: self._http_factory(key),
         )
         market_data.on_demand(self._on_demand)
 
@@ -238,6 +248,7 @@ class KiteLive:
             log.error("kite instrument list not refreshed: %r (using the cached one)", exc)
             return
         report = load_kite_instruments(text, self._store)
+        freeze_heap()  # today's ~90,000 contracts: out of the garbage collector's way
         self._instruments_day = today
         log.info("instruments from kite: %d loaded, %d skipped", report.loaded, report.skipped)
         self._cache.parent.mkdir(parents=True, exist_ok=True)

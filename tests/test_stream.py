@@ -400,3 +400,41 @@ async def test_connections_are_cleaned_up_when_the_tab_closes(live):
         await asyncio.sleep(0.02)
     assert live.hub.connections == 0 and FUT not in live.md.watched()
     await client.aclose()
+
+
+def test_a_tick_is_encoded_once_with_the_same_fields_as_before():
+    import json
+    from datetime import UTC, datetime
+
+    from mocktrade.domain.ticks import DepthLevel, Tick
+    from mocktrade.server import stream
+
+    t = Tick(
+        "NFO:NIFTY26OCTFUT",
+        2501000,
+        volume=12345,
+        exchange_time=datetime(2026, 10, 14, 4, 0, 1, 250000, tzinfo=UTC),
+        bids=(DepthLevel(2500990, 150, 2),),
+        asks=(DepthLevel(2501010, 225, 3),),
+    )
+    text = stream.tick_json(t)
+    assert json.loads(text) == {
+        "instrument_id": "NFO:NIFTY26OCTFUT",
+        "ltp_paise": 2501000,
+        "last_qty": None,
+        "volume": 12345,
+        "avg_price_paise": None,
+        "buy_qty": None,
+        "sell_qty": None,
+        "open_paise": None,
+        "high_paise": None,
+        "low_paise": None,
+        "close_paise": None,
+        "open_interest": None,
+        "exchange_time": "2026-10-14T04:00:01.250000+00:00",
+        "bids": [[2500990, 150, 2]],
+        "asks": [[2501010, 225, 3]],
+    }
+    assert stream.tick_json(t) is text  # the same tick: encoded once, shared
+    newer = t._replace(ltp_paise=2501010)
+    assert json.loads(stream.tick_json(newer))["ltp_paise"] == 2501010

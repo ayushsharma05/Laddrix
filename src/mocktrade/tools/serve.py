@@ -47,13 +47,16 @@ import uvicorn
 from fastapi import FastAPI
 
 from mocktrade.algos.builtin import BUILTIN
+from mocktrade.broker.kite.http import BASE_URL
 from mocktrade.broker.kite.live import KiteLive
+from mocktrade.broker.kite.ticker import WS_URL
 from mocktrade.broker.paper import PaperBroker
 from mocktrade.config import ConfigError, KiteSettings, environment
 from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.marketdata.service import MarketData
 from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
+from mocktrade.metrics import freeze_heap, watch_loop_lag
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
@@ -80,6 +83,10 @@ class ServeSettings:
     prices: str = "sim"
     trusted_proxies: str = ""
     kite_env: tuple[tuple[str, str], ...] = ()  # the KITE_* settings (kite mode)
+
+    def kite_url(self, name: str, default: str) -> str:
+        """KITE_API_URL / KITE_WS_URL: only to point at a Kite simulator (load tests)."""
+        return dict(self.kite_env).get(name, default)
 
     def kite_app(self, account: BrokerAccount) -> KiteSettings:
         """The account's own Kite app if it has one, else the shared one."""
@@ -197,6 +204,8 @@ def build(settings: ServeSettings) -> Assembly:
             md,
             instruments_cache=settings.data_dir / "kite_instruments.csv",
             on_reconnect=resync,
+            api_url=settings.kite_url("KITE_API_URL", BASE_URL),
+            ws_url=settings.kite_url("KITE_WS_URL", WS_URL),
         )
         jobs.append(kite.start_and_run)
     else:
@@ -230,6 +239,7 @@ def build(settings: ServeSettings) -> Assembly:
     if kite is not None:
         platform_ref.append(platform)
     jobs.append(platform.run)
+    jobs.append(watch_loop_lag)
     ui = settings.ui_dir if (settings.ui_dir / "index.html").exists() else None
     if ui is None:
         log.warning("no built screens in %s: serving the API only", settings.ui_dir)
@@ -274,6 +284,7 @@ class _Server(uvicorn.Server):
 
 async def run(settings: ServeSettings) -> None:
     built = build(settings)
+    freeze_heap()  # start-up objects never slow a garbage collection again (metrics.py)
     config = uvicorn.Config(
         built.app,
         host=settings.host,

@@ -9,6 +9,7 @@ for an instrument arrive before it reads, it gets only the newest one
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable, Iterable
 
 from mocktrade.domain.instruments import InstrumentId
@@ -25,10 +26,13 @@ class Subscription:
         self._service = service
         self.instrument_ids: set[InstrumentId] = set(instrument_ids)
         self._pending: dict[InstrumentId, Tick] = {}
+        self.pending_since_ns = 0  # perf_counter_ns when the oldest unread tick arrived
         self._ready = asyncio.Event()
         self.closed = False
 
     def _offer(self, tick: Tick) -> None:
+        if not self._pending:
+            self.pending_since_ns = time.perf_counter_ns()
         self._pending[tick.instrument_id] = tick  # replaces any unread older tick
         self._ready.set()
 

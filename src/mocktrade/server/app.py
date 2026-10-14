@@ -33,6 +33,7 @@ from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import spec_to_dict
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Validity
+from mocktrade.metrics import METRICS, process_gauges, since_us
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
@@ -152,6 +153,10 @@ def create_app(
     app = FastAPI(title="MockTrade", docs_url=None, redoc_url=None, openapi_url=None)
     hub = StreamHub(platform, users, origin=settings.origin, cookie_name=settings.cookie_name)
     app.state.hub = hub
+    METRICS.gauge("stream_connections", lambda: hub.connections)
+    METRICS.gauge("ticks_received", lambda: platform.market_data.ticks_received)
+    METRICS.gauge("instruments_watched", lambda: len(platform.market_data.watched()))
+    process_gauges(METRICS)
     app.add_api_websocket_route("/ws", hub.serve)
     login_attempts: dict[str, deque[float]] = {}
     login_states: dict[str, tuple[str, str, float]] = {}  # state -> (user, account, expiry)
@@ -160,6 +165,7 @@ def create_app(
 
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable[[Request], Awaitable[Response]]):
+        started = time.perf_counter_ns()
         if request.method in UNSAFE_METHODS and request.url.path.startswith("/api/"):
             if request.headers.get("origin") != settings.origin:
                 return _headers(JSONResponse({"detail": "request from another site"}, 403))
@@ -167,6 +173,10 @@ def create_app(
                 if request.method != "DELETE":
                     return _headers(JSONResponse({"detail": "send JSON"}, 415))
         response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            route = request.scope.get("route")
+            name = getattr(route, "path", "other")  # the template: no ids in metric names
+            METRICS.observe(f"http_us{{route={request.method} {name}}}", since_us(started))
         if request.url.path.startswith("/assets/") and response.status_code == 200:
             # built files carry a content hash in their name: safe to cache for a year
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -198,6 +208,24 @@ def create_app(
     @app.get("/api/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/metrics", response_model=None)
+    async def metrics(user: Me, format: str = "json") -> dict[str, Any] | Response:
+        """How fast each step is (metrics.py). Admin and risk only."""
+        if not _risk_or_admin(user):
+            raise HTTPException(403, "metrics are for admin and risk users")
+        if format == "prometheus":
+            return Response(METRICS.prometheus(), media_type="text/plain; version=0.0.4")
+        return METRICS.snapshot()
+
+    @app.delete("/api/metrics")
+    async def reset_metrics(user: Me) -> dict[str, str]:
+        """Start measuring afresh (e.g. after a load test's warm-up). Admin only."""
+        if not user.has_role(Role.ADMIN):
+            raise HTTPException(403, "only an admin can reset metrics")
+        METRICS.reset()
+        audit("METRICS_RESET", user.id, {})
+        return {"status": "reset"}
 
     @app.post("/api/session")
     async def login(body: LoginIn, request: Request, response: Response) -> dict[str, Any]:

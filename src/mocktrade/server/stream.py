@@ -25,14 +25,16 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, NamedTuple
 
+import orjson
 from fastapi import WebSocket, WebSocketDisconnect
 
 from mocktrade.algos.engine import AlgoEvent
 from mocktrade.domain.accounts import User, can_view
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import Subscription
+from mocktrade.metrics import METRICS, since_us
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import EventKind, OrderEvent
 from mocktrade.platform import AccountRuntime, Platform
@@ -64,11 +66,12 @@ class _Connection:
     too_slow: asyncio.Event = field(default_factory=asyncio.Event)
     positions_changed: asyncio.Event = field(default_factory=asyncio.Event)
 
-    def put(self, message: dict[str, Any]) -> None:
+    def put(self, message: "dict[str, Any] | _Raw", since_ns: int = 0) -> None:
+        """Queue a message; `since_ns` is when its cause happened (default: now)."""
         if self.too_slow.is_set():
             return
         try:
-            self.queue.put_nowait(message)
+            self.queue.put_nowait((since_ns or time.perf_counter_ns(), message))
         except asyncio.QueueFull:
             self.too_slow.set()  # disconnect rather than skip anything
 
@@ -174,8 +177,17 @@ class StreamHub:
 
     async def _send(self, websocket: WebSocket, connection: _Connection) -> None:
         while True:
-            message = await connection.queue.get()
-            await websocket.send_text(json.dumps(message, separators=(",", ":")))
+            since_ns, message = await connection.queue.get()
+            if isinstance(message, _Raw):
+                kind = message.kind
+                await websocket.send_text(message.text)
+            else:
+                kind = message.get("type")
+                await websocket.send_text(json.dumps(message, separators=(",", ":")))
+            # ticks: from arriving at the server to on the wire (includes conflation waits);
+            # everything else: from the event to on the wire
+            name = "stream_tick_age_us" if kind == "ticks" else f"stream_send_us{{type={kind}}}"
+            METRICS.observe(name, since_us(since_ns))
 
     async def _receive(self, websocket: WebSocket, connection: _Connection) -> None:
         with contextlib.suppress(WebSocketDisconnect):
@@ -228,9 +240,12 @@ class StreamHub:
             if wait > 0:
                 await asyncio.sleep(wait)  # a burst: collect, newest wins
             last = self._clock()
+            since = connection.ticks.pending_since_ns
             ticks = connection.ticks.drain()
             if ticks:
-                connection.put({"type": "ticks", "ticks": [_tick(t) for t in ticks]})
+                # each tick is encoded once and shared by every screen watching it
+                body = ",".join([tick_json(t) for t in ticks])
+                connection.put(_Raw("ticks", f'{{"type":"ticks","ticks":[{body}]}}'), since)
             connection.positions_changed.clear()
             if connection.positions:
                 by_account: dict[str, list[dict[str, Any]]] = {}
@@ -345,7 +360,29 @@ class StreamHub:
         return {a.id for a in self._users.accounts() if can_view(user, a)}
 
 
+class _Raw(NamedTuple):
+    """A message already encoded (ticks: shared between screens)."""
+
+    kind: str
+    text: str
+
+
+_encoded: dict[str, tuple[Tick, str]] = {}  # instrument -> (its newest tick, that tick's JSON)
+
+
+def tick_json(tick: Tick) -> str:
+    """The tick as JSON, encoded once however many screens watch it."""
+    cached = _encoded.get(tick.instrument_id)
+    if cached is not None and cached[0] is tick:
+        return cached[1]
+    # orjson: about 4x faster than json here; depth levels go out as [price, qty, orders]
+    text = orjson.dumps(_tick(tick), default=tuple).decode()
+    _encoded[tick.instrument_id] = (tick, text)
+    return text
+
+
 def _tick(tick: Tick) -> dict[str, Any]:
+    """The tick's fields for the screens (datetimes and depth are encoded by orjson)."""
     return {
         "instrument_id": tick.instrument_id,
         "ltp_paise": tick.ltp_paise,
@@ -359,7 +396,7 @@ def _tick(tick: Tick) -> dict[str, Any]:
         "low_paise": tick.low_paise,
         "close_paise": tick.close_paise,
         "open_interest": tick.open_interest,
-        "exchange_time": tick.exchange_time.isoformat() if tick.exchange_time else None,
-        "bids": [[level.price_paise, level.qty, level.orders] for level in tick.bids],
-        "asks": [[level.price_paise, level.qty, level.orders] for level in tick.asks],
+        "exchange_time": tick.exchange_time,
+        "bids": tick.bids,
+        "asks": tick.asks,
     }

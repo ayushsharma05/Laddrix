@@ -26,6 +26,7 @@ share state, so they can later run in separate processes.
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -34,6 +35,7 @@ from mocktrade.broker.base import Broker, BrokerError
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import OrderSpec, spec_problem
 from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderUpdate
+from mocktrade.metrics import METRICS, since_us
 from mocktrade.orders.gate import OpenGate, OrderGate
 from mocktrade.orders.model import (
     ClientIds,
@@ -105,6 +107,7 @@ class OrderManager:
         self.account_id = account_id
         self._spec = spec  # what the broker offers per instrument (order types, validities...)
         self._broker = broker
+        self._broker_name = getattr(broker, "name", type(broker).__name__)
         self._instrument = instruments
         self._ids = ids
         self._gate = gate or OpenGate()
@@ -172,8 +175,10 @@ class OrderManager:
             return order.view()
 
         order.sent = True
+        started = time.perf_counter_ns()
         try:
             broker_order_id = await self._broker.place(request)
+            self._timed("place", started)
         except BrokerError as exc:
             self._reject_locally(order, exc.reason)
             return order.view()
@@ -191,6 +196,12 @@ class OrderManager:
         self._replay_parked(broker_order_id)
         await self._send_cancel_if_requested(order)
         return order.view()
+
+    def _timed(self, op: str, started_ns: int) -> None:
+        """How long the broker took to accept a request (our side of the round trip)."""
+        METRICS.observe(
+            f"broker_ms{{op={op},broker={self._broker_name}}}", since_us(started_ns) / 1000, "ms"
+        )
 
     def _rule_problem(self, request: OrderRequest) -> str | None:
         if request.account_id != self.account_id:
@@ -239,10 +250,12 @@ class OrderManager:
             raise OrderError(problem)
         if (reason := await self._gate.admit_modify(order.view(), new)) is not None:
             raise OrderError(reason)
+        started = time.perf_counter_ns()
         try:
             await self._broker.modify(
                 order.broker_order_id, qty=qty, price_paise=price_paise, trigger_paise=trigger_paise
             )
+            self._timed("modify", started)
         except BrokerError as exc:
             raise OrderError(exc.reason) from None
         except Exception as exc:
@@ -295,8 +308,10 @@ class OrderManager:
     async def _send_cancel(self, order: _Order) -> None:
         order.pending = Pending.CANCEL
         order.cancel_sent = True
+        started = time.perf_counter_ns()
         try:
             await self._broker.cancel(order.broker_order_id)
+            self._timed("cancel", started)
         except Exception as exc:
             if not order.status.is_final:
                 order.pending = Pending.NONE

@@ -1,31 +1,35 @@
 """Ticks: one snapshot of an instrument's market, in our own ids and whole paise."""
 
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
+from typing import NamedTuple
 
 from mocktrade.domain.instruments import InstrumentId
 
 
-@dataclass(frozen=True)
-class DepthLevel:
-    """One price level of market depth: what's waiting to trade at one price."""
+class DepthLevel(NamedTuple):
+    """One price level of market depth: what's waiting to trade at one price.
+
+    A NamedTuple, not a dataclass: immutable all the same, and five times cheaper to make
+    (a full Kite tick carries ten of them; thousands of ticks a second)."""
 
     price_paise: int
     qty: int
     orders: int
 
 
-@dataclass(frozen=True)
-class Tick:
+class Tick(NamedTuple):
     """The latest known state of one instrument's market.
 
     Fields a feed doesn't provide (e.g. depth in a light mode) are None or empty.
     Bids are best (highest) first, asks best (lowest) first.
+
+    A NamedTuple, not a dataclass: immutable all the same, and about four times cheaper to
+    make. Every price change makes one, thousands a second (docs/design/performance.md).
     """
 
     instrument_id: InstrumentId
     ltp_paise: int  # last traded price
-    received_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    received_at: datetime | None = None  # when our server got it (feeds set it, per frame)
     last_qty: int | None = None
     avg_price_paise: int | None = None
     volume: int | None = None  # total traded today

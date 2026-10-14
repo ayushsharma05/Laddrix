@@ -112,3 +112,18 @@ This runs as the app's own user, so the files keep the right owner. It removes t
 
 The same `MOCKTRADE_SECRET_KEY` is needed. Without it, users must set up their authenticator
 again. Keep a copy of `deploy/.env` in your password manager.
+
+## Measure speed on this server (#154)
+
+The numbers in `docs/design/performance.md` were taken on a shared cloud VM. Take them again
+here, outside market hours, and replace the table:
+
+```bash
+cd /opt/mocktrade
+docker compose -f deploy/compose.yaml run --rm --no-deps app python -m mocktrade.tools.loadtest
+docker compose -f deploy/compose.yaml run --rm --no-deps app python -m mocktrade.tools.loadtest \
+  --instruments 3000 --rate 1 --clients 10
+```
+
+The test starts its own server and a fake Kite inside the container. It never touches the
+real server or Kite. While trading, `GET /api/metrics` (admin) shows the same measures live.

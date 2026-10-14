@@ -675,3 +675,25 @@ async def test_the_built_screens_are_served_without_shadowing_the_api(world, tmp
         assert "unsafe-inline" not in (await c.get("/")).headers["content-security-policy"]
         assert (await c.get("/api/nothing-here")).status_code == 404
         assert (await c.get("/api/me")).status_code == 401  # still the API
+
+
+async def test_metrics_are_for_admin_and_risk_and_time_each_step(world):
+    from mocktrade.metrics import METRICS
+
+    METRICS.reset()
+    riya = await world.logged_in("riya")
+    assert (await riya.get("/api/metrics")).status_code == 403
+    ayush = await world.logged_in("ayush")
+    r = await ayush.post("/api/accounts/acc-ayush/orders", json=ORDER)
+    assert r.status_code == 201, r.text
+    risk = await world.logged_in("risk")
+    snap = (await risk.get("/api/metrics")).json()
+    hist = snap["histograms"]
+    # the route template, never the ids: one series per endpoint
+    assert hist["http_us{route=POST /api/accounts/{account_id}/orders}"]["count"] == 1
+    assert hist["broker_ms{op=place,broker=fake}"]["count"] == 1
+    assert {"stream_connections", "ticks_received", "process_rss_mb"} <= set(snap["gauges"])
+    text = (await risk.get("/api/metrics?format=prometheus")).text
+    assert 'mocktrade_broker_ms_count{op="place",broker="fake"} 1' in text
+    for c in (riya, ayush, risk):
+        await c.aclose()
