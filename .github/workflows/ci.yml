@@ -55,3 +55,15 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t mocktrade:ci .
+      - name: compose file is valid
+        run: |
+          printf 'MOCKTRADE_DOMAIN=localhost\nMOCKTRADE_SECRET_KEY=placeholder\n' > deploy/.env
+          docker compose -f deploy/compose.yaml config --quiet
+      - name: image starts locked down, answers, and stops cleanly
+        run: deploy/smoke.sh mocktrade:ci
