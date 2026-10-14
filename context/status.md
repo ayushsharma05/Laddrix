@@ -4,6 +4,8 @@ As of 14 Oct 2026 (evening). GitHub issues are the source of truth.
 
 Ladder (K5.4) as built: ![K5.4 ladder](images/k5-4-ladder.png)
 
+Order book, positions, audit trail (K5.5) as built: ![K5.5 screens](images/k5-5-screens.png)
+
 ## Active track: Kite Connect (NSE/BSE)
 Decided 14 Oct 2026. MockTrade connects to the real Indian market through Zerodha Kite Connect. A paper broker fills orders against live Kite prices for testing without money. Design: `docs/design/kite-architecture.md` (diagrams in `context/images/kite-*.png`).
 
@@ -39,11 +41,12 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | K5.2 Browser stream (#144) | #169 (base k5-1-server) | ✅ CI green, 490 tests; contract in docs/design/stream.md |
 | UI design pass (mockups) | canvas "MockTrade UI design" (claude.ai artifact) | ✅ dense trading terminal; ladder (board 0, interactive) + workspace (board 2) redone; other boards still "old style" |
 | K5.3 UI skeleton: workspace, login, watch list (#145) | #170 (base k5-2-stream) | ✅ CI green after a fix: `ui/src/lib/format.ts` had never been pushed (the Python `.gitignore` ignored every `lib/` folder); rebuilt with tests, `.gitignore` now ignores only `/lib/` |
-| K5.4 Ladder (#146) | #171 (base k5-3-ui) | ✅ 112 UI + 509 Python tests, 13/13 mutations caught, paper trading checked end to end in a real browser |
+| K5.4 Ladder (#146) | #171 (base k5-3-ui) | ✅ CI green; 112 UI + 509 Python tests, 13/13 mutations caught, paper trading checked end to end in a real browser |
+| K5.5 Order book, positions, audit trail, messages (#147) | #172 (base k5-4-ladder) | ✅ 143 UI + 511 Python tests, 13/13 mutations caught, checked end to end in a real browser |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
-Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
@@ -64,6 +67,7 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 - Stream: prices/positions conflated (250 ms, newest wins), orders never; slow browser closed with 4408 (never silent gaps); reconnect = hello → snapshots → merge by updated_at.
 - Mutation testing now uses `scratchpad/mutate.py`-style harness that always restores files (a killed run once left a mutated line; the suite caught it).
 - Ladder (K5.4): PIQ is estimated in the browser with the paper broker's own queue rule (Kite doesn't report it), so paper and live agree; VAP is counted on the server from every tick (`marketdata/vap.py`, `GET /api/instruments/{id}/vap`) and continued from the stream. The browser makes client order ids (a lost "place" answer can't double-place). Cancels are allowed while trading is stopped (`cancelBlock` vs `tradingBlock` in `ui/src/state/gate.ts`). Optional confirm-over (Cfm) per ladder.
+- K5.5: `GET /api/accounts/{a}/events` = the account's audit trail newest first (`EventLog.page`), including its kill switch (`account <id>`) and the firm's. Audit exec types: SUBMITTED=Pending new, SENT=New, FILL=Fill/Partial fill, UPDATED=the new state (Working/Partial/Filled/Cancelled/Rejected), CANCEL_SENT=Pending cancel, MODIFY_SENT=Pending replace, KILL_SWITCH=STOP/Resume. Live audit catches up from the log 300 ms and 2 s after each order event and every 5 s (the log writes in a background thread). Order book and positions "drive" the link group (click = linked ladder switches). Grids scroll sideways in narrow windows. CSV export guards against spreadsheet formulas.
 - Lesson (K5.3): before pushing, check `git status --ignored` for source files hidden by `.gitignore`.
 - Risk: reducing a position is always allowed (even past limits or the daily loss); worst-case position counts working orders; option selling to open is off by default.
 
@@ -72,10 +76,11 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-1. Ayush merges in order: #123 → #157 → #158 → … → #171.
-2. **K5.5 Blotter, positions and audit screens (#147)**: order book (Working/Filled/Rejected tabs, cancel, cancel all), positions with reconcile state, audit trail with an order's timeline, Messages widget, then the order ticket. Build to canvas boards 3, 4 and 6, and redo those boards in terminal style first if they're still "old style".
-3. Then K5.6 Electron (#156), K6 algos (#148–#151), K7 deploy (#152–#155).
-4. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`.
+1. Ayush merges in order: #123 → #157 → #158 → … → #172.
+2. **Order ticket widget** (canvas board 3, `docs/design/ui.md` §4 "Order ticket"): contract, BUY/SELL, lots, price with −/+ tick buttons, LMT/MKT/SL/SL-M, TIF, product, value + worst-case position + distance from last, "confirm over" inline second click, Enter/Esc/↑↓. It has no issue yet: create one in milestone K5 (label `track: kite`, `comp:ui`) before coding. The default layout already asks for a `ticket` widget (it's skipped until it exists).
+3. Then K5.6 Electron desktop shell (#156), K6 algos (#148–#151, Algo Manager per canvas board 2), K7 deploy (#152–#155).
+4. Redo the remaining "old style" canvas boards (3 ticket, 4 stopped, 5 login, 7 phone) in terminal style when building those screens.
+5. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`.
 
 ## Key facts the design depends on (checked 14 Oct 2026, re-check before going live)
 - Data ₹500/month per app; order APIs free.

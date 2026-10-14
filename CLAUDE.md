@@ -2,7 +2,7 @@
 
 Ayush's learning project: a personal, professional-style trading platform for **NSE/BSE on Zerodha Kite Connect** (REST for orders, WebSocket for live ticks), with a paper-trading broker that fills against live Kite prices. Since 14 Oct 2026 this **Kite track** is active; the earlier COMEX/MockCME track is paused (issues labelled `paused: cme-track`). Design: `docs/design/kite-architecture.md`.
 
-**Before anything else, read `context/README.md`.** It has how Ayush wants to work, the full history, the current status and every diagram.
+**Before anything else, read `context/README.md`** (it has a "How to continue" checklist). Until PR #157 merges, `CLAUDE.md` and `context/` live only on the `kite-architecture` branch. It has how Ayush wants to work, the full history, the current status and every diagram.
 
 The short version:
 - Ayush is new to programming and learns by doing. Use plain words, flowcharts and short answers, and explain every line of code.
