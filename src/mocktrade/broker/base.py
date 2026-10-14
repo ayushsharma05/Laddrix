@@ -6,6 +6,9 @@ a specific broker, which is what keeps MockTrade broker-agnostic.
 
 Guarantees every implementation must keep:
 - `place` returns quickly with the broker's order id, or raises BrokerError.
+- BrokerError means a clear refusal: the broker did NOT act. Any other exception
+  (timeout, dropped connection) means the outcome is unknown; callers then check
+  the broker's order list instead of assuming anything.
 - Every placed order eventually reaches a final status (filled, cancelled or
   rejected) through `updates()`.
 - Updates for one order arrive in the order they happened.
