@@ -45,10 +45,11 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | K5.5 Order book, positions, audit trail, messages (#147) | #172 (base k5-4-ladder) | ✅ CI green; 143 UI + 511 Python tests, 13/13 mutations caught, checked end to end in a real browser |
 | Order ticket + **order spec** (#173) | #175 (base k5-5-screens, branch k5-5b-ticket) | ✅ 179 UI + 529 Python tests; all order types checked in a real browser |
 | K5.6 Desktop app + pop-out windows (#156) | #176 (base k5-5b-ticket, branch k5-6-desktop) | ✅ 181 UI + 12 desktop + 529 Python tests; real Electron run under xvfb (pop-out live, pages can't reach Node, ~600 MB app, ~20–25 MB per pop-out). Ayush: build the installer on Windows (`ui/desktop/README.md`) |
+| Stream sends changes at once (#177) | #178 (base k5-6-desktop, branch k5-7-fast-stream) | ✅ tick → browser ~200 ms → **1–6 ms**; the new latency test fails on the old code |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
-Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → … (GitHub retargets stacked PRs automatically when their base merges).
+Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → … (GitHub retargets stacked PRs automatically when their base merges).
 
 **Design changes made while coding:**
 - Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
@@ -73,6 +74,7 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 - **Order spec (#175): backend provides, frontend displays.** `GET /api/accounts/{a}/instruments/{id}/order-spec` (`domain/order_spec.py`) lists the broker's order types by what they need (price/trigger: required|none, market protection: auto|none), validities, named rules (`stop_trigger`, `stop_limit`), `priced_by_click`, plus products, tick, lot, auto protection %. Broker adapters publish `order_spec()` (Kite and paper share `broker/rules.order_spec`); the order manager enforces it. Ticket and ladder draw from it (`useOrderSpec`), nothing hard-coded. Apply the same pattern to everything new (algo parameters, products, limits, permissions).
 - **Pop-outs (#176):** a widget's window loads `/popout.html` and is drawn by the main page (dockview `addPopoutGroup`), so it shares the one WebSocket/store/link groups: zero sync delay. `/popout.html` has its own CSP (inline styles yes, scripts never). Desktop app = `ui/desktop/` (Electron 44, opens the server, https only; `src/security.ts` rules tested). Electron's binary download fails through Node here: fetch the zip with curl and unpack into `node_modules/electron/dist` + `path.txt` (see how it was done in the #176 session); CI skips the binary (`ELECTRON_SKIP_BINARY_DOWNLOAD=1`).
 - **Speed (Ayush, 14 Oct): "ensure syncing and latency are very fast from our side".** Measure every hop (K7.3) and remove waits we add: first change goes out at once, conflation only during bursts.
+- Stream (#178): wait for a change → send at once if nothing went out in the last 250 ms, else wait the rest and send the newest. Measured 1–6 ms tick → browser (was ~200 ms).
 - Paper refuses stops whose trigger the market already passed (Kite does too); SL trigger vs limit checked in `OrderRequest.validate`.
 - Ticket "confirm" is derived from the exact order (`armedFor === signature`), not reset by an effect: an effect-based reset caused a timing-dependent test failure.
 - Lesson (K5.3): before pushing, check `git status --ignored` for source files hidden by `.gitignore`.
@@ -83,12 +85,11 @@ Merge order: #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-1. Ayush merges in order: #123 → #157 → #158 → … → #175 → #176.
-2. **Stream latency**: send a price change at once when nothing is pending (conflate only bursts), measured before/after. Small issue + PR on top of #176.
-3. K6 algos (#148–#151): engine → slicer → spreader → algo manager. Algo parameters come from a server-published **algo spec** (like the order spec).
-4. K7 deploy (#152–#155): Docker + Caddy → Mumbai server checklist → latency/load → morning routine + runbooks. AWS account, static IP and Kite IP whitelist are Ayush's steps.
-5. Then the roadmap in `docs/design/product-vision.md` (K8 options, K9 synthetic orders, K10 accounts & charges, K11 replay/backtest, K12 charts & alerts, K13 admin & phone): create each milestone's issues before coding.
-6. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`; build the desktop installer on Windows.
+1. Ayush merges in order: #123 → #157 → #158 → … → #176 → #178.
+2. K6 algos (#148–#151): engine → slicer → spreader → algo manager. Algo parameters come from a server-published **algo spec** (like the order spec).
+3. K7 deploy (#152–#155): Docker + Caddy → Mumbai server checklist → latency/load → morning routine + runbooks. AWS account, static IP and Kite IP whitelist are Ayush's steps.
+4. Then the roadmap in `docs/design/product-vision.md` (K8 options, K9 synthetic orders, K10 accounts & charges, K11 replay/backtest, K12 charts & alerts, K13 admin & phone): create each milestone's issues before coding.
+5. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`; build the desktop installer on Windows.
 
 ## Key facts the design depends on (checked 14 Oct 2026, re-check before going live)
 - Data ₹500/month per app; order APIs free.
