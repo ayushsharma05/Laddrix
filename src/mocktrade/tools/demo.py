@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlparse
 
 import uvicorn
 
+from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.paper import PaperBroker
 from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
@@ -103,7 +104,7 @@ async def main(port: int, origin: str, ui: Path | None) -> None:
         ids = ClientIds(
             f"D{time.strftime('%y%m%d')}", log.last_counter(f"D{time.strftime('%y%m%d')}")
         )
-        platform.add_account(account, broker, ids=ids, auto_kill_on_loss=True)
+        platform.add_account(account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN)
     settings = ServerSettings(origin=origin, cookie_secure=False)
     app = create_app(platform, users, settings, static_dir=ui)
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))

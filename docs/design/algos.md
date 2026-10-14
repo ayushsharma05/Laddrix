@@ -34,3 +34,20 @@ pause ─► pull working children        stop / kill switch ─► pull every c
 
 States: WORKING → PAUSED ⇄ WORKING → STOPPING → DONE (filled) / STOPPED / FAILED. Every
 change is audited in the event log (`ALGO_STARTED`, `ALGO_PAUSED`, `ALGO_DONE`, …).
+
+## Slicer (`algos/slicer.py`)
+A big order as equal slices at regular times (time-sliced execution).
+
+| Setting | Meaning |
+|---|---|
+| Slices, Every (s) | how many pieces and how far apart; whole lots, the remainder on the first slices |
+| Price: join / cross | wait at the best price on our side (cheaper, may not fill) / take the other side (fills, pays the spread) |
+| Limit | never buy above / sell below it; beyond it the slicer waits and says so |
+
+- Unfilled slices follow the best price **on the slice clock**, not on every tick (a busy market
+  would burn modifications). A slice modified 24 times is cancelled and its rest re-sent (brokers
+  allow 25).
+- A slice is never bigger than planned: refused or replaced quantity goes out in further slices
+  after the plan ("catching up"), never as one big order. (Found by a paper run: risk refused
+  ₹94 lakh slices and the first version tried to send everything left in one order.)
+- Pause pulls the working slices; resume sends again at once.
