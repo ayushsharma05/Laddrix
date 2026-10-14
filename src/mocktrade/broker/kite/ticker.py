@@ -15,6 +15,7 @@ connection, 3 connections per API key.
 import asyncio
 import json
 import logging
+import time
 from collections.abc import Awaitable, Callable, Iterable
 from decimal import Decimal
 from typing import Any
@@ -22,10 +23,12 @@ from typing import Any
 from websockets.asyncio.client import connect as ws_connect
 from websockets.exceptions import InvalidStatus
 
-from mocktrade.broker.kite.decoder import DecodeError, KiteTick, decode_frame
+from mocktrade.broker.kite.decoder import DecodeError, KiteTick, decode_packets, split_packets
 from mocktrade.broker.kite.http import KiteAuthError
+from mocktrade.metrics import METRICS, since_us
 
 log = logging.getLogger(__name__)
+CHUNK = 250  # packets decoded between yields to the event loop (about 3 ms of work)
 
 WS_URL = "wss://ws.kite.trade"
 MAX_TOKENS_PER_CONNECTION = 3000
@@ -130,18 +133,34 @@ class KiteTicker:
             except TimeoutError:
                 raise ConnectionError(f"no data for {self._stale_after_s} s") from None
             if isinstance(message, bytes):
-                self._handle_binary(message)
+                await self.handle_frame(message)
             else:
                 self._handle_text(message)
 
-    def _handle_binary(self, frame: bytes) -> None:
+    async def handle_frame(self, frame: bytes) -> None:
+        """Decode a frame CHUNK packets at a time, letting everything else run in between (a
+        3000-contract frame never holds up an order click), then hand the whole frame on at
+        once: screens get one prompt update per frame, not a first part now and the rest
+        after the stream's throttle window."""
+        started = time.perf_counter_ns()
         try:
-            ticks = decode_frame(frame)
+            packets = split_packets(frame)
+            ticks: list[KiteTick] = []
+            for start in range(0, len(packets), CHUNK):
+                if start:
+                    await asyncio.sleep(0)
+                chunk_started = time.perf_counter_ns()
+                ticks += decode_packets(packets[start : start + CHUNK])
+                METRICS.observe("kite_chunk_us", since_us(chunk_started))
         except DecodeError as exc:
             log.error("bad tick frame dropped: %s", exc)
             return
         if ticks:
+            fan_out = time.perf_counter_ns()
             self._on_ticks(ticks)
+            METRICS.observe("kite_fanout_us", since_us(fan_out))
+            METRICS.inc("kite_ticks", len(ticks))
+        METRICS.observe("kite_frame_us", since_us(started))  # arrival to fanned out
 
     def _handle_text(self, text: str) -> None:
         try:

@@ -22,6 +22,7 @@ export interface OrderRequest {
   market_protection: string | null;
   algo_id: string | null;
   parent_id: string | null;
+  basket_id?: string | null;
 }
 
 export interface OrderView {
@@ -99,6 +100,8 @@ export interface AccountSummary {
   running: boolean;
   stopped: boolean;
   stop_reason: string;
+  /** The broker's own daily login: "live", "login_needed", or null when it has none. */
+  broker_session?: "live" | "login_needed" | null;
 }
 
 export interface Me {
@@ -121,12 +124,15 @@ export interface PositionsSnapshot {
 }
 
 export interface AuditEvent {
-  seq: number;
+  seq: number; // position in the event log: later events have bigger numbers
   ts: string;
-  kind: string;
+  account_id: string; // the account, "account <id>" (its kill switch) or "firm"
+  kind: string; // an order event kind, KILL_SWITCH or POSITION_MISMATCH_…
+  client_order_id: string;
   detail: string;
   order: OrderView | null;
   fill: Fill | null;
+  extra: Record<string, unknown>; // e.g. {engaged, by} for kill switches
 }
 
 // --- stream messages (server -> browser) ---------------------------------------------------
@@ -153,5 +159,197 @@ export type ServerMessage =
       broker: number;
       message: string;
     }
+  | { type: "algo"; account_id: string; kind: string; detail: string; algo: AlgoView }
+  | { type: "ops"; key: string; level: "INFO" | "WARN" | "ERROR" | "OK"; text: string; active: boolean; at: string }
+  | ({ type: "chain" } & OptionChain)
   | { type: "error"; message: string }
   | { type: "pong" };
+
+// --- what can be ordered (GET /api/accounts/{a}/instruments/{id}/order-spec) -----------------
+// The server describes order types and their fields; screens draw from this and hard-code none.
+
+export type Need = "required" | "none" | "auto";
+
+export interface OrderTypeSpec {
+  code: string; // sent as order_type, e.g. "LIMIT", "SL-M"
+  label: string; // short, for buttons: "LMT"
+  name: string; // in words: "Stop-loss market"
+  help: string;
+  price: Need;
+  trigger: Need;
+  market_protection: Need;
+  validities: string[];
+  rules: string[]; // e.g. "stop_trigger", "stop_limit"
+  priced_by_click: boolean; // a ladder click can place it
+}
+
+export interface OrderSpec {
+  instrument_id: string;
+  tradable: boolean;
+  tick_paise: number;
+  lot_size: number;
+  order_types: OrderTypeSpec[];
+  products: string[];
+  auto_protection_pct: string; // decimal text, e.g. "2"
+  max_modifications: number;
+}
+
+// --- algos (GET …/algo-specs, …/algos; stream "algo") -------------------------------------------
+// Every algo describes its settings; the start form is drawn from this, nothing hard-coded.
+
+export type AlgoParamKind =
+  | "lots"
+  | "price"
+  | "price_offset"
+  | "ticks"
+  | "seconds"
+  | "minutes"
+  | "count"
+  | "percent"
+  | "choice"
+  | "flag"
+  | "instrument";
+
+export interface AlgoParamSpec {
+  name: string;
+  label: string;
+  kind: AlgoParamKind | string; // an unknown kind is shown as a plain text box
+  help: string;
+  required: boolean;
+  default: unknown;
+  min: number | null;
+  max: number | null;
+  choices: string[];
+}
+
+export interface AlgoSpec {
+  code: string;
+  name: string;
+  help: string;
+  family?: string; // how screens group algos: "execution", "protection"
+  params: AlgoParamSpec[];
+}
+
+export type AlgoState = "WORKING" | "PAUSED" | "STOPPING" | "DONE" | "STOPPED" | "FAILED";
+
+export interface AlgoView {
+  algo_id: string;
+  code: string;
+  account_id: string;
+  user_id: string;
+  instrument_id: string;
+  side: Side;
+  qty: number;
+  params: Record<string, unknown>;
+  state: AlgoState;
+  filled_qty: number;
+  avg_price_paise: number;
+  working_qty: number;
+  children: string[];
+  reason: string;
+  status: string;
+  extra: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- options (GET /api/options/…, stream "chain") ---------------------------------------------
+
+export interface ChainLeg {
+  instrument_id: string;
+  ltp_paise: number | null;
+  bid_paise: number | null;
+  ask_paise: number | null;
+  volume: number | null;
+  oi: number | null;
+  oi_change: number | null; // since the first OI seen today
+  iv: number | null; // a fraction: 0.12 = 12%
+  delta: number | null;
+  gamma: number | null;
+  theta: number | null; // rupees per calendar day
+  vega: number | null; // rupees per IV point
+}
+
+export interface ChainRow {
+  strike_paise: number;
+  call: ChainLeg | null;
+  put: ChainLeg | null;
+}
+
+export interface OptionChain {
+  underlying: string;
+  expiry: string; // YYYY-MM-DD
+  forward_paise: number | null;
+  atm_strike_paise: number | null;
+  days_to_expiry: number;
+  rate: number;
+  pcr: number | null;
+  max_pain_paise: number | null;
+  atm_iv: number | null;
+  rows: ChainRow[];
+}
+
+export interface StrategyLegIn {
+  instrument_id: string;
+  side: Side;
+  lots: number;
+  price_paise?: number; // entry price; default: the live mid
+}
+
+export interface StrategyTemplate {
+  code: string;
+  name: string;
+  view: string;
+  legs: { side: Side; kind: string; offset: number; ratio: number }[];
+  params: { name: string; label: string; kind: string; min: number; max: number; default: number }[];
+}
+
+export interface StrategyAnalysis {
+  underlying: string;
+  expiry: string;
+  forward_paise: number;
+  prices: number[]; // rupees
+  payoff_expiry: number[]; // rupees, whole position
+  payoff_today: number[];
+  breakevens: number[];
+  max_profit: number | "unlimited";
+  max_loss: number | "unlimited";
+  net_premium: number; // + = credit
+  net_greeks: { delta: number; gamma: number; theta: number; vega: number };
+  legs: {
+    instrument_id: string;
+    side: Side;
+    lots: number;
+    lot_size: number;
+    strike_paise: number;
+    kind: string;
+    expiry: string;
+    price_paise: number;
+    iv: number | null;
+  }[];
+}
+
+// --- baskets (POST /api/accounts/{a}/baskets/check | send) -------------------------------------
+
+export interface BasketLegIn {
+  instrument_id: string;
+  side: Side;
+  lots: number;
+  product?: string;
+  price_paise?: number;
+  at?: "touch" | "mid";
+}
+
+export interface BasketCheck {
+  ok: boolean;
+  legs: { instrument_id: string; side: Side; qty: number; price_paise: number; problem: string | null }[];
+  margin: { initial_paise: number; final_paise: number; hedge_benefit_paise: number } | null;
+  margin_note: string;
+}
+
+export interface BasketSent {
+  basket_id: string;
+  sent: OrderView[];
+  not_sent: { instrument_id: string; side: Side; qty: number; price_paise: number }[];
+  stopped: string;
+}

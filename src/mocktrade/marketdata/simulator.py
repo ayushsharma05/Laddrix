@@ -5,19 +5,27 @@ started, and publishes ticks shaped like Kite's full mode: last price and quanti
 5 levels of depth each side, cumulative volume, open/high/low and the previous close.
 About one tick per instrument per second, like Kite. Seeded, so tests are repeatable.
 
+Options don't walk on their own: each is priced from its underlying's future with Black-76
+and a volatility smile (higher IV away from the money, more on the put side), plus a tick
+of noise and slowly changing open interest, so an option chain built from the simulator
+looks like a real one (sensible IVs, Greeks, put-call parity).
+
 It never trades with you: the paper broker fills against these prices exactly as it
 would against Kite's.
 """
 
 import asyncio
+import math
 import random
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from mocktrade.domain.instruments import Instrument, InstrumentId
+from mocktrade.domain.instruments import Instrument, InstrumentId, InstrumentKind
 from mocktrade.domain.ticks import DepthLevel, Tick
 from mocktrade.marketdata.service import MarketData
+
+_OPTIONS = (InstrumentKind.CALL, InstrumentKind.PUT)
 
 
 @dataclass
@@ -32,6 +40,7 @@ class _Walk:
     volume: int = 0
     up: bool = True
     depth_seed: list[int] = field(default_factory=list)
+    oi: int = 0  # open interest (options)
 
 
 class MarketSimulator:
@@ -51,7 +60,9 @@ class MarketSimulator:
         self._clock = clock
         self._sleep = sleep
         self._walks: dict[InstrumentId, _Walk] = {}
-        for instrument, price in start_prices.items():
+        # futures first: options are priced from their future's newest price
+        ordered = sorted(start_prices.items(), key=lambda kv: kv[0].kind in _OPTIONS)
+        for instrument, price in ordered:
             if price <= 0 or price % instrument.tick_paise:
                 raise ValueError(f"{instrument.id}: start price must be on the tick grid")
             close = price - instrument.tick_paise * self._rng.randint(-40, 40)
@@ -59,6 +70,8 @@ class MarketSimulator:
             self._walks[instrument.id] = _Walk(
                 instrument, price, price, close, close, max(price, close), min(price, close)
             )
+            if instrument.kind in _OPTIONS:
+                self._walks[instrument.id].oi = instrument.lot_size * self._rng.randint(200, 4000)
 
     @property
     def instruments(self) -> list[InstrumentId]:
@@ -77,12 +90,43 @@ class MarketSimulator:
             self.step()
             await self._sleep(self._interval_s)
 
+    def _future_for(self, option: Instrument) -> _Walk | None:
+        futures = [
+            w
+            for w in self._walks.values()
+            if w.instrument.kind is InstrumentKind.FUTURE
+            and w.instrument.underlying == option.underlying
+            and w.instrument.expiry is not None
+        ]
+        if not futures or option.expiry is None:
+            return None
+        return min(futures, key=lambda w: abs((w.instrument.expiry - option.expiry).days))
+
+    def _option_price(self, walk: _Walk) -> int | None:
+        """Black-76 off the future with a smile, on the tick grid; None without a future."""
+        from mocktrade.options.model import fair_value_paise  # options build on market data
+
+        option = walk.instrument
+        future = self._future_for(option)
+        if future is None or option.strike_paise is None:
+            return None
+        moneyness = math.log(option.strike_paise / future.ltp)
+        sigma = 0.12 + 0.6 * moneyness * moneyness - 0.08 * moneyness  # smile, put skew
+        fair = fair_value_paise(option, future.ltp, sigma, self._clock())
+        noise = self._rng.choice((-1, 0, 0, 1)) * option.tick_paise
+        return max(option.tick_paise, round(fair / option.tick_paise) * option.tick_paise + noise)
+
     def _move(self, walk: _Walk) -> Tick:
         tick = walk.instrument.tick_paise
         lot = walk.instrument.lot_size
-        pull = (walk.anchor - walk.ltp) / (tick * 200)  # mean reversion, gentle
-        step = round(self._rng.gauss(pull, 1.2))
-        new = max(tick, walk.ltp + step * tick)
+        priced = self._option_price(walk) if walk.instrument.kind in _OPTIONS else None
+        if priced is not None:
+            new = priced
+            walk.oi = max(0, walk.oi + lot * self._rng.randint(-20, 24))
+        else:
+            pull = (walk.anchor - walk.ltp) / (tick * 200)  # mean reversion, gentle
+            step = round(self._rng.gauss(pull, 1.2))
+            new = max(tick, walk.ltp + step * tick)
         walk.up = new >= walk.ltp
         walk.ltp = new
         walk.high, walk.low = max(walk.high, new), min(walk.low, new)
@@ -112,6 +156,7 @@ class MarketSimulator:
             high_paise=walk.high,
             low_paise=walk.low,
             close_paise=walk.close,
+            open_interest=walk.oi if walk.instrument.kind in _OPTIONS else None,
             last_trade_time=now,
             exchange_time=now,
             bids=bids,

@@ -6,6 +6,7 @@ tokens into our instrument ids, so the market data cache never sees a Kite numbe
 
 import logging
 from collections.abc import Iterable
+from datetime import UTC, datetime
 
 from mocktrade.broker.kite.decoder import KiteTick
 from mocktrade.broker.kite.instruments import BROKER
@@ -17,24 +18,26 @@ from mocktrade.refdata.store import InstrumentStore
 log = logging.getLogger(__name__)
 
 
-def to_tick(kite_tick: KiteTick, instrument_id: InstrumentId) -> Tick:
+def to_tick(k: KiteTick, instrument_id: InstrumentId, received_at: datetime | None = None) -> Tick:
+    # positional, in Tick's field order: this runs for every price change
     return Tick(
-        instrument_id=instrument_id,
-        ltp_paise=kite_tick.ltp_paise,
-        last_qty=kite_tick.last_qty,
-        avg_price_paise=kite_tick.avg_price_paise,
-        volume=kite_tick.volume,
-        buy_qty=kite_tick.buy_qty,
-        sell_qty=kite_tick.sell_qty,
-        open_paise=kite_tick.open_paise,
-        high_paise=kite_tick.high_paise,
-        low_paise=kite_tick.low_paise,
-        close_paise=kite_tick.close_paise,
-        open_interest=kite_tick.open_interest,
-        last_trade_time=kite_tick.last_trade_time,
-        exchange_time=kite_tick.exchange_time,
-        bids=kite_tick.bids,
-        asks=kite_tick.asks,
+        instrument_id,
+        k.ltp_paise,
+        received_at,
+        k.last_qty,
+        k.avg_price_paise,
+        k.volume,
+        k.buy_qty,
+        k.sell_qty,
+        k.open_paise,
+        k.high_paise,
+        k.low_paise,
+        k.close_paise,
+        k.open_interest,
+        k.last_trade_time,
+        k.exchange_time,
+        k.bids,
+        k.asks,
     )
 
 
@@ -47,12 +50,14 @@ class KiteFeed:
         self.unknown_tokens = 0
 
     def on_ticks(self, kite_ticks: list[KiteTick]) -> None:
+        received = datetime.now(UTC)  # one frame, one arrival time
+        on_tick, from_broker = self._market_data.on_tick, self._store.from_broker
         for kite_tick in kite_ticks:
-            instrument_id = self._store.from_broker(BROKER, str(kite_tick.token))
+            instrument_id = from_broker(BROKER, str(kite_tick.token))
             if instrument_id is None:
                 self.unknown_tokens += 1
                 continue
-            self._market_data.on_tick(to_tick(kite_tick, instrument_id))
+            on_tick(to_tick(kite_tick, instrument_id, received))
 
     def tokens_for(self, instrument_ids: Iterable[InstrumentId]) -> list[int]:
         """Kite tokens for our ids. Raises KeyError naming any id Kite doesn't list."""

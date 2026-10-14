@@ -1,0 +1,27 @@
+# HTTPS in front of MockTrade. Caddy gets and renews the certificate for MOCKTRADE_DOMAIN
+# by itself (Let's Encrypt; for "localhost" it uses its own local authority).
+{
+	servers {
+		timeouts {
+			read_header 10s
+			idle 2m
+		}
+	}
+}
+
+{$MOCKTRADE_DOMAIN} {
+	encode zstd gzip
+	header -Server
+
+	# The app sets its own security headers (CSP, HSTS, frame and referrer rules).
+	reverse_proxy app:8000 {
+		flush_interval -1 # pass stream messages through at once, never buffered
+		health_uri /api/health
+		health_interval 10s
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

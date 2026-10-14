@@ -1,15 +1,17 @@
 # MockTrade
 
-Ayush's learning project: a professional-style trading platform for COMEX metals futures (GC, SI, HG, plus multi-leg spreads) that trades against a mock exchange replaying real data. The exchange itself is the separate repo `ayushsharma05/MockCME`.
+Ayush's learning project: a personal, professional-style trading platform for **NSE/BSE on Zerodha Kite Connect** (REST for orders, WebSocket for live ticks), with a paper-trading broker that fills against live Kite prices. Since 14 Oct 2026 this **Kite track** is active; the earlier COMEX/MockCME track is paused (issues labelled `paused: cme-track`). Design: `docs/design/kite-architecture.md`.
 
-**Before anything else, read `context/README.md`.** It has how Ayush wants to work, the full history, the current status and every diagram.
+**Before anything else, read `context/README.md`** (it has a "How to continue" checklist). Code and context now live together on `main`; start new work there. It has how Ayush wants to work, the full history, the current status and every diagram.
 
 The short version:
+- **Product direction (14 Oct):** a professional trading platform for the Indian market, its own product (may be deployed commercially later): never name or copy another vendor. Every component replaceable behind an interface. **Backend provides, frontend displays**: the server publishes what's possible (order spec etc.), the UI hard-codes no market rules. See `docs/design/product-vision.md`.
 - Ayush is new to programming and learns by doing. Use plain words, flowcharts and short answers, and explain every line of code.
-- **He writes the code.** You plan, write issues, review and coach.
+- **Claude writes the code** (Ayush asked on 14 Oct): professional code, extensive tests, self-review, one issue per PR targeting main. Explain by tracing real data, and send progress updates as you go. Take time: brainstorm each part before coding.
 - Every change goes through an issue, then a PR with `Closes #N`, then green CI.
 - **Never commit company details** from his employer: no names, internal systems, code or screenshots. Use generic names.
-- Next issue = the earliest open milestone, then the lowest open number.
+- Next issue = the lowest open issue in the earliest open **K** milestone (K0 onward; next is K9.2, issue #200), label `track: kite`.
+- Kite limits and SEBI rules drive the design (rate limits, static IP for orders, market_protection ≠ 0, 10 OPS). Re-check them before going live.
 
 ## Keep the context folder up to date (standing rule from Ayush)
 Any chat can hit its limit without warning, so **don't wait to be asked**. Whenever a session changes something (an issue closed, a decision made, a PR merged, a new diagram or file), before ending your reply:

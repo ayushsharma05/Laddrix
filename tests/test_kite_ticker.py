@@ -225,3 +225,35 @@ async def test_prices_in_order_messages_stay_exact():
     ticker.stop()
     await asyncio.wait_for(task, 3)
     server.close()
+
+
+async def test_a_big_frame_is_decoded_in_chunks_but_handed_on_whole():
+    """Other work (an order click) runs between chunks; screens get the frame in one go."""
+    from mocktrade.broker.kite.ticker import CHUNK
+
+    delivered: list[int] = []
+    ticker = KiteTicker("k", "t", lambda ticks: delivered.append(len(ticks)))
+    others_ran_at: list[int] = []
+
+    async def an_order_click():
+        while True:
+            others_ran_at.append(len(delivered))
+            await asyncio.sleep(0)
+
+    count = CHUNK * 2 + 10
+    big = frame(*[ltp_packet(NSE_TOKEN + 256 * n, 100 + n) for n in range(count)])
+    other = asyncio.create_task(an_order_click())
+    await asyncio.sleep(0)
+    before = len(others_ran_at)
+    await ticker.handle_frame(big)
+    other.cancel()
+    assert delivered == [count]  # one hand-over with every tick
+    assert len(others_ran_at) - before >= 2  # the click ran between the 3 chunks
+    assert all(n == 0 for n in others_ran_at[before:-1])  # ...before the ticks were handed on
+
+
+async def test_a_bad_frame_is_dropped_whole():
+    delivered = []
+    ticker = KiteTicker("k", "t", delivered.append)
+    await ticker.handle_frame(b"\x00\x02\x00\x08" + b"\x00" * 8 + b"\x00\x50")  # 2nd packet cut
+    assert delivered == []

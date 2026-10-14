@@ -68,12 +68,18 @@ class KiteHttp:
         data: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
         authenticated: bool = True,
+        json_body: Any = None,  # for the few endpoints that take JSON (e.g. basket margins)
     ) -> Any:
         """Send one request and return the `data` part of Kite's reply."""
         headers = self._auth_headers() if authenticated else {}
         form = {k: v for k, v in (data or {}).items() if v is not None}
         response = await self._client.request(
-            method, path, data=form or None, params=params, headers=headers
+            method,
+            path,
+            data=form or None,
+            params=params,
+            headers=headers,
+            json=json_body,
         )
         return _unwrap(response)
 

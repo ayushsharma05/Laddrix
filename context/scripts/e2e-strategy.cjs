@@ -1,0 +1,60 @@
+// Real browser: Strategy Builder from Widgets, build an iron condor, read the figures, then
+// open the chain and Alt-click a leg into the builder.
+const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { execSync } = require('child_process');
+const out = process.argv[2] || '.';
+const flat = (s) => s.replace(/\s+/g, ' ').trim();
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const page = await browser.newPage({ viewport: { width: 1680, height: 1000 } });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('http://localhost:8000/');
+  await page.getByLabel('Username').fill('demo');
+  await page.getByLabel('Password').fill('demo-password-123');
+  await page.getByLabel('Authenticator code').fill(execSync('cd /home/user/MockTrade && python3 -m mocktrade.tools.demo --code').toString().trim());
+  await page.keyboard.press('Enter');
+  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.evaluate(async () => {
+    for (const k of Object.keys(localStorage)) localStorage.removeItem(k);
+    await fetch('/api/layouts/current', { method: 'DELETE', credentials: 'same-origin' });
+  });
+  await page.reload();
+  await page.locator('.ladder').first().waitFor({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Widgets ▾' }).click();
+  await page.getByRole('menuitem', { name: /Strategy Builder/ }).click();
+  await page.locator('.tab', { hasText: 'Strategy' }).dblclick();
+  const sb = page.locator('.strategy');
+  await sb.getByRole('option', { name: 'Iron condor' }).waitFor({ state: 'attached' });
+  await sb.getByRole('combobox', { name: 'Strategy' }).selectOption('IRON_CONDOR');
+  await sb.getByRole('button', { name: 'Build' }).click();
+  await sb.getByLabel('Strategy figures').waitFor({ timeout: 10000 });
+  console.log('legs:', (await sb.getByRole('row').allInnerTexts()).map(flat).join(' / '));
+  console.log('figures:', flat(await sb.getByLabel('Strategy figures').innerText()));
+  console.log('greeks:', flat(await sb.getByLabel('Net Greeks').innerText()));
+  await page.waitForTimeout(500);
+  await sb.getByRole('button', { name: 'Check' }).click();
+  await sb.getByRole('status').waitFor();
+  console.log('check:', flat(await sb.getByRole('status').innerText()));
+  await sb.getByRole('button', { name: /^Send 4 orders/ }).click();
+  await sb.locator('.basket-note').waitFor({ timeout: 10000 });
+  console.log('sent:', flat(await sb.locator('.basket-note').innerText()));
+  await page.screenshot({ path: `${out}/15-strategy.png` });
+  await page.locator('.tab', { hasText: 'Strategy' }).dblclick(); // restore
+  await page.getByRole('button', { name: 'Widgets ▾' }).click();
+  await page.getByRole('menuitem', { name: /Option Chain/ }).click();
+  const chain = page.locator('.chain');
+  await chain.locator('.chain-row.atm').waitFor({ timeout: 10000 });
+  await page.locator('.tab', { hasText: 'Chain' }).dblclick();
+  await chain.getByRole('button', { name: 'Call 25,000' }).click({ modifiers: ['Alt'] });
+  await page.locator('.tab', { hasText: 'Chain' }).dblclick();
+  await page.waitForTimeout(1500);
+  console.log('legs after Alt-click:', (await sb.getByRole('row').count()));
+  await page.locator('.tab', { hasText: 'Order Book' }).click();
+  await page.getByRole('button', { name: /^All \d+/ }).click();
+  const book = page.getByRole('grid', { name: 'Orders' });
+  console.log('order book:', (await book.getByRole('row').allInnerTexts()).map(flat).slice(0, 4).join(' / '));
+  console.log('basket in title:', await book.getByRole('row').first().getAttribute('title'));
+  console.log('errors:', JSON.stringify(errors));
+  await browser.close();
+})().catch((e) => { console.error(e); process.exit(1); });

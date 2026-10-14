@@ -21,8 +21,9 @@ A frame shorter than 2 bytes is a heartbeat.
 """
 
 import struct
-from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
+from typing import NamedTuple
 
 from mocktrade.domain.ticks import DepthLevel
 
@@ -35,18 +36,19 @@ _U16 = struct.Struct(">H")
 _LTP = struct.Struct(">II")
 _INDEX = struct.Struct(">IIIIIIi")  # token, ltp, high, low, open, close, change (signed)
 _QUOTE = struct.Struct(">11I")
-_FULL_HEAD = struct.Struct(">16I")
-_DEPTH = struct.Struct(">IIH2x")
+_FULL = struct.Struct(">16I" + "IIH2x" * 10)  # the whole 184-byte packet in one unpack
 _U32 = struct.Struct(">I")
+_new = tuple.__new__
 
 
 class DecodeError(ValueError):
     """A frame or packet didn't match Kite's documented layout."""
 
 
-@dataclass(frozen=True)
-class KiteTick:
-    """One decoded packet, still in Kite's terms (instrument token)."""
+class KiteTick(NamedTuple):
+    """One decoded packet, still in Kite's terms (instrument token).
+
+    A NamedTuple: immutable, and cheap to make (thousands a second; see metrics.py)."""
 
     token: int
     mode: str  # "ltp", "quote" or "full"
@@ -134,6 +136,7 @@ def decode_packet(packet: bytes) -> KiteTick | None:
         )
 
     if size == FULL_LEN:
+        v = _FULL.unpack(packet)
         (
             _,
             ltp,
@@ -151,29 +154,28 @@ def decode_packet(packet: bytes) -> KiteTick | None:
             _oi_high,
             _oi_low,
             exchange_time,
-        ) = _FULL_HEAD.unpack_from(packet, 0)
-        levels = [
-            DepthLevel(price_paise=price, qty=qty, orders=orders)
-            for qty, price, orders in (_DEPTH.unpack_from(packet, 64 + 12 * i) for i in range(10))
-        ]
-        return KiteTick(
-            token=token,
-            mode="full",
-            ltp_paise=ltp,
-            last_qty=last_qty,
-            avg_price_paise=avg,
-            volume=volume,
-            buy_qty=buy_qty,
-            sell_qty=sell_qty,
-            open_paise=open_,
-            high_paise=high,
-            low_paise=low,
-            close_paise=close,
-            open_interest=oi,
-            last_trade_time=_time(last_trade_time),
-            exchange_time=_time(exchange_time),
-            bids=tuple(levels[:5]),
-            asks=tuple(levels[5:]),
+        ) = v[:16]
+        # depth entries are [qty, price, orders]; ours are (price, qty, orders). Built with
+        # tuple.__new__ straight from the unpacked values: 5x cheaper than DepthLevel(...)
+        levels = [_new(DepthLevel, e) for e in zip(v[17:46:3], v[16:46:3], v[18:46:3], strict=True)]
+        return KiteTick(  # positional, in field order: the hot path
+            token,
+            "full",
+            ltp,
+            last_qty,
+            avg,
+            volume,
+            buy_qty,
+            sell_qty,
+            open_,
+            high,
+            low,
+            close,
+            oi,
+            _time(last_trade_time),
+            _time(exchange_time),
+            tuple(levels[:5]),
+            tuple(levels[5:]),
         )
 
     raise DecodeError(f"unknown packet length {size}")
@@ -181,14 +183,19 @@ def decode_packet(packet: bytes) -> KiteTick | None:
 
 def decode_frame(frame: bytes) -> list[KiteTick]:
     """Decode a whole frame into ticks, skipping packets MockTrade doesn't handle."""
+    return decode_packets(split_packets(frame))
+
+
+def decode_packets(packets: list[bytes]) -> list[KiteTick]:
     ticks = []
-    for packet in split_packets(frame):
+    for packet in packets:
         tick = decode_packet(packet)
         if tick is not None:
             ticks.append(tick)
     return ticks
 
 
+@lru_cache(maxsize=256)  # a frame's ticks share a few distinct seconds
 def _time(seconds: int) -> datetime | None:
     """Kite sends Unix seconds; 0 means 'not available'."""
     return datetime.fromtimestamp(seconds, UTC) if seconds else None

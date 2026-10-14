@@ -9,8 +9,9 @@
 import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Rest } from "../api/rest";
 import { StreamClient } from "../api/stream";
-import type { Instrument, Tick } from "../api/types";
+import type { Instrument, OrderSpec, Tick } from "../api/types";
 import { Instruments } from "../state/instruments";
+import { OrderSpecs } from "../state/orderSpecs";
 import { Session } from "../state/session";
 import { Store, type State } from "../state/store";
 import { LinkBus } from "../workspace/links";
@@ -21,6 +22,7 @@ export interface App {
   store: Store;
   session: Session;
   instruments: Instruments;
+  specs: OrderSpecs;
   links: LinkBus;
 }
 
@@ -36,6 +38,7 @@ export function createApp(opts: { rest?: Rest; stream?: StreamClient; store?: St
     store,
     session: new Session(rest, stream, store),
     instruments: new Instruments(rest),
+    specs: new OrderSpecs(rest),
     links: new LinkBus(),
   };
 }
@@ -98,6 +101,31 @@ export function useInstrument(instrumentId: string | undefined): Instrument | nu
       live = false;
     };
   }, [instruments, instrumentId]);
+  return found;
+}
+
+/** What can be ordered on an instrument through an account, or null while loading / unavailable. */
+export function useOrderSpec(accountId: string | null | undefined, instrumentId: string | undefined): OrderSpec | null {
+  const { specs } = useApp();
+  const [found, setFound] = useState<OrderSpec | null>(() =>
+    accountId && instrumentId ? (specs.peek(accountId, instrumentId) ?? null) : null,
+  );
+  useEffect(() => {
+    let live = true;
+    if (!accountId || !instrumentId) {
+      setFound(null);
+      return;
+    }
+    const known = specs.peek(accountId, instrumentId);
+    setFound(known ?? null);
+    if (known) return;
+    void specs.get(accountId, instrumentId).then((s) => {
+      if (live) setFound(s);
+    });
+    return () => {
+      live = false;
+    };
+  }, [specs, accountId, instrumentId]);
   return found;
 }
 

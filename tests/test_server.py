@@ -10,10 +10,11 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import pytest
 
+from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.fake import FakeBroker
 from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.domain.orders import OrderStatus, OrderUpdate, Product, Side
-from mocktrade.domain.ticks import Tick
+from mocktrade.domain.ticks import DepthLevel, Tick
 from mocktrade.marketdata.service import MarketData
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
@@ -64,7 +65,11 @@ class World:
         for account in self.users.accounts():
             self.brokers[account.id] = FakeBroker()
             self.platform.add_account(
-                account, self.brokers[account.id], ids=ClientIds("MT"), clock=self.clock
+                account,
+                self.brokers[account.id],
+                ids=ClientIds("MT"),
+                clock=self.clock,
+                algo_types=BUILTIN,
             )
         self.login_calls = []
         self.app = create_app(
@@ -72,6 +77,7 @@ class World:
             self.users,
             ServerSettings(origin=ORIGIN),
             broker_login=self,
+            broker_status=lambda account: "login_needed" if account.id == "acc-ayush" else None,
             monotonic=self.clock.mono,
         )
 
@@ -174,6 +180,8 @@ async def test_login_sets_a_locked_down_cookie(world):
         me = (await c.get("/api/me")).json()
     assert me["user"] == {"id": "ayush", "name": "Ayush", "roles": ["admin", "trader"]}
     assert [a["id"] for a in me["accounts"]] == ["acc-ayush", "acc-riya"]  # admin sees all
+    # the broker's daily login, so the screen can offer it
+    assert [a["broker_session"] for a in me["accounts"]] == ["login_needed", None]
 
 
 @pytest.mark.parametrize(
@@ -370,6 +378,114 @@ async def test_an_orders_audit_history(world):
     await c.aclose()
 
 
+async def test_an_accounts_audit_trail_in_pages(world):
+    c = await world.logged_in()
+    for _ in range(3):
+        await c.post("/api/accounts/acc-ayush/orders", json=ORDER)
+    await c.post("/api/accounts/acc-ayush/stop", json={"reason": "break"})
+    await world.log.flush()
+    page = (await c.get("/api/accounts/acc-ayush/events", params={"limit": 4})).json()
+    kinds = [e["kind"] for e in page]
+    # STOP engages the switch first, then cancels the working orders: the cancels are newer
+    assert kinds.index("KILL_SWITCH") > kinds.index("CANCEL_SENT")
+    stop = page[kinds.index("KILL_SWITCH")]
+    assert stop["detail"] == "break" and stop["extra"]["by"] == "ayush"
+    seqs = [e["seq"] for e in page]
+    assert seqs == sorted(seqs, reverse=True)
+    older = (await c.get("/api/accounts/acc-ayush/events", params={"before_seq": seqs[-1]})).json()
+    assert all(e["seq"] < seqs[-1] for e in older)
+    assert {e["account_id"] for e in page + older} <= {"acc-ayush", "account acc-ayush", "firm"}
+    assert any(e["order"] and e["order"]["request"]["user_id"] == "ayush" for e in older)
+    await c.aclose()
+    # a plain trader can't read someone else's audit trail: the account doesn't exist for them
+    riya = await world.logged_in("riya")
+    assert (await riya.get("/api/accounts/acc-ayush/events")).status_code == 404
+    await riya.aclose()
+
+
+# --- algos ---
+
+
+async def test_algo_specs_describe_each_algos_settings(world):
+    c = await world.logged_in()
+    specs = (await c.get("/api/accounts/acc-ayush/algo-specs")).json()
+    assert [s["code"] for s in specs] == ["SLICER", "TWAP", "VWAP", "POV", "ICEBERG", "SPREAD"]
+    assert {s["family"] for s in specs} == {"execution"}
+    slicer = specs[0]
+    assert [p["name"] for p in slicer["params"]] == ["slices", "interval_s", "mode", "limit_paise"]
+    assert slicer["params"][2] == {
+        "name": "mode",
+        "label": "Price",
+        "kind": "choice",
+        "help": slicer["params"][2]["help"],
+        "required": True,
+        "default": "join",
+        "min": None,
+        "max": None,
+        "choices": ["join", "cross"],
+    }
+    await c.aclose()
+
+
+async def test_start_pause_resume_stop_an_algo(world):
+    c = await world.logged_in()
+    body = {
+        "code": "SLICER",
+        "instrument_id": FUT,
+        "side": "BUY",
+        "qty": 150,
+        "params": {"slices": 2, "interval_s": 60},
+    }
+    world.platform.market_data.on_tick(
+        Tick(FUT, 2501000, bids=(DepthLevel(2501000, 150, 2),), asks=(DepthLevel(2501010, 75, 1),))
+    )
+    started = await c.post("/api/accounts/acc-ayush/algos", json=body)
+    assert started.status_code == 201, started.text
+    algo = started.json()
+    assert (algo["state"], algo["user_id"], algo["params"]["mode"]) == ("WORKING", "ayush", "join")
+    await world.platform.accounts["acc-ayush"].algos.settle()
+    listed = (await c.get("/api/accounts/acc-ayush/algos")).json()
+    assert [a["algo_id"] for a in listed] == [algo["algo_id"]] and len(listed[0]["children"]) == 1
+    base = f"/api/accounts/acc-ayush/algos/{algo['algo_id']}"
+    assert (await c.post(f"{base}/pause", json={})).json()["state"] == "PAUSED"
+    assert (await c.post(f"{base}/resume", json={})).json()["state"] == "WORKING"
+    assert (await c.post(f"{base}/stop", json={})).json()["state"] in ("STOPPING", "STOPPED")
+    assert (await c.post(f"{base}/explode", json={})).status_code == 404
+    await c.aclose()
+
+
+async def test_bad_algo_settings_come_back_as_readable_reasons(world):
+    c = await world.logged_in()
+    r = await c.post(
+        "/api/accounts/acc-ayush/algos",
+        json={"code": "SLICER", "instrument_id": FUT, "side": "BUY", "qty": 100, "params": {}},
+    )
+    assert r.status_code == 422
+    reason = r.json()["detail"]
+    assert "Slices is required" in reason and "lot" in reason
+    r = await c.post(
+        "/api/accounts/acc-ayush/algos",
+        json={"code": "NOPE", "instrument_id": FUT, "side": "BUY", "qty": 75, "params": {}},
+    )
+    assert r.json()["detail"] == "there is no algo called 'NOPE'"
+    assert (await c.post("/api/accounts/acc-ayush/algos/A99/stop", json={})).status_code == 409
+    await c.aclose()
+
+
+async def test_algos_follow_the_same_permissions_as_orders(world):
+    risk = await world.logged_in("risk")  # may watch, may not trade
+    assert (await risk.get("/api/accounts/acc-ayush/algos")).status_code == 200
+    r = await risk.post(
+        "/api/accounts/acc-ayush/algos",
+        json={"code": "SLICER", "instrument_id": FUT, "side": "BUY", "qty": 75, "params": {}},
+    )
+    assert r.status_code == 403
+    await risk.aclose()
+    riya = await world.logged_in("riya")
+    assert (await riya.get("/api/accounts/acc-ayush/algos")).status_code == 404
+    await riya.aclose()
+
+
 # --- positions ---
 
 
@@ -477,6 +593,34 @@ async def test_instrument_search_and_detail(world):
     await c.aclose()
 
 
+async def test_volume_at_price(world):
+    c = await world.logged_in()
+    md = world.platform.market_data
+    md.on_tick(Tick(FUT, 2501000, volume=1000))
+    md.on_tick(Tick(FUT, 2501010, volume=1150))
+    md.on_tick(Tick(FUT, 2501000, volume=1225))
+    body = (await c.get(f"/api/instruments/{FUT}/vap")).json()
+    assert body == {"volume": 1225, "levels": [[2501000, 75], [2501010, 150]]}
+    assert (await c.get("/api/instruments/NSE:NOPE/vap")).status_code == 404
+    await c.aclose()
+
+
+async def test_the_order_spec_for_an_account_and_instrument(world):
+    c = await world.logged_in()
+    spec = (await c.get(f"/api/accounts/acc-ayush/instruments/{FUT}/order-spec")).json()
+    assert [t["code"] for t in spec["order_types"]] == ["LIMIT", "MARKET", "SL", "SL-M"]
+    assert spec["products"] == ["NRML", "MIS"] and spec["lot_size"] == 75
+    assert (
+        await c.get("/api/accounts/acc-ayush/instruments/NSE:NOPE/order-spec")
+    ).status_code == 404
+    await c.aclose()
+    riya = await world.logged_in("riya")  # someone else's account doesn't exist for you
+    assert (
+        await riya.get(f"/api/accounts/acc-ayush/instruments/{FUT}/order-spec")
+    ).status_code == 404
+    await riya.aclose()
+
+
 async def test_layouts_are_saved_per_user(world):
     ayush = await world.logged_in("ayush")
     riya = await world.logged_in("riya")
@@ -514,6 +658,7 @@ async def test_the_built_screens_are_served_without_shadowing_the_api(world, tmp
     (ui / "assets").mkdir(parents=True)
     (ui / "index.html").write_text("<!doctype html><title>MockTrade</title>")
     (ui / "assets" / "app-abc123.js").write_text("console.log(1)")
+    (ui / "popout.html").write_text("<!doctype html><body></body>")
     (tmp_path / "secret.txt").write_text("not for the web")
     app = create_app(world.platform, world.users, ServerSettings(origin=ORIGIN), static_dir=ui)
     async with httpx.AsyncClient(
@@ -525,5 +670,40 @@ async def test_the_built_screens_are_served_without_shadowing_the_api(world, tmp
         assert asset.text == "console.log(1)" and "immutable" in asset.headers["cache-control"]
         assert "not for the web" not in (await c.get("/../secret.txt")).text
         assert "not for the web" not in (await c.get("/%2e%2e/secret.txt")).text
+        # a popped-out widget's window: inline styles allowed (copied in), scripts never
+        popout = (await c.get("/popout.html")).headers["content-security-policy"]
+        assert "style-src 'self' 'unsafe-inline'" in popout and "script-src 'none'" in popout
+        assert "unsafe-inline" not in (await c.get("/")).headers["content-security-policy"]
         assert (await c.get("/api/nothing-here")).status_code == 404
         assert (await c.get("/api/me")).status_code == 401  # still the API
+
+
+async def test_metrics_are_for_admin_and_risk_and_time_each_step(world):
+    from mocktrade.metrics import METRICS
+
+    METRICS.reset()
+    riya = await world.logged_in("riya")
+    assert (await riya.get("/api/metrics")).status_code == 403
+    ayush = await world.logged_in("ayush")
+    r = await ayush.post("/api/accounts/acc-ayush/orders", json=ORDER)
+    assert r.status_code == 201, r.text
+    risk = await world.logged_in("risk")
+    snap = (await risk.get("/api/metrics")).json()
+    hist = snap["histograms"]
+    # the route template, never the ids: one series per endpoint
+    assert hist["http_us{route=POST /api/accounts/{account_id}/orders}"]["count"] == 1
+    assert hist["broker_ms{op=place,broker=fake}"]["count"] == 1
+    assert {"stream_connections", "ticks_received", "process_rss_mb"} <= set(snap["gauges"])
+    text = (await risk.get("/api/metrics?format=prometheus")).text
+    assert 'mocktrade_broker_ms_count{op="place",broker="fake"} 1' in text
+    for c in (riya, ayush, risk):
+        await c.aclose()
+
+
+async def test_ops_view_is_for_admin_and_risk(world):
+    riya = await world.logged_in("riya")
+    assert (await riya.get("/api/ops")).status_code == 403
+    risk = await world.logged_in("risk")
+    assert (await risk.get("/api/ops")).json() == {"alerts": [], "jobs": []}
+    for c in (riya, risk):
+        await c.aclose()

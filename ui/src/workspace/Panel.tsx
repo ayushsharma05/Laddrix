@@ -2,7 +2,7 @@
 // changes, follows the link group, and keeps the tab title in step.
 
 import type { IDockviewPanelHeaderProps, IDockviewPanelProps } from "dockview-react";
-import { createContext, useCallback, useContext, useEffect, useRef, type FunctionComponent } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type FunctionComponent } from "react";
 import { useApp } from "../app/context";
 import type { WorkspaceController } from "./controller";
 import { LINK_COLOURS, nextLink, type LinkGroup } from "./links";
@@ -90,8 +90,21 @@ function PanelBody({ kind, params, api }: IDockviewPanelProps<BaseParams> & { ki
 }
 
 /** The tab: link colour (click to change group), title, close. Acts as the window title bar. */
+/** "grid", "floating" or "popout", kept current as the widget moves between windows. */
+function useLocation(api: IDockviewPanelHeaderProps<BaseParams>["api"]): string {
+  const [where, setWhere] = useState(() => api.group.api.location.type);
+  useEffect(() => {
+    const update = () => setWhere(api.group.api.location.type);
+    update();
+    const subs = [api.onDidLocationChange(update), api.onDidGroupChange(update)];
+    return () => subs.forEach((d) => d.dispose());
+  }, [api]);
+  return where;
+}
+
 export function WidgetTab({ api, params }: IDockviewPanelHeaderProps<BaseParams>) {
   const controller = useController();
+  const where = useLocation(api);
   const def = widget(api.component);
   const link: LinkGroup = params?.link ?? "none";
   const cycle = (e: React.MouseEvent) => {
@@ -99,8 +112,14 @@ export function WidgetTab({ api, params }: IDockviewPanelHeaderProps<BaseParams>
     api.updateParameters({ ...params, link: nextLink(link) });
     controller.changed();
   };
+  // double-click a tab: fill the workspace with this widget; again to put it back
+  const toggleMaximized = () => {
+    if (where === "popout") return;
+    if (api.isMaximized()) api.exitMaximized();
+    else api.maximize();
+  };
   return (
-    <div className="tab">
+    <div className="tab" onDoubleClick={toggleMaximized} title="Double-click to maximize or restore">
       {def && def.link !== "none" && (
         <button
           type="button"
@@ -113,6 +132,35 @@ export function WidgetTab({ api, params }: IDockviewPanelHeaderProps<BaseParams>
         />
       )}
       <span className="tab-title">{api.title}</span>
+      {where === "popout" ? (
+        <button
+          type="button"
+          className="tab-close"
+          aria-label="Dock back"
+          title="Put back into the workspace"
+          onClick={(e) => {
+            e.stopPropagation();
+            controller.dockBack(api.id);
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          ⇲
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="tab-close"
+          aria-label="Pop out"
+          title="Pop out into its own window (e.g. another monitor)"
+          onClick={(e) => {
+            e.stopPropagation();
+            void controller.popOut(api.id);
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          ⧉
+        </button>
+      )}
       <button
         type="button"
         className="tab-close"

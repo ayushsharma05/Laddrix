@@ -11,6 +11,7 @@ dependencies = [
     "argon2-cffi>=23.1",
     "pyotp>=2.9",
     "cryptography>=43",
+    "orjson>=3.10",  # tick encoding: 4x faster than json (docs/design/performance.md)
 ]
 
 [tool.pytest.ini_options]
@@ -22,6 +23,10 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Historical context generators and session-specific mutation harnesses are
+# preserved as evidence, not maintained application modules. Source and tests
+# remain subject to every existing rule; runnable tools live under src/.
+extend-exclude = ["context/backlog-scripts", "context/build-map", "context/scripts"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

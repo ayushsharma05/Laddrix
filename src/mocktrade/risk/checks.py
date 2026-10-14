@@ -12,6 +12,7 @@ quantity still working in other orders: a resting buy of 75 counts as if it fill
 """
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -41,6 +42,7 @@ class RiskGate:
         day_pnl_paise: Callable[[], int],  # realised + unrealised today
         switches: Sequence[KillSwitch],  # e.g. the firm's and this account's
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),  # same clock as the orders
+        positions: Callable[[], dict[str, int]] = dict,  # every net position (covered shorts)
     ) -> None:
         self.limits = limits
         self._instrument = instruments
@@ -50,6 +52,7 @@ class RiskGate:
         self._pnl = day_pnl_paise
         self._switches = tuple(switches)
         self._clock = clock
+        self._positions = positions
 
     # --- the gate -------------------------------------------------------------------------
 
@@ -72,6 +75,23 @@ class RiskGate:
             or self._duplicate_problem(request, others)
         )
         return reason
+
+    async def check_basket(self, requests: Sequence[OrderRequest]) -> list[str | None]:
+        """Every leg of a basket through the same checks, each leg seeing the legs before it
+        as already working (open-order count, position worst case). Sends nothing."""
+        real = self._working
+        pending: list[_Pending] = []
+        results: list[str | None] = []
+        try:
+            for n, request in enumerate(requests, 1):
+                # legs have no order id yet: a stand-in keeps them apart from each other
+                request = replace(request, client_order_id=f"(basket leg {n})")
+                self._working = lambda p=tuple(pending): [*real(), *p]
+                results.append(await self.admit_new(request))
+                pending.append(_Pending(request, self._clock()))
+        finally:
+            self._working = real
+        return results
 
     async def admit_modify(self, order: OrderView, new: OrderRequest) -> str | None:
         instrument = self._instrument(new.instrument_id)
@@ -120,9 +140,36 @@ class RiskGate:
             short_after = self._position(instrument.id) - self._working_qty(
                 instrument.id, Side.SELL, others
             )
-            if short_after - request.qty < 0:
-                return "selling options to open a short position is not enabled for this account"
+            if short_after - request.qty < 0 and not self._covered(instrument, request, others):
+                return (
+                    "selling options to open a short position is not enabled for this account "
+                    "(a short covered by a long option of the same type and expiry is)"
+                )
         return None
+
+    def _covered(self, instrument: Instrument, request: OrderRequest, others) -> bool:
+        """A short covered by longs of the same underlying, type and expiry (held, working,
+        or earlier legs of the same basket) has a capped loss: a spread, not a naked short."""
+
+        def family(other_id: str) -> bool:
+            other = self._instrument(other_id)
+            return (
+                other is not None
+                and other.kind is instrument.kind
+                and other.underlying == instrument.underlying
+                and other.expiry == instrument.expiry
+            )
+
+        held = {i: q for i, q in self._positions().items() if family(i)}
+        longs = sum(q for q in held.values() if q > 0)
+        shorts = -sum(q for q in held.values() if q < 0)
+        for o in others:
+            if family(o.request.instrument_id):
+                if o.request.side is Side.BUY:
+                    longs += o.leaves_qty
+                else:
+                    shorts += o.leaves_qty
+        return longs >= shorts + request.qty
 
     def _product_problem(self, instrument: Instrument, request: OrderRequest) -> str | None:
         allowed = PRODUCTS_FOR_KIND.get(instrument.kind, frozenset())
@@ -217,12 +264,12 @@ class RiskGate:
     def _duplicate_problem(self, request: OrderRequest, others) -> str | None:
         """An identical manual order still working and placed moments ago is a double click.
         Refused orders don't count, so retrying after a refusal always works."""
-        if request.algo_id is not None:
+        if request.from_algo:
             return None  # algos send identical orders on purpose
         key = _duplicate_key(request)
         now = self._clock()
         for order in others:
-            if order.request.algo_id is None and _duplicate_key(order.request) == key:
+            if not order.request.from_algo and _duplicate_key(order.request) == key:
                 ago = (now - order.created_at).total_seconds()
                 if 0 <= ago < self.limits.duplicate_window_s:
                     return (
@@ -240,6 +287,22 @@ class RiskGate:
             for o in others
             if o.request.instrument_id == instrument_id and o.request.side is side
         )
+
+
+@dataclass(frozen=True)
+class _Pending:
+    """An earlier basket leg, counted as if it were already working."""
+
+    request: OrderRequest
+    created_at: datetime
+
+    @property
+    def client_order_id(self) -> str:
+        return self.request.client_order_id
+
+    @property
+    def leaves_qty(self) -> int:
+        return self.request.qty
 
 
 def _worst_price(instrument: Instrument, request: OrderRequest, tick: Tick | None) -> int | None:

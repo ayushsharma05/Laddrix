@@ -279,6 +279,34 @@ class EventLog:
             args = (after_seq, account_id)
         return self._query(sql, (*args, limit))
 
+    def page(
+        self,
+        names: list[str],
+        *,
+        before_seq: int | None = None,
+        after_seq: int | None = None,
+        limit: int = 200,
+    ) -> list[StoredEvent]:
+        """One page of the audit trail for these log names (an account id, its kill
+        switch "account <id>", "firm"), **newest first**.
+
+        - neither: the newest `limit` events (opening the screen)
+        - `before_seq`: the `limit` events just older than it (scrolling back)
+        - `after_seq`: every event newer than it, up to `limit` (live updates)
+        """
+        if not names:
+            return []
+        marks = ",".join("?" * len(names))
+        if after_seq is not None:
+            sql = f"""SELECT * FROM (
+                SELECT * FROM events WHERE seq > ? AND account_id IN ({marks})
+                ORDER BY seq LIMIT ?) ORDER BY seq DESC"""
+            return self._query(sql, (after_seq, *names, limit))
+        top = before_seq if before_seq is not None else 2**62
+        sql = f"""SELECT * FROM events WHERE seq < ? AND account_id IN ({marks})
+                  ORDER BY seq DESC LIMIT ?"""
+        return self._query(sql, (top, *names, limit))
+
     def latest_views(self, account_id: str, *, since: datetime | None = None) -> list[OrderView]:
         """Each order's newest known state, oldest order first (rebuilding after a restart).
 
