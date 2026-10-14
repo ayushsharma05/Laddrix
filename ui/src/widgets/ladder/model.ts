@@ -294,10 +294,11 @@ export interface OrderBody {
   instrument_id: string;
   side: Side;
   qty: number;
-  order_type: "LIMIT" | "MARKET";
+  order_type: "LIMIT" | "MARKET" | "SL" | "SL-M";
   product: string;
   validity: Tif;
   price_paise: number | null;
+  trigger_paise: number | null;
   market_protection: number | null;
 }
 
@@ -338,6 +339,7 @@ export function buildOrder(args: {
     product: args.product,
     validity: args.tif,
     price_paise: market ? null : snap(args.price, args.instrument.tick_paise),
+    trigger_paise: null,
     // Kite refuses market orders without protection (0 is not allowed): -1 = the exchange's automatic band.
     market_protection: market ? -1 : null,
   };

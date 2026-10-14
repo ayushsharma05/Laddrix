@@ -243,6 +243,7 @@ describe("building an order", () => {
       product: "NRML",
       validity: "DAY",
       price_paise: 2501000,
+      trigger_paise: null,
       market_protection: null,
     });
     expect(orderValue(body, 2501000)).toBe(150 * 2501000);

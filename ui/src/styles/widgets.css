@@ -641,3 +641,147 @@ button.lc:disabled {
 .book-scroll:has(.messages-row) {
   --min-row: 420px;
 }
+
+/* --- order ticket (canvas board 3) ------------------------------------------------------------ */
+
+.ticket {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-variant-numeric: tabular-nums;
+  border-top: 3px solid var(--bid);
+}
+.ticket.sell {
+  border-top-color: var(--ask);
+}
+.ticket-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px 10px;
+  padding: 8px;
+  overflow-y: auto;
+}
+.ticket-sides {
+  display: flex;
+  gap: 4px;
+}
+.ticket-sides .side {
+  flex: 1 1 0;
+  height: 30px;
+  font-weight: 700;
+  color: var(--text-3);
+  background: var(--chrome);
+  border: 1px solid #3a4452;
+  cursor: pointer;
+}
+.ticket-sides .side.buy.on {
+  color: #fff;
+  background: var(--bid);
+  border-color: var(--work-buy);
+}
+.ticket-sides .side.sell.on {
+  color: #fff;
+  background: var(--ask);
+  border-color: var(--work-sell);
+}
+.ticket-types {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.ticket-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.ticket-field.off {
+  opacity: 0.4;
+}
+.ticket-field select {
+  height: 26px;
+}
+.stepper {
+  display: flex;
+  height: 26px;
+}
+.stepper button {
+  width: 24px;
+  padding: 0;
+  color: var(--text);
+  background: var(--chrome);
+  border: 1px solid #3a4452;
+  cursor: pointer;
+}
+.stepper input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 6px;
+  font-size: 13px;
+  text-align: right;
+  color: var(--text);
+  background: var(--well);
+  border: 1px solid #3a4452;
+  border-left: 0;
+  border-right: 0;
+}
+.ticket-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  border-top: 1px solid var(--border);
+}
+.ticket-summary b {
+  color: var(--text);
+}
+.ticket-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+.ticket-send {
+  flex: 1 1 auto;
+  height: 34px;
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ticket-send.buy {
+  background: var(--bid);
+  border-color: var(--work-buy);
+}
+.ticket-send.sell {
+  background: var(--ask);
+  border-color: var(--work-sell);
+}
+.ticket-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ticket-send.confirm {
+  outline: 2px solid var(--select);
+  outline-offset: -2px;
+}
+.ticket .ladder-status {
+  margin-top: auto;
+}

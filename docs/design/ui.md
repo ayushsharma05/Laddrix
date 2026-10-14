@@ -6,7 +6,7 @@ comes first: the common action is one click, the dangerous one is never one acci
 
 The visual reference is the "MockTrade UI design" canvas (8 boards: ladder, design system,
 workspace, order ticket and messages, stopped and alerts, sign-in and session start, audit
-trail, phone). It follows the patterns professional platforms share (TT-style ladders,
+trail, phone). It follows patterns common to professional trading terminals (price ladders,
 dockable widgets, audit trails); it copies no firm's screens or names.
 
 ## 1. Rules for every screen
@@ -110,11 +110,14 @@ Columns **Work | PIQ | Bids | Price | Asks | LTQ | VAP**; rows are prices on the
   Ctrl+click Bids/Asks joins the best price on that side.
 
 ### Order ticket
-Contract, BUY/SELL, lots, price with −/+ tick buttons, type (LMT/MKT/SL/SL-M), TIF, product,
-then value, worst-case position and distance from last price. Orders above the user's
-"confirm over" value need an inline second click (CONFIRM BUY 300), focus on Back. Market
-orders show "pays at most" and the worst value. Enter sends, Esc clears, ↑↓ moves the price
-one tick.
+Contract (follows its link group), BUY/SELL, lots (= qty), price and trigger with −/+ tick
+buttons, type LMT / MKT / SL / SL-M, TIF, product, account, "confirm over". Under it: value,
+worst-case position (position + working orders on that side + this order), distance from the
+last price, and for market orders "pays at most" (the protected worst price). Problems are
+found before the click and named in the status line (no price, off the tick grid, a stop
+trigger the market already passed, a stop-loss trigger on the wrong side of its limit, IOC on
+a stop). Over "confirm over", the button turns into CONFIRM BUY 300 with Back focused.
+Enter sends, Esc clears, ↑↓ move the focused price one tick.
 
 ### Order book
 Tabs Working / Filled / Rejected with counts; columns Time, Contract, Side, Qty, Filled, Price,

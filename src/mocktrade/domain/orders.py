@@ -100,6 +100,15 @@ class OrderRequest:
             if self.trigger_paise is None:
                 raise ValueError(f"{self.order_type.value} orders need a trigger price")
             instrument.check_price(self.trigger_paise)
+            if self.order_type is OrderType.SL and self.price_paise is not None:
+                # A stop-loss buy fires when the price rises to the trigger, then buys up to its
+                # limit: a limit below the trigger could never trade. Mirror image for sells.
+                if self.side is Side.BUY and self.trigger_paise > self.price_paise:
+                    raise ValueError("stop-loss buy: the trigger must not be above the limit price")
+                if self.side is Side.SELL and self.trigger_paise < self.price_paise:
+                    raise ValueError(
+                        "stop-loss sell: the trigger must not be below the limit price"
+                    )
         elif self.trigger_paise is not None:
             raise ValueError(f"{self.order_type.value} orders must not have a trigger price")
 

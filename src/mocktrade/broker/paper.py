@@ -31,7 +31,11 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field, replace
 
 from mocktrade.broker.base import BrokerError, BrokerPosition
-from mocktrade.broker.rules import MAX_MODIFICATIONS_PER_ORDER, protected_limit
+from mocktrade.broker.rules import (
+    MAX_MODIFICATIONS_PER_ORDER,
+    protected_limit,
+    stop_trigger_problem,
+)
 from mocktrade.domain.instruments import Instrument, InstrumentId
 from mocktrade.domain.orders import (
     OrderRequest,
@@ -118,6 +122,7 @@ class PaperBroker:
             request.validate(instrument)
         except ValueError as exc:
             raise BrokerError(str(exc)) from None
+        self._check_trigger(request)
         seq = next(self._ids)
         broker_id = f"P{seq}"
         order = _PaperOrder(
@@ -162,6 +167,8 @@ class PaperBroker:
             new_request.validate(order.instrument)
         except ValueError as exc:
             raise BrokerError(str(exc)) from None
+        if trigger_paise is not None and not order.triggered:
+            self._check_trigger(new_request)
 
         price_changed = price_paise is not None and price_paise != order.request.price_paise
         qty_raised = qty is not None and qty > order.qty
@@ -175,6 +182,17 @@ class PaperBroker:
         if loses_place:
             order.queue_ahead = UNKNOWN_QUEUE  # back of the queue at the (new) price
         self._spawn(self._after_modify(order, loses_place))
+
+    def _check_trigger(self, request: OrderRequest) -> None:
+        """Refuse a stop the market has already passed, as Kite does (see rules.py)."""
+        if request.order_type not in (OrderType.SL, OrderType.SL_M):
+            return
+        tick = self._market_data.latest(request.instrument_id)
+        if tick is None or request.trigger_paise is None:
+            return  # no price yet: nothing to compare with
+        problem = stop_trigger_problem(request.side, request.trigger_paise, tick.ltp_paise)
+        if problem:
+            raise BrokerError(problem)
 
     async def cancel(self, broker_order_id: str) -> None:
         order = self._working(broker_order_id)
