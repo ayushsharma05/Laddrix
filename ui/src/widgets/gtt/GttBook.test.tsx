@@ -87,7 +87,8 @@ describe("GTT book", () => {
     expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Single", "OCO (stop + target)", "NRML", "MIS"]);
     expect(screen.getByText("One trigger, held by the broker")).toBeTruthy();
     fireEvent.change(screen.getByRole("combobox", { name: "GTT kind" }), { target: { value: "two-leg" } });
-    expect((screen.getByRole("textbox", { name: "Stop (lower) trigger" }) as HTMLInputElement).value).toBe("24,759.90");
+    // filled from the market once its price is known (it may arrive after the form opens)
+    await vi.waitFor(() => expect((screen.getByRole("textbox", { name: "Stop (lower) trigger" }) as HTMLInputElement).value).toBe("24,759.90"));
     expect((screen.getByRole("textbox", { name: "Target (upper) trigger" }) as HTMLInputElement).value).toBe("25,260.10");
     fireEvent.change(screen.getByRole("textbox", { name: "GTT lots" }), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: /Place GTT SELL 150/ }));
