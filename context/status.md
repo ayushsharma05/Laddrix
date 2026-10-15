@@ -128,7 +128,7 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
          - A CNC sell of holdings is a credit (shown as an available line "Holdings sold today"), never margin.
          - `estimate=True`.
      - **Recovery** (DONE, pushed) (non-durable branch): earlier days' CNC longs become paper **holdings**, not book positions, as at Kite. `earlier_pnl` = the earlier book's realised P&L + Σ carried non-CNC (close − avg)·qty. Then call the new `adopt`. Keep `tests/test_recovery.py` green.
-     - **Service** `accounts/reads.py` (or `orders/`), `AccountReads` per account, `AccountRuntime.reads`:
+     - **Service** (DONE, pushed: `portfolio/service.py` `PortfolioService`, `AccountRuntime.portfolio`, REST + stream type "portfolio" {account_id, kind, items, as_of, error}, `MOCKTRADE_PAPER_FUNDS`, `tests/test_portfolio.py`), was planned as `AccountReads` per account, `AccountRuntime.reads`:
        - Caches each port.
        - Refreshes every 30 s, and 0.5 s (debounced) after any fill event.
        - One read in flight per kind.
@@ -136,7 +136,7 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
        - Re-marks holdings with live prices every 2 s and subscribes their instruments to market data.
        - Maps trades' broker order ids to our client ids via the OrderManager.
        - Pushes stream messages `funds` / `holdings` / `trades` only when changed.
-     - **REST**: `GET /api/accounts/{a}/funds|holdings|trades[?fresh=1]`. 404 "<broker> doesn't report holdings" when a port is missing, as GTT does.
+     - **REST** (DONE): `GET /api/accounts/{a}/funds|holdings|trades[?fresh=1]`. 404 "<broker> doesn't report holdings" when a port is missing, as GTT does.
      - **UI**:
        - Funds widget and Holdings widget (read-only, with "as of …" and the stale reason); a Trades tab in the order book; add them to the workspace defaults.
        - Types in `api/types.ts`, store slices, session stream handling.
