@@ -36,6 +36,11 @@ from mocktrade.domain.orders import Product, Side
 VENUE = {"NSE": "NSE", "NFO": "NSE", "BSE": "BSE", "BFO": "BSE"}
 
 
+def position_key(instrument_id: InstrumentId, product: Product) -> str:
+    """The key a position is known by on screens: "NFO:NIFTY26OCTFUT|NRML"."""
+    return f"{instrument_id}|{product.value}"
+
+
 def venue(instrument: Instrument) -> str:
     return VENUE.get(instrument.exchange.value, instrument.exchange.value)
 
@@ -105,7 +110,7 @@ class ChargeLine:
 @dataclass(frozen=True)
 class ChargeBill:
     lines: tuple[ChargeLine, ...]  # in the order screens show them; zero lines included
-    by_instrument: dict[InstrumentId, int]  # each instrument's total, for net P&L per row
+    by_position: dict[str, int]  # "instrument_id|product" -> its total, for net P&L per row
     turnover_paise: int
 
     @property
@@ -142,17 +147,18 @@ class ScheduleCharges:
     def bill(self, orders: Sequence[ExecutedOrder]) -> ChargeBill:
         """Each line is rounded to the paisa per instrument, then added up: a position's
         charges and the day's total always agree to the paisa."""
-        exact: dict[InstrumentId, dict[str, Fraction]] = {}
+        exact: dict[str, dict[str, Fraction]] = {}  # by position key
         turnover = Fraction(0)
         for o in orders:
             parts = self._parts(o)
             if parts is None:
                 continue
-            mine = exact.setdefault(o.instrument.id, {key: Fraction(0) for key, _ in LABELS})
+            key = position_key(o.instrument.id, o.product)
+            mine = exact.setdefault(key, {k: Fraction(0) for k, _ in LABELS})
             if parts.pop("_dp_sale", None) and not mine["dp"]:  # once a stock a day
                 mine["dp"] = Fraction(self._rates(o).dp_paise)  # type: ignore[union-attr]
-            for key, amount in parts.items():
-                mine[key] += amount
+            for part, amount in parts.items():
+                mine[part] += amount
             turnover += o.value_paise
         rounded = {i: {k: _round(v) for k, v in parts.items()} for i, parts in exact.items()}
         lines = tuple(
@@ -160,7 +166,7 @@ class ScheduleCharges:
         )
         return ChargeBill(
             lines=lines,
-            by_instrument={i: sum(r.values()) for i, r in sorted(rounded.items())},
+            by_position={k: sum(r.values()) for k, r in sorted(rounded.items())},
             turnover_paise=_round(turnover),
         )
 
@@ -202,7 +208,7 @@ def bill_to_dict(bill: ChargeBill, schedule: ChargeSchedule) -> dict[str, Any]:
         "total_paise": bill.total_paise,
         "turnover_paise": bill.turnover_paise,
         "lines": [{"label": line.label, "paise": line.paise} for line in bill.lines],
-        "by_instrument": bill.by_instrument,
+        "by_position": bill.by_position,
         "schedule": {
             "name": schedule.name,
             "checked_on": schedule.checked_on.isoformat(),

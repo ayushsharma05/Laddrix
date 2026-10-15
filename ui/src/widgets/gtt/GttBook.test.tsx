@@ -105,7 +105,8 @@ describe("GTT book", () => {
   it("shows problems in words before anything is sent", async () => {
     const { calls } = setup();
     fireEvent.click(screen.getByRole("button", { name: /New GTT/ }));
-    const trigger = await screen.findByRole("textbox", { name: "GTT trigger" });
+    const trigger = (await screen.findByRole("textbox", { name: "GTT trigger" })) as HTMLInputElement;
+    await vi.waitFor(() => expect(trigger.value).not.toBe("")); // the last price is known (the check needs it)
     fireEvent.change(trigger, { target: { value: "25,000" } });
     fireEvent.click(screen.getByRole("button", { name: /Place GTT/ }));
     expect((await screen.findByRole("alert")).textContent).toContain("only 0.04% from the last price");

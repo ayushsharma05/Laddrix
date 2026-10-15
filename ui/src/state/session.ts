@@ -8,7 +8,7 @@
 
 import { ApiError, type Rest } from "../api/rest";
 import type { StreamClient } from "../api/stream";
-import type { AlgoView, GttView, Me, OrderView, PortfolioKind, PortfolioSnapshot, PositionsSnapshot } from "../api/types";
+import type { AlgoView, ChargeBill, GttView, Me, OrderView, PortfolioKind, PortfolioSnapshot, PositionsSnapshot } from "../api/types";
 import type { Store } from "./store";
 
 const KINDS: PortfolioKind[] = ["funds", "holdings", "trades"];
@@ -35,6 +35,7 @@ export class Session {
       stream.on("algo", (m) => store.applyMessage(m)),
       stream.on("gtt", (m) => store.applyMessage(m)),
       stream.on("portfolio", (m) => store.applyMessage(m)),
+      stream.on("charges", (m) => store.applyMessage(m)),
       stream.on("ops", (m) => store.applyMessage(m)),
       stream.on("error", (m) => store.applyMessage(m)),
     );
@@ -97,6 +98,8 @@ export class Session {
           this.store.applyAlgos(account.id, algos);
           this.store.applyGtts(account.id, gtts);
           await Promise.all(KINDS.map((kind) => this.loadPortfolio(account.id, kind)));
+          const charges = await this.rest.get<ChargeBill>(`${base}/charges`).catch(() => null); // a nicety
+          if (charges) this.store.applyCharges(account.id, charges);
         }),
       );
     } catch (err) {

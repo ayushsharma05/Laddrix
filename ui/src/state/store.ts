@@ -11,7 +11,7 @@
 // (docs/design/stream.md, "After every (re)connect").
 
 import type { Status } from "../api/stream";
-import type { AlgoView, GttView, Me, PortfolioKind, PortfolioSnapshot, OrderView, Position, PositionsSnapshot, ServerMessage, StrategyLegIn } from "../api/types";
+import type { AlgoView, ChargeBill, GttView, Me, PortfolioKind, PortfolioSnapshot, OrderView, Position, PositionsSnapshot, ServerMessage, StrategyLegIn } from "../api/types";
 import { price, qty, shortName } from "../lib/format";
 
 export type Level = "ERROR" | "WARN" | "INFO" | "OK";
@@ -48,6 +48,7 @@ export interface AccountBook {
   gtts: Record<string, GttView>; // by gtt_id
   portfolio: Partial<Record<PortfolioKind, PortfolioSnapshot>>; // funds, holdings, trades
   missing: Partial<Record<PortfolioKind, string>>; // what this broker doesn't report, and why
+  charges: ChargeBill | null; // today's charges (net P&L = gross − these)
 }
 
 export interface State {
@@ -75,7 +76,7 @@ export const MAX_MESSAGES = 500;
 const OFF: KillState = { engaged: false, reason: "", by: "" };
 
 export function emptyBook(): AccountBook {
-  return { orders: {}, positions: {}, dayPnl: 0, reconcile: null, alerts: {}, kill: OFF, algos: {}, gtts: {}, portfolio: {}, missing: {} };
+  return { orders: {}, positions: {}, dayPnl: 0, reconcile: null, alerts: {}, kill: OFF, algos: {}, gtts: {}, portfolio: {}, missing: {}, charges: null };
 }
 
 export function positionKey(p: { instrument_id: string; product: string }): string {
@@ -203,6 +204,11 @@ export class Store {
     this.setBook(snapshot.account_id, { portfolio: { ...book.portfolio, [snapshot.kind]: snapshot } });
   }
 
+  /** Today's charges (a new day starts from zero, so the newest answer simply wins). */
+  applyCharges(accountId: string, bill: ChargeBill): void {
+    this.setBook(accountId, { charges: bill });
+  }
+
   /** The broker doesn't report this (the server said 404, in words). */
   portfolioMissing(accountId: string, kind: PortfolioKind, why: string): void {
     const book = this.book(accountId);
@@ -298,6 +304,11 @@ export class Store {
         const note = describeAlgoEvent(m.kind, m.detail, m.algo);
         if (note) this.addMessage(note.level, m.algo.instrument_id, note.text);
         return;
+      }
+      case "charges": {
+        const { type: _type, account_id, ...bill } = m;
+        this.applyCharges(account_id, bill);
+        break;
       }
       case "portfolio": {
         const { type: _type, ...snapshot } = m;

@@ -526,7 +526,7 @@ button.lc:disabled {
   grid-template-columns: 104px minmax(110px, 1.4fr) 42px 56px 56px minmax(84px, 1fr) 76px minmax(96px, 1.4fr) 22px;
 }
 .positions-row {
-  grid-template-columns: minmax(110px, 1.4fr) 50px 64px 80px 80px minmax(84px, 1fr) minmax(84px, 1fr) minmax(84px, 1fr);
+  grid-template-columns: minmax(110px, 1.4fr) 50px 64px 80px 80px minmax(84px, 1fr) minmax(84px, 1fr) minmax(84px, 1fr) 72px minmax(84px, 1fr);
 }
 .holdings-row {
   grid-template-columns: minmax(100px, 1.3fr) minmax(70px, 0.8fr) 76px 76px minmax(90px, 1fr) minmax(90px, 1fr) minmax(130px, 1.4fr) minmax(80px, 1fr);
@@ -639,7 +639,7 @@ button.lc:disabled {
   --min-row: 680px;
 }
 .book-scroll:has(.positions-row) {
-  --min-row: 660px;
+  --min-row: 820px;
 }
 .book-scroll:has(.holdings-row) {
   --min-row: 760px;

@@ -62,7 +62,7 @@ def test_options_on_the_premium_flat_brokerage_per_order():
         "DP charges": 0,
     }
     assert bill.total_paise == 6644 and bill.turnover_paise == 15750_00
-    assert bill.by_instrument == {CE.id: 6644}
+    assert bill.by_position == {f"{CE.id}|NRML": 6644}
 
 
 def test_futures_brokerage_capped_at_20_rupees_an_order():
@@ -97,6 +97,14 @@ def test_intraday_brokerage_below_the_cap_and_stt_on_the_sell_only():
     }
 
 
+def test_each_position_its_own_charges_and_they_add_up():
+    bill = MODEL.bill([order(REL, Side.BUY, 10, 2500, Product.CNC),
+                       order(REL, Side.BUY, 10, 2500, Product.MIS),
+                       order(CE, Side.BUY, 75, 101)])  # fmt: skip
+    assert set(bill.by_position) == {"NSE:RELIANCE|CNC", "NSE:RELIANCE|MIS", f"{CE.id}|NRML"}
+    assert sum(bill.by_position.values()) == bill.total_paise
+
+
 def test_delivery_stt_both_sides_and_dp_once_a_stock_a_day():
     # CNC: buy 10 @ ₹2,500; sold in two orders of 5 @ ₹2,510
     bill = MODEL.bill([
@@ -126,7 +134,7 @@ def test_the_exchange_decides_the_exchange_fee():
 
 def test_nothing_executed_costs_nothing():
     bill = MODEL.bill([])
-    assert bill.total_paise == 0 and bill.by_instrument == {}
+    assert bill.total_paise == 0 and bill.by_position == {}
     assert [line.label for line in bill.lines][0] == "Brokerage"
 
 
@@ -161,9 +169,8 @@ async def test_partial_fills_of_one_order_pay_brokerage_once(nifty_fut):
     await asyncio.sleep(0)
     bill = p.rt.charges.bill()
     assert lines(bill)["Brokerage"] == 2000  # one executed order: ₹20, however many fills
-    assert (
-        seen and seen[-1] == bill and bill.by_instrument == {"NFO:NIFTY26OCTFUT": bill.total_paise}
-    )
+    assert seen and seen[-1] == bill
+    assert bill.by_position == {"NFO:NIFTY26OCTFUT|NRML": bill.total_paise}
     est = p.rt.charges.estimate("NFO:NIFTY26OCTFUT", Side.SELL, 75, 2510000, Product.NRML)
     assert lines(est)["STT"] == 94125  # 0.05% of ₹18,82,500
     await p.stop()
