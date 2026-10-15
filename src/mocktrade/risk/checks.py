@@ -106,6 +106,11 @@ class RiskGate:
             or self._size_problem(instrument, new.qty)
             or self._price_problem(instrument, new, tick)
             or self._value_problem(instrument, new, new.qty, tick)
+            or (
+                self._instrument_problem(instrument, replace(new, qty=leaves), others)
+                if grows
+                else None
+            )
             or (self._position_problem(instrument, new, leaves, others) if grows else None)
             or (self._loss_problem(new, leaves, others) if grows else None)
         )
@@ -136,20 +141,23 @@ class RiskGate:
             instrument.kind in OPTIONS
             and request.side is Side.SELL
             and not limits.allow_option_selling
+            and not self._covered(instrument, request, others)
         ):
-            short_after = self._position(instrument.id) - self._working_qty(
-                instrument.id, Side.SELL, others
+            return (
+                "selling options to open a short position is not enabled for this account "
+                "(a short covered by a filled long option of the same type and expiry is)"
             )
-            if short_after - request.qty < 0 and not self._covered(instrument, request, others):
-                return (
-                    "selling options to open a short position is not enabled for this account "
-                    "(a short covered by a long option of the same type and expiry is)"
-                )
         return None
 
     def _covered(self, instrument: Instrument, request: OrderRequest, others) -> bool:
-        """A short covered by longs of the same underlying, type and expiry (held, working,
-        or earlier legs of the same basket) has a capped loss: a spread, not a naked short."""
+        """After this sell, every short in the family (same underlying, type and expiry) is
+        still covered by longs: a spread with a capped loss, never a naked short.
+
+        Worst case: every working sell fills. Only FILLED longs cover: a working buy may never
+        fill (or be cancelled), so it protects nothing yet. The one exception is a basket's
+        preview, where its own earlier buy legs count: the basket sends no short leg until
+        those buys have filled (orders/basket.py). Checking every option sell, not only one
+        that opens a short, also stops selling the long that protects an open short."""
 
         def family(other_id: str) -> bool:
             other = self._instrument(other_id)
@@ -160,16 +168,20 @@ class RiskGate:
                 and other.expiry == instrument.expiry
             )
 
-        held = {i: q for i, q in self._positions().items() if family(i)}
-        longs = sum(q for q in held.values() if q > 0)
-        shorts = -sum(q for q in held.values() if q < 0)
+        net = {i: q for i, q in self._positions().items() if family(i)}
+        net[request.instrument_id] = self._position(request.instrument_id)  # always this one
         for o in others:
-            if family(o.request.instrument_id):
-                if o.request.side is Side.BUY:
-                    longs += o.leaves_qty
-                else:
-                    shorts += o.leaves_qty
-        return longs >= shorts + request.qty
+            i = o.request.instrument_id
+            if not family(i):
+                continue
+            if o.request.side is Side.SELL:
+                net[i] = net.get(i, 0) - o.leaves_qty
+            elif getattr(o, "planned", False):  # an earlier buy leg of the basket being checked
+                net[i] = net.get(i, 0) + o.leaves_qty
+        net[request.instrument_id] = net.get(request.instrument_id, 0) - request.qty
+        longs = sum(q for q in net.values() if q > 0)
+        shorts = -sum(q for q in net.values() if q < 0)
+        return longs >= shorts
 
     def _product_problem(self, instrument: Instrument, request: OrderRequest) -> str | None:
         allowed = PRODUCTS_FOR_KIND.get(instrument.kind, frozenset())
@@ -295,6 +307,7 @@ class _Pending:
 
     request: OrderRequest
     created_at: datetime
+    planned: bool = True  # not working yet: the basket sends it before anything it covers
 
     @property
     def client_order_id(self) -> str:

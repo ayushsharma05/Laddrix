@@ -140,5 +140,11 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 - Main CI had 450 lint errors in the historical context generators, before Python tests ran. These archived, session-specific utilities are now explicitly outside application lint scope; all src/ and tests/ rules remain enabled.
 - The intended stopping point is K9.1 complete. #200 synthetic orders, #201 GTT, and #202 screens remain pending. AWS deployment, AMO checks and a real trading day remain manual work.
 - Future code and context updates travel in the same PR against main, avoiding a second divergent context branch. See merge-recovery-2026-10-15.md for the audit and validation.
+
+## 23. Back after the recovery (15 Oct 2026)
+- Ayush: after Claude got stuck he merged PRs out of order, asked another assistant to fix the merges, and it made some changes; "recheck and continue".
+- Checked: main holds Claude's K9.1 code byte for byte (no src/tests/ui/deploy change); the extra changes are docs and context from the old context branch, a Ruff exclude for historical context scripts, and the rule "code and context in the same PR against main". CI on main is green; no PRs open; #199 closed, #200–#202 open. Followed the new rule from here.
+- Two new issues from that review are real safety gaps, so they go before K9.2: **#207** a working buy counted as cover, and a basket sent its shorts as soon as the buys were accepted; **#206** production start-up never restores orders from the event log.
+- #207 fixed: only filled longs cover; every option sell checked (also selling the long that protects a short); modify that grows a sell re-checked; baskets wait (events, 10 s bound) for the buys to fill, else cancel them and send no short.
 - #206 fixed: each account starts with a recovery gate (new orders and modifies refused, cancels allowed). Once the broker answers (Kite: after login) it rebuilds carried positions (Kite overnight qty at the close; paper from earlier days' fills at the close), replays today's fills once each, restores today's orders, reconciles with the broker's order book, closes paper orders the paper broker forgot, and compares positions. Any difference keeps trading shut with an ERROR alert; a person settles it and restarts. Algo leftovers are cancelled and position checks start only after recovery. Checked with a real demo restart.
 

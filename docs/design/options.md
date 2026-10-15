@@ -86,12 +86,17 @@
 - **One check for all legs.** Every leg goes through the normal risk checks, and each leg sees
   the legs before it as already working. If any leg fails, nothing is sent and the result
   names the leg.
-- **Covered shorts.** By default an account can't open a naked short option. A short covered
-  by longs of the same underlying, type and expiry (held, working, or earlier legs of the
-  basket) has defined risk, so it is allowed. Spreads and condors work; naked shorts still
-  need `allow_option_selling`.
-- **Send order:** option buys first, so the protection is in place before the shorts. A leg
-  that is refused or unconfirmed stops the rest, and the result says which legs are working.
+- **Covered shorts.** By default an account can't open a naked short option. Every option
+  sell is checked: afterwards, the shorts of its family (same underlying, type and expiry,
+  counting every working sell as filled) must be covered by **filled** longs. A working buy
+  covers nothing: it may never fill, or be cancelled (#207). This also refuses selling the
+  long that protects an open short, and growing a covered short past its cover by a modify.
+  Spreads and condors work; naked shorts still need `allow_option_selling`.
+- **Send order:** option buys first, then the rest **only once every buy has filled**. An
+  accepted buy is not protection yet. The wait is event-driven and bounded (`fill_wait_s`,
+  10 s): a buy refused, unconfirmed, cancelled (even after a part fill) or not filled in time
+  stops the basket, the unfilled rest of the buys is cancelled, and no short leg goes. The
+  basket's preview (`check`) still counts its own buy legs as the cover they will be.
 - **Prices:** a leg's own limit, or "touch" (buy at the offer, sell at the bid) or "mid"
   (rounded to the tick on the side that doesn't overpay). Every leg is a LIMIT order.
 - **Margin:** brokers that can quote it implement `MarginQuoter` (Kite: `POST /margins/basket`,
