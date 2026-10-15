@@ -133,6 +133,7 @@ def test_the_exchange_decides_the_exchange_fee():
 
 
 def test_nothing_executed_costs_nothing():
+    assert MODEL.bill([order(CE, Side.BUY, 0, 100)]).total_paise == 0  # no flat ₹20 for nothing
     bill = MODEL.bill([])
     assert bill.total_paise == 0 and bill.by_position == {}
     assert [line.label for line in bill.lines][0] == "Brokerage"
@@ -198,3 +199,28 @@ async def test_the_charges_api(tmp_path, nifty_fut):
     assert today["total_paise"] == 0 and today["account_id"] == "acc-ayush"
     await c.aclose()
     w.log.close()
+
+
+def test_only_todays_orders_and_estimates_need_a_quantity_and_a_price():
+    from datetime import UTC, datetime, timedelta
+    from types import SimpleNamespace as NS
+
+    from mocktrade.charges.service import ChargesError, ChargesService
+
+    now = datetime(2026, 10, 15, 6, 0, tzinfo=UTC)  # 11:30 in India
+
+    def view(cid, when, side=Side.BUY):
+        request = NS(instrument_id=FUT.id, product=Product.NRML, side=side)
+        return NS(client_order_id=cid, created_at=when, filled_qty=75, avg_price_paise=2500000,
+                  request=request)  # fmt: skip
+
+    orders = NS(orders=lambda: [view("Y", now - timedelta(days=1), Side.SELL), view("T", now)])
+    service = ChargesService("acc", MODEL, orders, {FUT.id: FUT}.get, clock=lambda: now)
+    today = lines(service.bill())
+    assert today["Brokerage"] == 2000 and today["STT"] == 0  # yesterday's sell isn't today's
+    assert today["Stamp duty"] == 3750  # today's buy: 0.002% of ₹18,75,000
+    for qty, price in ((0, 2500000), (75, 0)):
+        with pytest.raises(ChargesError, match="needs a quantity and a price"):
+            service.estimate(FUT.id, Side.BUY, qty, price, Product.NRML)
+    with pytest.raises(ChargesError, match="unknown instrument"):
+        service.estimate("NFO:NOPE", Side.BUY, 75, 1, Product.NRML)
