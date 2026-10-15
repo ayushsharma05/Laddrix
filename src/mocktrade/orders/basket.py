@@ -4,9 +4,12 @@
                    working), priced as asked, plus the broker's margin for them together
                    (with the hedge benefit) where the broker can say
     send(legs)  -> the same check; nothing goes if any leg fails. Then option BUYS first,
-                   then the rest, so the account is never briefly short options without
-                   the protection it asked for. A leg the broker refuses stops the rest,
-                   and the result says exactly which legs are working.
+                   and the rest only once every one of them has FILLED, so the account is
+                   never short options without the protection it asked for. An accepted
+                   buy is not yet protection: it may never fill, or be cancelled.
+                   A buy refused, unconfirmed, cancelled or unfilled within the wait
+                   (`fill_wait_s`) stops the basket: the unfilled rest of the buys is
+                   cancelled and no short leg goes. The result says exactly what happened.
 
 Each leg is an ordinary order (audited, cancelled and reconciled like any other) carrying
 the basket id, so the order book can show the legs together.
@@ -15,6 +18,8 @@ Prices: a leg may give its own limit price, or ask for "touch" (buy at the offer
 the bid: marketable) or "mid" (rounded to the tick on the side that doesn't overpay).
 """
 
+import asyncio
+import contextlib
 import secrets
 import time
 from collections.abc import Callable
@@ -26,10 +31,11 @@ from mocktrade.domain.instruments import Instrument, InstrumentKind
 from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
 from mocktrade.domain.ticks import Tick
 from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import OrderView, Pending
+from mocktrade.orders.model import OrderError, OrderView, Pending
 from mocktrade.risk.checks import RiskGate
 
 MAX_LEGS = 10
+FILL_WAIT_S = 10.0  # how long a basket waits for its protective buys to fill
 OPTIONS = (InstrumentKind.CALL, InstrumentKind.PUT)
 
 
@@ -74,7 +80,9 @@ class Baskets:
         instruments: Callable[[str], Instrument | None],
         prices: Callable[[str], Tick | None],
         audit: Callable[[str, str, dict], None] | None = None,
+        fill_wait_s: float = FILL_WAIT_S,
     ) -> None:
+        self._fill_wait_s = fill_wait_s
         self._account_id = account_id
         self._orders = orders
         self._risk = risk
@@ -151,21 +159,19 @@ class Baskets:
         if not checked.ok:
             return {"basket_id": None, "sent": [], "not_sent": _legs(checked), "check": checked}
         basket_id = f"B{time.strftime('%y%m%d')}{secrets.token_hex(3).upper()}"
-        sent: list[OrderView] = []
         ordered = self._send_order([c.request for c in checked.legs])
-        stopped = ""
-        for i, request in enumerate(ordered):
-            view = await self._orders.submit(replace(request, basket_id=basket_id))
-            sent.append(view)
-            unknown = view.pending is Pending.UNCONFIRMED  # no clear answer: don't pile on
-            if view.status is OrderStatus.REJECTED or unknown:
-                what = "unconfirmed" if unknown else "refused"
-                stopped = (
-                    f"{request.instrument_id} {what}: {view.reason}; "
-                    f"{len(ordered) - i - 1} legs not sent"
-                )
-                break
+        buys = [r for r in ordered if self._protects(r)]
+        sent: list[OrderView] = []
+        stopped = await self._submit(buys, basket_id, sent)
+        rest = ordered[len(buys) :]
+        if not stopped and buys and rest:
+            stopped = await self._await_protection(sent)
+        if not stopped:
+            stopped = await self._submit(rest, basket_id, sent)
+        sent = [self._orders.get(v.client_order_id) or v for v in sent]  # latest states
         not_sent = [_leg_dict(r) for r in ordered[len(sent) :]]
+        if stopped and not_sent:
+            stopped = f"{stopped}; {len(not_sent)} legs not sent"
         if self._audit is not None:
             self._audit(
                 "BASKET_STOPPED" if stopped else "BASKET_SENT",
@@ -178,14 +184,69 @@ class Baskets:
             )
         return {"basket_id": basket_id, "sent": sent, "not_sent": not_sent, "stopped": stopped}
 
+    async def _submit(
+        self, requests: list[OrderRequest], basket_id: str, sent: list[OrderView]
+    ) -> str:
+        """Send legs one by one; the first refused or unconfirmed one stops the rest."""
+        for request in requests:
+            view = await self._orders.submit(replace(request, basket_id=basket_id))
+            sent.append(view)
+            unknown = view.pending is Pending.UNCONFIRMED  # no clear answer: don't pile on
+            if view.status is OrderStatus.REJECTED or unknown:
+                what = "unconfirmed" if unknown else "refused"
+                return f"{request.instrument_id} {what}: {view.reason}"
+        return ""
+
+    async def _await_protection(self, buys: list[OrderView]) -> str:
+        """Wait, on order events (no polling), until every protective buy has filled.
+        Returns "" when all have, else why not, after cancelling what is still unfilled."""
+        ids = [v.client_order_id for v in buys]
+        changed = asyncio.Event()
+        stop_listening = self._orders.subscribe(
+            lambda e: changed.set() if e.order and e.order.client_order_id in ids else None
+        )
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._fill_wait_s
+        try:
+            while True:
+                views = [self._orders.get(i) for i in ids]
+                if all(v is not None and v.status is OrderStatus.FILLED for v in views):
+                    return ""
+                failed = next(
+                    (v for v in views if v is not None and v.status.is_final
+                     and v.status is not OrderStatus.FILLED),
+                    None,
+                )  # fmt: skip
+                if failed is not None:
+                    why = f"{failed.request.instrument_id} {failed.status.value.lower()}"
+                    break
+                left = deadline - loop.time()
+                if left <= 0:
+                    why = f"protective buys not filled within {self._fill_wait_s:g} s"
+                    break
+                changed.clear()
+                try:
+                    await asyncio.wait_for(changed.wait(), left)
+                except TimeoutError:
+                    pass
+        finally:
+            stop_listening()
+        for i in ids:  # an unfilled rest protects nothing on its own: pull it
+            view = self._orders.get(i)
+            if view is not None and not view.status.is_final:
+                with contextlib.suppress(OrderError):
+                    await self._orders.cancel(i)
+        return f"{why}: short legs not sent, unfilled protective buys cancelled"
+
+    def _protects(self, r: OrderRequest) -> bool:
+        instrument = self._instrument(r.instrument_id)
+        return r.side is Side.BUY and instrument is not None and instrument.kind in OPTIONS
+
     def _send_order(self, requests: list[OrderRequest]) -> list[OrderRequest]:
         """Option buys first (they protect the sells), then everything else, as given."""
-
-        def protects(r: OrderRequest) -> bool:
-            instrument = self._instrument(r.instrument_id)
-            return r.side is Side.BUY and instrument is not None and instrument.kind in OPTIONS
-
-        return [r for r in requests if protects(r)] + [r for r in requests if not protects(r)]
+        return [r for r in requests if self._protects(r)] + [
+            r for r in requests if not self._protects(r)
+        ]
 
 
 def _leg_dict(r: OrderRequest) -> dict[str, Any]:

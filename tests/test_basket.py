@@ -1,5 +1,6 @@
 """Baskets: one check for all legs, protective buys first, stop at a refusal, margins."""
 
+import asyncio
 import json
 from datetime import date
 
@@ -12,7 +13,14 @@ from mocktrade.broker.kite.broker import KiteBroker
 from mocktrade.broker.kite.http import KiteHttp
 from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from mocktrade.domain.orders import (
+    OrderRequest,
+    OrderStatus,
+    OrderType,
+    OrderUpdate,
+    Product,
+    Side,
+)
 from mocktrade.domain.ticks import DepthLevel, Tick
 from mocktrade.marketdata.service import MarketData
 from mocktrade.orders.basket import BasketError, LegIn
@@ -40,6 +48,29 @@ class QuotingBroker(FakeBroker):
         return BasketMargin(initial_paise=len(requests) * 10_000_00, final_paise=3_000_00)
 
 
+class FillingBroker(FakeBroker):
+    """A fake broker whose market fills buys at their limit a moment after they're placed
+    (or only part of them, with `part`); sells are left working."""
+
+    def __init__(self, part=None):
+        super().__init__()
+        self.manager = None
+        self.part = part
+        self.fill_buys = True
+
+    async def place(self, request):
+        broker_id = await super().place(request)
+        if request.side is Side.BUY and self.fill_buys:
+            qty = self.part or request.qty
+            status = OrderStatus.FILLED if qty >= request.qty else OrderStatus.PARTIAL
+            update = OrderUpdate(
+                request.client_order_id, broker_id, status, qty, request.price_paise,
+                last_fill_qty=qty, last_fill_price_paise=request.price_paise,
+            )  # fmt: skip
+            asyncio.get_running_loop().call_soon(self.manager.apply, update)
+        return broker_id
+
+
 def world(tmp_path, broker=None, **limits):
     store, md = InstrumentStore(), MarketData()
     for k in (24800, 24900, 25000, 25100, 25200):
@@ -64,7 +95,16 @@ def world(tmp_path, broker=None, **limits):
         ids=ClientIds("MT"),
         limits=RiskLimits(**limits),
     )
+    if isinstance(broker, FillingBroker):
+        broker.manager = runtime.orders
+    runtime.baskets._fill_wait_s = 0.3
     return runtime, broker, log
+
+
+def hold(runtime, positions):
+    """Pretend the account holds these net positions (both views the risk gate reads)."""
+    runtime.risk._positions = lambda: dict(positions)
+    runtime.risk._position = lambda i: positions.get(i, 0)
 
 
 def condor():
@@ -120,7 +160,7 @@ async def test_a_naked_short_is_refused_and_nothing_is_sent(tmp_path):
 
 
 async def test_protective_buys_go_first_and_every_leg_carries_the_basket_id(tmp_path):
-    runtime, broker, log = world(tmp_path)
+    runtime, broker, log = world(tmp_path, broker=FillingBroker())
     result = await runtime.baskets.send(condor(), "ayush")
     assert result["stopped"] == "" and result["not_sent"] == []
     assert [(r.side, r.instrument_id[-7:]) for r in broker.placed] == [
@@ -223,10 +263,87 @@ async def test_a_held_long_covers_a_later_short_of_the_same_type_and_expiry(tmp_
     runtime, broker, log = world(tmp_path)
     short = [LegIn(opt(25200, K.CALL).id, Side.SELL, 1)]
     assert not (await runtime.baskets.check(short, "ayush")).ok  # naked
-    runtime.risk._positions = lambda: {opt(25100, K.CALL).id: 75}  # long one lot
+    hold(runtime, {opt(25100, K.CALL).id: 75})  # long one lot
     assert (await runtime.baskets.check(short, "ayush")).ok  # now a call spread
     two = [LegIn(opt(25200, K.CALL).id, Side.SELL, 2)]
     assert not (await runtime.baskets.check(two, "ayush")).ok  # one lot covers one lot
     puts = [LegIn(opt(24800, K.PUT).id, Side.SELL, 1)]
     assert not (await runtime.baskets.check(puts, "ayush")).ok  # a call doesn't cover a put
+    await log.aclose()
+
+
+# --- an accepted buy is not protection: only a filled one is (#207) ---
+
+
+async def test_short_legs_wait_for_the_protective_buys_to_fill(tmp_path):
+    runtime, broker, log = world(tmp_path, broker=FillingBroker())
+    result = await runtime.baskets.send(condor(), "ayush")
+    statuses = {v.request.instrument_id[-7:]: v.status for v in result["sent"]}
+    assert statuses["24800PE"] is OrderStatus.FILLED and statuses["25200CE"] is OrderStatus.FILLED
+    assert result["stopped"] == "" and len(broker.placed) == 4
+    await log.aclose()
+
+
+async def test_unfilled_protection_sends_no_short_and_pulls_the_buys(tmp_path):
+    runtime, broker, log = world(tmp_path, broker=FillingBroker())
+    broker.fill_buys = False  # the buys are accepted but nobody sells to us
+    result = await runtime.baskets.send(condor(), "ayush")
+    assert [r.side for r in broker.placed] == [Side.BUY, Side.BUY]  # no short leg went
+    assert len(broker.cancelled) == 2  # both unfilled buys pulled
+    assert "not filled within 0.3 s" in result["stopped"]
+    assert "short legs not sent" in result["stopped"] and "2 legs not sent" in result["stopped"]
+    assert len(result["not_sent"]) == 2
+    await log.aclose()
+
+
+async def test_a_part_filled_then_cancelled_buy_stops_the_basket(tmp_path):
+    runtime, broker, log = world(tmp_path, broker=FillingBroker(part=0))
+    broker.fill_buys = False
+    task = asyncio.create_task(runtime.baskets.send(condor(), "ayush"))
+    while len(broker.placed) < 2:
+        await asyncio.sleep(0.01)
+    first = runtime.orders.orders()[0]
+    runtime.orders.apply(
+        OrderUpdate(first.client_order_id, first.broker_order_id, OrderStatus.CANCELLED, 0, 0)
+    )
+    result = await task
+    assert "cancelled" in result["stopped"] and len(broker.placed) == 2
+    await log.aclose()
+
+
+async def test_a_working_buy_does_not_cover_a_short(tmp_path):
+    runtime, broker, log = world(tmp_path)
+    buy = await runtime.orders.submit(
+        OrderRequest("", "acc", "ayush", opt(25100, K.CALL).id, Side.BUY, 75,
+                     OrderType.LIMIT, Product.NRML, price_paise=9500)
+    )  # fmt: skip
+    assert buy.status is not OrderStatus.REJECTED  # working, not filled
+    short = [LegIn(opt(25200, K.CALL).id, Side.SELL, 1)]
+    assert not (await runtime.baskets.check(short, "ayush")).ok
+    await log.aclose()
+
+
+async def test_selling_the_long_that_protects_a_short_is_refused(tmp_path):
+    runtime, broker, log = world(tmp_path)
+    hold(runtime, {opt(25100, K.CALL).id: 75, opt(25200, K.CALL).id: -75})
+    sell_long = [LegIn(opt(25100, K.CALL).id, Side.SELL, 1)]
+    checked = await runtime.baskets.check(sell_long, "ayush")
+    assert "not enabled" in checked.legs[0].problem  # it would leave the 25200 short naked
+    hold(runtime, {opt(25100, K.CALL).id: 75})
+    assert (await runtime.baskets.check(sell_long, "ayush")).ok  # nothing short: just closing
+    await log.aclose()
+
+
+async def test_growing_a_covered_short_past_its_cover_is_refused(tmp_path):
+    from mocktrade.orders.model import OrderError
+
+    runtime, broker, log = world(tmp_path)
+    hold(runtime, {opt(25100, K.CALL).id: 75})
+    short = await runtime.orders.submit(
+        OrderRequest("", "acc", "ayush", opt(25200, K.CALL).id, Side.SELL, 75,
+                     OrderType.LIMIT, Product.NRML, price_paise=12000)
+    )  # fmt: skip
+    assert short.status is not OrderStatus.REJECTED  # covered by the held long
+    with pytest.raises(OrderError, match="not enabled"):
+        await runtime.orders.modify(short.client_order_id, qty=150)
     await log.aclose()
