@@ -284,6 +284,15 @@ def build(settings: ServeSettings) -> Assembly:
             gate.subscribe(
                 lambda state, reason, a=account_id: _recovery_alert(alerts, a, state, reason)
             )
+        # stops held by MockTrade don't survive a restart: say so loudly, once
+        if lost := platform.lost_protection(account_id):
+            alerts.raise_(
+                f"protection_lost:{account_id}",
+                "ERROR",
+                f"{account_id}: {len(lost)} stop/target orders held by MockTrade were running "
+                f"when the server stopped and are NOT running now: {'; '.join(lost)}. "
+                "Check those positions.",
+            )
     checks = Checks(
         alerts,
         md,
