@@ -10,5 +10,6 @@ import "./algos/AlgoManager";
 import "./gtt/GttBook";
 import "./portfolio/FundsPanel";
 import "./portfolio/HoldingsPanel";
+import "./reports/Reports";
 import "./chain/OptionChain";
 import "./strategy/StrategyBuilder";
