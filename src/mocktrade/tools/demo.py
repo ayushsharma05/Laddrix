@@ -24,9 +24,12 @@ from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.marketdata.service import MarketData
 from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
+from mocktrade.ops.scheduler import Scheduler
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
+from mocktrade.reports.service import Reports
+from mocktrade.reports.store import ReportStore
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.server import security
 from mocktrade.server.app import ServerSettings, create_app
@@ -85,11 +88,15 @@ async def main(port: int, origin: str, ui: Path | None) -> None:
             recover_on_start=True,
         )  # fmt: skip
     settings = ServerSettings(origin=origin, cookie_secure=False)
-    app = create_app(platform, users, settings, static_dir=ui)
+    reports = Reports(platform, ReportStore(DATA / "reports"))
+    scheduler = Scheduler()
+    scheduler.daily("16:00", reports.close_of_day, "end-of-day reports")
+    app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler, reports=reports)
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
     print(f"\nMockTrade demo on http://localhost:{port}  (pages from {origin})")
     print(f"user: {USER}   password: {PASSWORD}   code: python -m mocktrade.tools.demo --code\n")
-    background = [asyncio.create_task(simulator.run()), asyncio.create_task(platform.run())]
+    background = [asyncio.create_task(simulator.run()), asyncio.create_task(platform.run()),
+                  asyncio.create_task(scheduler.run())]  # fmt: skip
     try:
         await server.serve()
     finally:

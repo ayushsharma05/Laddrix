@@ -19,7 +19,7 @@ import time
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol
@@ -50,6 +50,8 @@ from mocktrade.orders.gtt import GttError, gtt_request_from
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.portfolio.service import PortfolioError, snapshot_to_dict
+from mocktrade.reports.export import report_csv, report_pdf
+from mocktrade.reports.service import ReportError, Reports
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.server import security
 from mocktrade.server.formats import algo_to_dict, position_to_dict
@@ -216,6 +218,7 @@ def create_app(
     broker_status: Callable[[BrokerAccount], str | None] | None = None,
     alerts: Alerts | None = None,
     scheduler: Scheduler | None = None,
+    reports: Reports | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -396,6 +399,51 @@ def create_app(
         except ChargesError as exc:
             raise HTTPException(422, str(exc)) from None
         return bill_to_dict(bill, service.model.schedule)
+
+    # --- end-of-day reports and P&L history ---------------------------------------------------
+
+    day_reports = reports or Reports(platform, None)
+
+    def report_day(text: str) -> date:
+        try:
+            return date.fromisoformat(text)
+        except ValueError:
+            raise HTTPException(422, f"not a date: {text!r} (YYYY-MM-DD)") from None
+
+    @app.get("/api/accounts/{account_id}/reports")
+    async def report_days(account_id: str, user: Me) -> dict[str, Any]:
+        runtime(account_id, user)
+        return {"today": day_reports.today().isoformat(),
+                "kept": [d.isoformat() for d in day_reports.kept_days(account_id)]}  # fmt: skip
+
+    @app.get("/api/accounts/{account_id}/reports/{day}", response_model=None)
+    async def report(account_id: str, day: str, user: Me, format: str = "json") -> Any:
+        runtime(account_id, user)
+        if format not in ("json", "csv", "pdf"):
+            raise HTTPException(422, "format must be json, csv or pdf")
+        try:
+            data = day_reports.day(account_id, report_day(day))
+        except ReportError as exc:
+            raise HTTPException(422, str(exc)) from None
+        if format == "json":
+            return data
+        name = f"mocktrade-{account_id}-{data['day']}{'' if data['final'] else '-preview'}"
+        disposition = {"Content-Disposition": f'attachment; filename="{name}.{format}"'}
+        if format == "csv":
+            return Response(report_csv(data), media_type="text/csv; charset=utf-8",
+                            headers=disposition)  # fmt: skip
+        return Response(report_pdf(data), media_type="application/pdf", headers=disposition)
+
+    @app.get("/api/accounts/{account_id}/pnl")
+    async def pnl(account_id: str, user: Me, by: str = "day", start: str = "",
+                  end: str = "") -> dict[str, Any]:  # fmt: skip
+        runtime(account_id, user)
+        last = report_day(end) if end else day_reports.today()
+        first = report_day(start) if start else last - timedelta(days=30)
+        try:
+            return {"account_id": account_id, **day_reports.history(account_id, by, first, last)}
+        except ReportError as exc:
+            raise HTTPException(422, str(exc)) from None
 
     # --- funds, holdings, tradebook (read-only, from the broker) ------------------------------
 
