@@ -253,10 +253,19 @@ async def test_yesterdays_delivery_buy_is_a_holding_after_a_restart(tmp_path, ni
     await day.buy(FUT, 75, 2501010, Product.NRML)
     await day.stop()
 
+    today = Paper(nifty_fut, tmp_path, recover=True)  # a fill recorded twice is one trade
+    await today.ready()
+    fills = []
+    today.rt.orders.subscribe(lambda e: fills.append(e) if e.kind.value == "FILL" else None)
+    await today.buy(FUT, 75, 2500990, Product.NRML, side=Side.SELL)
+    today.log.record(fills[-1])
+    await today.stop()
+
     again = Paper(nifty_fut, tmp_path, recover=True)
     await again.ready()
     assert "1 carried positions, 1 holdings" in again.rt.recovery.reason
-    assert [(p.instrument_id, p.qty) for p in again.rt.positions.positions()] == [(FUT, 75)]
+    assert [(p.instrument_id, p.qty) for p in again.rt.positions.positions()] == [(FUT, 0)]
+    assert [(t.side, t.qty) for t in await again.paper.trades()] == [(Side.SELL, 75)]
     (h,) = await again.paper.holdings()
     assert (h.instrument_id, h.qty, h.avg_price_paise, h.ltp_paise) == (REL, 10, 250010, 250000)
     assert h.day_change_paise == 10 * (250000 - 248000)
@@ -264,10 +273,12 @@ async def test_yesterdays_delivery_buy_is_a_holding_after_a_restart(tmp_path, ni
     # yesterday: the future settled at the close (24,900.00), the shares cost 25,001.00
     earlier = 75 * (2490000 - 2501010)
     assert f.opening_paise == 10_00_000_00 + earlier - 10 * 250010
+    await again.buy(REL, 1, 249990, Product.MIS, side=Side.SELL)  # intraday: not a holding sold
+    assert (await again.paper.holdings())[0].used_qty == 0
     # selling 4 held shares today: a credit, and the holding shows them as used
     await again.buy(REL, 4, 249990, Product.CNC, side=Side.SELL)
     (h,) = await again.paper.holdings()
-    assert (h.qty, h.used_qty) == (10, 4)
+    assert (h.qty, h.used_qty) == (10, 4)  # the MIS sale isn't counted
     (f,) = await again.paper.funds()
     assert FundsLine("Holdings sold today", 4 * 250000) in f.available_lines
     await again.stop()
@@ -348,9 +359,11 @@ async def test_trades_carry_our_order_ids_and_fills_refresh_once_after_a_burst()
     assert [t.client_order_id for t in trades] == ["MT1", ""]  # X9 was placed elsewhere
     data = snapshot_to_dict("acc", s.snapshot("trades"))
     assert data["items"][0]["value_paise"] == 75 * 2501000 and data["kind"] == "trades"
-    for _ in range(3):
+    s.after_fill_s = 0.1
+    for _ in range(3):  # a burst: each fill comes before the previous one's wait is over
         s.on_order_event(OrderEvent(EventKind.FILL, datetime.now(UTC), "acc", "MT1", None))
-    await asyncio.sleep(0.1)
+        await asyncio.sleep(0.03)
+    await asyncio.sleep(0.3)
     assert broker.calls == {"funds": 1, "trades": 2}  # one refresh after the last fill
 
 

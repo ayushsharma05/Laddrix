@@ -67,7 +67,8 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | Fix: rebuild state after a restart (#206) | #209 merged | ✅ 878 Python; 12/12 mutations (`context/scripts/mutate-recovery.py`); real demo restart: position, P&L and orders back, resting paper order closed with the reason |
 | K9.2 Protection: trailing stop, OCO, bracket (#200) | #210 merged | ✅ 15 new tests; mutation check `context/scripts/mutate-protect.py`; real browser: bracket entered at market with target and stop, trailing stop following the highs (`context/scripts/e2e-protect.cjs`) |
 | K9.3 GTT at the broker (#201) | #211 merged | ✅ 914 Python; GTT spec + risk at the trigger; Kite /gtt/triggers; paper simulation; fired orders adopted; design `docs/design/gtt.md` |
-| K9.4 Orders+ screens (#202) | branch k9-4-screens | ✅ 239 UI tests; real browser: GTT OCO from the book, trailing stop and GTT from the ticket tabs, algos grouped by family (`context/scripts/e2e-orders-plus.cjs`) |
+| K9.4 Orders+ screens (#202) | #212 merged | ✅ 239 UI tests; real browser: GTT OCO from the book, trailing stop and GTT from the ticket tabs, algos grouped by family (`context/scripts/e2e-orders-plus.cjs`) |
+| K10.1 Funds, holdings, tradebook (#213) | branch k10-1-accounts | ✅ 930 Python + 247 UI tests; optional broker ports (Kite `/portfolio/holdings`, `/user/margins`, `/trades`; paper cash model `broker/paper_funds.py`); `PortfolioService`; Funds + Holdings widgets, Trades tab; mutations 25/27 (2 equivalent); real browser on the demo (`context/scripts/e2e-portfolio.cjs`); design `docs/design/portfolio.md` |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
@@ -111,39 +112,8 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
 ## Next
 **Where we are (15 Oct 2026, night):** K0–K9 are merged on `main` (K9.4 screens: PR #212). Safety fixes #206 and #207 are merged. Main CI is green. **Claude merges its own PRs once CI is green** (Ayush, 15 Oct). K10 issues exist: #213 (K10.1), #214 (K10.2), #215 (K10.3), #216 (K10.4), #217 (K10.5).
 
-1. **K10.1 (#213) is in progress on branch `k10-1-accounts`** (work in progress is pushed; nothing is merged yet). Done so far:
-   - `domain/portfolio.py`: `Holding` (with `t1_qty`, `used_qty`, P&L and day change from prices), `Funds` per segment (available, used, opening, collateral, labelled lines, `estimate` flag), `FundsLine`, `Trade` (with our `client_order_id` when MockTrade placed it), plus the `*_to_dict` helpers.
-   - `broker/base.py`: optional ports `HoldingsSource.holdings()`, `FundsSource.funds()` and `TradesSource.trades()`, like `GttBook`.
-   - `broker/kite/portfolio.py` (parsing `/portfolio/holdings`, `/user/margins` and `/trades`) and the `KiteBroker.holdings/funds/trades` methods (reads, retried). Kite's `net` and `debits` are shown as given and never re-added: the signs of Kite's M2M lines are Kite's.
-   - Still to do, with the design decided:
-     - **Paper broker** (DONE, pushed; `broker/paper_funds.py` + `PaperBroker.adopt/holdings/funds/trades`):
-       - Add `starting_paise` (default ₹10 lakh), a `clock`, and a `_trades` list recorded in `_fill`.
-       - Keep its own `PositionBook` fed by its fills; `positions()` reads from it.
-       - `adopt(carried, trades, holdings, earlier_pnl_paise)` replaces `adopt(positions)`. Carried positions are seeded at the close; today's trades come from the audit trail.
-       - `holdings()` = the adopted holdings, with `used_qty` = today's CNC sells, marked by `market_data.latest`.
-       - `funds()` = a cash model in a new `broker/paper_funds.py` with `PaperMargins`: CNC 100%, MIS equity 20%, futures 12% of value, short options 12% of the underlying (or the strike), long options the premium.
-         - opening cash = starting + earlier P&L − cost of holdings.
-         - available = opening + today's realised and unrealised − used.
-         - Per (instrument, product), used = max(m(q), m(q+buy leaves), m(q−sell leaves)).
-         - A CNC sell of holdings is a credit (shown as an available line "Holdings sold today"), never margin.
-         - `estimate=True`.
-     - **Recovery** (DONE, pushed) (non-durable branch): earlier days' CNC longs become paper **holdings**, not book positions, as at Kite. `earlier_pnl` = the earlier book's realised P&L + Σ carried non-CNC (close − avg)·qty. Then call the new `adopt`. Keep `tests/test_recovery.py` green.
-     - **Service** (DONE, pushed: `portfolio/service.py` `PortfolioService`, `AccountRuntime.portfolio`, REST + stream type "portfolio" {account_id, kind, items, as_of, error}, `MOCKTRADE_PAPER_FUNDS`, `tests/test_portfolio.py`), was planned as `AccountReads` per account, `AccountRuntime.reads`:
-       - Caches each port.
-       - Refreshes every 30 s, and 0.5 s (debounced) after any fill event.
-       - One read in flight per kind.
-       - On BrokerError keeps the last good values with `as_of` and `error` (stale), never empty.
-       - Re-marks holdings with live prices every 2 s and subscribes their instruments to market data.
-       - Maps trades' broker order ids to our client ids via the OrderManager.
-       - Pushes stream messages `funds` / `holdings` / `trades` only when changed.
-     - **REST** (DONE): `GET /api/accounts/{a}/funds|holdings|trades[?fresh=1]`. 404 "<broker> doesn't report holdings" when a port is missing, as GTT does.
-     - **UI**:
-       - Funds widget and Holdings widget (read-only, with "as of …" and the stale reason); a Trades tab in the order book; add them to the workspace defaults.
-       - Types in `api/types.ts`, store slices, session stream handling.
-       - Every figure comes from the server.
-     - **Tests**: fake Kite rows (including unreadable rows), a broker lacking each port, the paper cash model by hand (CNC buy, holdings sale credit, long option, future, short option, orders' worst case), recovery of holdings, the service's stale and refresh behaviour, REST and stream.
-     - Then a mutation script (`context/scripts/mutate-portfolio.py`; run it alone), an e2e browser check on the demo (`context/scripts/e2e-portfolio.cjs`), `docs/design/portfolio.md`, the context files, and a PR "Closes #213" → green CI → merge.
-2. **Then** K10.2 #214 charges (`ChargesModel` per segment; gross and net), K10.3 #215 EOD report and exports, K10.4 #216 pre-trade margin (broker margin API; `MarginQuoter`; paper can reuse `PaperMargins`), K10.5 #217 MTM watch and square-off before 15:20 IST.
+1. **K10.1 (#213) is done** on branch `k10-1-accounts` (PR "Closes #213"; merge on green CI if still open). See `docs/design/portfolio.md`: optional ports `FundsSource`/`HoldingsSource`/`TradesSource`; `PortfolioService` (`AccountRuntime.portfolio`: cached, one read per kind, stale-not-empty with `as_of`/`error`, refresh 0.5 s after fills, holdings live-marked); REST `GET /api/accounts/{a}/funds|holdings|trades[?fresh=true]`; stream type `portfolio`; paper money in `broker/paper_funds.py` (`PaperMargins`, `MOCKTRADE_PAPER_FUNDS`); recovery hands paper CNC over as holdings; UI `ui/src/widgets/portfolio/` (Funds, Holdings, TradesTable in the order book).
+2. **Next: K10.2 #214** charges (`ChargesModel` per segment; gross and net), K10.3 #215 EOD report and exports, K10.4 #216 pre-trade margin (broker margin API; `MarginQuoter`; paper can reuse `PaperMargins`), K10.5 #217 MTM watch and square-off before 15:20 IST.
 3. Then K11 research (tick recorder, replay into paper, backtest with the same algo engine), K12 charts & alerts, K13 admin & phone. See `docs/design/product-vision.md`.
 4. Ayush's own steps (not code): `docs/runbooks/server.md` (AWS Mumbai, static IP, Kite app ₹500/month, AMO check), then a real trading day; before selling to others: the broker's multi-user arrangement, exchange algo empanelment, licensed market data, legal review.
 
