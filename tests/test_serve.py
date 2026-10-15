@@ -21,6 +21,11 @@ def test_good_settings_and_their_defaults():
     assert s.origin == "https://trade.example.in"  # a trailing slash would break origin checks
     assert (s.host, s.port, s.prices, s.trusted_proxies) == ("127.0.0.1", 8000, "sim", "")
     assert s.cookie_secure
+    assert s.paper_funds_paise == 10_00_000_00  # ₹10 lakh of paper money
+    rich = ServeSettings.from_env(env(MOCKTRADE_PAPER_FUNDS="2500000"))
+    assert rich.paper_funds_paise == 25_00_000_00
+    with pytest.raises(ConfigError, match="MOCKTRADE_PAPER_FUNDS must be whole rupees"):
+        ServeSettings.from_env(env(MOCKTRADE_PAPER_FUNDS="1e6"))
 
 
 def test_plain_http_only_on_this_machine():

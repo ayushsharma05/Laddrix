@@ -21,6 +21,7 @@ from typing import Protocol, runtime_checkable
 from mocktrade.domain.gtt import GttRequest, GttSpec, GttView
 from mocktrade.domain.instruments import Instrument, InstrumentId
 from mocktrade.domain.orders import OrderRequest, OrderUpdate, Product
+from mocktrade.domain.portfolio import Funds, Holding, Trade
 
 
 class BrokerError(Exception):
@@ -73,6 +74,29 @@ class GttBook(Protocol):
 
     async def gtts(self) -> list[GttView]:
         """Every GTT the broker holds for this account, with its status."""
+        ...
+
+
+# What the account holds and owns (K10.1). Read-only, safe to ask again; each raises
+# BrokerError when the broker can't answer. A broker without one doesn't implement it.
+
+
+@runtime_checkable
+class HoldingsSource(Protocol):
+    async def holdings(self) -> list[Holding]: ...
+
+
+@runtime_checkable
+class FundsSource(Protocol):
+    async def funds(self) -> list[Funds]:
+        """One row per segment."""
+        ...
+
+
+@runtime_checkable
+class TradesSource(Protocol):
+    async def trades(self) -> list[Trade]:
+        """Today's fills, oldest first."""
         ...
 
 

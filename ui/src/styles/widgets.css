@@ -528,6 +528,12 @@ button.lc:disabled {
 .positions-row {
   grid-template-columns: minmax(110px, 1.4fr) 50px 64px 80px 80px minmax(84px, 1fr) minmax(84px, 1fr) minmax(84px, 1fr);
 }
+.holdings-row {
+  grid-template-columns: minmax(100px, 1.3fr) minmax(70px, 0.8fr) 76px 76px minmax(90px, 1fr) minmax(90px, 1fr) minmax(130px, 1.4fr) minmax(80px, 1fr);
+}
+.trades-row {
+  grid-template-columns: 64px minmax(110px, 1.4fr) 42px 48px 56px 84px minmax(96px, 1fr) minmax(90px, 1fr);
+}
 .messages-row {
   grid-template-columns: 68px 52px minmax(90px, 0.6fr) minmax(200px, 4fr);
 }
@@ -634,6 +640,12 @@ button.lc:disabled {
 }
 .book-scroll:has(.positions-row) {
   --min-row: 660px;
+}
+.book-scroll:has(.holdings-row) {
+  --min-row: 760px;
+}
+.book-scroll:has(.trades-row) {
+  --min-row: 620px;
 }
 .book-scroll:has(.audit-row) {
   --min-row: 900px;
@@ -1211,4 +1223,49 @@ label.algo-field {
   color: #fff;
   background: var(--bid);
   border-color: var(--work-buy);
+}
+
+/* Funds (widgets/portfolio/FundsPanel.tsx): one section per segment */
+.funds {
+  padding: 6px 10px;
+}
+.funds-segment h3 {
+  margin: 4px 0 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  letter-spacing: 0.04em;
+}
+.funds-segment h3 .algo-family {
+  margin-left: 8px;
+}
+.funds-heads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-bottom: 8px;
+}
+.funds-heads b {
+  font-size: 14px;
+  margin-left: 4px;
+}
+.funds-lines {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0 24px;
+  margin-bottom: 12px;
+}
+.funds-lines dl {
+  margin: 0;
+}
+.funds-lines dl > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--border);
+}
+.funds-lines dt {
+  color: var(--text-2);
+}
+.funds-lines dd {
+  margin: 0;
 }

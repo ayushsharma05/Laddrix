@@ -17,6 +17,7 @@ Settings (environment; secrets never on the command line):
                                           against live prices
     MOCKTRADE_HOLIDAYS         (none)     exchange holidays, e.g. 2026-10-21,2026-11-10
                                           (no morning reminders or price alerts on them)
+    MOCKTRADE_PAPER_FUNDS      1000000    each paper account's starting balance, rupees
     MOCKTRADE_ALERT_WEBHOOK    (none)     https:// address that gets WARN/ERROR alerts as
                                           JSON {"text": ...} (Slack, ntfy, Google Chat...)
     KITE_API_KEY, KITE_API_SECRET         the Kite Connect app (kite mode). One account with
@@ -93,6 +94,7 @@ class ServeSettings:
     holidays: frozenset = frozenset()  # exchange holidays (no morning jobs or alerts)
     alert_webhook: str = ""  # alerts to a phone: Slack, ntfy, Google Chat... (JSON POST)
     kite_env: tuple[tuple[str, str], ...] = ()  # the KITE_* settings (kite mode)
+    paper_funds_paise: int = 10_00_000_00  # each paper account's starting balance
 
     def kite_url(self, name: str, default: str) -> str:
         """KITE_API_URL / KITE_WS_URL: only to point at a Kite simulator (load tests)."""
@@ -156,6 +158,11 @@ class ServeSettings:
         hook = env.get("MOCKTRADE_ALERT_WEBHOOK", "")
         if hook and not hook.startswith("https://"):
             problems.append("MOCKTRADE_ALERT_WEBHOOK must be an https:// address")
+        funds_text = env.get("MOCKTRADE_PAPER_FUNDS", "1000000")
+        if not funds_text.isdigit() or int(funds_text) <= 0:
+            problems.append(
+                f"MOCKTRADE_PAPER_FUNDS must be whole rupees above 0, got {funds_text!r}"
+            )
         if problems:
             raise ConfigError("; ".join(problems))
         return cls(
@@ -170,6 +177,7 @@ class ServeSettings:
             holidays=holidays,
             alert_webhook=env.get("MOCKTRADE_ALERT_WEBHOOK", ""),
             kite_env=kite_env,
+            paper_funds_paise=int(funds_text) * 100,
         )
 
 
@@ -249,7 +257,9 @@ def build(settings: ServeSettings) -> Assembly:
     ids = ClientIds(day, events.last_counter(day))  # one sequence for the day, all accounts
     for account in accounts:
         if account.broker == "paper":
-            broker = PaperBroker(md, instruments, name="paper")
+            broker = PaperBroker(
+                md, instruments, name="paper", starting_paise=settings.paper_funds_paise
+            )
             broker.start()
             brokers.append(broker)
         elif account.broker == "kite" and kite is not None:

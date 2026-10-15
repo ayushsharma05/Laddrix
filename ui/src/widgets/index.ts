@@ -8,5 +8,7 @@ import "./books/Messages";
 import "./ticket/Ticket";
 import "./algos/AlgoManager";
 import "./gtt/GttBook";
+import "./portfolio/FundsPanel";
+import "./portfolio/HoldingsPanel";
 import "./chain/OptionChain";
 import "./strategy/StrategyBuilder";

@@ -42,6 +42,7 @@ from mocktrade.options.chain import ChainService, ChainWatch
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import EventKind, OrderEvent
 from mocktrade.platform import AccountRuntime, Platform
+from mocktrade.portfolio.service import Snapshot, snapshot_to_dict
 from mocktrade.positions.book import PositionView
 from mocktrade.positions.reconcile import Mismatch
 from mocktrade.risk.kill_switch import KillState
@@ -139,6 +140,8 @@ class StreamHub:
         runtime.algos.subscribe(self._on_algo)
         if runtime.gtt is not None:
             runtime.gtt.subscribe(self._on_gtt)
+        if runtime.portfolio is not None:
+            runtime.portfolio.subscribe(self._on_portfolio)
 
     # --- one browser tab ----------------------------------------------------------------------
 
@@ -395,6 +398,13 @@ class StreamHub:
         """GTT changes (placed, changed, fired, deleted): never conflated or dropped."""
         account_id = view.request.account_id
         message = {"type": "gtt", "account_id": account_id, "gtt": gtt_to_dict(view)}
+        for connection in list(self._connections):
+            if account_id in connection.accounts:
+                connection.put(message)
+
+    def _on_portfolio(self, account_id: str, snapshot: Snapshot) -> None:
+        """Funds, holdings or trades changed: the whole list (they're short), never dropped."""
+        message = {"type": "portfolio", **snapshot_to_dict(account_id, snapshot)}
         for connection in list(self._connections):
             if account_id in connection.accounts:
                 connection.put(message)

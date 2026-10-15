@@ -67,7 +67,8 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | Fix: rebuild state after a restart (#206) | #209 merged | ✅ 878 Python; 12/12 mutations (`context/scripts/mutate-recovery.py`); real demo restart: position, P&L and orders back, resting paper order closed with the reason |
 | K9.2 Protection: trailing stop, OCO, bracket (#200) | #210 merged | ✅ 15 new tests; mutation check `context/scripts/mutate-protect.py`; real browser: bracket entered at market with target and stop, trailing stop following the highs (`context/scripts/e2e-protect.cjs`) |
 | K9.3 GTT at the broker (#201) | #211 merged | ✅ 914 Python; GTT spec + risk at the trigger; Kite /gtt/triggers; paper simulation; fired orders adopted; design `docs/design/gtt.md` |
-| K9.4 Orders+ screens (#202) | branch k9-4-screens | ✅ 239 UI tests; real browser: GTT OCO from the book, trailing stop and GTT from the ticket tabs, algos grouped by family (`context/scripts/e2e-orders-plus.cjs`) |
+| K9.4 Orders+ screens (#202) | #212 merged | ✅ 239 UI tests; real browser: GTT OCO from the book, trailing stop and GTT from the ticket tabs, algos grouped by family (`context/scripts/e2e-orders-plus.cjs`) |
+| K10.1 Funds, holdings, tradebook (#213) | branch k10-1-accounts | ✅ 930 Python + 247 UI tests; optional broker ports (Kite `/portfolio/holdings`, `/user/margins`, `/trades`; paper cash model `broker/paper_funds.py`); `PortfolioService`; Funds + Holdings widgets, Trades tab; mutations 25/27 (2 equivalent); real browser on the demo (`context/scripts/e2e-portfolio.cjs`); design `docs/design/portfolio.md` |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
@@ -109,17 +110,12 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-**Where we are (15 Oct 2026, late):** K0–K9 are done on `main` except the K9.4 screens PR (#202, branch `k9-4-screens`). Safety fixes #206 and #207 are merged. Main CI green. **Claude merges its own PRs once CI is green** (Ayush, 15 Oct); Claude also opens the issues for each milestone before coding.
+**Where we are (15 Oct 2026, night):** K0–K9 are merged on `main` (K9.4 screens: PR #212). Safety fixes #206 and #207 are merged. Main CI is green. **Claude merges its own PRs once CI is green** (Ayush, 15 Oct). K10 issues exist: #213 (K10.1), #214 (K10.2), #215 (K10.3), #216 (K10.4), #217 (K10.5).
 
-1. **Finish #202** if its PR is still open: CI green → merge. What it adds: GTT Book widget (`ui/src/widgets/gtt/`), GTT tab and Algo tab in the ticket (`TicketParams.mode`), algo picker grouped by `family`, "held" tag on protection algos, GTT spec now publishes `legs` and `labels` per kind.
-2. **Then K10 Accounts & reports.** Create its issues first (issue → branch from main → PR with `Closes #N` → green CI → merge). Planned issues:
-   - K10.1 holdings, funds/margins and the tradebook from the broker (`Broker` optional ports like `GttBook`; Kite `/portfolio/holdings`, `/user/margins`, `/trades`; paper equivalents) + screens.
-   - K10.2 charges estimator (brokerage, STT/CTT, exchange transaction charges, SEBI fee, stamp duty, GST) as a replaceable `ChargesModel` published per segment; positions and P&L show gross and net.
-   - K10.3 end-of-day report and P&L by day / instrument / strategy (from the audit trail), CSV and PDF export.
-   - K10.4 pre-trade margin check (broker margin API; `MarginQuoter` exists for baskets) in the ticket and the risk gate.
-   - K10.5 MTM watch: per-position and portfolio stop, square-off assistant before the MIS cut-off (15:20 IST).
-3. Then K11 research (tick recorder, replay into paper, backtest with the same algo engine), K12 charts & alerts (charts with trade marks, price/%/volume/OI alerts in app and by webhook, time & sales, depth, movers), K13 admin & phone (admin panel, per-user limits, phone screens, keyboard shortcut editor, themes). About 16 issues in all; see `docs/design/product-vision.md`.
-4. Ayush's own steps (not code): `docs/runbooks/server.md` (AWS Mumbai, static IP, Kite app ₹500/month, AMO check), then a real trading day; before selling to others: broker multi-user arrangement, exchange algo empanelment, licensed market data, legal review.
+1. **K10.1 (#213) is done** on branch `k10-1-accounts` (PR "Closes #213"; merge on green CI if still open). See `docs/design/portfolio.md`: optional ports `FundsSource`/`HoldingsSource`/`TradesSource`; `PortfolioService` (`AccountRuntime.portfolio`: cached, one read per kind, stale-not-empty with `as_of`/`error`, refresh 0.5 s after fills, holdings live-marked); REST `GET /api/accounts/{a}/funds|holdings|trades[?fresh=true]`; stream type `portfolio`; paper money in `broker/paper_funds.py` (`PaperMargins`, `MOCKTRADE_PAPER_FUNDS`); recovery hands paper CNC over as holdings; UI `ui/src/widgets/portfolio/` (Funds, Holdings, TradesTable in the order book).
+2. **Next: K10.2 #214** charges (`ChargesModel` per segment; gross and net), K10.3 #215 EOD report and exports, K10.4 #216 pre-trade margin (broker margin API; `MarginQuoter`; paper can reuse `PaperMargins`), K10.5 #217 MTM watch and square-off before 15:20 IST.
+3. Then K11 research (tick recorder, replay into paper, backtest with the same algo engine), K12 charts & alerts, K13 admin & phone. See `docs/design/product-vision.md`.
+4. Ayush's own steps (not code): `docs/runbooks/server.md` (AWS Mumbai, static IP, Kite app ₹500/month, AMO check), then a real trading day; before selling to others: the broker's multi-user arrangement, exchange algo empanelment, licensed market data, legal review.
 
 **How each piece is built (keep the quality):** brainstorm the traps → code with the "backend provides, frontend displays" rule (specs from the server, no market rules in the UI) → Python tests + UI tests → a mutation script in `context/scripts/mutate-*.py` (restores files in `finally`, a hang counts as caught; **run one at a time, never kill one mid-run**: it can leave a mutant in the source) → real browser or real server check against the demo (`context/scripts/e2e-*.cjs`) → docs in `docs/design/` → context files → PR → green CI → merge.
 

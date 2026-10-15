@@ -35,3 +35,5 @@ The scripts assume the cloud container's paths (`/home/user/MockTrade`, Playwrig
 TOTP codes work only once (replay protection) and 5 failures lock the user for 15 minutes:
 scripts must use a fresh code each login, and `python -m mocktrade.tools.demo --code` must run
 from the repo root (elsewhere it creates a second demo user with a different secret).
+| `mutate-portfolio.py` | 27 mutations of funds, holdings and the tradebook (paper money, recovery hand-over, service, Kite parsing); 25 caught, 2 equivalent | `python3 context/scripts/mutate-portfolio.py` (alone) |
+| `e2e-portfolio.cjs` | Real browser on a fresh demo: funds before/after a 75-lot buy, the tradebook, holdings, then the Trades tab, Funds and Holdings on screen | `node context/scripts/e2e-portfolio.cjs` |

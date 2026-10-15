@@ -29,6 +29,7 @@ from mocktrade.orders.gate import Gates
 from mocktrade.orders.gtt import GttService
 from mocktrade.orders.manager import OrderManager
 from mocktrade.orders.model import ClientIds
+from mocktrade.portfolio.service import PortfolioService
 from mocktrade.positions.book import PositionBook
 from mocktrade.positions.reconcile import PositionReconciler
 from mocktrade.recovery import RecoveryGate, recover, recover_until_done, session_start
@@ -58,6 +59,7 @@ class AccountRuntime:
     baskets: Baskets
     recovery: RecoveryGate | None = None  # set when the account rebuilds its state at start
     gtt: GttService | None = None  # when the broker holds GTT orders
+    portfolio: PortfolioService | None = None  # funds, holdings, trades (what the broker offers)
 
 
 @dataclass
@@ -91,6 +93,8 @@ class Platform:
                 loops.append(self._recover(runtime))
             if runtime.gtt is not None:
                 loops.append(self._after_recovery(runtime, runtime.gtt.run))
+            if runtime.portfolio is not None:
+                loops.append(self._after_recovery(runtime, runtime.portfolio.run))
             if reconcile:
                 loops.append(self._after_recovery(runtime, runtime.reconciler.run))
         await asyncio.gather(*loops)
@@ -345,6 +349,15 @@ class Platform:
                 account.id, broker, orders, risk, self.instruments.get, self.market_data.latest,
                 audit=gtt_audit, clock=clock,
             )  # fmt: skip
+
+        def client_id_of(broker_order_id: str) -> str | None:
+            view = orders.by_broker_id(broker_order_id)
+            return view.client_order_id if view is not None else None
+
+        portfolio = PortfolioService(
+            account.id, broker, self.market_data, client_id_of=client_id_of, clock=clock
+        )
+        orders.subscribe(portfolio.on_order_event)
         runtime = AccountRuntime(
             account,
             broker,
@@ -359,6 +372,7 @@ class Platform:
             baskets,
             recovery,
             gtt,
+            portfolio,
         )
         self.accounts[account.id] = runtime
         return runtime

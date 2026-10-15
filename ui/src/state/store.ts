@@ -11,7 +11,7 @@
 // (docs/design/stream.md, "After every (re)connect").
 
 import type { Status } from "../api/stream";
-import type { AlgoView, GttView, Me, OrderView, Position, PositionsSnapshot, ServerMessage, StrategyLegIn } from "../api/types";
+import type { AlgoView, GttView, Me, PortfolioKind, PortfolioSnapshot, OrderView, Position, PositionsSnapshot, ServerMessage, StrategyLegIn } from "../api/types";
 import { price, qty, shortName } from "../lib/format";
 
 export type Level = "ERROR" | "WARN" | "INFO" | "OK";
@@ -46,6 +46,8 @@ export interface AccountBook {
   kill: KillState;
   algos: Record<string, AlgoView>; // by algo_id
   gtts: Record<string, GttView>; // by gtt_id
+  portfolio: Partial<Record<PortfolioKind, PortfolioSnapshot>>; // funds, holdings, trades
+  missing: Partial<Record<PortfolioKind, string>>; // what this broker doesn't report, and why
 }
 
 export interface State {
@@ -73,7 +75,7 @@ export const MAX_MESSAGES = 500;
 const OFF: KillState = { engaged: false, reason: "", by: "" };
 
 export function emptyBook(): AccountBook {
-  return { orders: {}, positions: {}, dayPnl: 0, reconcile: null, alerts: {}, kill: OFF, algos: {}, gtts: {} };
+  return { orders: {}, positions: {}, dayPnl: 0, reconcile: null, alerts: {}, kill: OFF, algos: {}, gtts: {}, portfolio: {}, missing: {} };
 }
 
 export function positionKey(p: { instrument_id: string; product: string }): string {
@@ -192,6 +194,21 @@ export class Store {
     });
   }
 
+  /** Funds, holdings or trades: the newest read wins (a slow REST answer can't undo a push). */
+  applyPortfolio(snapshot: PortfolioSnapshot): void {
+    const book = this.book(snapshot.account_id);
+    const old = book.portfolio[snapshot.kind];
+    // older figures never replace newer ones; the same read with a new error does
+    if (old?.as_of && (!snapshot.as_of || Date.parse(snapshot.as_of) < Date.parse(old.as_of))) return;
+    this.setBook(snapshot.account_id, { portfolio: { ...book.portfolio, [snapshot.kind]: snapshot } });
+  }
+
+  /** The broker doesn't report this (the server said 404, in words). */
+  portfolioMissing(accountId: string, kind: PortfolioKind, why: string): void {
+    const book = this.book(accountId);
+    this.setBook(accountId, { missing: { ...book.missing, [kind]: why } });
+  }
+
   applyGtts(accountId: string, gtts: GttView[]): void {
     const merged = { ...this.book(accountId).gtts };
     for (const g of gtts) {
@@ -281,6 +298,11 @@ export class Store {
         const note = describeAlgoEvent(m.kind, m.detail, m.algo);
         if (note) this.addMessage(note.level, m.algo.instrument_id, note.text);
         return;
+      }
+      case "portfolio": {
+        const { type: _type, ...snapshot } = m;
+        this.applyPortfolio(snapshot);
+        break;
       }
       case "gtt": {
         const before = this.book(m.account_id).gtts[m.gtt.gtt_id];

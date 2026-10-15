@@ -46,6 +46,7 @@ from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.gtt import GttError, gtt_request_from
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
+from mocktrade.portfolio.service import PortfolioError, snapshot_to_dict
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.server import security
 from mocktrade.server.formats import algo_to_dict, position_to_dict
@@ -357,6 +358,30 @@ def create_app(
             },
             201,
         )
+
+    # --- funds, holdings, tradebook (read-only, from the broker) ------------------------------
+
+    async def portfolio(account_id: str, kind: str, fresh: bool, user: User) -> dict[str, Any]:
+        running = runtime(account_id, user)
+        if running.portfolio is None:
+            raise HTTPException(404, f"{running.broker.name} doesn't report {kind}")
+        try:
+            snapshot = await running.portfolio.read(kind, fresh=fresh)
+        except PortfolioError as exc:
+            raise HTTPException(404, str(exc)) from None
+        return snapshot_to_dict(account_id, snapshot)
+
+    @app.get("/api/accounts/{account_id}/funds")
+    async def funds(account_id: str, user: Me, fresh: bool = False) -> dict[str, Any]:
+        return await portfolio(account_id, "funds", fresh, user)
+
+    @app.get("/api/accounts/{account_id}/holdings")
+    async def holdings(account_id: str, user: Me, fresh: bool = False) -> dict[str, Any]:
+        return await portfolio(account_id, "holdings", fresh, user)
+
+    @app.get("/api/accounts/{account_id}/trades")
+    async def trades(account_id: str, user: Me, fresh: bool = False) -> dict[str, Any]:
+        return await portfolio(account_id, "trades", fresh, user)
 
     # --- GTT (held by the broker) ------------------------------------------------------------
 
