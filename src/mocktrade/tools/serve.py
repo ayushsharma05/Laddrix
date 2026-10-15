@@ -258,7 +258,10 @@ def build(settings: ServeSettings) -> Assembly:
             not_running[account.id] = f"{account.broker} accounts need MOCKTRADE_PRICES=kite"
             log.warning("account %s not started: %s", account.id, not_running[account.id])
             continue
-        platform.add_account(account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN)
+        platform.add_account(
+            account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN,
+            recover_on_start=True,  # no new orders until rebuilt and checked (recovery.py)
+        )  # fmt: skip
         running.append(account.id)
     if kite is not None:
         platform_ref.append(platform)
@@ -275,6 +278,12 @@ def build(settings: ServeSettings) -> Assembly:
     notifier = WebhookNotifier(settings.alert_webhook) if settings.alert_webhook else None
     if notifier is not None:
         alerts.subscribe(notifier)
+    for account_id in running:
+        gate = platform.accounts[account_id].recovery
+        if gate is not None:
+            gate.subscribe(
+                lambda state, reason, a=account_id: _recovery_alert(alerts, a, state, reason)
+            )
     checks = Checks(
         alerts,
         md,
@@ -306,6 +315,15 @@ def build(settings: ServeSettings) -> Assembly:
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)
     built.alerts, built.notifier = alerts, notifier
     return built
+
+
+def _recovery_alert(alerts: Alerts, account_id: str, state: str, reason: str) -> None:
+    """A failed recovery keeps the account shut: someone must look, so say it loudly."""
+    key = f"recovery:{account_id}"
+    if state == "failed":
+        alerts.raise_(key, "ERROR", f"{account_id}: trading stays paused after a restart: {reason}")
+    elif state == "ok":
+        alerts.clear(key, f"{account_id}: orders and positions rebuilt after the restart")
 
 
 async def _resync(account_id: str, orders) -> None:

@@ -211,6 +211,13 @@ class PaperBroker:
     async def orders(self) -> list[OrderUpdate]:
         return [self._snapshot(o) for o in self._orders.values()]
 
+    durable = False  # its orders live in memory: a restart forgets them (recovery.py)
+
+    def adopt(self, positions: dict[InstrumentId, tuple[int, int]]) -> None:
+        """After a restart: the positions MockTrade rebuilt from its audit trail (net qty,
+        average price), as the paper exchange's own carried positions."""
+        self._adopted = {i: v for i, v in positions.items() if v[0]}
+
     async def positions(self) -> list[BrokerPosition]:
         totals: dict[InstrumentId, list[int]] = {}  # id -> [net qty, buy qty, buy notional, ...]
         for order in self._orders.values():
@@ -234,6 +241,17 @@ class PaperBroker:
             else:
                 avg = 0
             result.append(BrokerPosition(instrument_id, net, avg))
+        adopted = getattr(self, "_adopted", {})
+        if adopted:  # carried positions plus today's paper fills (average: approximate)
+            by_id = {p.instrument_id: p for p in result}
+            for instrument_id, (qty, avg) in adopted.items():
+                now = by_id.get(instrument_id)
+                by_id[instrument_id] = BrokerPosition(
+                    instrument_id,
+                    qty + (now.qty if now else 0),
+                    now.avg_price_paise if now and now.qty else avg,
+                )
+            result = [by_id[i] for i in sorted(by_id)]
         return result
 
     # --- running against live prices ---------------------------------------------------

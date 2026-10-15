@@ -72,3 +72,30 @@ Kite's. The Recon light is red.
 - **Resume:** the account owner, risk or an admin uses the STOPPED button. For the firm switch,
   only an admin can resume. Each reset is in the audit trail with who and when.
 - Positions are not closed for you. Close them deliberately (ladder or ticket), or leave them.
+
+## Trading paused after a restart
+
+**What you see:** orders refused with "trading is paused after a restart: …", and on a
+failure an ERROR alert "trading stays paused after a restart". `GET /api/accounts/{a}/positions`
+shows `recovery: {state, reason}`.
+
+**Why:** at start each account rebuilds its orders and positions from the audit trail and
+checks them against the broker before taking new orders (`src/mocktrade/recovery.py`).
+Cancels always go through.
+
+| `recovery.state` | Meaning | Do |
+|---|---|---|
+| `recovering`, "waiting for the broker" | the broker can't be asked yet (Kite: before the daily login) | log in to Kite; it retries every 10 s |
+| `ok` | rebuilt and matching; the reason says how many orders, fills and carried positions | nothing |
+| `failed` | a working order the broker doesn't list, or a position that differs | below |
+
+**When it failed:** compare the broker's own order book and positions (Kite console) with
+MockTrade's order book and the reason. A difference means a trade made outside MockTrade,
+or a lost update. Settle it at the broker if needed (cancel the stray order, close or
+match the position), then **restart the server**: recovery runs again from the start.
+Nothing is adopted silently: a person decides.
+
+Paper accounts: the paper broker keeps its orders in memory, so working paper orders are
+closed at a restart ("the paper broker restarted: paper orders don't survive a restart");
+positions and today's P&L come back from the audit trail.
+

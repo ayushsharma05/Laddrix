@@ -30,6 +30,7 @@ from mocktrade.orders.manager import OrderManager
 from mocktrade.orders.model import ClientIds
 from mocktrade.positions.book import PositionBook
 from mocktrade.positions.reconcile import PositionReconciler
+from mocktrade.recovery import RecoveryGate, recover, recover_until_done, session_start
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.risk.checks import RiskGate
 from mocktrade.risk.kill_switch import KillSwitch
@@ -52,6 +53,7 @@ class AccountRuntime:
     loss_watch: DailyLossWatch | None
     algos: AlgoEngine
     baskets: Baskets
+    recovery: RecoveryGate | None = None  # set when the account rebuilds its state at start
 
 
 @dataclass
@@ -81,13 +83,53 @@ class Platform:
         for runtime in self.accounts.values():
             loops.append(runtime.orders.run())
             loops.append(self._run_algos(runtime))
+            if runtime.recovery is not None:
+                loops.append(self._recover(runtime))
             if reconcile:
-                loops.append(runtime.reconciler.run())
+                loops.append(self._after_recovery(runtime, runtime.reconciler.run))
         await asyncio.gather(*loops)
+
+    async def _recover(self, runtime: AccountRuntime, retry_s: float = 10.0) -> None:
+        """Rebuild the account from the audit trail and the broker (recovery.py)."""
+        assert runtime.recovery is not None and self.event_log is not None
+        log, account_id = self.event_log, runtime.account.id
+
+        def close(instrument_id: str) -> int | None:
+            tick = self.market_data.latest(instrument_id)
+            return tick.close_paise if tick is not None else None
+
+        def attempt():
+            return recover(
+                account_id,
+                runtime.orders,
+                runtime.positions,
+                runtime.broker,
+                log,
+                since=session_start(datetime.now(UTC)),
+                close=close,
+                latest=self.market_data.latest,
+            )
+
+        await recover_until_done(
+            runtime.recovery,
+            attempt,
+            retry_s=retry_s,
+            audit=lambda kind, detail: log.record_note(kind, account_id, detail),
+        )
+
+    @staticmethod
+    async def _after_recovery(runtime: AccountRuntime, loop) -> None:
+        """Position checks start once the state is rebuilt (an empty book would mismatch)."""
+        if runtime.recovery is not None:
+            await runtime.recovery.finished.wait()
+        await loop()
 
     @staticmethod
     async def _run_algos(runtime: AccountRuntime) -> None:
-        """Algos don't survive a restart: cancel their leftover children, then run."""
+        """Algos don't survive a restart: once the broker has said what happened to every
+        order (recovery), cancel their leftover children, then run."""
+        if runtime.recovery is not None:
+            await runtime.recovery.finished.wait()
         await runtime.algos.cancel_orphans()
         await runtime.algos.run()
 
@@ -181,7 +223,13 @@ class Platform:
         throttle: OrderThrottle | None = None,
         algo_types: tuple[AlgoType, ...] = (),
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        recover_on_start: bool = False,
     ) -> AccountRuntime:
+        """`recover_on_start`: the server's setting. The account takes no new orders until
+        its orders and positions are rebuilt from the audit trail and checked against the
+        broker (recovery.py). Needs the event log."""
+        if recover_on_start and self.event_log is None:
+            raise ValueError("recovery after a restart needs the event log")
         if account.id in self.accounts:
             raise ValueError(f"account {account.id} is already running")
         limits = limits or RiskLimits()
@@ -200,12 +248,13 @@ class Platform:
             positions=book.net_by_instrument,
         )
         throttle = throttle or OrderThrottle()
+        recovery = RecoveryGate() if recover_on_start else None
         orders = OrderManager(
             account.id,
             broker,
             self.instruments.get,
             ids=ids,
-            gate=Gates([risk, throttle]),
+            gate=Gates([recovery, risk, throttle] if recovery else [risk, throttle]),
             spec=spec_of(broker),
             clock=clock,
         )
@@ -262,6 +311,7 @@ class Platform:
             loss_watch,
             algos,
             baskets,
+            recovery,
         )
         self.accounts[account.id] = runtime
         return runtime

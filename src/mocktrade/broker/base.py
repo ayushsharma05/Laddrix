@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from mocktrade.domain.instruments import InstrumentId
-from mocktrade.domain.orders import OrderRequest, OrderUpdate
+from mocktrade.domain.orders import OrderRequest, OrderUpdate, Product
 
 
 class BrokerError(Exception):
@@ -37,6 +37,9 @@ class BrokerPosition:
     instrument_id: InstrumentId
     qty: int  # positive long, negative short
     avg_price_paise: int
+    overnight_qty: int = 0  # carried in from earlier days (part of qty)
+    close_paise: int = 0  # the previous close, for valuing what was carried in
+    product: Product | None = None
 
 
 @dataclass(frozen=True)

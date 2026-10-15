@@ -307,6 +307,13 @@ class EventLog:
                   ORDER BY seq DESC LIMIT ?"""
         return self._query(sql, (top, *names, limit))
 
+    def fills(self, account_id: str) -> list[StoredEvent]:
+        """Every fill of one account, oldest first (rebuilding positions after a restart)."""
+        return self._query(
+            "SELECT * FROM events WHERE account_id = ? AND kind = ? ORDER BY seq",
+            (account_id, EventKind.FILL.value),
+        )
+
     def latest_views(self, account_id: str, *, since: datetime | None = None) -> list[OrderView]:
         """Each order's newest known state, oldest order first (rebuilding after a restart).
 

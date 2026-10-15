@@ -63,6 +63,7 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | K8.4 Strategy builder (#192) | #197 (base k8-3-chain-widget, branch k8-4-strategy) | ✅ 835 Python + 222 UI tests, 13/13 mutations; real browser: iron condor payoff, Alt-click legs from the chain |
 | K8.5 Baskets (#193) | #198 (base k8-4-strategy, branch k8-5-baskets) | ✅ 844 Python + 224 UI tests; covered-short risk rule; real browser: iron condor checked and sent as one basket |
 | K9.1 Execution algos (#199) | #203 (base k8-5-baskets, branch k9-1-exec-algos) | ✅ 867 Python + 225 UI; 17/17 mutations; real browser: TWAP, iceberg and POV run to Done |
+| Fix: rebuild state after a restart (#206) | branch fix-206-restore (from main) | ✅ 878 Python; 12/12 mutations (`context/scripts/mutate-recovery.py`); real demo restart: position, P&L and orders back, resting paper order closed with the reason |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 

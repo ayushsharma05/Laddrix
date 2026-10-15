@@ -595,6 +595,11 @@ def create_app(
             "realised_paise": book.realised_paise(),
             "unrealised_paise": book.unrealised_paise(),
             "day_pnl_paise": book.day_pnl_paise(),
+            "recovery": (
+                {"state": running.recovery.state, "reason": running.recovery.reason}
+                if running.recovery is not None
+                else None
+            ),
             "reconcile": {
                 "checked_at": last.checked_at.isoformat() if last else None,
                 "ok": last.ok if last else None,
