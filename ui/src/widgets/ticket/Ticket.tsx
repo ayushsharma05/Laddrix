@@ -3,13 +3,14 @@
 //   NIFTY26OCTFUT · LTP 25,010.00 · bid 25,010.00 / ask 25,010.10
 //   [ BUY ][ SELL ]   Lots [−] 2 [+] = 150      Type LMT MKT SL SL-M
 //   Price  [−] 25,010.00 [+]      Trigger [−] 25,015.00 [+]     TIF  Prod  Acct
-//   Value ₹37,51,500.00 · worst position +225 · +0.00% from last
+//   Value ₹37,51,500.00 · charges ≈ ₹21.40 · worst position +225 · +0.00% from last
 //   [ BUY 150 NIFTY26OCTFUT @ 25,010.00 ]     → over "confirm over": [CONFIRM BUY 150] [Back]
 //
 // Enter sends, Esc clears, ↑/↓ move the price one tick. The same gate as the ladder
 // (tradingBlock) runs before every send, and the server checks everything again.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { chargeLines, useChargeEstimate } from "./useChargeEstimate";
 import { ApiError } from "../../api/rest";
 import type { Instrument, OrderSpec, OrderView, Side } from "../../api/types";
 import { useApp, useInstrument, useOrderSpec, useStore, useTick } from "../../app/context";
@@ -126,6 +127,13 @@ function TicketBody({
   );
   const summary = summarise(input, ltp, position, workingSameSide);
   const qty = lots * spec.lot_size;
+  const charges = useChargeEstimate(accountId, {
+    instrumentId: id,
+    side,
+    qty,
+    pricePaise: summary.value !== null && qty ? Math.round(summary.value / qty) : null,
+    product,
+  });
   const what = `${side} ${fmtQty(qty)} ${instrument.symbol}${needsPrice(type) && price !== null ? ` @ ${fmtPrice(price)}` : ` ${type.label}`}${needsTrigger(type) && trigger !== null ? ` trigger ${fmtPrice(trigger)}` : ""}`;
 
   const signature = JSON.stringify([side, priceText, triggerText, lots, type.code, tif, product, accountId]);
@@ -353,6 +361,9 @@ function TicketBody({
       <div className="ticket-summary" aria-label="Order summary">
         <span>
           Value <b>{summary.value !== null ? rupees(summary.value) : "–"}</b>
+        </span>
+        <span title={charges ? chargeLines(charges, fmtPrice) : "Charges if it fills in full (brokerage, taxes, fees)"}>
+          Charges ≈ <b>{charges ? rupees(charges.total_paise) : "–"}</b>
         </span>
         <span>
           Worst position{" "}
