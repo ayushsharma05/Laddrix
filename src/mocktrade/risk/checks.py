@@ -93,6 +93,16 @@ class RiskGate:
             self._working = real
         return results
 
+    async def admit_at(self, request: OrderRequest, ltp_paise: int) -> str | None:
+        """The checks for an order that will only be placed when the price reaches
+        `ltp_paise` (a GTT leg at its trigger): price bands and values are judged there."""
+        real = self._price
+        try:
+            self._price = lambda i: Tick(i, ltp_paise) if i == request.instrument_id else real(i)
+            return await self.admit_new(request)
+        finally:
+            self._price = real
+
     async def admit_modify(self, order: OrderView, new: OrderRequest) -> str | None:
         instrument = self._instrument(new.instrument_id)
         if instrument is None:

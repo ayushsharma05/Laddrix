@@ -33,6 +33,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from mocktrade.algos.engine import AlgoEvent
 from mocktrade.domain.accounts import User, can_view
+from mocktrade.domain.gtt import GttView, gtt_to_dict
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import Subscription
 from mocktrade.metrics import METRICS, since_us
@@ -136,6 +137,8 @@ class StreamHub:
             lambda what, mismatch: self._on_alert(account_id, what, mismatch)
         )
         runtime.algos.subscribe(self._on_algo)
+        if runtime.gtt is not None:
+            runtime.gtt.subscribe(self._on_gtt)
 
     # --- one browser tab ----------------------------------------------------------------------
 
@@ -386,6 +389,14 @@ class StreamHub:
         }
         for connection in list(self._connections):
             if event.algo.account_id in connection.accounts:
+                connection.put(message)
+
+    def _on_gtt(self, view: GttView) -> None:
+        """GTT changes (placed, changed, fired, deleted): never conflated or dropped."""
+        account_id = view.request.account_id
+        message = {"type": "gtt", "account_id": account_id, "gtt": gtt_to_dict(view)}
+        for connection in list(self._connections):
+            if account_id in connection.accounts:
                 connection.put(message)
 
     def _on_kill(self, name: str, state: KillState) -> None:

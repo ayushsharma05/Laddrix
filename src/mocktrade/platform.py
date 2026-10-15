@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from mocktrade.algos.engine import AlgoEngine, AlgoEvent, AlgoType
-from mocktrade.broker.base import Broker
+from mocktrade.broker.base import Broker, GttBook
 from mocktrade.broker.rules import order_spec
 from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.domain.instruments import Instrument
@@ -26,6 +26,7 @@ from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
 from mocktrade.orders.basket import Baskets
 from mocktrade.orders.gate import Gates
+from mocktrade.orders.gtt import GttService
 from mocktrade.orders.manager import OrderManager
 from mocktrade.orders.model import ClientIds
 from mocktrade.positions.book import PositionBook
@@ -56,6 +57,7 @@ class AccountRuntime:
     algos: AlgoEngine
     baskets: Baskets
     recovery: RecoveryGate | None = None  # set when the account rebuilds its state at start
+    gtt: GttService | None = None  # when the broker holds GTT orders
 
 
 @dataclass
@@ -87,6 +89,8 @@ class Platform:
             loops.append(self._run_algos(runtime))
             if runtime.recovery is not None:
                 loops.append(self._recover(runtime))
+            if runtime.gtt is not None:
+                loops.append(self._after_recovery(runtime, runtime.gtt.run))
             if reconcile:
                 loops.append(self._after_recovery(runtime, runtime.reconciler.run))
         await asyncio.gather(*loops)
@@ -328,6 +332,19 @@ class Platform:
             self.market_data.latest,
             audit=basket_audit,
         )
+        gtt = None
+        if isinstance(broker, GttBook):
+            gtt_audit = None
+            if self.event_log is not None:
+                log = self.event_log
+
+                def gtt_audit(kind: str, detail: str, extra: dict) -> None:
+                    log.record_note(kind, account.id, detail, extra)
+
+            gtt = GttService(
+                account.id, broker, orders, risk, self.instruments.get, self.market_data.latest,
+                audit=gtt_audit, clock=clock,
+            )  # fmt: skip
         runtime = AccountRuntime(
             account,
             broker,
@@ -341,6 +358,7 @@ class Platform:
             algos,
             baskets,
             recovery,
+            gtt,
         )
         self.accounts[account.id] = runtime
         return runtime

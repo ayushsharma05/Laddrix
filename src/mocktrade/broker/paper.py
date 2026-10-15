@@ -37,8 +37,17 @@ from mocktrade.broker.rules import (
     protected_limit,
     stop_trigger_problem,
 )
+from mocktrade.domain.gtt import (
+    GttKind,
+    GttRequest,
+    GttSpec,
+    GttStatus,
+    GttView,
+    gtt_problems,
+    standard_gtt_spec,
+)
 from mocktrade.domain.instruments import Instrument, InstrumentId
-from mocktrade.domain.order_spec import OrderSpec
+from mocktrade.domain.order_spec import OrderSpec, products_for
 from mocktrade.domain.orders import (
     OrderRequest,
     OrderStatus,
@@ -89,6 +98,32 @@ class _Book:
     traded_left: dict[int, int] = field(default_factory=dict)  # price -> volume not yet shared
 
 
+@dataclass
+class _PaperGtt:
+    gtt_id: str
+    request: GttRequest
+    placed_at_paise: int  # the last price when placed: which way a SINGLE trigger is crossed
+    status: GttStatus = GttStatus.ACTIVE
+    order_id: str | None = None
+    fired_leg: int | None = None
+    reason: str = ""
+
+    def touched(self, ltp: int) -> int | None:
+        """The leg the last price has touched, if any."""
+        legs = self.request.legs
+        if self.request.kind is GttKind.OCO:
+            if ltp <= legs[0].trigger_paise:
+                return 0
+            return 1 if ltp >= legs[1].trigger_paise else None
+        trigger = legs[0].trigger_paise
+        rising = trigger > self.placed_at_paise
+        return 0 if (ltp >= trigger if rising else ltp <= trigger) else None
+
+    def view(self) -> GttView:
+        return GttView(self.gtt_id, self.request, self.status, order_id=self.order_id,
+                       fired_leg=self.fired_leg, reason=self.reason)  # fmt: skip
+
+
 class PaperBroker:
     def __init__(
         self,
@@ -113,6 +148,8 @@ class PaperBroker:
         self._ids = itertools.count(1)
         self._subscription = market_data.subscribe()
         self._runner: asyncio.Task | None = None
+        self._gtts: dict[str, _PaperGtt] = {}
+        self._gtt_ids = itertools.count(1)
 
     # --- Broker interface --------------------------------------------------------------
 
@@ -254,6 +291,78 @@ class PaperBroker:
             result = [by_id[i] for i in sorted(by_id)]
         return result
 
+    # --- GTT, as Kite holds them -------------------------------------------------------
+    # A trigger touched by the last price places a LIMIT order *from the broker* (a client id
+    # "GTT<id>" we never issued), exactly as Kite does: MockTrade adopts it (orders/gtt.py).
+    # Like paper orders, paper GTTs live in memory: a restart forgets them.
+
+    def gtt_spec(self, instrument: Instrument) -> GttSpec:
+        return standard_gtt_spec(instrument, products_for(instrument))
+
+    async def place_gtt(self, request: GttRequest, ltp_paise: int) -> str:
+        self._check_gtt(request)
+        gtt_id = f"G{next(self._gtt_ids)}"
+        self._gtts[gtt_id] = _PaperGtt(gtt_id, request, ltp_paise)
+        self._subscription.add([request.instrument_id])
+        await self._sleep(self._latency_s)
+        return gtt_id
+
+    async def modify_gtt(self, gtt_id: str, request: GttRequest, ltp_paise: int) -> None:
+        gtt = self._active_gtt(gtt_id)
+        self._check_gtt(request)
+        gtt.request, gtt.placed_at_paise = request, ltp_paise
+        await self._sleep(self._latency_s)
+
+    async def delete_gtt(self, gtt_id: str) -> None:
+        self._active_gtt(gtt_id).status = GttStatus.DELETED
+        await self._sleep(self._latency_s)
+
+    async def gtts(self) -> list[GttView]:
+        return [g.view() for g in self._gtts.values()]
+
+    def _check_gtt(self, request: GttRequest) -> None:
+        instrument = self._instruments.get(request.instrument_id)
+        if instrument is None:
+            raise BrokerError(f"unknown instrument {request.instrument_id}")
+        tick = self._market_data.latest(instrument.id)
+        problems = gtt_problems(
+            self.gtt_spec(instrument), request, tick.ltp_paise if tick else None
+        )
+        if problems:
+            raise BrokerError("; ".join(problems))
+
+    def _active_gtt(self, gtt_id: str) -> "_PaperGtt":
+        gtt = self._gtts.get(gtt_id)
+        if gtt is None:
+            raise BrokerError(f"no GTT {gtt_id}")
+        if gtt.status is not GttStatus.ACTIVE:
+            raise BrokerError(f"GTT {gtt_id} is {gtt.status.value}")
+        return gtt
+
+    def _check_gtts(self, tick: Tick) -> None:
+        for gtt in self._gtts.values():
+            if (
+                gtt.status is not GttStatus.ACTIVE
+                or gtt.request.instrument_id != tick.instrument_id
+            ):
+                continue
+            leg = gtt.touched(tick.ltp_paise)
+            if leg is not None:
+                gtt.status, gtt.fired_leg = GttStatus.TRIGGERED, leg
+                self._spawn(self._fire_gtt(gtt, leg))
+
+    async def _fire_gtt(self, gtt: "_PaperGtt", n: int) -> None:
+        leg, r = gtt.request.legs[n], gtt.request
+        order = OrderRequest(
+            client_order_id=f"GTT{gtt.gtt_id}", account_id=r.account_id, user_id=r.user_id,
+            instrument_id=r.instrument_id, side=leg.side, qty=leg.qty,
+            order_type=OrderType.LIMIT, product=r.product, price_paise=leg.price_paise,
+        )  # fmt: skip
+        try:
+            gtt.order_id = await self.place(order)
+        except BrokerError as exc:
+            gtt.reason = f"the order was refused: {exc.reason}"
+
     # --- running against live prices ---------------------------------------------------
 
     def start(self) -> None:
@@ -271,11 +380,14 @@ class PaperBroker:
 
     async def settle(self) -> None:
         """Wait until every pending acknowledgement has been processed (for tests)."""
-        while self._tasks:
-            await asyncio.gather(*list(self._tasks), return_exceptions=True)
+        while pending := [t for t in self._tasks if not t.done()]:
+            # only unfinished ones: gathering finished tasks never yields to the event loop,
+            # so their clean-up callbacks would never run and this would spin forever
+            await asyncio.gather(*pending, return_exceptions=True)
 
     def on_tick(self, tick: Tick) -> None:
         """Process one market update: trigger stops, then try to fill working orders."""
+        self._check_gtts(tick)
         book = self._book_for(tick)
         working = [self._orders[b] for b in self._by_instrument.get(tick.instrument_id, ())]
         for order in sorted(working, key=lambda o: o.seq):
