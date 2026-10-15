@@ -63,10 +63,11 @@ Ayush asked Claude to code the whole project professionally (extensive tests, ca
 | K8.4 Strategy builder (#192) | #197 (base k8-3-chain-widget, branch k8-4-strategy) | ✅ 835 Python + 222 UI tests, 13/13 mutations; real browser: iron condor payoff, Alt-click legs from the chain |
 | K8.5 Baskets (#193) | #198 (base k8-4-strategy, branch k8-5-baskets) | ✅ 844 Python + 224 UI tests; covered-short risk rule; real browser: iron condor checked and sent as one basket |
 | K9.1 Execution algos (#199) | #203 (base k8-5-baskets, branch k9-1-exec-algos) | ✅ 867 Python + 225 UI; 17/17 mutations; real browser: TWAP, iceberg and POV run to Done |
-| Fix: basket cover must be filled (#207) | branch fix-207-basket-cover (from main) | ✅ 873 Python; 9/9 mutations (`context/scripts/mutate-basket-cover.py`) |
-| Fix: rebuild state after a restart (#206) | branch fix-206-restore (from main) | ✅ 878 Python; 12/12 mutations (`context/scripts/mutate-recovery.py`); real demo restart: position, P&L and orders back, resting paper order closed with the reason |
-| K9.2 Protection: trailing stop, OCO, bracket (#200) | branch k9-2-synthetic-v2 (from main) | ✅ 15 new tests; mutation check `context/scripts/mutate-protect.py`; real browser: bracket entered at market with target and stop, trailing stop following the highs (`context/scripts/e2e-protect.cjs`) |
-| K9.3 GTT at the broker (#201) | branch k9-3-gtt (from main) | ✅ 913 Python; GTT spec + risk at the trigger; Kite /gtt/triggers; paper simulation; fired orders adopted; design `docs/design/gtt.md` |
+| Fix: basket cover must be filled (#207) | #208 merged | ✅ 873 Python; 9/9 mutations (`context/scripts/mutate-basket-cover.py`) |
+| Fix: rebuild state after a restart (#206) | #209 merged | ✅ 878 Python; 12/12 mutations (`context/scripts/mutate-recovery.py`); real demo restart: position, P&L and orders back, resting paper order closed with the reason |
+| K9.2 Protection: trailing stop, OCO, bracket (#200) | #210 merged | ✅ 15 new tests; mutation check `context/scripts/mutate-protect.py`; real browser: bracket entered at market with target and stop, trailing stop following the highs (`context/scripts/e2e-protect.cjs`) |
+| K9.3 GTT at the broker (#201) | #211 merged | ✅ 914 Python; GTT spec + risk at the trigger; Kite /gtt/triggers; paper simulation; fired orders adopted; design `docs/design/gtt.md` |
+| K9.4 Orders+ screens (#202) | branch k9-4-screens | ✅ 239 UI tests; real browser: GTT OCO from the book, trailing stop and GTT from the ticket tabs, algos grouped by family (`context/scripts/e2e-orders-plus.cjs`) |
 
 K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
 
@@ -108,12 +109,24 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-1. Continue from `main`. Safety fixes #207 (PR #208) and #206 (PR #209) are merged. K9.2 (#200, PR #210) merged; K9.3 GTT (#201) in its PR. Next **#202** Orders+ screens (ticket Advanced tab from specs, GTT book, algo screen grouped by `family`, synthetic parents marked "held by MockTrade"). Then K10–K13. One issue branch from main each. **Ayush (15 Oct): Claude merges its own PRs once CI is green.**
-2. **K6 is complete** (#179–#182). Algo screen: `ui/src/widgets/algos/` (form drawn from `/algo-specs`, by param kind; `extra` figures formatted by unit suffix `_paise`/`_ms`); API and stream in `docs/design/algos.md` § "The algo screen". New algos need only a strategy + `AlgoSpec` registered as an `AlgoType` (BUILTIN in `algos/builtin.py`).
-3. Live Kite is wired (#185): `broker/kite/live.py` (KiteLive). Kite accounts run from boot without a token; the screen's "Log in to Kite" makes them live with no restart; one account's ticker carries prices; 6 AM logs out. Server entry point: `python -m mocktrade.tools.serve` (settings at the top of the file). Docker: `Dockerfile`, `deploy/` (compose, Caddyfile, README, smoke.sh). Testing Docker in a cloud session: start `dockerd`, pull from `mirror.gcr.io/library/<image>` (Docker Hub returns 429), and put the sandbox proxy CA into local base images only (conversation log 20).
-4. **K8 Options is complete** (#194–#198). **Now: K9 Orders+** (issues #199–#202). #199 is done (PR #203). Next: #200, synthetic orders as algos with `family="protection"` (trailing stop, OCO exit, bracket; stops stay synthetic until triggered; on restart, raise an ops alert listing the lost ones). Then #201 GTT (`GttBook` port, Kite `/gtt/triggers`, paper simulation, GTT spec). Then #202 screens (ticket Advanced tab from the specs, GTT book, algo screen grouped by family). Then K10–K13. Ayush's manual steps: `docs/runbooks/server.md` (AWS, Kite, AMO check), then a real trading day.
-5. Then the roadmap in `docs/design/product-vision.md` (K8 options, K9 synthetic orders, K10 accounts & charges, K11 replay/backtest, K12 charts & alerts, K13 admin & phone): create each milestone's issues before coding.
-6. Ayush, when ready: create the Kite Connect app (₹500/month data plan) at developers.kite.trade and run `python -m mocktrade.tools.login`; build the desktop installer on Windows.
+**Where we are (15 Oct 2026, late):** K0–K9 are done on `main` except the K9.4 screens PR (#202, branch `k9-4-screens`). Safety fixes #206 and #207 are merged. Main CI green. **Claude merges its own PRs once CI is green** (Ayush, 15 Oct); Claude also opens the issues for each milestone before coding.
+
+1. **Finish #202** if its PR is still open: CI green → merge. What it adds: GTT Book widget (`ui/src/widgets/gtt/`), GTT tab and Algo tab in the ticket (`TicketParams.mode`), algo picker grouped by `family`, "held" tag on protection algos, GTT spec now publishes `legs` and `labels` per kind.
+2. **Then K10 Accounts & reports.** Create its issues first (issue → branch from main → PR with `Closes #N` → green CI → merge). Planned issues:
+   - K10.1 holdings, funds/margins and the tradebook from the broker (`Broker` optional ports like `GttBook`; Kite `/portfolio/holdings`, `/user/margins`, `/trades`; paper equivalents) + screens.
+   - K10.2 charges estimator (brokerage, STT/CTT, exchange transaction charges, SEBI fee, stamp duty, GST) as a replaceable `ChargesModel` published per segment; positions and P&L show gross and net.
+   - K10.3 end-of-day report and P&L by day / instrument / strategy (from the audit trail), CSV and PDF export.
+   - K10.4 pre-trade margin check (broker margin API; `MarginQuoter` exists for baskets) in the ticket and the risk gate.
+   - K10.5 MTM watch: per-position and portfolio stop, square-off assistant before the MIS cut-off (15:20 IST).
+3. Then K11 research (tick recorder, replay into paper, backtest with the same algo engine), K12 charts & alerts (charts with trade marks, price/%/volume/OI alerts in app and by webhook, time & sales, depth, movers), K13 admin & phone (admin panel, per-user limits, phone screens, keyboard shortcut editor, themes). About 16 issues in all; see `docs/design/product-vision.md`.
+4. Ayush's own steps (not code): `docs/runbooks/server.md` (AWS Mumbai, static IP, Kite app ₹500/month, AMO check), then a real trading day; before selling to others: broker multi-user arrangement, exchange algo empanelment, licensed market data, legal review.
+
+**How each piece is built (keep the quality):** brainstorm the traps → code with the "backend provides, frontend displays" rule (specs from the server, no market rules in the UI) → Python tests + UI tests → a mutation script in `context/scripts/mutate-*.py` (restores files in `finally`, a hang counts as caught; **run one at a time, never kill one mid-run**: it can leave a mutant in the source) → real browser or real server check against the demo (`context/scripts/e2e-*.cjs`) → docs in `docs/design/` → context files → PR → green CI → merge.
+
+**Session lessons:** anchor `pkill -f` patterns with `^` (an unanchored pattern matches the calling shell and kills it); TOTP codes are single-use: wait for the next 30 s window before logging in again; `rm -rf data/demo` for a fresh demo; rebuild `ui/dist` before browser checks; positions add up across demo runs (±1500 limit).
+
+## Earlier notes
+- K6 algo engine: new algos need only a strategy + `AlgoSpec` registered in `algos/builtin.py`; the screen draws them. Live Kite: `broker/kite/live.py`; server entry `python -m mocktrade.tools.serve`; Docker in a cloud session: start `dockerd`, pull from `mirror.gcr.io/library/<image>`, proxy CA only in local base images.
 
 ## Key facts the design depends on (checked 14 Oct 2026, re-check before going live)
 - Data ₹500/month per app; order APIs free.

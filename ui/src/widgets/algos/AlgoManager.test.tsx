@@ -182,4 +182,12 @@ describe("Algo manager", () => {
     fireEvent.click(within(form).getByRole("button", { name: /^Start Slicer/ }));
     await vi.waitFor(() => expect(within(form).getByRole("alert").textContent).toContain("Slices must be at most 100"));
   });
+
+  it("a protection algo is marked as held by MockTrade", async () => {
+    const trail = { code: "TRAILING_STOP", name: "Trailing stop", help: "", family: "protection", params: [] };
+    const { app } = setup({ "GET /api/accounts/acc-a/algo-specs": [...SPECS, trail] });
+    act(() => app.store.applyAlgos("acc-a", [algo("A0001", { code: "TRAILING_STOP" }), algo("A0002")]));
+    await vi.waitFor(() => expect(rows().find((r) => r.textContent!.includes("A0001"))!.textContent).toContain("TRAILING_STOPheld"));
+    expect(rows().find((r) => r.textContent!.includes("A0002"))!.textContent).not.toContain("held");
+  });
 });

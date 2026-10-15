@@ -369,6 +369,8 @@ async def test_the_gtt_api(tmp_path, nifty_fut):
     c = await w.logged_in()
     spec = (await c.get(f"/api/accounts/acc-ayush/gtt-spec?instrument_id={FUT}")).json()
     assert spec["kinds"] == ["single", "two-leg"] and spec["min_distance_pct"] == 0.25
+    assert spec["legs"] == {"single": 1, "two-leg": 2}
+    assert spec["labels"]["two-leg"] == "OCO (stop + target)"
     assert "works even if MockTrade is down" in spec["help"]["single"]
     body = {"instrument_id": FUT, "product": "NRML", "kind": "single",
             "legs": [{"trigger_paise": 2480000, "side": "SELL", "qty": 75,

@@ -26,6 +26,10 @@ class GttKind(Enum):
     OCO = "two-leg"  # Kite's name for it
 
 
+LEGS = {GttKind.SINGLE: 1, GttKind.OCO: 2}
+LABELS = {GttKind.SINGLE: "Single", GttKind.OCO: "OCO (stop + target)"}
+
+
 class GttStatus(Enum):
     ACTIVE = "active"
     TRIGGERED = "triggered"
@@ -108,7 +112,7 @@ def standard_gtt_spec(instrument: Instrument, products: tuple[Product, ...]) -> 
 def gtt_problems(spec: GttSpec, request: GttRequest, ltp_paise: int | None) -> list[str]:
     """Every reason the broker would refuse this GTT, in words (empty: fine)."""
     problems: list[str] = []
-    want = 2 if request.kind is GttKind.OCO else 1
+    want = LEGS[request.kind]
     if request.kind not in spec.kinds:
         problems.append(f"{request.kind.value} GTTs are not offered on {spec.instrument_id}")
     if len(request.legs) != want:
@@ -171,6 +175,8 @@ def gtt_spec_to_dict(spec: GttSpec) -> dict[str, Any]:
     return {
         "instrument_id": spec.instrument_id,
         "kinds": [k.value for k in spec.kinds],
+        "legs": {k.value: LEGS[k] for k in spec.kinds},  # how many legs each kind has
+        "labels": {k.value: LABELS[k] for k in spec.kinds},
         "tick_paise": spec.tick_paise,
         "lot_size": spec.lot_size,
         "products": [p.value for p in spec.products],

@@ -186,3 +186,25 @@ export function figures(extra: Record<string, unknown>, labels: Record<string, s
   }
   return out;
 }
+
+/** The specs grouped by family, in the order the server lists them ("execution" first). */
+export function byFamily(specs: AlgoSpec[]): [string, AlgoSpec[]][] {
+  const groups = new Map<string, AlgoSpec[]>();
+  for (const s of specs) {
+    const family = s.family ?? "execution";
+    groups.set(family, [...(groups.get(family) ?? []), s]);
+  }
+  return [...groups.entries()];
+}
+
+export function familyOf(specs: AlgoSpec[] | null, code: string): string | undefined {
+  return specs?.find((s) => s.code === code)?.family;
+}
+
+const FAMILY_LABELS: Record<string, string> = {
+  execution: "Execution: work an order",
+  protection: "Protection: held by MockTrade",
+};
+
+/** A family's heading; an unknown family shows its own name, capitalised. */
+export const familyLabel = (family: string) => FAMILY_LABELS[family] ?? family.charAt(0).toUpperCase() + family.slice(1);

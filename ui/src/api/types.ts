@@ -160,6 +160,7 @@ export type ServerMessage =
       message: string;
     }
   | { type: "algo"; account_id: string; kind: string; detail: string; algo: AlgoView }
+  | { type: "gtt"; account_id: string; gtt: GttView }
   | { type: "ops"; key: string; level: "INFO" | "WARN" | "ERROR" | "OK"; text: string; active: boolean; at: string }
   | ({ type: "chain" } & OptionChain)
   | { type: "error"; message: string }
@@ -352,4 +353,44 @@ export interface BasketSent {
   sent: OrderView[];
   not_sent: { instrument_id: string; side: Side; qty: number; price_paise: number }[];
   stopped: string;
+}
+
+// --- GTT: orders held by the broker (GET …/gtt-spec, …/gtt; stream "gtt") ------------------------
+
+export interface GttLeg {
+  trigger_paise: number;
+  side: Side;
+  qty: number;
+  price_paise: number;
+}
+
+export type GttStatus = "active" | "triggered" | "disabled" | "expired" | "cancelled" | "rejected" | "deleted";
+
+export interface GttView {
+  gtt_id: string;
+  account_id: string;
+  instrument_id: string;
+  product: string;
+  kind: string; // "single" | "two-leg" (from the spec)
+  legs: GttLeg[];
+  status: GttStatus | string;
+  order_id: string | null;
+  fired_leg: number | null;
+  reason: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface GttSpec {
+  instrument_id: string;
+  kinds: string[];
+  legs: Record<string, number>; // how many legs each kind has
+  labels: Record<string, string>;
+  tick_paise: number;
+  lot_size: number;
+  products: string[];
+  min_distance_pct: number;
+  expiry_days: number;
+  max_active: number;
+  help: Record<string, string>;
 }

@@ -1,6 +1,6 @@
 import type { AlgoParamSpec, AlgoSpec } from "../../api/types";
 import { algo } from "../../test/fixtures";
-import { buildAlgoBody, figures, initialValues, parseOffset, parseParam, sortAlgos, stateTone } from "./model";
+import { buildAlgoBody, byFamily, familyLabel, familyOf, figures, initialValues, parseOffset, parseParam, sortAlgos, stateTone } from "./model";
 
 function param(name: string, kind: string, extra: Partial<AlgoParamSpec> = {}): AlgoParamSpec {
   return { name, label: name, kind, help: "", required: true, default: null, min: null, max: null, choices: [], ...extra };
@@ -99,5 +99,18 @@ describe("algo grid", () => {
       { label: "Ends at", text: "15:30:00", alert: false },
       { label: "Better", text: "-1 bps", alert: false },
     ]);
+  });
+
+  it("groups algos by the family the server gives, in its order", () => {
+    const spec = (code: string, family?: string) => ({ code, name: code, help: "", params: [], family });
+    const specs = [spec("SLICER", "execution"), spec("TRAILING_STOP", "protection"), spec("TWAP", "execution"), spec("OLD")];
+    expect(byFamily(specs).map(([f, list]) => [f, list.map((s) => s.code)])).toEqual([
+      ["execution", ["SLICER", "TWAP", "OLD"]],
+      ["protection", ["TRAILING_STOP"]],
+    ]);
+    expect(familyOf(specs, "TRAILING_STOP")).toBe("protection");
+    expect(familyOf(null, "TRAILING_STOP")).toBeUndefined();
+    expect(familyLabel("protection")).toBe("Protection: held by MockTrade");
+    expect(familyLabel("hedging")).toBe("Hedging");
   });
 });

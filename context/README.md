@@ -10,10 +10,10 @@ Everything a new Claude chat needs to continue this project exactly where the la
 ## How to continue (a new chat, when Ayush says "continue")
 
 1. Read the four files above (in order), then `CLAUDE.md` and `docs/design/product-vision.md`.
-2. **Where things live:** code, design and context are integrated on **main** through K9.1. Start new work from current main; create a short-lived branch and a PR targeting main. The old stacked branches are historical references, not the next starting point.
+2. **Where things live:** code, design and context are all on **main**. Start new work from current main: one short-lived branch and one PR per issue, targeting main; Claude merges it once CI is green. The old stacked branches are history only.
 3. Check the open PRs (CI green? review comments?) and fix anything red first.
 4. Take the "Next" item in `status.md`. Work like the earlier milestones: brainstorm the traps in a table → code → tests (Python `pytest`, `ruff check .`, `ruff format --check .`; UI `cd ui && npm ci && npm run typecheck && npm test && npm run build`) → mutation check → real-browser check against the demo server (`scripts/`) → self-review → push → PR with `Closes #N` and the PR body style used in #170–#172.
-5. Ayush allowed pushing straight to these milestone branches (14 Oct). Commit WIP often: limits can end a session at any time.
+5. Commit and push WIP often: limits can end a session at any time. Never run two mutation scripts at once.
 6. **Update `context/` at every important point, not only at the end** (Ayush, 14 Oct): status table, Next, conversation log, screenshots. Commit context changes on the same feature branch as the code, so they merge together.
 7. Before pushing, run `git status --ignored` and check no source file is hidden by `.gitignore` (K5.3 lost `ui/src/lib/format.ts` that way).
 

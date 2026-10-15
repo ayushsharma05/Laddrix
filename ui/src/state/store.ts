@@ -11,7 +11,7 @@
 // (docs/design/stream.md, "After every (re)connect").
 
 import type { Status } from "../api/stream";
-import type { AlgoView, Me, OrderView, Position, PositionsSnapshot, ServerMessage, StrategyLegIn } from "../api/types";
+import type { AlgoView, GttView, Me, OrderView, Position, PositionsSnapshot, ServerMessage, StrategyLegIn } from "../api/types";
 import { price, qty, shortName } from "../lib/format";
 
 export type Level = "ERROR" | "WARN" | "INFO" | "OK";
@@ -45,6 +45,7 @@ export interface AccountBook {
   alerts: Record<string, PositionAlert>; // by instrument_id
   kill: KillState;
   algos: Record<string, AlgoView>; // by algo_id
+  gtts: Record<string, GttView>; // by gtt_id
 }
 
 export interface State {
@@ -72,7 +73,7 @@ export const MAX_MESSAGES = 500;
 const OFF: KillState = { engaged: false, reason: "", by: "" };
 
 export function emptyBook(): AccountBook {
-  return { orders: {}, positions: {}, dayPnl: 0, reconcile: null, alerts: {}, kill: OFF, algos: {} };
+  return { orders: {}, positions: {}, dayPnl: 0, reconcile: null, alerts: {}, kill: OFF, algos: {}, gtts: {} };
 }
 
 export function positionKey(p: { instrument_id: string; product: string }): string {
@@ -191,6 +192,15 @@ export class Store {
     });
   }
 
+  applyGtts(accountId: string, gtts: GttView[]): void {
+    const merged = { ...this.book(accountId).gtts };
+    for (const g of gtts) {
+      const old = merged[g.gtt_id];
+      if (!old || !g.updated_at || !old.updated_at || newer(g.updated_at, old.updated_at)) merged[g.gtt_id] = g;
+    }
+    this.setBook(accountId, { gtts: merged });
+  }
+
   applyAlgos(accountId: string, algos: AlgoView[]): void {
     const merged = { ...this.book(accountId).algos };
     for (const a of algos) {
@@ -270,6 +280,13 @@ export class Store {
         this.applyAlgos(m.account_id, [m.algo]);
         const note = describeAlgoEvent(m.kind, m.detail, m.algo);
         if (note) this.addMessage(note.level, m.algo.instrument_id, note.text);
+        return;
+      }
+      case "gtt": {
+        const before = this.book(m.account_id).gtts[m.gtt.gtt_id];
+        this.applyGtts(m.account_id, [m.gtt]);
+        const note = describeGtt(m.gtt, before);
+        if (note) this.addMessage(note.level, m.gtt.instrument_id, note.text);
         return;
       }
       case "ops": {
@@ -364,6 +381,26 @@ export function describeOrderEvent(
 }
 
 /** The Messages line for an algo event, or null for routine updates. */
+/** A GTT change worth a line in Messages (its first sighting and status changes). */
+export function describeGtt(g: GttView, before: GttView | undefined): { level: Level; text: string } | null {
+  const legs = g.legs.map((l) => `${l.side} ${qty(l.qty)} @ ${price(l.price_paise)} when ${price(l.trigger_paise)}`).join(" / ");
+  const what = `GTT ${g.gtt_id} ${shortName(g.instrument_id)}`;
+  if (before && before.status === g.status && before.order_id === g.order_id) return null;
+  switch (g.status) {
+    case "active":
+      return before ? null : { level: "INFO", text: `${what} placed: ${legs}` };
+    case "triggered":
+      return {
+        level: "WARN",
+        text: g.order_id ? `${what} triggered: the broker placed order ${g.order_id} (leg ${(g.fired_leg ?? 0) + 1})` : `${what} triggered`,
+      };
+    case "deleted":
+      return { level: "INFO", text: `${what} deleted` };
+    default:
+      return { level: "WARN", text: `${what} ${g.status}${g.reason ? `: ${g.reason}` : ""}` };
+  }
+}
+
 export function describeAlgoEvent(kind: string, detail: string, a: AlgoView): { level: Level; text: string } | null {
   const what = `${a.algo_id} ${a.code} ${a.side} ${qty(a.qty)} ${shortName(a.instrument_id)}`;
   switch (kind) {
