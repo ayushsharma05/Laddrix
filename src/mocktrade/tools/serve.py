@@ -18,6 +18,8 @@ Settings (environment; secrets never on the command line):
     MOCKTRADE_HOLIDAYS         (none)     exchange holidays, e.g. 2026-10-21,2026-11-10
                                           (no morning reminders or price alerts on them)
     MOCKTRADE_PAPER_FUNDS      1000000    each paper account's starting balance, rupees
+    MOCKTRADE_CHARGES          (built in) a charge schedule (JSON, charges/schedules.py) to use
+                                          instead of the built-in rates, e.g. after a budget
     MOCKTRADE_ALERT_WEBHOOK    (none)     https:// address that gets WARN/ERROR alerts as
                                           JSON {"text": ...} (Slack, ntfy, Google Chat...)
     KITE_API_KEY, KITE_API_SECRET         the Kite Connect app (kite mode). One account with
@@ -56,6 +58,8 @@ from mocktrade.broker.kite.http import BASE_URL
 from mocktrade.broker.kite.live import KiteLive
 from mocktrade.broker.kite.ticker import WS_URL
 from mocktrade.broker.paper import PaperBroker
+from mocktrade.charges.model import ScheduleCharges
+from mocktrade.charges.schedules import load_schedule
 from mocktrade.config import ConfigError, KiteSettings, environment
 from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.marketdata.service import MarketData
@@ -95,6 +99,7 @@ class ServeSettings:
     alert_webhook: str = ""  # alerts to a phone: Slack, ntfy, Google Chat... (JSON POST)
     kite_env: tuple[tuple[str, str], ...] = ()  # the KITE_* settings (kite mode)
     paper_funds_paise: int = 10_00_000_00  # each paper account's starting balance
+    charges_file: Path | None = None  # a charge schedule (JSON) instead of the built-in one
 
     def kite_url(self, name: str, default: str) -> str:
         """KITE_API_URL / KITE_WS_URL: only to point at a Kite simulator (load tests)."""
@@ -163,6 +168,12 @@ class ServeSettings:
             problems.append(
                 f"MOCKTRADE_PAPER_FUNDS must be whole rupees above 0, got {funds_text!r}"
             )
+        charges_text = env.get("MOCKTRADE_CHARGES", "")
+        if charges_text:
+            try:
+                load_schedule(charges_text)
+            except (OSError, ValueError) as exc:
+                problems.append(f"MOCKTRADE_CHARGES: {exc}")
         if problems:
             raise ConfigError("; ".join(problems))
         return cls(
@@ -178,6 +189,7 @@ class ServeSettings:
             alert_webhook=env.get("MOCKTRADE_ALERT_WEBHOOK", ""),
             kite_env=kite_env,
             paper_funds_paise=int(funds_text) * 100,
+            charges_file=Path(charges_text) if charges_text else None,
         )
 
 
@@ -250,6 +262,8 @@ def build(settings: ServeSettings) -> Assembly:
     events = EventLog(settings.data_dir / "events.db")
     events.start()
     platform = Platform(instruments, md, KillSwitch("firm"), events)
+    if settings.charges_file is not None:
+        platform.charges_model = ScheduleCharges(load_schedule(settings.charges_file))
     brokers = []
     running: list[str] = []
     not_running: dict[str, str] = {}

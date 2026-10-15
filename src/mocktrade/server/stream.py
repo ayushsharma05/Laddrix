@@ -32,6 +32,8 @@ import orjson
 from fastapi import WebSocket, WebSocketDisconnect
 
 from mocktrade.algos.engine import AlgoEvent
+from mocktrade.charges.model import ChargeBill, bill_to_dict
+from mocktrade.charges.service import ChargesService
 from mocktrade.domain.accounts import User, can_view
 from mocktrade.domain.gtt import GttView, gtt_to_dict
 from mocktrade.domain.ticks import Tick
@@ -142,6 +144,9 @@ class StreamHub:
             runtime.gtt.subscribe(self._on_gtt)
         if runtime.portfolio is not None:
             runtime.portfolio.subscribe(self._on_portfolio)
+        if runtime.charges is not None:
+            charges = runtime.charges
+            charges.subscribe(lambda account_id, bill: self._on_charges(account_id, bill, charges))
 
     # --- one browser tab ----------------------------------------------------------------------
 
@@ -405,6 +410,14 @@ class StreamHub:
     def _on_portfolio(self, account_id: str, snapshot: Snapshot) -> None:
         """Funds, holdings or trades changed: the whole list (they're short), never dropped."""
         message = {"type": "portfolio", **snapshot_to_dict(account_id, snapshot)}
+        for connection in list(self._connections):
+            if account_id in connection.accounts:
+                connection.put(message)
+
+    def _on_charges(self, account_id: str, bill: ChargeBill, service: ChargesService) -> None:
+        """The day's charges after a fill (positions show P&L gross and net of them)."""
+        message = {"type": "charges", "account_id": account_id,
+                   **bill_to_dict(bill, service.model.schedule)}  # fmt: skip
         for connection in list(self._connections):
             if account_id in connection.accounts:
                 connection.put(message)

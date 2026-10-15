@@ -19,6 +19,9 @@ from datetime import UTC, datetime
 from mocktrade.algos.engine import AlgoEngine, AlgoEvent, AlgoType
 from mocktrade.broker.base import Broker, GttBook
 from mocktrade.broker.rules import order_spec
+from mocktrade.charges.model import ChargesModel, ScheduleCharges
+from mocktrade.charges.schedules import KITE_STANDARD
+from mocktrade.charges.service import ChargesService
 from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import OrderSpec
@@ -60,6 +63,7 @@ class AccountRuntime:
     recovery: RecoveryGate | None = None  # set when the account rebuilds its state at start
     gtt: GttService | None = None  # when the broker holds GTT orders
     portfolio: PortfolioService | None = None  # funds, holdings, trades (what the broker offers)
+    charges: ChargesService | None = None  # the day's charges, and estimates for the ticket
 
 
 @dataclass
@@ -69,6 +73,7 @@ class Platform:
     firm_switch: KillSwitch
     event_log: EventLog | None = None
     accounts: dict[str, AccountRuntime] = field(default_factory=dict)
+    charges_model: ChargesModel = field(default_factory=lambda: ScheduleCharges(KITE_STANDARD))
 
     def __post_init__(self) -> None:
         if self.event_log is not None:
@@ -358,6 +363,10 @@ class Platform:
             account.id, broker, self.market_data, client_id_of=client_id_of, clock=clock
         )
         orders.subscribe(portfolio.on_order_event)
+        charges = ChargesService(
+            account.id, self.charges_model, orders, self.instruments.get, clock=clock
+        )
+        orders.subscribe(charges.on_order_event)
         runtime = AccountRuntime(
             account,
             broker,
@@ -373,6 +382,7 @@ class Platform:
             recovery,
             gtt,
             portfolio,
+            charges,
         )
         self.accounts[account.id] = runtime
         return runtime

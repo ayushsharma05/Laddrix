@@ -30,6 +30,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from mocktrade.algos.engine import AlgoError
 from mocktrade.algos.spec import spec_to_dict as algo_spec_to_dict
+from mocktrade.charges.model import bill_to_dict
+from mocktrade.charges.schedules import schedule_to_dict
+from mocktrade.charges.service import ChargesError
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_view
 from mocktrade.domain.gtt import gtt_spec_to_dict, gtt_to_dict
 from mocktrade.domain.instruments import Instrument
@@ -183,6 +186,14 @@ class GttIn(_Strict):
     product: Product
     kind: str = Field(pattern=r"^(single|two-leg)$")
     legs: list[GttLegIn] = Field(min_length=1, max_length=2)
+
+
+class ChargesIn(_Strict):
+    instrument_id: str = Field(min_length=3, max_length=64)
+    side: Side
+    qty: int = Field(gt=0, le=10_000_000)
+    price_paise: int = Field(gt=0, le=10**12)
+    product: Product
 
 
 class StopIn(_Strict):
@@ -358,6 +369,33 @@ def create_app(
             },
             201,
         )
+
+    # --- charges: the day's, an order's estimate, the published rates -------------------------
+
+    def charges_service(running: AccountRuntime):
+        if running.charges is None:
+            raise HTTPException(404, "no charges model for this account")
+        return running.charges
+
+    @app.get("/api/charges/schedule")
+    async def charge_schedule(user: Me) -> dict[str, Any]:
+        return schedule_to_dict(platform.charges_model.schedule)
+
+    @app.get("/api/accounts/{account_id}/charges")
+    async def charges_today(account_id: str, user: Me) -> dict[str, Any]:
+        service = charges_service(runtime(account_id, user))
+        return {"account_id": account_id,
+                **bill_to_dict(service.bill(), service.model.schedule)}  # fmt: skip
+
+    @app.post("/api/accounts/{account_id}/charges/estimate")
+    async def charges_estimate(account_id: str, body: ChargesIn, user: Me) -> dict[str, Any]:
+        service = charges_service(runtime(account_id, user))
+        try:
+            bill = service.estimate(body.instrument_id, body.side, body.qty,
+                                    body.price_paise, body.product)  # fmt: skip
+        except ChargesError as exc:
+            raise HTTPException(422, str(exc)) from None
+        return bill_to_dict(bill, service.model.schedule)
 
     # --- funds, holdings, tradebook (read-only, from the broker) ------------------------------
 
