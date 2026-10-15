@@ -15,7 +15,7 @@
 Rates are data, one table per broker and plan with the date they were checked
 (charges/schedules.py), never code: a budget changes STT, an exchange changes its fee, and
 only the table changes. Every amount is worked exactly (fractions of a paisa kept) and each
-line is rounded to the paisa once, at the end, as a contract note does.
+line is rounded to the paisa once per instrument, at the end, as a contract note does.
 
 Segments: equity delivery (CNC), equity intraday (MIS), futures, options. Options are charged
 on the premium. Not covered (yet): STT on options exercised at expiry (charged on the
@@ -31,6 +31,13 @@ from typing import Any, Protocol
 
 from mocktrade.domain.instruments import Instrument, InstrumentId, InstrumentKind
 from mocktrade.domain.orders import Product, Side
+
+# The exchange that charges the fee: F&O contracts trade on NFO/BFO, segments of NSE/BSE.
+VENUE = {"NSE": "NSE", "NFO": "NSE", "BSE": "BSE", "BFO": "BSE"}
+
+
+def venue(instrument: Instrument) -> str:
+    return VENUE.get(instrument.exchange.value, instrument.exchange.value)
 
 
 class Segment(Enum):
@@ -133,27 +140,27 @@ class ScheduleCharges:
         self.schedule = schedule
 
     def bill(self, orders: Sequence[ExecutedOrder]) -> ChargeBill:
-        totals = {key: Fraction(0) for key, _ in LABELS}
-        by_instrument: dict[InstrumentId, Fraction] = {}
+        """Each line is rounded to the paisa per instrument, then added up: a position's
+        charges and the day's total always agree to the paisa."""
+        exact: dict[InstrumentId, dict[str, Fraction]] = {}
         turnover = Fraction(0)
-        dp_sold: set[InstrumentId] = set()
         for o in orders:
             parts = self._parts(o)
             if parts is None:
                 continue
-            if parts.pop("_dp_sale", None) and o.instrument.id not in dp_sold:
-                dp_sold.add(o.instrument.id)
-                parts["dp"] = Fraction(self._rates(o).dp_paise)  # type: ignore[union-attr]
+            mine = exact.setdefault(o.instrument.id, {key: Fraction(0) for key, _ in LABELS})
+            if parts.pop("_dp_sale", None) and not mine["dp"]:  # once a stock a day
+                mine["dp"] = Fraction(self._rates(o).dp_paise)  # type: ignore[union-attr]
             for key, amount in parts.items():
-                totals[key] += amount
-            by_instrument[o.instrument.id] = by_instrument.get(o.instrument.id, Fraction(0)) + sum(
-                parts.values(), Fraction(0)
-            )
+                mine[key] += amount
             turnover += o.value_paise
-        lines = tuple(ChargeLine(label, _round(totals[key])) for key, label in LABELS)
+        rounded = {i: {k: _round(v) for k, v in parts.items()} for i, parts in exact.items()}
+        lines = tuple(
+            ChargeLine(label, sum(r[key] for r in rounded.values())) for key, label in LABELS
+        )
         return ChargeBill(
             lines=lines,
-            by_instrument={i: _round(v) for i, v in sorted(by_instrument.items())},
+            by_instrument={i: sum(r.values()) for i, r in sorted(rounded.items())},
             turnover_paise=_round(turnover),
         )
 
@@ -166,7 +173,7 @@ class ScheduleCharges:
         if rates is None or o.qty <= 0:
             return None
         value = o.value_paise
-        exchange = o.instrument.exchange.value
+        exchange = venue(o.instrument)
         pct = lambda p: value * p / 100  # noqa: E731
         if rates.brokerage_flat_paise is not None:
             brokerage = Fraction(rates.brokerage_flat_paise)
