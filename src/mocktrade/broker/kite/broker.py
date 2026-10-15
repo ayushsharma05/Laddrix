@@ -39,11 +39,13 @@ from mocktrade.broker.kite.orders import (
     to_paise,
     to_update,
 )
+from mocktrade.broker.kite.portfolio import parse_holding, parse_margins, parse_trade
 from mocktrade.broker.rules import order_spec
 from mocktrade.domain.gtt import GttRequest, GttSpec, GttView, standard_gtt_spec
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import OrderSpec, products_for
 from mocktrade.domain.orders import OrderRequest, OrderUpdate, Product
+from mocktrade.domain.portfolio import Funds, Holding, Trade
 
 log = logging.getLogger(__name__)
 
@@ -143,6 +145,20 @@ class KiteBroker:
                 )
             )
         return result
+
+    # --- holdings, funds, tradebook (read-only; retried like every read) -------------------
+
+    async def holdings(self) -> list[Holding]:
+        rows = await self._read("/portfolio/holdings")
+        return [h for h in map(parse_holding, rows or []) if h is not None]
+
+    async def funds(self) -> list[Funds]:
+        return parse_margins(await self._read("/user/margins") or {})
+
+    async def trades(self) -> list[Trade]:
+        rows = await self._read("/trades")
+        trades = [t for t in map(parse_trade, rows or []) if t is not None]
+        return sorted(trades, key=lambda t: (t.ts is None, t.ts or 0, t.trade_id))
 
     # --- GTT (good till triggered), held by Kite -------------------------------------------
 
