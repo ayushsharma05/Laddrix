@@ -3,7 +3,8 @@
     start ─► RecoveryGate: new orders and modifies refused ("recovering"), cancels allowed
           ─► broker reachable? (Kite: after the daily login) ─► recover():
                1. carried positions: from the broker (Kite: overnight qty at the close), or for
-                  the paper broker from the audit trail's earlier days, at the last close
+                  the paper broker from the audit trail's earlier days, at the last close;
+                  paper delivery (CNC) longs become holdings, not positions, as at Kite
                2. today's fills from the audit trail, in order, once each (the book's rule)
                3. today's orders from the audit trail, then the broker's order book over them
                4. a working order the broker doesn't know: the paper broker forgets its orders
@@ -26,11 +27,13 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, time
+from fractions import Fraction
 from zoneinfo import ZoneInfo
 
 from mocktrade.broker.base import Broker, BrokerError
 from mocktrade.domain.instruments import InstrumentId
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderUpdate
+from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderUpdate, Product
+from mocktrade.domain.portfolio import Holding, Trade
 from mocktrade.domain.ticks import Tick
 from mocktrade.orders.model import OrderView
 from mocktrade.positions.book import PositionBook
@@ -89,6 +92,7 @@ class RecoveryReport:
     orders: int = 0  # restored from the audit trail
     fills: int = 0  # replayed
     carried: int = 0  # positions carried in from earlier days
+    holdings: int = 0  # paper: delivery holdings from earlier days (not positions, as at Kite)
     closed: list[str] = field(default_factory=list)  # paper orders closed (forgotten by it)
     problems: list[str] = field(default_factory=list)
 
@@ -98,6 +102,8 @@ class RecoveryReport:
 
     def summary(self) -> str:
         done = f"{self.orders} orders, {self.fills} fills, {self.carried} carried positions"
+        if self.holdings:
+            done += f", {self.holdings} holdings"
         if self.closed:
             done += f"; {len(self.closed)} paper orders closed ({PAPER_GONE})"
         return done if self.ok else f"{'; '.join(self.problems)} ({done})"
@@ -120,6 +126,10 @@ async def recover(
     broker_orders = await broker.orders()
     durable = getattr(broker, "durable", True)
     report = RecoveryReport()
+    carried: dict[tuple[InstrumentId, Product], tuple[int, int]] = {}
+    holdings: list[Holding] = []
+    trades: list[Trade] = []
+    earlier_pnl = Fraction(0)
     fills = log_.fills(account_id)
     today = [e for e in fills if e.ts >= since]
 
@@ -131,24 +141,41 @@ async def recover(
                     p.instrument_id, p.product, p.overnight_qty, p.close_paise or p.avg_price_paise
                 )
                 report.carried += 1
-    else:
+    else:  # the paper broker: from the audit trail's earlier days
         earlier = PositionBook(account_id)
         for e in fills:
             if e.ts < since and e.order is not None and e.fill is not None:
                 earlier.replay(e.client_order_id, e.order.request, e.order.filled_qty,
                                e.fill.qty, e.fill.price_paise)  # fmt: skip
+        earlier_pnl = Fraction(earlier.realised_paise())
         for p in earlier.positions():
-            if p.qty:
-                price = close(p.instrument_id) or round(p.avg_price_paise)
-                book.seed(p.instrument_id, p.product, p.qty, price)
-                report.carried += 1
+            if not p.qty:
+                continue
+            if p.product is Product.CNC and p.qty > 0:  # delivery: a holding from tomorrow on
+                holdings.append(Holding(p.instrument_id, p.qty, round(p.avg_price_paise),
+                                        close_paise=close(p.instrument_id)))  # fmt: skip
+                report.holdings += 1
+                continue
+            price = close(p.instrument_id) or round(p.avg_price_paise)
+            book.seed(p.instrument_id, p.product, p.qty, price)
+            carried[(p.instrument_id, p.product)] = (p.qty, price)
+            earlier_pnl += (price - p.avg_price_paise) * p.qty  # settled at the close
+            report.carried += 1
 
     # 2. today's fills, in order, once each
+    applied: dict[str, int] = {}
     for e in today:
         if e.order is not None and e.fill is not None:
             book.replay(e.client_order_id, e.order.request, e.order.filled_qty,
                         e.fill.qty, e.fill.price_paise)  # fmt: skip
             report.fills += 1
+            qty = e.order.filled_qty - applied.get(e.client_order_id, 0)
+            if qty > 0:  # the same rule as the book: each part of a fill once
+                applied[e.client_order_id] = e.order.filled_qty
+                r = e.order.request
+                trades.append(Trade(f"A{e.seq}", e.order.broker_order_id or "", r.instrument_id,
+                                    r.side, r.product, qty, e.fill.price_paise, e.ts,
+                                    e.client_order_id))  # fmt: skip
 
     # 3. today's orders, then the broker's word on them
     report.orders = orders.restore(log_.latest_views(account_id, since=since))
@@ -179,8 +206,8 @@ async def recover(
 
     # 5. positions: ours against the broker's
     if not durable and hasattr(broker, "adopt"):
-        broker.adopt({p.instrument_id: (p.qty, round(p.avg_price_paise))
-                      for p in book.positions() if p.qty})  # fmt: skip
+        broker.adopt(carried=carried, trades=trades, holdings=holdings,
+                     earlier_pnl_paise=round(earlier_pnl))  # fmt: skip
         broker_positions = await broker.positions()
     ours = {i: q for i, q in book.net_by_instrument().items() if q}
     theirs = {p.instrument_id: p.qty for p in broker_positions if p.qty}

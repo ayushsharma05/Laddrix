@@ -116,7 +116,7 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    - `broker/base.py`: optional ports `HoldingsSource.holdings()`, `FundsSource.funds()` and `TradesSource.trades()`, like `GttBook`.
    - `broker/kite/portfolio.py` (parsing `/portfolio/holdings`, `/user/margins` and `/trades`) and the `KiteBroker.holdings/funds/trades` methods (reads, retried). Kite's `net` and `debits` are shown as given and never re-added: the signs of Kite's M2M lines are Kite's.
    - Still to do, with the design decided:
-     - **Paper broker**:
+     - **Paper broker** (DONE, pushed; `broker/paper_funds.py` + `PaperBroker.adopt/holdings/funds/trades`):
        - Add `starting_paise` (default ₹10 lakh), a `clock`, and a `_trades` list recorded in `_fill`.
        - Keep its own `PositionBook` fed by its fills; `positions()` reads from it.
        - `adopt(carried, trades, holdings, earlier_pnl_paise)` replaces `adopt(positions)`. Carried positions are seeded at the close; today's trades come from the audit trail.
@@ -127,7 +127,7 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
          - Per (instrument, product), used = max(m(q), m(q+buy leaves), m(q−sell leaves)).
          - A CNC sell of holdings is a credit (shown as an available line "Holdings sold today"), never margin.
          - `estimate=True`.
-     - **Recovery** (non-durable branch): earlier days' CNC longs become paper **holdings**, not book positions, as at Kite. `earlier_pnl` = the earlier book's realised P&L + Σ carried non-CNC (close − avg)·qty. Then call the new `adopt`. Keep `tests/test_recovery.py` green.
+     - **Recovery** (DONE, pushed) (non-durable branch): earlier days' CNC longs become paper **holdings**, not book positions, as at Kite. `earlier_pnl` = the earlier book's realised P&L + Σ carried non-CNC (close − avg)·qty. Then call the new `adopt`. Keep `tests/test_recovery.py` green.
      - **Service** `accounts/reads.py` (or `orders/`), `AccountReads` per account, `AccountRuntime.reads`:
        - Caches each port.
        - Refreshes every 30 s, and 0.5 s (debounced) after any fill event.

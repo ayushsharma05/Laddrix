@@ -27,10 +27,12 @@ price trades through them.
 
 import asyncio
 import itertools
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 
 from mocktrade.broker.base import BrokerError, BrokerPosition
+from mocktrade.broker.paper_funds import Exposure, PaperMargins, paper_funds
 from mocktrade.broker.rules import (
     MAX_MODIFICATIONS_PER_ORDER,
     order_spec,
@@ -53,11 +55,14 @@ from mocktrade.domain.orders import (
     OrderStatus,
     OrderType,
     OrderUpdate,
+    Product,
     Side,
     Validity,
 )
+from mocktrade.domain.portfolio import Funds, Holding, Trade
 from mocktrade.domain.ticks import DepthLevel, Tick
 from mocktrade.marketdata.service import MarketData
+from mocktrade.positions.book import PositionBook
 from mocktrade.refdata.store import InstrumentStore
 
 UNKNOWN_QUEUE = 10**12  # our price is outside the visible depth: assume a long queue
@@ -133,8 +138,14 @@ class PaperBroker:
         latency_s: float = 0.08,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         name: str = "paper",
+        starting_paise: int = 10_00_000_00,  # ₹10 lakh of paper money
+        margins: PaperMargins | None = None,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.name = name
+        self.starting_paise = starting_paise
+        self.margins = margins or PaperMargins()
+        self._clock = clock
         self._market_data = market_data
         self._instruments = instruments
         self._latency_s = latency_s
@@ -150,6 +161,14 @@ class PaperBroker:
         self._runner: asyncio.Task | None = None
         self._gtts: dict[str, _PaperGtt] = {}
         self._gtt_ids = itertools.count(1)
+        # the account as the paper broker keeps it (positions, trades, holdings, money)
+        self._trades: list[Trade] = []  # today's fills here
+        self._trade_ids = itertools.count(1)
+        self._carried: dict[tuple[InstrumentId, Product], tuple[int, int]] = {}
+        self._adopted_trades: list[Trade] = []  # today's fills before a restart
+        self._holdings: list[Holding] = []
+        self._earlier_pnl_paise = 0
+        self._book = PositionBook(name)
 
     # --- Broker interface --------------------------------------------------------------
 
@@ -250,46 +269,103 @@ class PaperBroker:
 
     durable = False  # its orders live in memory: a restart forgets them (recovery.py)
 
-    def adopt(self, positions: dict[InstrumentId, tuple[int, int]]) -> None:
-        """After a restart: the positions MockTrade rebuilt from its audit trail (net qty,
-        average price), as the paper exchange's own carried positions."""
-        self._adopted = {i: v for i, v in positions.items() if v[0]}
+    def adopt(
+        self,
+        *,
+        carried: dict[tuple[InstrumentId, Product], tuple[int, int]] | None = None,
+        trades: Iterable[Trade] = (),
+        holdings: Iterable[Holding] = (),
+        earlier_pnl_paise: int = 0,
+    ) -> None:
+        """After a restart (recovery.py), what the paper exchange would still know: positions
+        carried in from earlier days ((instrument, product) -> (qty, the previous close)),
+        today's fills before the restart, delivery holdings, and earlier days' P&L."""
+        self._carried = {k: v for k, v in (carried or {}).items() if v[0]}
+        self._adopted_trades = list(trades)
+        self._holdings = [h for h in holdings if h.total_qty]
+        self._earlier_pnl_paise = earlier_pnl_paise
+        book = PositionBook(self.name, clock=self._clock)
+        for (instrument_id, product), (qty, close) in sorted(self._carried.items(), key=str):
+            book.seed(instrument_id, product, qty, close)
+        for t in [*self._adopted_trades, *self._trades]:
+            book.apply_fill(t.instrument_id, t.product, t.side, t.qty, t.price_paise)
+        self._book = book
 
     async def positions(self) -> list[BrokerPosition]:
-        totals: dict[InstrumentId, list[int]] = {}  # id -> [net qty, buy qty, buy notional, ...]
-        for order in self._orders.values():
-            if not order.filled:
-                continue
-            t = totals.setdefault(order.instrument.id, [0, 0, 0, 0, 0])
-            sign = order.request.side.sign
-            t[0] += sign * order.filled
-            if sign > 0:
-                t[1] += order.filled
-                t[2] += order.notional
-            else:
-                t[3] += order.filled
-                t[4] += order.notional
+        """Net per instrument across products, as brokers report it for reconciling."""
         result = []
-        for instrument_id, (net, bq, bn, sq, sn) in sorted(totals.items()):
-            if net > 0:
-                avg = bn // bq
-            elif net < 0:
-                avg = sn // sq
-            else:
-                avg = 0
+        for instrument_id, net in sorted(self._book.net_by_instrument().items()):
+            views = [p for p in self._book.positions() if p.instrument_id == instrument_id]
+            same_side = [p for p in views if p.qty and (p.qty > 0) == (net > 0)]
+            avg = round(same_side[0].avg_price_paise) if net and same_side else 0
             result.append(BrokerPosition(instrument_id, net, avg))
-        adopted = getattr(self, "_adopted", {})
-        if adopted:  # carried positions plus today's paper fills (average: approximate)
-            by_id = {p.instrument_id: p for p in result}
-            for instrument_id, (qty, avg) in adopted.items():
-                now = by_id.get(instrument_id)
-                by_id[instrument_id] = BrokerPosition(
-                    instrument_id,
-                    qty + (now.qty if now else 0),
-                    now.avg_price_paise if now and now.qty else avg,
-                )
-            result = [by_id[i] for i in sorted(by_id)]
         return result
+
+    # --- holdings, funds, tradebook (what the account holds and owns) -------------------
+
+    async def trades(self) -> list[Trade]:
+        return [*self._adopted_trades, *self._trades]
+
+    async def holdings(self) -> list[Holding]:
+        """Delivery holdings from earlier days, marked at the latest price. Today's delivery
+        buys are positions until tomorrow, as at Kite; today's sales show as `used_qty`."""
+        sold: dict[InstrumentId, int] = {}
+        for t in await self.trades():
+            if t.product is Product.CNC:
+                sold[t.instrument_id] = sold.get(t.instrument_id, 0) - t.side.sign * t.qty
+        result = []
+        for h in self._holdings:
+            tick = self._market_data.latest(h.instrument_id)
+            result.append(
+                replace(
+                    h,
+                    used_qty=min(max(sold.get(h.instrument_id, 0), 0), h.total_qty),
+                    ltp_paise=tick.ltp_paise if tick and tick.ltp_paise > 0 else h.ltp_paise,
+                    close_paise=(tick.close_paise if tick and tick.close_paise else h.close_paise),
+                )
+            )
+        return result
+
+    async def funds(self) -> list[Funds]:
+        """Paper money, worked out by paper_funds.py (an estimate: plain margin rates)."""
+        exposures: dict[tuple[InstrumentId, Product], dict] = {}
+        for p in self._book.positions():
+            if (tick := self._market_data.latest(p.instrument_id)) is not None:
+                self._book.mark(tick)
+        for p in self._book.positions():
+            exposures[(p.instrument_id, p.product)] = {"qty": p.qty}
+        for o in self._orders.values():
+            if o.status.is_final or not o.leaves:
+                continue
+            e = exposures.setdefault((o.instrument.id, o.request.product), {"qty": 0})
+            side = "buy" if o.request.side is Side.BUY else "sell"
+            e[f"{side}_leaves"] = e.get(f"{side}_leaves", 0) + o.leaves
+            if o.limit_paise:  # the worst price any of them would pay
+                worst = max if side == "buy" else min
+                e[f"{side}_price"] = worst(e.get(f"{side}_price", o.limit_paise), o.limit_paise)
+        built = []
+        for (instrument_id, product), e in exposures.items():
+            instrument = self._instruments.get(instrument_id)
+            if instrument is None:
+                continue
+            tick = self._market_data.latest(instrument_id)
+            view = self._book.get(instrument_id, product)
+            price = tick.ltp_paise if tick and tick.ltp_paise > 0 else 0
+            price = price or (round(view.avg_price_paise) if view else 0)
+            price = price or e.get("buy_price") or e.get("sell_price") or 0
+            built.append(Exposure(instrument, product, price=price, **e))
+        cost = sum(h.invested_paise for h in self._holdings)
+        return [
+            paper_funds(
+                starting_paise=self.starting_paise,
+                earlier_pnl_paise=self._earlier_pnl_paise,
+                holdings_cost_paise=cost,
+                realised_paise=self._book.realised_paise(),
+                unrealised_paise=self._book.unrealised_paise(),
+                exposures=built,
+                rates=self.margins,
+            )
+        ]
 
     # --- GTT, as Kite holds them -------------------------------------------------------
     # A trigger touched by the last price places a LIMIT order *from the broker* (a client id
@@ -573,6 +649,12 @@ class PaperBroker:
     def _fill(self, order: _PaperOrder, qty: int, price: int) -> None:
         order.filled += qty
         order.notional += qty * price
+        r = order.request
+        self._trades.append(
+            Trade(f"T{next(self._trade_ids)}", order.broker_id, r.instrument_id, r.side,
+                  r.product, qty, price, self._clock(), r.client_order_id)
+        )  # fmt: skip
+        self._book.apply_fill(r.instrument_id, r.product, r.side, qty, price)
         order.status = OrderStatus.FILLED if order.leaves == 0 else OrderStatus.PARTIAL
         self._emit(order, last_fill_qty=qty, last_fill_price=price)
 
