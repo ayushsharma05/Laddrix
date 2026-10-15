@@ -122,26 +122,31 @@ class PositionBook:
             return
         if event.account_id != self.account_id:
             return
-        request = event.order.request
-        cumulative = event.order.filled_qty
-        before = self._filled.get(event.client_order_id, 0)
+        self.replay(event.client_order_id, event.order.request, event.order.filled_qty,
+                    event.fill.qty, event.fill.price_paise)  # fmt: skip
+
+    def replay(
+        self, client_order_id: str, request, cumulative: int, fill_qty: int, price_paise: int
+    ) -> None:
+        """Apply one fill of an order whose filled quantity is now `cumulative`. Live fills
+        and fills read back from the audit trail after a restart both come here, so a fill
+        is never counted twice: only the part beyond what this order already applied."""
+        before = self._filled.get(client_order_id, 0)
         if cumulative <= before:
-            log.debug("fill for %s already applied", event.client_order_id)
+            log.debug("fill for %s already applied", client_order_id)
             return
         qty = cumulative - before
-        if qty != event.fill.qty:
+        if qty != fill_qty:
             log.warning(
                 "fill qty %d for %s doesn't match filled %d -> %d; using %d",
-                event.fill.qty,
-                event.client_order_id,
+                fill_qty,
+                client_order_id,
                 before,
                 cumulative,
                 qty,
             )
-        self._filled[event.client_order_id] = cumulative
-        self.apply_fill(
-            request.instrument_id, request.product, request.side, qty, event.fill.price_paise
-        )
+        self._filled[client_order_id] = cumulative
+        self.apply_fill(request.instrument_id, request.product, request.side, qty, price_paise)
 
     def apply_fill(
         self, instrument_id: InstrumentId, product: Product, side: Side, qty: int, price: int

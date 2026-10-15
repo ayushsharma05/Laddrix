@@ -243,6 +243,9 @@ async def test_positions_come_from_the_net_book(broker, kite):
                                 "tradingsymbol": "NIFTY26OCTFUT",
                                 "quantity": -75,
                                 "average_price": 25010.15,
+                                "overnight_quantity": -150,
+                                "close_price": 24990.5,
+                                "product": "NRML",
                             }
                         ],
                         "day": [],
@@ -256,4 +259,10 @@ async def test_positions_come_from_the_net_book(broker, kite):
         "NFO:NIFTY26OCTFUT",
         -75,
         2501015,
+    )
+    # what was carried in from earlier days, for rebuilding after a restart (#206)
+    assert (position.overnight_qty, position.close_paise, position.product) == (
+        -150,
+        2499050,
+        Product.NRML,
     )

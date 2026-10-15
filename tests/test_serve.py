@@ -100,6 +100,8 @@ async def test_paper_accounts_run_and_others_are_listed_not_run(tmp_path):
     try:
         assert built.running == ["acc-paper"]
         assert built.platform.account("acc-kite") is None  # never traded on paper by surprise
+        # a restart never starts trading from an empty state: rebuilt first (#206)
+        assert built.platform.account("acc-paper").recovery.state == "recovering"
         assert "MOCKTRADE_PRICES=kite" in built.not_running["acc-kite"]
         transport = httpx.ASGITransport(app=built.app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:

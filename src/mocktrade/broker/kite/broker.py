@@ -41,7 +41,7 @@ from mocktrade.broker.kite.orders import (
 from mocktrade.broker.rules import order_spec
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import OrderSpec
-from mocktrade.domain.orders import OrderRequest, OrderUpdate
+from mocktrade.domain.orders import OrderRequest, OrderUpdate, Product
 
 log = logging.getLogger(__name__)
 
@@ -133,6 +133,9 @@ class KiteBroker:
                     instrument_id=f"{row['exchange']}:{row['tradingsymbol']}",
                     qty=int(row.get("quantity") or 0),
                     avg_price_paise=to_paise(row.get("average_price")),
+                    overnight_qty=int(row.get("overnight_quantity") or 0),
+                    close_paise=to_paise(row.get("close_price")),
+                    product=_product(row.get("product")),
                 )
             )
         return result
@@ -203,3 +206,10 @@ class KiteBroker:
                     raise BrokerError(f"Kite {path}: {message}") from None
                 await self._sleep(0.5 * attempt)
         raise AssertionError("unreachable")
+
+
+def _product(value: object) -> Product | None:
+    try:
+        return Product(str(value))
+    except ValueError:
+        return None
