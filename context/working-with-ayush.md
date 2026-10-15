@@ -40,5 +40,5 @@ Read this before replying. These are Ayush's own stated preferences, gathered ov
 ## Hard rules
 - **Company privacy.** He works at a trading firm. Never put company names, internal system names, code, screenshots, account numbers or limits in these repos. Use generic names: guard, runner, newsroom, reception desk, accounts office. The private reference files about his firm's platform ("NG One Chart", "NG Architecture", "How NG Works") are **never** committed. They exist only outside the repos.
 - Never commit secrets or `.env` files.
-- Every change goes through a PR (`Closes #N`); merge only with green CI.
+- Every change goes through a PR (`Closes #N`); merge only with green CI. **Claude merges its own PRs** once CI is green (Ayush, 15 Oct).
 - Do not misattribute new work to a previous assistant or session. Preserve historical attribution in existing commits.

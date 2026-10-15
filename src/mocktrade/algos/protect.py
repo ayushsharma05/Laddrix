@@ -134,10 +134,8 @@ class TrailingStop(_Stop):
         ltp = tick.ltp_paise
         selling = ctx.side is Side.SELL  # protecting a long: follow the highs
         if self.best is None or (ltp > self.best if selling else ltp < self.best):
-            self.best = ltp
-            new = self._level(ctx, ltp)
-            if self.stop is None or (new > self.stop if selling else new < self.stop):
-                self.stop = new
+            self.best = ltp  # a new best only ever moves the stop toward the price
+            self.stop = self._level(ctx, ltp)
         assert self.stop is not None
         ctx.report(stop_paise=self.stop, best_paise=self.best)
         if touched(ctx.side, ltp, self.stop):

@@ -116,6 +116,31 @@ The screen needed no change for any of them beyond one new setting kind (`minute
 figure units by name (`…_pct`, `…_bps`, `…_at`). Specs now carry a `family` ("execution";
 K9.2 adds "protection") for the screens to group by.
 
+## Protection held by MockTrade (K9.2): trailing stop, OCO exit, bracket
+`algos/protect.py`, family `"protection"` in the spec (screens group by it). Each one's
+stop is **synthetic**: MockTrade watches the last traded price and sends the exit only when
+the stop is touched. Nothing sits at the exchange for it before, so a stop and a target can
+never both fill and turn an exit into a new position the other way.
+
+| Algo | Parent side / qty | What it does |
+|---|---|---|
+| Trailing stop | the exit side (SELL protects a long) | stop = best price − trail (points or %), on the tick grid, moved only when a new best is seen; touched ─► exit |
+| Target + stop (OCO) | the exit side | target rests as a limit; stop touched ─► cancel the target, **then** exit what is still open |
+| Bracket | the entry side | entry (limit, or market); each entry fill gets a target for its quantity; stop touched ─► cancel the entry's rest and the targets, then exit what is open |
+
+- "When touched": `market` (protected market order) or `limit` with a slack of N ticks past
+  the stop. A gap through the stop exits at the market, or waits at the limit and says so.
+- Exits never exceed what is open: the engine's main leg is now the parent's instrument
+  **and side**, so a bracket's exits don't count as entry fills, and an OCO's exit can't go
+  while its target is working (two layers: the algo waits for the cancel, and the engine's
+  never-over-send rule refuses it).
+- Pause or stop pulls every child: the screen shows the position as unprotected. A bracket
+  that ends with a position open says `UNPROTECTED: n of …` in its reason and the audit.
+- **Honest about restarts**: these are held by MockTrade, so they work only while the server
+  runs (a broker GTT, K9.3, survives our outages). At start, any protection algo that was
+  running when the server stopped raises an ERROR alert naming it, and is noted
+  `ALGO_LOST` in the audit so it is reported once (`Platform.lost_protection`).
+
 ## The algo screen (`ui/src/widgets/algos/`, K6.4)
 
 ```
