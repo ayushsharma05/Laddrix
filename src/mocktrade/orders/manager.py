@@ -197,6 +197,24 @@ class OrderManager:
         await self._send_cancel_if_requested(order)
         return order.view()
 
+    def adopt(self, request: OrderRequest, broker_order_id: str, detail: str) -> OrderView:
+        """Take on an order the BROKER placed for us (a GTT that fired): from now on it is
+        ours like any other (its fills reach positions and the audit trail), under a client
+        id of ours. Updates that came before it was adopted are replayed. Adopting twice
+        returns the same order."""
+        known = self._by_broker_id.get(broker_order_id)
+        if known is not None:
+            return known.view()
+        request = replace(request, client_order_id=self._ids.next())
+        now = self._clock()
+        order = _Order(request=request, created_at=now, updated_at=now, sent=True)
+        self._orders[request.client_order_id] = order
+        self._emit(EventKind.SUBMITTED, order, detail=detail)
+        self._register_broker_id(order, broker_order_id)
+        self._emit(EventKind.SENT, order, detail=detail)
+        self._replay_parked(broker_order_id)
+        return order.view()
+
     def _timed(self, op: str, started_ns: int) -> None:
         """How long the broker took to accept a request (our side of the round trip)."""
         METRICS.observe(

@@ -31,6 +31,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from mocktrade.algos.engine import AlgoError
 from mocktrade.algos.spec import spec_to_dict as algo_spec_to_dict
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_view
+from mocktrade.domain.gtt import gtt_spec_to_dict, gtt_to_dict
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import spec_to_dict
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Validity
@@ -42,6 +43,7 @@ from mocktrade.options.strategy import Strategies, StrategyError
 from mocktrade.options.strategy import templates as strategy_templates_list
 from mocktrade.orders.basket import BasketError, LegIn, check_to_dict
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
+from mocktrade.orders.gtt import GttError, gtt_request_from
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.risk.kill_switch import stop_trading
@@ -166,6 +168,20 @@ class BasketLegIn(_Strict):
 
 class BasketIn(_Strict):
     legs: list[BasketLegIn] = Field(min_length=1, max_length=10)
+
+
+class GttLegIn(_Strict):
+    trigger_paise: int = Field(gt=0)
+    side: Side
+    qty: int = Field(gt=0)
+    price_paise: int = Field(gt=0)
+
+
+class GttIn(_Strict):
+    instrument_id: str = Field(min_length=3, max_length=64)
+    product: Product
+    kind: str = Field(pattern=r"^(single|two-leg)$")
+    legs: list[GttLegIn] = Field(min_length=1, max_length=2)
 
 
 class StopIn(_Strict):
@@ -341,6 +357,52 @@ def create_app(
             },
             201,
         )
+
+    # --- GTT (held by the broker) ------------------------------------------------------------
+
+    def gtt_service(running: AccountRuntime):
+        if running.gtt is None:
+            raise HTTPException(404, f"{running.broker.name} doesn't hold GTT orders")
+        return running.gtt
+
+    def gtt_request(body: GttIn, account_id: str, user: User):
+        return gtt_request_from(body.model_dump(mode="json"), account_id, user.id)
+
+    @app.get("/api/accounts/{account_id}/gtt")
+    async def gtt_list(account_id: str, user: Me) -> list[dict[str, Any]]:
+        return [gtt_to_dict(v) for v in gtt_service(runtime(account_id, user)).list()]
+
+    @app.get("/api/accounts/{account_id}/gtt-spec")
+    async def gtt_spec(account_id: str, instrument_id: str, user: Me) -> dict[str, Any]:
+        """What the broker allows for GTTs on this instrument: the screens draw from it."""
+        try:
+            return gtt_spec_to_dict(gtt_service(runtime(account_id, user)).spec(instrument_id))
+        except GttError as exc:
+            raise HTTPException(404, str(exc)) from None
+
+    @app.post("/api/accounts/{account_id}/gtt", status_code=201)
+    async def gtt_place(account_id: str, body: GttIn, user: Me) -> dict[str, Any]:
+        service = gtt_service(runtime(account_id, user, trade=True))
+        try:
+            return gtt_to_dict(await service.place(gtt_request(body, account_id, user)))
+        except GttError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.put("/api/accounts/{account_id}/gtt/{gtt_id}")
+    async def gtt_modify(account_id: str, gtt_id: str, body: GttIn, user: Me) -> dict[str, Any]:
+        service = gtt_service(runtime(account_id, user, trade=True))
+        try:
+            return gtt_to_dict(await service.modify(gtt_id, gtt_request(body, account_id, user)))
+        except GttError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.delete("/api/accounts/{account_id}/gtt/{gtt_id}")
+    async def gtt_delete(account_id: str, gtt_id: str, user: Me) -> dict[str, Any]:
+        service = gtt_service(runtime(account_id, user, trade=True))
+        try:
+            return gtt_to_dict(await service.delete(gtt_id, user.id))
+        except GttError as exc:
+            raise HTTPException(422, str(exc)) from None
 
     @app.get("/api/ops")
     async def ops(user: Me) -> dict[str, Any]:

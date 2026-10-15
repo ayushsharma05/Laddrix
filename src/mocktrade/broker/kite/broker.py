@@ -30,6 +30,7 @@ from typing import Any
 import httpx
 
 from mocktrade.broker.base import BasketMargin, BrokerError, BrokerPosition
+from mocktrade.broker.kite.gtt import gtt_params, parse_gtt
 from mocktrade.broker.kite.http import KiteAuthError, KiteError, KiteHttp, KiteRateLimited
 from mocktrade.broker.kite.orders import (
     margin_params,
@@ -39,8 +40,9 @@ from mocktrade.broker.kite.orders import (
     to_update,
 )
 from mocktrade.broker.rules import order_spec
+from mocktrade.domain.gtt import GttRequest, GttSpec, GttView, standard_gtt_spec
 from mocktrade.domain.instruments import Instrument
-from mocktrade.domain.order_spec import OrderSpec
+from mocktrade.domain.order_spec import OrderSpec, products_for
 from mocktrade.domain.orders import OrderRequest, OrderUpdate, Product
 
 log = logging.getLogger(__name__)
@@ -66,10 +68,12 @@ class KiteBroker:
         kite_user_id: str,  # the Zerodha client id this account trades as, e.g. "AB1234"
         name: str = "kite",
         variety: str = REGULAR,
+        account_id: str = "",
         sleep=asyncio.sleep,
     ) -> None:
         self.name = name
         self.kite_user_id = kite_user_id
+        self.account_id = account_id  # MockTrade's account, stamped on what we read back
         self.variety = variety  # set to AMO to place after-market orders
         self._http = http
         self._sleep = sleep
@@ -139,6 +143,30 @@ class KiteBroker:
                 )
             )
         return result
+
+    # --- GTT (good till triggered), held by Kite -------------------------------------------
+
+    def gtt_spec(self, instrument: Instrument) -> GttSpec:
+        return standard_gtt_spec(instrument, products_for(instrument))
+
+    async def place_gtt(self, request: GttRequest, ltp_paise: int) -> str:
+        data = await self._call(
+            "POST", "/gtt/triggers", gtt_params(request, ltp_paise), what="place GTT"
+        )
+        return str(data["trigger_id"])
+
+    async def modify_gtt(self, gtt_id: str, request: GttRequest, ltp_paise: int) -> None:
+        await self._call(
+            "PUT", f"/gtt/triggers/{gtt_id}", gtt_params(request, ltp_paise), what="modify GTT"
+        )
+
+    async def delete_gtt(self, gtt_id: str) -> None:
+        await self._call("DELETE", f"/gtt/triggers/{gtt_id}", None, what="delete GTT")
+
+    async def gtts(self) -> list[GttView]:
+        rows = await self._read("/gtt/triggers")
+        views = [parse_gtt(row, self.account_id) for row in rows or []]
+        return [v for v in views if v is not None]
 
     async def basket_margin(self, requests: list[OrderRequest]) -> BasketMargin:
         """Kite's margin for the orders together (POST /margins/basket): `final` includes

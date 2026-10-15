@@ -18,7 +18,8 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-from mocktrade.domain.instruments import InstrumentId
+from mocktrade.domain.gtt import GttRequest, GttSpec, GttView
+from mocktrade.domain.instruments import Instrument, InstrumentId
 from mocktrade.domain.orders import OrderRequest, OrderUpdate, Product
 
 
@@ -55,6 +56,24 @@ class MarginQuoter(Protocol):
     """A broker that can price a basket's margin before it is sent (optional)."""
 
     async def basket_margin(self, requests: list[OrderRequest]) -> BasketMargin: ...
+
+
+@runtime_checkable
+class GttBook(Protocol):
+    """A broker that holds GTT (good till triggered) orders for us (optional). Placing,
+    changing and deleting raise BrokerError with the broker's reason when refused."""
+
+    def gtt_spec(self, instrument: Instrument) -> GttSpec: ...
+
+    async def place_gtt(self, request: GttRequest, ltp_paise: int) -> str: ...
+
+    async def modify_gtt(self, gtt_id: str, request: GttRequest, ltp_paise: int) -> None: ...
+
+    async def delete_gtt(self, gtt_id: str) -> None: ...
+
+    async def gtts(self) -> list[GttView]:
+        """Every GTT the broker holds for this account, with its status."""
+        ...
 
 
 @runtime_checkable

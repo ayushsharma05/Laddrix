@@ -109,7 +109,7 @@ class KiteLive:
         """The account's broker, usable at once: orders are refused until it goes live."""
         app = self._apps(account)
         http = self._http_factory(app.api_key)
-        broker = KiteBroker(http, kite_user_id=account.broker_client_id)
+        broker = KiteBroker(http, kite_user_id=account.broker_client_id, account_id=account.id)
         self._links[account.id] = _Link(account, app, http, broker)
         return broker
 
