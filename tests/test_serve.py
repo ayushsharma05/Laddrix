@@ -28,6 +28,22 @@ def test_good_settings_and_their_defaults():
         ServeSettings.from_env(env(MOCKTRADE_PAPER_FUNDS="1e6"))
 
 
+def test_a_charge_schedule_file_is_checked_at_start(tmp_path):
+    import json
+
+    from mocktrade.charges.schedules import KITE_STANDARD, schedule_to_dict
+
+    good = tmp_path / "charges.json"
+    good.write_text(json.dumps(schedule_to_dict(KITE_STANDARD)))
+    assert ServeSettings.from_env(env(MOCKTRADE_CHARGES=str(good))).charges_file == good
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"name": "x", "checked_on": "2026-10-15", "segments": {}}))
+    with pytest.raises(ConfigError, match="MOCKTRADE_CHARGES: charge schedule: no rates for"):
+        ServeSettings.from_env(env(MOCKTRADE_CHARGES=str(bad)))
+    with pytest.raises(ConfigError, match="MOCKTRADE_CHARGES"):
+        ServeSettings.from_env(env(MOCKTRADE_CHARGES=str(tmp_path / "missing.json")))
+
+
 def test_plain_http_only_on_this_machine():
     local = ServeSettings.from_env(env(MOCKTRADE_ORIGIN="http://localhost:8000"))
     assert not local.cookie_secure  # browsers drop Secure cookies over http

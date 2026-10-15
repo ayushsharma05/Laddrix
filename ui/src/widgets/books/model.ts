@@ -2,7 +2,8 @@
 // can be tested on its own. Every state is written out in words; colour only repeats it
 // (docs/design/ui.md §1).
 
-import type { AuditEvent, OrderView, Position, PositionsSnapshot } from "../../api/types";
+import type { AuditEvent, ChargeBill, OrderView, Position, PositionsSnapshot } from "../../api/types";
+import { positionKey } from "../../state/store";
 import { clock, price, qty, rupees, shortName } from "../../lib/format";
 
 export type Tone = "buy" | "good" | "bad" | "pending" | "dim" | "";
@@ -91,7 +92,9 @@ export function orderPrice(o: OrderView): string {
 export interface PositionTotals {
   realised: number;
   unrealised: number;
-  pnl: number;
+  pnl: number; // gross
+  charges: number; // the day's charges
+  net: number; // gross − charges
 }
 
 /** Positions to show: open ones first (largest exposure first), then closed ones with P&L today. */
@@ -104,11 +107,20 @@ export function positionRows(positions: Record<string, Position>): Position[] {
     });
 }
 
-export function positionTotals(rows: Position[]): PositionTotals {
-  return rows.reduce(
-    (t, p) => ({ realised: t.realised + p.realised_paise, unrealised: t.unrealised + p.unrealised_paise, pnl: t.pnl + p.pnl_paise }),
-    { realised: 0, unrealised: 0, pnl: 0 },
+export function positionTotals(rows: Position[], charges: ChargeBill | null = null): PositionTotals {
+  const totals = rows.reduce(
+    (t, p) => ({ ...t, realised: t.realised + p.realised_paise, unrealised: t.unrealised + p.unrealised_paise, pnl: t.pnl + p.pnl_paise }),
+    { realised: 0, unrealised: 0, pnl: 0, charges: 0, net: 0 },
   );
+  // the day's charges (from the server), including positions closed and hidden from the rows
+  totals.charges = charges?.total_paise ?? 0;
+  totals.net = totals.pnl - totals.charges;
+  return totals;
+}
+
+/** A position's charges today (the server's figure for this instrument and product). */
+export function chargesFor(p: Position, charges: ChargeBill | null): number {
+  return charges?.by_position[positionKey(p)] ?? 0;
 }
 
 /** "100.08" for an exact average of 10007.5 paise: the server sends averages as decimal text. */

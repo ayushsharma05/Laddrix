@@ -57,11 +57,32 @@ async function ready(): Promise<HTMLInputElement> {
   return price;
 }
 
-const posts = (calls: { method: string; body: unknown }[]) => calls.filter((c) => c.method === "POST");
+// orders sent (the charge estimate is a POST too, but sends nothing to the market)
+const posts = (calls: { method: string; path: string; body: unknown }[]) => calls.filter((c) => c.method === "POST" && c.path.endsWith("/orders"));
 const send = () => screen.getByRole("button", { name: /^(BUY|SELL) / });
 const status = () => (document.querySelector(".ladder-status") as HTMLElement).textContent ?? "";
 
 describe("Order ticket", () => {
+  it("shows what the order would pay in charges, asked from the server", async () => {
+    const { calls } = setup({}, {
+      "POST /api/accounts/acc-a/charges/estimate": {
+        total_paise: 4283,
+        turnover_paise: 375150000,
+        lines: [{ label: "Brokerage", paise: 2000 }, { label: "Stamp duty", paise: 2283 }, { label: "STT", paise: 0 }],
+        by_position: {},
+        schedule: { name: "Kite standard plan", checked_on: "2026-10-15", source: "" },
+      },
+    });
+    await ready();
+    const summary = screen.getByLabelText("Order summary");
+    await vi.waitFor(() => expect(summary.textContent).toContain("Charges ≈ ₹42.83"));
+    const asked = calls.filter((c) => c.path.endsWith("/charges/estimate"));
+    expect(asked.at(-1)!.body).toEqual({ instrument_id: ID, side: "BUY", qty: 150, price_paise: 2501000, product: "NRML" });
+    const tip = screen.getByText("Charges ≈", { exact: false }).getAttribute("title")!;
+    expect(tip).toBe("Brokerage 20.00 · Stamp duty 22.83 (Kite standard plan, rates checked 2026-10-15)");
+    expect(posts(calls)).toHaveLength(0); // an estimate sends nothing
+  });
+
   it("draws its order types from the server's spec, so a new type needs no UI change", async () => {
     const spec = orderSpec(ID);
     const iceberg = { ...spec.order_types[0]!, code: "ICEBERG", label: "ICE", name: "Iceberg", validities: ["DAY"] };

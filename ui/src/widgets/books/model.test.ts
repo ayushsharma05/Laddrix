@@ -12,6 +12,7 @@ import {
   ordersFor,
   positionRows,
   positionTotals,
+  chargesFor,
   reconcileState,
   statusText,
   tabCounts,
@@ -100,7 +101,11 @@ describe("positions", () => {
 
   it("adds up realised, unrealised and total P&L", () => {
     const t = positionTotals([pos("A", 1, { realised_paise: 100, unrealised_paise: -40, pnl_paise: 60 }), pos("B", 1, { realised_paise: 0, unrealised_paise: 15, pnl_paise: 15 })]);
-    expect(t).toEqual({ realised: 100, unrealised: -25, pnl: 75 });
+    expect(t).toEqual({ realised: 100, unrealised: -25, pnl: 75, charges: 0, net: 75 });
+    const bill = { total_paise: 30, turnover_paise: 1, lines: [], by_position: { "A|NRML": 30 }, schedule: { name: "", checked_on: "", source: "" } };
+    expect(positionTotals([pos("A", 1, { pnl_paise: 75 })], bill)).toMatchObject({ pnl: 75, charges: 30, net: 45 });
+    expect(chargesFor(pos("A", 1), bill)).toBe(30);
+    expect(chargesFor(pos("B", 1), bill)).toBe(0);
   });
 
   it("shows exact averages rounded to the paisa", () => {

@@ -162,6 +162,7 @@ export type ServerMessage =
   | { type: "algo"; account_id: string; kind: string; detail: string; algo: AlgoView }
   | { type: "gtt"; account_id: string; gtt: GttView }
   | ({ type: "portfolio" } & PortfolioSnapshot)
+  | ({ type: "charges"; account_id: string } & ChargeBill)
   | { type: "ops"; key: string; level: "INFO" | "WARN" | "ERROR" | "OK"; text: string; active: boolean; at: string }
   | ({ type: "chain" } & OptionChain)
   | { type: "error"; message: string }
@@ -451,4 +452,14 @@ export interface PortfolioSnapshot {
   items: Funds[] | Holding[] | Trade[];
   as_of: string | null; // when the broker last answered
   error: string; // why the latest refresh failed ("" when it worked)
+}
+
+// --- charges: the day's, and an order's estimate (GET …/charges, POST …/charges/estimate) ------
+
+export interface ChargeBill {
+  total_paise: number;
+  turnover_paise: number;
+  lines: { label: string; paise: number }[]; // brokerage, STT, exchange, SEBI, IPFT, stamp, GST, DP
+  by_position: Record<string, number>; // "instrument_id|product" -> its charges today (positionKey)
+  schedule: { name: string; checked_on: string; source: string };
 }

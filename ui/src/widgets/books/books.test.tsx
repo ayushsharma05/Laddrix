@@ -117,7 +117,7 @@ describe("Positions", () => {
   });
 
   it("shows each position, the total and that they match the broker", () => {
-    const { app } = setup((x) => <Positions {...x} />, {});
+    const { app, socket } = setup((x) => <Positions {...x} />, {});
     act(() =>
       app.store.applyPositions("acc-a", {
         ...SNAP,
@@ -138,7 +138,24 @@ describe("Positions", () => {
     expect(closed!.textContent).toContain("+₹2,088.50");
     expect(total!.textContent).toContain("+₹14,812.50");
     expect(screen.getByText("✓ = broker 2m")).toBeTruthy();
-    expect(screen.getAllByText("+₹14,812.50")).toHaveLength(2); // day P&L in the bar too
+    expect(screen.getAllByText("+₹14,812.50")).toHaveLength(4); // no charges yet: gross = net, bar and total
+    // a fill's charges arrive from the server: net = gross − charges, per row and for the day
+    act(() =>
+      socket().receive({
+        type: "charges",
+        account_id: "acc-a",
+        total_paise: 11152,
+        turnover_paise: 375750000,
+        lines: [{ label: "STT", paise: 9412 }, { label: "Brokerage", paise: 1740 }],
+        by_position: { "NFO:NIFTY26OCTFUT|NRML": 11152 },
+        schedule: { name: "Kite standard plan", checked_on: "2026-10-15", source: "" },
+      }),
+    );
+    const [nifty, , , sum] = rows("Positions");
+    expect(nifty!.textContent).toContain("111.52");
+    expect(nifty!.textContent).toContain("+₹12,608.48"); // 12,720.00 − 111.52
+    expect(sum!.textContent).toContain("+₹14,700.98");
+    expect(screen.getByText("+₹14,700.98", { selector: ".book-bar b" })).toBeTruthy();
   });
 
   it("a position that differs from the broker is marked on its row and in the bar", () => {
