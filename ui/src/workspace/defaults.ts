@@ -67,13 +67,14 @@ export async function buildDefault(api: DockviewApi, pageName: string, instrumen
     ticketAnchor ? { position: { referencePanel: ticketAnchor.id, direction: "right" } } : undefined,
   );
 
-  // the bottom row: order book (+ algos tab) | positions | audit trail (+ messages tab)
+  // the bottom row: order book (+ algos and GTT tabs) | positions | audit trail (+ messages tab)
   const book = add(
     "orders",
     {},
     watch ? { position: { direction: "below" } } : undefined,
   );
   add("algos", {}, book ? { position: { referencePanel: book.id, direction: "within" } } : undefined);
+  add("gtt", {}, book ? { position: { referencePanel: book.id, direction: "within" } } : undefined);
   if (book) {
     try {
       book.api.setActive(); // the order book shows; Algos waits in the tab next to it

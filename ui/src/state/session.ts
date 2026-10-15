@@ -8,7 +8,7 @@
 
 import { ApiError, type Rest } from "../api/rest";
 import type { StreamClient } from "../api/stream";
-import type { AlgoView, Me, OrderView, PositionsSnapshot } from "../api/types";
+import type { AlgoView, GttView, Me, OrderView, PositionsSnapshot } from "../api/types";
 import type { Store } from "./store";
 
 export class Session {
@@ -31,6 +31,7 @@ export class Session {
       stream.on("kill", (m) => store.applyMessage(m)),
       stream.on("position_alert", (m) => store.applyMessage(m)),
       stream.on("algo", (m) => store.applyMessage(m)),
+      stream.on("gtt", (m) => store.applyMessage(m)),
       stream.on("ops", (m) => store.applyMessage(m)),
       stream.on("error", (m) => store.applyMessage(m)),
     );
@@ -82,14 +83,16 @@ export class Session {
       await Promise.all(
         me.accounts.map(async (account) => {
           const base = `/api/accounts/${encodeURIComponent(account.id)}`;
-          const [orders, positions, algos] = await Promise.all([
+          const [orders, positions, algos, gtts] = await Promise.all([
             this.rest.get<OrderView[]>(`${base}/orders`),
             this.rest.get<PositionsSnapshot>(`${base}/positions`),
             this.rest.get<AlgoView[]>(`${base}/algos`).catch(() => [] as AlgoView[]), // a nicety
+            this.rest.get<GttView[]>(`${base}/gtt`).catch(() => [] as GttView[]), // not every broker
           ]);
           this.store.applyOrders(account.id, orders);
           this.store.applyPositions(account.id, positions);
           this.store.applyAlgos(account.id, algos);
+          this.store.applyGtts(account.id, gtts);
         }),
       );
     } catch (err) {

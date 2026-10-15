@@ -46,3 +46,16 @@ the API answers 404 "… doesn't hold GTT orders", so screens hide it.
 - **What a GTT can't do**: the risk checks run when it is placed, not when it fires (the
   broker places that order without asking us). Paper GTTs, like paper orders, live in memory:
   a restart forgets them; Kite's survive and are read back at start.
+
+## Screens (K9.4, #202)
+
+- **GTT Book** (`ui/src/widgets/gtt/`, a tab beside Algos): GTTs live from the stream,
+  active first; New GTT draws its form from the spec (kinds and their labels, legs per kind,
+  help, products, tick, lot); a two-leg kind shows "Stop (lower)" and "Target (upper)". The
+  form starts each trigger 1% from the market and each limit five ticks past it, and says
+  every problem in words before the click (the server checks again). Delete on an active one.
+- **Ticket tabs**: Order | Algo | GTT. Algo and GTT reuse the same forms (`StartForm`,
+  `GttForm`) with the ticket's contract, side and lots. The GTT tab appears only when the
+  broker publishes a GTT spec.
+- **Algo screen**: the picker is grouped by the spec's `family`; protection algos carry a
+  "held" tag (held by MockTrade, unlike a GTT).

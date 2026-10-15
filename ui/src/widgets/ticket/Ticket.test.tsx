@@ -179,4 +179,27 @@ describe("Order ticket", () => {
     });
     expect(screen.getByLabelText("Order summary").textContent).toContain("Worst position +300");
   });
+
+  it("has Order | Algo | GTT tabs: Algo starts an algo here, GTT appears only when the broker holds GTTs", async () => {
+    const SLICER = { code: "SLICER", name: "Slicer", help: "slices", family: "execution", params: [] };
+    const TRAIL = { code: "TRAILING_STOP", name: "Trailing stop", help: "held by MockTrade", family: "protection", params: [] };
+    const { setParams, rerender } = setup({}, { "GET /api/accounts/acc-a/algo-specs": [SLICER, TRAIL] });
+    const tabs = () => screen.getAllByRole("tab").map((t) => t.textContent);
+    await vi.waitFor(() => expect(tabs()).toEqual(["Order", "Algo"])); // no GTT: the spec answers 404
+    fireEvent.click(screen.getByRole("tab", { name: "Algo" }));
+    expect(setParams).toHaveBeenCalledWith({ mode: "algo" });
+    rerender({ mode: "algo" });
+    const form = await screen.findByRole("form", { name: "Start an algo" });
+    expect(form.textContent).toContain("NIFTY26OCTFUT"); // the ticket's contract
+    expect([...form.querySelectorAll("optgroup")].map((g) => g.label)).toEqual(["Execution: work an order", "Protection: held by MockTrade"]);
+    expect((screen.getByRole("textbox", { name: "Lots" }) as HTMLInputElement).value).toBe("2"); // the ticket's lots
+  });
+
+  it("shows the GTT tab and form when the broker publishes a GTT spec", async () => {
+    const spec = { instrument_id: ID, kinds: ["single"], legs: { single: 1 }, labels: { single: "Single" }, tick_paise: 10, lot_size: 75, products: ["NRML"], min_distance_pct: 0.25, expiry_days: 365, max_active: 250, help: {} };
+    const { rerender } = setup({}, { "GET /api/accounts/acc-a/gtt-spec": spec, "GET /api/accounts/acc-a/algo-specs": [] });
+    await vi.waitFor(() => expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Order", "Algo", "GTT"]));
+    rerender({ mode: "gtt" });
+    expect(await screen.findByRole("button", { name: /Place GTT BUY 150 NIFTY26OCTFUT/ })).toBeTruthy(); // the ticket's side and lots
+  });
 });

@@ -21,6 +21,9 @@ import { registerWidget, type BaseParams, type WidgetProps } from "../../workspa
 import { orderPrice, statusText, statusTone } from "../books/model";
 import {
   buildAlgoBody,
+  byFamily,
+  familyLabel,
+  familyOf,
   canPause,
   canResume,
   canStop,
@@ -43,6 +46,25 @@ const EMPTY_ORDERS: Record<string, OrderView> = {};
 
 const errorText = (e: unknown) => (e instanceof ApiError || e instanceof Error ? e.message : String(e));
 
+/** The account's algo specs (null while loading), and why not if they can't be had. */
+export function useAlgoSpecs(accountId: string | null): { specs: AlgoSpec[] | null; error: string } {
+  const { rest } = useApp();
+  const [state, setState] = useState<{ specs: AlgoSpec[] | null; error: string }>({ specs: null, error: "" });
+  useEffect(() => {
+    setState({ specs: null, error: "" });
+    if (!accountId) return;
+    let live = true;
+    rest
+      .get<AlgoSpec[]>(`/api/accounts/${encodeURIComponent(accountId)}/algo-specs`)
+      .then((specs) => live && setState({ specs, error: "" }))
+      .catch((e: unknown) => live && setState({ specs: null, error: errorText(e) }));
+    return () => {
+      live = false;
+    };
+  }, [rest, accountId]);
+  return state;
+}
+
 export function AlgoManager({ params, publish }: WidgetProps<AlgoParams>) {
   const { rest, store } = useApp();
   const accountId = useStore((s) => s.accountId);
@@ -52,22 +74,7 @@ export function AlgoManager({ params, publish }: WidgetProps<AlgoParams>) {
   const [selected, setSelected] = useState<string | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [starting, setStarting] = useState(false);
-  const [specs, setSpecs] = useState<AlgoSpec[] | null>(null);
-  const [specError, setSpecError] = useState("");
-
-  useEffect(() => {
-    setSpecs(null);
-    setSpecError("");
-    if (!accountId) return;
-    let live = true;
-    rest
-      .get<AlgoSpec[]>(`/api/accounts/${encodeURIComponent(accountId)}/algo-specs`)
-      .then((s) => live && setSpecs(s))
-      .catch((e: unknown) => live && setSpecError(errorText(e)));
-    return () => {
-      live = false;
-    };
-  }, [rest, accountId]);
+  const { specs, error: specError } = useAlgoSpecs(accountId);
 
   const control = useCallback(
     (list: AlgoView[], action: Action) => {
@@ -188,7 +195,14 @@ export function AlgoManager({ params, publish }: WidgetProps<AlgoParams>) {
                     {expanded ? "▾" : "▸"}
                   </button>
                   <span>{a.algo_id}</span>
-                  <span>{a.code}</span>
+                  <span>
+                    {a.code}
+                    {familyOf(specs, a.code) === "protection" && (
+                      <span className="algo-family" title="Held by MockTrade: works while the server runs (a broker GTT survives our outages)">
+                        held
+                      </span>
+                    )}
+                  </span>
                   <span>{shortName(a.instrument_id)}</span>
                   <span className={a.side === "BUY" ? "buy-text" : "sell-text"}>{a.side}</span>
                   <span className="num">{qty(a.qty)}</span>
@@ -266,19 +280,21 @@ interface StartFormProps {
   accountId: string;
   specs: AlgoSpec[]; // at least one
   defaultInstrument: string | null;
+  defaultSide?: Side;
+  defaultLots?: number;
   onStarted: (view: AlgoView) => void;
   onCancel: () => void;
 }
 
 /** The start form, drawn from the chosen algo's spec. */
-function StartForm({ accountId, specs, defaultInstrument, onStarted, onCancel }: StartFormProps) {
+export function StartForm({ accountId, specs, defaultInstrument, defaultSide = "BUY", defaultLots = 1, onStarted, onCancel }: StartFormProps) {
   const { rest, store } = useApp();
   const [code, setCode] = useState<string>(specs[0]!.code);
   const spec = specs.find((s) => s.code === code) ?? specs[0]!;
   const [values, setValues] = useState<FormValues>(() => initialValues(spec));
   const [instrumentId, setInstrumentId] = useState<string | null>(defaultInstrument);
-  const [side, setSide] = useState<Side>("BUY");
-  const [lots, setLots] = useState("1");
+  const [side, setSide] = useState<Side>(defaultSide);
+  const [lots, setLots] = useState(String(defaultLots));
   const [product, setProduct] = useState("");
   const [problems, setProblems] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -331,10 +347,14 @@ function StartForm({ accountId, specs, defaultInstrument, onStarted, onCancel }:
         <div className="algo-field">
           <span>Algo</span>
           <select aria-label="Algo" value={spec.code} onChange={(e) => pick(e.target.value)}>
-            {specs.map((s) => (
-              <option key={s.code} value={s.code}>
-                {s.name}
-              </option>
+            {byFamily(specs).map(([family, list]) => (
+              <optgroup key={family} label={familyLabel(family)}>
+                {list.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>

@@ -17,6 +17,8 @@ import { SearchBox } from "../../components/SearchBox";
 import { price as fmtPrice, qty as fmtQty, rupees, shortName } from "../../lib/format";
 import { tradingBlock } from "../../state/gate";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
+import { StartForm, useAlgoSpecs } from "../algos/AlgoManager";
+import { GttForm, useGttSpec } from "../gtt/GttBook";
 import { CONFIRM_CHOICES } from "../ladder/Ladder";
 import { leaves, snap, unconfirmed, workingOrders } from "../ladder/model";
 import {
@@ -32,6 +34,7 @@ import {
 } from "./model";
 
 export interface TicketParams extends BaseParams {
+  mode?: "order" | "algo" | "gtt"; // the ticket's tabs: a plain order, an algo, or a GTT
   lots: number;
   type: string; // an order type code from the order spec ("LIMIT", "SL-M"…)
   tif: string;
@@ -83,6 +86,8 @@ function TicketBody({
   const orders = useStore((s) => (accountId ? s.books[accountId]?.orders : undefined));
   const positions = useStore((s) => (accountId ? s.books[accountId]?.positions : undefined));
   const blocked = useStore((s) => tradingBlock(s, accountId));
+  const { specs: algoSpecs } = useAlgoSpecs(accountId);
+  const { spec: gttSpec } = useGttSpec(accountId, instrument.id); // none: the broker holds no GTTs
 
   const type = pickType(spec, params.type)!; // TicketWithSpec makes sure there is one
   const tif = pickValidity(type, params.tif);
@@ -183,6 +188,53 @@ function TicketBody({
     else setTriggerText(next);
   };
 
+  const mode = params.mode ?? "order";
+  const tabs = <ModeTabs mode={mode} gtt={!!gttSpec} onChange={(m) => setParams({ mode: m })} />;
+  if (mode === "algo" && accountId) {
+    return (
+      <div className="ticket advanced">
+        {tabs}
+        {algoSpecs ? (
+          <StartForm
+            key={`${accountId}.${id}`}
+            accountId={accountId}
+            specs={algoSpecs}
+            defaultInstrument={id}
+            defaultSide={side}
+            defaultLots={lots || 1}
+            onStarted={(view) => {
+              store.applyAlgos(accountId, [view]);
+              store.addMessage("INFO", id, `${view.algo_id} ${view.code} started from the ticket`);
+              setParams({ mode: "order" });
+            }}
+            onCancel={() => setParams({ mode: "order" })}
+          />
+        ) : (
+          <div className="empty-note">Loading algos…</div>
+        )}
+      </div>
+    );
+  }
+  if (mode === "gtt" && accountId && gttSpec) {
+    return (
+      <div className="ticket advanced">
+        {tabs}
+        <GttForm
+          key={`${accountId}.${id}`}
+          accountId={accountId}
+          defaultInstrument={id}
+          defaultSide={side}
+          defaultLots={lots || 1}
+          onPlaced={(view) => {
+            store.applyGtts(accountId, [view]);
+            setParams({ mode: "order" });
+          }}
+          onCancel={() => setParams({ mode: "order" })}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`ticket ${side === "BUY" ? "buy" : "sell"}${blocked ? " blocked" : ""}`}
@@ -199,6 +251,7 @@ function TicketBody({
         }
       }}
     >
+      {tabs}
       <div className="ticket-head">
         <b>{instrument.symbol}</b>
         <span className="dim">{instrument.exchange} · lot {spec.lot_size} · tick {fmtPrice(tickSize)}</span>
@@ -347,6 +400,24 @@ function TicketBody({
         <span className={`dot ${blocked || problem || note?.level === "WARN" ? "WARN" : "INFO"}`} />
         <span className="text">{blocked ? `Trading paused: ${blocked}` : problem ? `Fix: ${problem}` : (note?.text ?? "Enter sends · Esc clears · ↑↓ one tick")}</span>
       </div>
+    </div>
+  );
+}
+
+/** Order | Algo | GTT: what the ticket sends. GTT shows only when the broker holds GTTs. */
+function ModeTabs({ mode, gtt, onChange }: { mode: string; gtt: boolean; onChange: (m: "order" | "algo" | "gtt") => void }) {
+  const tabs: ["order" | "algo" | "gtt", string, string][] = [
+    ["order", "Order", "A single order now"],
+    ["algo", "Algo", "Work the order with an algo, or protect a position (trailing stop, OCO, bracket)"],
+  ];
+  if (gtt) tabs.push(["gtt", "GTT", "An order the broker holds until a price is touched"]);
+  return (
+    <div className="ticket-modes" role="tablist" aria-label="Ticket mode">
+      {tabs.map(([key, label, help]) => (
+        <button key={key} type="button" role="tab" aria-selected={mode === key} className={`book-tab${mode === key ? " on" : ""}`} title={help} onClick={() => onChange(key)}>
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
