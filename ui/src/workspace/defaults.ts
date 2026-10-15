@@ -67,7 +67,7 @@ export async function buildDefault(api: DockviewApi, pageName: string, instrumen
     ticketAnchor ? { position: { referencePanel: ticketAnchor.id, direction: "right" } } : undefined,
   );
 
-  // the bottom row: order book (+ algos and GTT tabs) | positions | audit trail (+ messages tab)
+  // the bottom row: order book (+ algos and GTT tabs) | positions (+ holdings, funds) | audit trail (+ messages)
   const book = add(
     "orders",
     {},
@@ -83,6 +83,16 @@ export async function buildDefault(api: DockviewApi, pageName: string, instrumen
     }
   }
   const positions = add("positions", {}, book ? { position: { referencePanel: book.id, direction: "right" } } : undefined);
+  // holdings and funds wait in tabs beside positions (the account's money, from the broker)
+  add("holdings", {}, positions ? { position: { referencePanel: positions.id, direction: "within" } } : undefined);
+  add("funds", {}, positions ? { position: { referencePanel: positions.id, direction: "within" } } : undefined);
+  if (positions) {
+    try {
+      positions.api.setActive();
+    } catch {
+      // a nicety
+    }
+  }
   const audit = add("audit", {}, positions ? { position: { referencePanel: positions.id, direction: "right" } } : undefined);
   add("messages", {}, audit ? { position: { referencePanel: audit.id, direction: "within" } } : undefined);
   if (audit) {

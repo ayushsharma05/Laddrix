@@ -161,6 +161,7 @@ export type ServerMessage =
     }
   | { type: "algo"; account_id: string; kind: string; detail: string; algo: AlgoView }
   | { type: "gtt"; account_id: string; gtt: GttView }
+  | ({ type: "portfolio" } & PortfolioSnapshot)
   | { type: "ops"; key: string; level: "INFO" | "WARN" | "ERROR" | "OK"; text: string; active: boolean; at: string }
   | ({ type: "chain" } & OptionChain)
   | { type: "error"; message: string }
@@ -393,4 +394,61 @@ export interface GttSpec {
   expiry_days: number;
   max_active: number;
   help: Record<string, string>;
+}
+
+// --- funds, holdings, tradebook from the broker (GET …/funds|holdings|trades; stream "portfolio") ---
+// Every figure comes from the server; a failed refresh keeps the last figures with `error` set.
+
+export type PortfolioKind = "funds" | "holdings" | "trades";
+
+export interface FundsLine {
+  label: string;
+  paise: number;
+}
+
+export interface Funds {
+  segment: string;
+  available_paise: number;
+  used_paise: number;
+  opening_paise: number;
+  collateral_paise: number;
+  available_lines: FundsLine[];
+  used_lines: FundsLine[];
+  estimate: boolean; // worked out by MockTrade (paper), not the broker's own figures
+}
+
+export interface Holding {
+  instrument_id: string;
+  qty: number;
+  t1_qty: number;
+  used_qty: number;
+  total_qty: number;
+  avg_price_paise: number;
+  ltp_paise: number | null;
+  close_paise: number | null;
+  invested_paise: number;
+  value_paise: number | null;
+  pnl_paise: number | null;
+  day_change_paise: number | null;
+}
+
+export interface Trade {
+  trade_id: string;
+  broker_order_id: string;
+  client_order_id: string; // "" for orders placed outside MockTrade
+  instrument_id: string;
+  side: Side;
+  product: string;
+  qty: number;
+  price_paise: number;
+  value_paise: number;
+  ts: string | null;
+}
+
+export interface PortfolioSnapshot {
+  account_id: string;
+  kind: PortfolioKind;
+  items: Funds[] | Holding[] | Trade[];
+  as_of: string | null; // when the broker last answered
+  error: string; // why the latest refresh failed ("" when it worked)
 }

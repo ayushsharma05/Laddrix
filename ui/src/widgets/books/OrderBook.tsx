@@ -14,10 +14,12 @@ import { useApp, useStore } from "../../app/context";
 import { clock, price, qty, shortName } from "../../lib/format";
 import { cancelBlock } from "../../state/gate";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
+import { TradesTable } from "../portfolio/TradesTable";
+import { usePortfolio } from "../portfolio/usePortfolio";
 import { cancellable, orderPrice, ordersFor, statusText, statusTone, tabCounts, type OrderTab } from "./model";
 
 export interface OrderBookParams extends BaseParams {
-  tab: OrderTab;
+  tab: OrderTab | "trades"; // Trades: the broker's tradebook (widgets/portfolio)
 }
 
 const TABS: [OrderTab, string][] = [
@@ -34,7 +36,9 @@ export function OrderBook({ params, setParams, publish, open }: WidgetProps<Orde
   const accountId = useStore((s) => s.accountId);
   const orders = useStore((s) => (s.accountId ? s.books[s.accountId]?.orders : undefined)) ?? EMPTY;
   const tab = params.tab ?? "working";
-  const rows = useMemo(() => ordersFor(orders, tab), [orders, tab]);
+  const orderTab: OrderTab = tab === "trades" ? "all" : tab;
+  const rows = useMemo(() => ordersFor(orders, orderTab), [orders, orderTab]);
+  const trades = usePortfolio("trades");
   const counts = useMemo(() => tabCounts(orders), [orders]);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -74,6 +78,17 @@ export function OrderBook({ params, setParams, publish, open }: WidgetProps<Orde
             {label} {counts[key]}
           </button>
         ))}
+        {!trades.missing && (
+          <button
+            type="button"
+            className={`book-tab${tab === "trades" ? " on" : ""}`}
+            aria-pressed={tab === "trades"}
+            title="Every fill at the exchange today, from the broker's tradebook"
+            onClick={() => setParams({ tab: "trades" })}
+          >
+            Trades {trades.snapshot?.items.length ?? ""}
+          </button>
+        )}
         <span className="book-spacer" />
         <button
           type="button"
@@ -85,70 +100,74 @@ export function OrderBook({ params, setParams, publish, open }: WidgetProps<Orde
           Cancel all{working.length ? ` (${working.length})` : ""}
         </button>
       </div>
-      <div className="book-scroll">
-        <div className="grid-head book-row orders-row" role="row">
-          <span>Time</span>
-          <span>Contract</span>
-          <span>Side</span>
-          <span className="num">Qty</span>
-          <span className="num">Filled</span>
-          <span className="num">Price</span>
-          <span className="num">Avg</span>
-          <span>Status</span>
-          <span />
+      {tab === "trades" ? (
+        <TradesTable portfolio={trades} publish={publish} open={open} />
+      ) : (
+        <div className="book-scroll">
+          <div className="grid-head book-row orders-row" role="row">
+            <span>Time</span>
+            <span>Contract</span>
+            <span>Side</span>
+            <span className="num">Qty</span>
+            <span className="num">Filled</span>
+            <span className="num">Price</span>
+            <span className="num">Avg</span>
+            <span>Status</span>
+            <span />
+          </div>
+          <div className="grid-body" role="grid" aria-label="Orders">
+            {!accountId && <div className="empty-note">No account selected.</div>}
+            {accountId && !rows.length && <div className="empty-note">No {tab === "all" ? "" : `${TABS.find((t) => t[0] === tab)![1].toLowerCase()} `}orders today.</div>}
+            {rows.map((o) => {
+              const id = o.request.client_order_id;
+              const status = statusText(o);
+              return (
+                <div
+                  key={id}
+                  role="row"
+                  aria-selected={selected === id}
+                  className={`row book-row orders-row${selected === id ? " selected" : ""}`}
+                  title={`${id}${o.broker_order_id ? ` · broker ${o.broker_order_id}` : ""}${o.request.basket_id ? ` · basket ${o.request.basket_id}` : ""} · double-click for its audit trail`}
+                  onClick={() => {
+                    setSelected(id);
+                    publish(o.request.instrument_id);
+                  }}
+                  onDoubleClick={() => open("audit", { link: "none", orderId: id })}
+                >
+                  <span className="dim">{clock(o.created_at)}</span>
+                  <span>{shortName(o.request.instrument_id)}</span>
+                  <span className={o.request.side === "BUY" ? "buy-text" : "sell-text"}>{o.request.side}</span>
+                  <span className="num">{qty(o.request.qty)}</span>
+                  <span className="num">{qty(o.filled_qty)}</span>
+                  <span className="num">{orderPrice(o)}</span>
+                  <span className="num">{o.filled_qty > 0 ? price(o.avg_price_paise) : "–"}</span>
+                  <span className={`tone-${statusTone(o)}`} title={o.reason || status}>
+                    {status}
+                    {o.status === "REJECTED" && o.reason ? `: ${o.reason}` : ""}
+                  </span>
+                  {cancellable(o) ? (
+                    <button
+                      type="button"
+                      className="row-action"
+                      aria-label={`Cancel ${o.request.side} ${o.request.qty} ${shortName(o.request.instrument_id)}`}
+                      title="Cancel"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cancel([o]);
+                      }}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    >
+                      ×
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div className="grid-body" role="grid" aria-label="Orders">
-          {!accountId && <div className="empty-note">No account selected.</div>}
-          {accountId && !rows.length && <div className="empty-note">No {tab === "all" ? "" : `${TABS.find((t) => t[0] === tab)![1].toLowerCase()} `}orders today.</div>}
-          {rows.map((o) => {
-            const id = o.request.client_order_id;
-            const status = statusText(o);
-            return (
-              <div
-                key={id}
-                role="row"
-                aria-selected={selected === id}
-                className={`row book-row orders-row${selected === id ? " selected" : ""}`}
-                title={`${id}${o.broker_order_id ? ` · broker ${o.broker_order_id}` : ""}${o.request.basket_id ? ` · basket ${o.request.basket_id}` : ""} · double-click for its audit trail`}
-                onClick={() => {
-                  setSelected(id);
-                  publish(o.request.instrument_id);
-                }}
-                onDoubleClick={() => open("audit", { link: "none", orderId: id })}
-              >
-                <span className="dim">{clock(o.created_at)}</span>
-                <span>{shortName(o.request.instrument_id)}</span>
-                <span className={o.request.side === "BUY" ? "buy-text" : "sell-text"}>{o.request.side}</span>
-                <span className="num">{qty(o.request.qty)}</span>
-                <span className="num">{qty(o.filled_qty)}</span>
-                <span className="num">{orderPrice(o)}</span>
-                <span className="num">{o.filled_qty > 0 ? price(o.avg_price_paise) : "–"}</span>
-                <span className={`tone-${statusTone(o)}`} title={o.reason || status}>
-                  {status}
-                  {o.status === "REJECTED" && o.reason ? `: ${o.reason}` : ""}
-                </span>
-                {cancellable(o) ? (
-                  <button
-                    type="button"
-                    className="row-action"
-                    aria-label={`Cancel ${o.request.side} ${o.request.qty} ${shortName(o.request.instrument_id)}`}
-                    title="Cancel"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      cancel([o]);
-                    }}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                  >
-                    ×
-                  </button>
-                ) : (
-                  <span />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
