@@ -16,6 +16,8 @@ from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.domain.orders import OrderStatus, OrderUpdate, Product, Side
 from mocktrade.domain.ticks import DepthLevel, Tick
 from mocktrade.marketdata.service import MarketData
+from mocktrade.ops.alerts import Alerts
+from mocktrade.ops.protection import ProtectionGuard
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
@@ -72,6 +74,7 @@ class World:
                 algo_types=BUILTIN,
             )
         self.login_calls = []
+        self.protection = ProtectionGuard(self.platform, Alerts())
         self.app = create_app(
             self.platform,
             self.users,
@@ -79,6 +82,7 @@ class World:
             broker_login=self,
             broker_status=lambda account: "login_needed" if account.id == "acc-ayush" else None,
             monotonic=self.clock.mono,
+            protection=self.protection,
         )
 
     def add_user(self, user_id, roles):
@@ -605,6 +609,21 @@ async def test_an_mtm_retry_needs_a_confirmation_and_a_blocked_close(world):
     assert r.status_code == 409 and "only a blocked close can be retried" in r.json()["detail"]
     body = (await c.get(base)).json()
     assert (body["breaches"], body["problem"]) == ([], "")
+    await c.aclose()
+
+
+async def test_lost_stops_api_lists_them_and_restore_needs_a_confirmation(world):
+    c = await world.logged_in("riya")
+    base = "/api/accounts/acc-riya/protection"
+    body = (await c.get(base)).json()
+    assert body["unprotected"] == [] and "only while the server runs" in body["guarantee"][0]
+    assert (await c.post(f"{base}/restore", json={"instrument_id": FUT, "confirm": False})
+            ).status_code == 422  # fmt: skip
+    r = await c.post(f"{base}/restore", json={"instrument_id": FUT, "confirm": True})
+    assert r.status_code == 409 and "isn't flagged unprotected" in r.json()["detail"]
+    other = await c.post("/api/accounts/acc-ayush/protection/restore",
+                         json={"instrument_id": FUT, "confirm": True})  # fmt: skip
+    assert other.status_code == 404  # another trader's account doesn't exist for her
     await c.aclose()
 
 
