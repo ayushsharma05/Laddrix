@@ -1,4 +1,4 @@
-import { ACTIONS, actionFor, chordOf, cleanBindings, keysOf, refusal, withKey, withoutKey } from "./model";
+import { ACTIONS, actionFor, chordOf, cleanBindings, keyText, keysOf, refusal, withKey, withoutKey } from "./model";
 
 const press = (key: string, mods: { ctrl?: boolean; meta?: boolean; alt?: boolean; shift?: boolean; code?: string } = {}) =>
   chordOf({ key, code: mods.code ?? "", ctrlKey: !!mods.ctrl, metaKey: !!mods.meta, altKey: !!mods.alt, shiftKey: !!mods.shift });
@@ -76,5 +76,16 @@ describe("changing keys", () => {
 
   it("the defaults themselves never clash", () => {
     for (const a of ACTIONS) for (const k of a.keys) expect(refusal(a.id, k, {})).toBeNull();
+  });
+});
+
+describe("keys in hints", () => {
+  it("shows the first key the way people read it", () => {
+    expect(keyText("ticket-send", {})).toBe("Enter");
+    expect(keyText("ticket-clear", {})).toBe("Esc");
+    expect(keyText("ticket-up", {})).toBe("↑");
+    expect(keyText("ticket-send", { "ticket-send": ["Ctrl+Enter"] })).toBe("Ctrl+Enter");
+    expect(keyText("ticket-send", { "ticket-send": [] })).toBe("–");
+    expect(keyText("chart-back", { "chart-back": ["Shift+ArrowLeft"] })).toBe("Shift+←");
   });
 });

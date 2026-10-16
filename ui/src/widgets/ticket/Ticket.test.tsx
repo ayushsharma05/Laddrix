@@ -144,6 +144,7 @@ describe("Order ticket", () => {
     const { calls, app } = setup({}, { "PUT /api/me/settings/keys": { name: "keys" } });
     const price = await ready();
     await act(() => app.keys.save({ "ticket-send": ["Ctrl+Enter"] }));
+    expect(screen.getByText("Ctrl+Enter sends · Esc clears · ↑↓ one tick")).toBeTruthy(); // the hint follows
     fireEvent.keyDown(price, { key: "Enter" });
     expect(posts(calls)).toHaveLength(0); // Enter no longer sends
     fireEvent.keyDown(price, { key: "s", code: "KeyS", altKey: true });

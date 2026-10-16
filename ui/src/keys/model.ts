@@ -145,3 +145,12 @@ export function cleanBindings(raw: unknown): Bindings {
   }
   return out;
 }
+
+const SHOWN: Record<string, string> = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", Escape: "Esc" };
+
+/** An action's first key as a hint shows it ("Enter", "Esc", "↑"); "–" when it has none. */
+export function keyText(actionId: string, bindings: Bindings): string {
+  const action = ACTIONS.find((a) => a.id === actionId);
+  const first = action ? keysOf(action, bindings)[0] : undefined;
+  return first ? first.split("+").map((part) => SHOWN[part] ?? part).join("+") : "–";
+}
