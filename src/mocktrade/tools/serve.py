@@ -57,11 +57,15 @@ from fastapi import FastAPI
 
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.kite.http import BASE_URL
+from mocktrade.broker.kite.instruments import BROKER as KITE
 from mocktrade.broker.kite.live import KiteLive
 from mocktrade.broker.kite.ticker import WS_URL
 from mocktrade.broker.paper import PaperBroker
 from mocktrade.charges.model import ScheduleCharges
 from mocktrade.charges.schedules import load_schedule
+from mocktrade.charts.candles import CandleBuilder
+from mocktrade.charts.history import KiteHistory, RecordedHistory
+from mocktrade.charts.service import Charts
 from mocktrade.config import ConfigError, KiteSettings, environment
 from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.marketdata.service import MarketData
@@ -364,6 +368,17 @@ def build(settings: ServeSettings) -> Assembly:
         ticks=(lambda d: ticks.read_timed(d) if ticks and d in ticks.days() else None),
         candles=candle_store.rows,
     )  # fmt: skip
+    # charts: live candles from every tick; history from Kite (or the recordings on paper)
+    builder = CandleBuilder()
+    md.tap(builder.on_tick)
+    if kite is not None:
+        history = KiteHistory(kite, lambda i: instruments.to_broker(KITE, i))
+        history_name = "Kite historical data"
+    elif ticks is not None:
+        history, history_name = RecordedHistory(ticks), "recorded ticks"
+    else:
+        history, history_name = None, ""
+    charts = Charts(builder, history, events=events, history_name=history_name)
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
     jobs.append(scheduler.run)
@@ -382,6 +397,7 @@ def build(settings: ServeSettings) -> Assembly:
         ticks=ticks,
         backtests=backtests,
         candles=candle_store,
+        charts=charts,
         static_dir=ui,
     )
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)
