@@ -134,3 +134,14 @@ async def test_a_lost_bracket_comes_back_as_an_oco_at_its_levels(tmp_path, nifty
     assert row["restore_as"] == ("OCO SELL 150 NFO:NIFTY26OCTFUT NRML "
                                  "{'target_paise': 2504000, 'stop_paise': 2499000}")  # fmt: skip
     await log.aclose()
+
+
+async def test_without_knowing_which_stop_it_had_restore_says_to_start_one_by_hand(
+    tmp_path, nifty_fut
+):
+    p, rt, log, guard = boot(tmp_path, nifty_fut, held=75)
+    guard._flags[("acc", FUT)] = "its stop failed"  # flagged, but its stop isn't on record
+    (row,) = guard.status("acc")
+    assert row["restore_as"] is None
+    assert row["blocked_by"] == "which stop it had isn't known: start a stop for it by hand"
+    await log.aclose()
