@@ -280,6 +280,7 @@ async def test_the_screens_api_form_and_a_day_as_csv_and_pdf(tmp_path, nifty_fut
     assert csv.headers["content-type"].startswith("text/csv")
     assert f'filename="mocktrade-backtest-{run_id}-2026-10-16.csv"' in csv.headers[
         "content-disposition"]  # fmt: skip
+    assert csv.text.startswith("End-of-day report,backtest,2026-10-16,final")
     assert "NIFTY26OCTFUT" in csv.text
     pdf = await c.get(f"{base}/{DAY}?format=pdf")
     assert pdf.content.startswith(b"%PDF") and pdf.headers["content-type"] == "application/pdf"

@@ -126,3 +126,50 @@ Checks:
 - `tests/test_backtest.py`;
 - `context/scripts/mutate-backtest.py` (12/12);
 - `context/scripts/check-backtest.py` on the demo recording.
+
+## K11.4 Research screens (#226)
+
+Two widgets (Widgets ▾): **Recordings** and **Backtests**. Every figure, choice and default comes
+from the server; the screens hold no market rules and know no algo.
+
+```
+ Recordings                         Backtests
+ GET /api/research/recordings       GET  /api/research/backtests/form[?instrument_id=]
+     day · ticks · size · segments       algos (with their settings), recorded days, products,
+ GET /api/research/recordings/{day}      defaults (start, capital, product), max days,
+     a day's instruments, busiest first  candle days of the contract
+                                    POST /api/research/backtests          start a run
+                                    GET  /api/research/backtests          runs (polled each 1 s
+                                                                          while one is going)
+                                    GET  /api/research/backtests/{run}    summary + days
+                                    GET  …/{run}/days/{day}?format=json|csv|pdf
+                                         the K10.3 report of that day (same CSV/PDF writers)
+```
+
+- **New:** the algo form reuses the algo screen's parts (`ParamInput`, `buildAlgoBody`): pick
+  the algo, contract, side, lots, product, settings, start time (IST), capital, name and days
+  (All / None, or from imported candles). Days are sent in order. The server checks everything
+  again, and now refuses an unknown algo up front (before, the run started and failed).
+- **Runs:** each run's state in words ("Running: 2 of 5 days", "Failed: …", "Done (1 day
+  skipped)"). The list is asked again each second only while a run is queued or running, then
+  stops. The picked run is read again whenever its state or progress changes.
+- **A run:** totals (net, gross, charges, max drawdown, winning days and rate, trades), the
+  cumulative net by day as a line, and the days table. A skipped day says why and has no
+  downloads. A day opens to its own P&L curve through the day (before charges, sampled each
+  minute), its trades and rejections, with CSV and PDF.
+- **Compare:** two to four finished runs. Each picked run takes a colour slot and keeps it while
+  others come and go (colour follows the run, never its position). The chart covers every day
+  any of them ran, with a gap where a run didn't. Below it is a table of the figures side by side.
+- **The chart** (`LineChart.tsx`, plain SVG, no library):
+  - 2 px lines; zero is always in range and drawn dashed;
+  - the highest and lowest values on the left, the first and last x below;
+  - hover shows a crosshair and each series' value; a legend appears from two series;
+  - the SVG's accessible name says where each series ends.
+  - The four slot colours were run through a colour-blind validator against the dark surface
+    (all checks pass; worst adjacent pair ΔE 8.4).
+
+Checks:
+- `tests/test_backtest.py` (form, day JSON/CSV/PDF, skipped/unknown/unfinished days);
+- `ui/src/widgets/research/*.test.ts(x)`;
+- `context/scripts/mutate-research.py`;
+- `context/scripts/e2e-research.cjs` (real browser on the demo's recording).

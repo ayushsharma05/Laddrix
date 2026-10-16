@@ -136,6 +136,11 @@ describe("Backtests", () => {
     expect(totals.textContent).toContain("Winning days 1 of 2 (50.0%)");
     expect(within(detail).getByText(/capital ₹10,00,000.00 · slices 2/)).toBeTruthy();
     expect(within(detail).getByRole("img", { name: /Cumulative net by day: Cumulative net ends at \+₹400.00/ })).toBeTruthy();
+    const chart = within(detail).getByRole("img", { name: /Cumulative net by day/ });
+    fireEvent.mouseMove(chart, { clientX: 0 }); // jsdom has no layout: the first day
+    expect(within(detail).getByRole("status").textContent).toBe("2026-10-14−₹50.00");
+    fireEvent.mouseLeave(chart);
+    expect(within(detail).queryByRole("status")).toBeNull();
     const days = within(detail).getByRole("grid", { name: "Backtest days" });
     const rows = within(days).getAllByRole("row");
     expect(rows[0]!.textContent).toContain("skipped: nothing recorded");
@@ -154,6 +159,22 @@ describe("Backtests", () => {
     fireEvent.click(rows[0]!); // a skipped day opens nothing
     expect(within(detail).queryByRole("region", { name: "Day 2026-10-14" })).toBeNull();
   });
+
+  it("the picked run is read again as it moves on, so its results appear when it finishes", async () => {
+    let n = 0;
+    const running = run("BT1", { state: "running", progress: 1, summary: undefined });
+    mount(<Backtests {...props()} />, {
+      "GET /api/research/backtests": () => {
+        n += 1;
+        return { status: 200, body: [n < 2 ? running : run("BT1")] };
+      },
+      "GET /api/research/backtests/BT1": () => ({ status: 200, body: n < 2 ? running : run("BT1", { daily: DAILY }) }),
+    });
+    fireEvent.click(await screen.findByText("SLICER BUY 150 NIFTY26OCTFUT"));
+    const detail = await screen.findByRole("region", { name: "Backtest BT1" });
+    expect(within(detail).queryByLabelText("Run totals")).toBeNull();
+    expect((await within(detail).findByLabelText("Run totals", {}, { timeout: POLL_MS * 2 })).textContent).toContain("Net +₹400.00");
+  }, 10_000);
 
   it("a failed run says why", async () => {
     mount(<Backtests {...props()} />, {

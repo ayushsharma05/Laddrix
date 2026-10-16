@@ -97,7 +97,7 @@ export function buildBacktestBody(t: BacktestInput): { body: BacktestBody | null
   if (t.days.length > t.form.max_days) problems.push(`At most ${t.form.max_days} days in one run`);
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t.start)) problems.push("Start must be a time like 09:20");
   const capital = parsePrice(t.capital);
-  if (capital === null || capital <= 0) problems.push("Capital must be an amount above ₹0");
+  if (capital === null) problems.push("Capital must be an amount above ₹0");
   if (problems.length || !algo.body || capital === null) return { body: null, problems };
   const days = [...t.days].sort(); // a run goes through its days in order
   return {
