@@ -24,6 +24,7 @@ explained line by line.
 | 6 | [The screens](06-screens.md) | Every widget, how screens get data, why the server decides | 20 min |
 | 7 | [The code, folder by folder](07-code-map.md) | Every server file in one line; how to read Python and React here | 40 min |
 | 8 | [Data, tests and running it](08-data-tests-running.md) | What's on disk, backups, releases, the four levels of testing, commands | 20 min |
+| ★ | [Reading order: every file](reading-order.md) | Every code file in the order to read it, with what each is for | your pace |
 | 10 | [Build it yourself (plan)](10-build-it-yourself-plan.md) | The order to write every file from scratch; written step by step from Wednesday | 5 min |
 | 9 | [How we work, what's next, your steps](09-work-next-your-steps.md) | Issue → PR → merge; the plan from Wednesday; the steps only you can do | 15 min |
 
