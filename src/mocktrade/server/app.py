@@ -275,6 +275,7 @@ def create_app(
     scheduler: Scheduler | None = None,
     reports: Reports | None = None,
     ticks: FileTickStore | None = None,
+    replay_command: Callable[[date], str] | None = None,
     replay: ReplayFeed | None = None,
     backtests: Backtests | None = None,
     candles: CandleStore | None = None,
@@ -469,11 +470,16 @@ def create_app(
     @app.get("/api/research/recordings")
     async def recorded_days(user: Me) -> dict[str, Any]:
         store = recordings()
+        admin = user.has_role(Role.ADMIN)
         days = []
         for day in reversed(store.days()):
             s = await asyncio.to_thread(store.summary, day)
-            days.append({k: s[k] for k in ("day", "ticks", "bytes", "segments")}
-                        | {"instruments": len(s["instruments"])})  # fmt: skip
+            row = {k: s[k] for k in ("day", "ticks", "bytes", "segments")}
+            row["instruments"] = len(s["instruments"])
+            row["deletable"] = admin and day != store.today()  # today is still being written
+            if replay_command is not None:  # only where a replay of this server's days works
+                row["replay"] = replay_command(day)
+            days.append(row)
         return {"keep_days": store.keep_days, "days": days}
 
     @app.get("/api/research/recordings/{day}")
@@ -486,6 +492,25 @@ def create_app(
         if when not in store.days():
             raise HTTPException(404, f"nothing recorded on {day}")
         return await asyncio.to_thread(store.summary, when)
+
+    @app.delete("/api/research/recordings/{day}")
+    async def recorded_day_delete(day: str, user: Me) -> dict[str, Any]:
+        store = recordings()
+        if not user.has_role(Role.ADMIN):
+            raise HTTPException(403, "only an admin can delete recordings")
+        try:
+            when = date.fromisoformat(day)
+        except ValueError:
+            raise HTTPException(422, f"not a date: {day!r} (YYYY-MM-DD)") from None
+        try:
+            size = (await asyncio.to_thread(store.summary, when))["bytes"]
+            await asyncio.to_thread(store.delete, when)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from None
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
+        audit("RECORDING_DELETED", f"{user.id} deleted the ticks of {day} ({size} bytes)", {})
+        return {"day": day, "deleted": True}
 
     # --- backtests (K11.3) ---------------------------------------------------------------------
 

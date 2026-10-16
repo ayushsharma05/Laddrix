@@ -90,6 +90,54 @@ describe("Recordings", () => {
     expect(screen.queryByRole("list", { name: "Instruments on 2026-10-16" })).toBeNull();
   });
 
+  it("an admin deletes a day after confirming; the replay command can be copied", async () => {
+    let days = [
+      { day: "2026-10-16", ticks: 10, bytes: 2048, segments: {}, instruments: 1, deletable: false, replay: "replay 2026-10-16" },
+      { day: "2026-10-15", ticks: 5, bytes: 1024, segments: {}, instruments: 1, deletable: true, replay: "replay 2026-10-15" },
+    ];
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.assign(navigator, { clipboard: { writeText } });
+    const server = mount(<Recordings {...props()} />, {
+      "GET /api/research/recordings": () => ({ status: 200, body: { keep_days: 30, days } }),
+      "GET /api/research/recordings/2026-10-16": { day: "2026-10-16", ticks: 10, bytes: 2048, segments: {}, instruments: { [FUT]: 10 } },
+      "GET /api/research/recordings/2026-10-15": { day: "2026-10-15", ticks: 5, bytes: 1024, segments: {}, instruments: { [FUT]: 5 } },
+      "DELETE /api/research/recordings/2026-10-15": () => {
+        days = days.slice(0, 1);
+        return { status: 200, body: { day: "2026-10-15", deleted: true } };
+      },
+    });
+    const grid = await screen.findByRole("grid", { name: "Recorded days" });
+    fireEvent.click(await within(grid).findByText("2026-10-16"));
+    const today = await screen.findByLabelText("Actions for 2026-10-16");
+    expect(within(today).queryByRole("button", { name: "Delete…" })).toBeNull(); // still being written
+    expect(within(today).getByText("replay 2026-10-16")).toBeTruthy();
+    fireEvent.click(within(today).getByRole("button", { name: "Copy" }));
+    expect(writeText).toHaveBeenCalledWith("replay 2026-10-16");
+    expect(await within(today).findByRole("button", { name: "Copied" })).toBeTruthy();
+    fireEvent.click(within(grid).getByText("2026-10-15"));
+    const old = await screen.findByLabelText("Actions for 2026-10-15");
+    fireEvent.click(within(old).getByRole("button", { name: "Delete…" }));
+    expect(server.calls.some((c) => c.method === "DELETE")).toBe(false); // one click only arms it
+    fireEvent.click(within(old).getByRole("button", { name: "Confirm: delete 2026-10-15 (1.0 KB)" }));
+    await vi.waitFor(() => expect(within(grid).queryByText("2026-10-15")).toBeNull());
+    expect(server.calls.filter((c) => c.method === "DELETE").map((c) => c.path)).toEqual(["/api/research/recordings/2026-10-15"]);
+  });
+
+  it("a refused delete says why", async () => {
+    mount(<Recordings {...props()} />, {
+      "GET /api/research/recordings": { keep_days: 30, days: [{ day: "2026-10-15", ticks: 5, bytes: 1024, segments: {}, instruments: 1, deletable: true }] },
+      "GET /api/research/recordings/2026-10-15": { day: "2026-10-15", ticks: 5, bytes: 1024, segments: {}, instruments: {} },
+      "DELETE /api/research/recordings/2026-10-15": () => ({ status: 409, body: { detail: "2026-10-15 is today: it is still being recorded" } }),
+    });
+    fireEvent.click(await screen.findByText("2026-10-15"));
+    const actions = await screen.findByLabelText("Actions for 2026-10-15");
+    expect(within(actions).queryByText(/Replay:/)).toBeNull(); // this server can't replay its days
+    fireEvent.click(within(actions).getByRole("button", { name: "Delete…" }));
+    fireEvent.click(within(actions).getByRole("button", { name: /^Confirm: delete/ }));
+    expect((await within(actions).findByRole("alert")).textContent).toBe("2026-10-15 is today: it is still being recorded");
+    expect(within(actions).getByRole("button", { name: "Delete…" })).toBeTruthy(); // disarmed again
+  });
+
   it("says so when this server doesn't record, or nothing is recorded yet", async () => {
     mount(<Recordings {...props()} />, {});
     expect(await screen.findByText(/Not recording: not found/)).toBeTruthy();

@@ -1357,6 +1357,18 @@ label.algo-field {
 .rec-instruments li {
   cursor: pointer;
 }
+.rec-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 6px;
+  padding: 4px 12px;
+  background: var(--well);
+}
+.rec-replay code {
+  margin: 0 6px;
+  user-select: all;
+}
 .bt-row {
   grid-template-columns: 64px minmax(160px, 2fr) minmax(150px, 1.6fr) 100px 48px 120px;
   cursor: pointer;

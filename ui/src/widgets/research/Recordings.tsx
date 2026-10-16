@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../../api/rest";
-import type { RecordedDayDetail, Recordings as RecordingsData } from "../../api/types";
+import type { RecordedDay, RecordedDayDetail, Recordings as RecordingsData } from "../../api/types";
 import { useApp } from "../../app/context";
 import { qty, shortName } from "../../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
@@ -97,20 +97,85 @@ export function Recordings({ publish }: WidgetProps<BaseParams>) {
                 </span>
               </div>
               {open === d.day && detail?.day === d.day && (
-                <ul className="rec-instruments" aria-label={`Instruments on ${d.day}`}>
-                  {Object.entries(detail.instruments)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([id, n]) => (
-                      <li key={id} onClick={() => publish(id)} title="Show in linked widgets">
-                        {shortName(id)} <span className="dim">{qty(n)}</span>
-                      </li>
-                    ))}
-                </ul>
+                <>
+                  <ul className="rec-instruments" aria-label={`Instruments on ${d.day}`}>
+                    {Object.entries(detail.instruments)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([id, n]) => (
+                        <li key={id} onClick={() => publish(id)} title="Show in linked widgets">
+                          {shortName(id)} <span className="dim">{qty(n)}</span>
+                        </li>
+                      ))}
+                  </ul>
+                  <DayActions
+                    day={d}
+                    onDeleted={() => {
+                      setOpen(null);
+                      refresh();
+                    }}
+                  />
+                </>
               )}
             </div>
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Under an opened day: how to replay it (a replay is its own server, so practice never mixes
+ *  with live) and, for an admin, delete it after a confirmation. */
+function DayActions({ day: d, onDeleted }: { day: RecordedDay; onDeleted: () => void }) {
+  const { rest } = useApp();
+  const [armed, setArmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  if (!d.replay && !d.deletable) return null;
+  const remove = () => {
+    setBusy(true);
+    rest
+      .delete(`/api/research/recordings/${d.day}`)
+      .then(onDeleted)
+      .catch((e: unknown) => setProblem(errorText(e)))
+      .finally(() => {
+        setBusy(false);
+        setArmed(false);
+      });
+  };
+  const copy = () => {
+    navigator.clipboard
+      ?.writeText(d.replay!)
+      .then(() => setCopied(true))
+      .catch(() => setCopied(false));
+  };
+  return (
+    <div className="rec-actions" aria-label={`Actions for ${d.day}`}>
+      {d.replay && (
+        <span className="rec-replay" title="Run this on the server: a replay starts as its own server with its own data">
+          Replay: <code>{d.replay}</code>
+          <button type="button" className="btn small" onClick={copy}>
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </span>
+      )}
+      <span className="book-spacer" />
+      {d.deletable &&
+        (armed ? (
+          <button type="button" className="btn small danger" disabled={busy} onClick={remove}>
+            Confirm: delete {d.day} ({bytesText(d.bytes)})
+          </button>
+        ) : (
+          <button type="button" className="btn small" onClick={() => setArmed(true)}>
+            Delete…
+          </button>
+        ))}
+      {problem && (
+        <span className="tone-bad" role="alert">
+          {problem}
+        </span>
+      )}
     </div>
   );
 }
