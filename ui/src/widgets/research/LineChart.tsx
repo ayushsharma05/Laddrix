@@ -55,7 +55,11 @@ export function LineChart({ title, xs, series, xText = (x) => x }: { title: stri
           {p.zero !== null && <line className="chart-zero" x1={0} x2={W} y1={p.zero} y2={p.zero} />}
           {p.paths.map((d, i) => d && <path key={series[i]!.key} className={`chart-line slot-${series[i]!.slot ?? i}`} d={d} vectorEffect="non-scaling-stroke" />)}
           {xs.length === 1 &&
-            series.map((s, i) => s.points[0] != null && <circle key={s.key} className={`chart-dot slot-${s.slot ?? i}`} cx={p.x(0)} cy={p.y(s.points[0])} r={4} />)}
+            series.map((s, i) => {
+              const v = s.points[0];
+              // a zero-length line with round caps: a round dot however the chart is stretched
+              return v != null && <line key={s.key} className={`chart-dot slot-${s.slot ?? i}`} x1={p.x(0)} x2={p.x(0)} y1={p.y(v)} y2={p.y(v)} vectorEffect="non-scaling-stroke" />;
+            })}
           {hover !== null && <line className="chart-cross" x1={p.x(hover)} x2={p.x(hover)} y1={0} y2={H} vectorEffect="non-scaling-stroke" />}
         </svg>
       </div>

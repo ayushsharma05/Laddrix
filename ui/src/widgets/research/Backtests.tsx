@@ -142,7 +142,7 @@ function RunList(props: { runs: BacktestRun[]; picked: string | null; onPick: (i
   return (
     <>
       <div className="grid-head book-row bt-row" role="row">
-        <span>{compare ? "Compare" : ""}</span>
+        <span>{compare ? "Pick" : ""}</span>
         <span>Run</span>
         <span>State</span>
         <span className="num">Net</span>
@@ -184,7 +184,9 @@ function RunList(props: { runs: BacktestRun[]; picked: string | null; onPick: (i
               </span>
               <span className={`num ${r.summary ? tone(r.summary.net_paise) : ""}`}>{r.summary ? signedRupees(r.summary.net_paise) : "–"}</span>
               <span className="num">{r.days}</span>
-              <span className="dim">{r.created_at.slice(0, 16).replace("T", " ")}</span>
+              <span className="dim" title={r.created_at}>
+                {new Date(r.created_at).toLocaleDateString("en-CA").slice(5)} {time(r.created_at)}
+              </span>
             </div>
           );
         })}

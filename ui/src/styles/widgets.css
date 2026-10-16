@@ -1297,7 +1297,7 @@ label.algo-field {
   grid-template-columns: minmax(120px, 1.6fr) 84px minmax(90px, 1fr) 80px minmax(90px, 1fr);
 }
 .report-trade-row {
-  grid-template-columns: 64px minmax(110px, 1.4fr) 42px 64px 90px minmax(90px, 1fr);
+  grid-template-columns: 72px minmax(110px, 1.4fr) 42px 64px 90px minmax(90px, 1fr);
 }
 .report-notes {
   margin: 0;
@@ -1358,7 +1358,7 @@ label.algo-field {
   cursor: pointer;
 }
 .bt-row {
-  grid-template-columns: 44px minmax(160px, 2fr) minmax(150px, 1.6fr) 100px 48px 120px;
+  grid-template-columns: 64px minmax(160px, 2fr) minmax(150px, 1.6fr) 100px 48px 120px;
   cursor: pointer;
   align-items: center;
 }
@@ -1504,9 +1504,9 @@ label.algo-field {
   stroke-linejoin: round;
 }
 .chart-dot {
-  fill: var(--slot-0);
-  stroke: var(--well);
-  stroke-width: 2;
+  stroke: var(--slot-0);
+  stroke-width: 9;
+  stroke-linecap: round;
 }
 .chart-line.slot-1 {
   stroke: var(--slot-1);
@@ -1518,13 +1518,13 @@ label.algo-field {
   stroke: var(--slot-3);
 }
 .chart-dot.slot-1 {
-  fill: var(--slot-1);
+  stroke: var(--slot-1);
 }
 .chart-dot.slot-2 {
-  fill: var(--slot-2);
+  stroke: var(--slot-2);
 }
 .chart-dot.slot-3 {
-  fill: var(--slot-3);
+  stroke: var(--slot-3);
 }
 .chart-tip {
   position: absolute;

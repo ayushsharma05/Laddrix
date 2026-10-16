@@ -39,6 +39,8 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   // --- Backtests: New
   await page.getByRole('button', { name: 'Widgets ▾' }).click();
   await page.getByRole('menuitem', { name: /Backtests/ }).click();
+  await page.locator('.tab', { hasText: 'Backtests' }).dblclick(); // maximize
+  await page.waitForTimeout(400);
   const bt = page.locator('.research').last();
   await bt.getByRole('button', { name: 'New' }).click();
   const form = page.getByRole('form', { name: 'Start a backtest' });
@@ -49,7 +51,7 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await page.getByRole('option', { name: /NIFTY26OCTFUT/ }).first().click();
   await form.getByRole('textbox', { name: 'Lots' }).fill('2');
   await form.getByRole('textbox', { name: 'Start time' }).fill('00:00'); // the demo records at any hour
-  for (const [label, value] of [['Duration', '1'], ['Interval', '10']]) {
+  for (const [label, value] of [['Over', '1'], ['Decide every', '10']]) {
     const box = form.getByRole('textbox', { name: new RegExp(`^${label}`) });
     if (await box.count()) await box.first().fill(value);
   }
@@ -58,6 +60,8 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   const submit = form.getByRole('button', { name: /^Backtest TWAP/ });
   console.log('submit:', flat(await submit.textContent()));
   await submit.click();
+  await page.waitForTimeout(800);
+  if (await form.getByRole('alert').count()) console.log('form says:', flat(await form.getByRole('alert').textContent()));
 
   // --- followed until done
   const runs = page.getByRole('grid', { name: 'Backtest runs' });
@@ -82,8 +86,9 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   const trades = day.getByRole('grid', { name: 'Backtest trades' }).getByRole('row');
   console.log('trades:', await trades.count(), '| first:', flat(await trades.first().textContent()));
   const svg = day.getByRole('img');
+  await svg.scrollIntoViewIfNeeded();
   const box = await svg.boundingBox();
-  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2);
+  await svg.hover({ position: { x: box.width * 0.6, y: box.height / 2 } });
   console.log('hover:', flat(await day.getByRole('status').textContent()));
   await page.screenshot({ path: '/tmp/claude-0/e2e-research-run.png' });
   for (const fmt of ['CSV', 'PDF']) {
@@ -104,15 +109,19 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await form.getByRole('button', { name: 'SELL' }).click();
   await form.getByRole('textbox', { name: 'Start time' }).fill('00:00');
   await form.getByRole('textbox', { name: 'Run name' }).fill('e2e twap sell');
+  await form.getByRole('textbox', { name: /^Over/ }).fill('2'); // no default: the form asks for it
   await form.getByRole('button', { name: 'All' }).click();
   await form.getByRole('button', { name: /^Backtest TWAP/ }).click();
+  await page.waitForTimeout(800);
+  if (await form.getByRole('alert').count()) console.log('form says:', flat(await form.getByRole('alert').textContent()));
+  console.log('rows now:', (await runs.getByRole('row').allTextContents()).map(flat).join(' || '));
   await page.waitForFunction(() => {
     const rows = document.querySelectorAll('[aria-label="Backtest runs"] [role=row]');
     return rows.length >= 2 && [...rows].slice(0, 2).every((r) => /Done|Failed/.test(r.textContent));
   }, null, { timeout: 60000 });
   await bt.getByRole('button', { name: 'Compare' }).click();
-  await page.getByRole('checkbox', { name: 'Compare e2e twap sell' }).check();
-  await page.getByRole('checkbox', { name: 'Compare e2e twap' }).check();
+  await page.getByRole('checkbox', { name: 'Compare e2e twap sell', exact: true }).first().check(); // the newest
+  await page.getByRole('checkbox', { name: 'Compare e2e twap', exact: true }).first().check();
   const compare = page.getByRole('region', { name: 'Compare runs' });
   await compare.waitFor({ timeout: 5000 });
   console.log('legend:', flat(await compare.getByLabel('Legend').textContent()));
