@@ -279,3 +279,12 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - resuming a stop didn't clear its band (a real bug);
     - an early drill counted the broker's tradebook, which is the wrong measure; it now counts our own fills;
     - mutation 27/27, after adding a test for a short position.
+- 16 Oct, **#329 done:**
+  - **What a backup holds now.** Everything a restored server needs: the two databases plus rules, reports, alerts, candles and backtests. Recordings come only with `--with-ticks`.
+  - **What it never holds:** broker tokens, keys, `.env` or temporary files. `manifest.json` gives each file's size and SHA-256.
+  - **A new restore command** (`mocktrade.tools.restore`):
+    - it checks the manifest, the checksums and SQLite's integrity first, and refuses a tampered or path-escaping manifest;
+    - it never overwrites; `--replace` moves the old data aside, and nothing is deleted;
+    - at the end it lists what comes from the password manager.
+  - **The drill passed 19/19:** a running demo was backed up and restored into an isolated folder. A server started on it had every user, the position, the layout, the theme, the MTM limit, the alert and every audit event. A trade made after the backup was correctly absent.
+  - **Mutation run, 24/24.** Along the way it found two pieces of dead code, now removed, and one missing test (a same-size tamper), now added.
