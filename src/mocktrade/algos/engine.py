@@ -79,6 +79,7 @@ class AlgoView:
     extra: dict[str, Any]  # the strategy's own figures for the screen (e.g. a spread's legs)
     created_at: datetime
     updated_at: datetime
+    product: Product = Product.NRML  # the position it works on (with the instrument)
 
 
 @dataclass(frozen=True)
@@ -771,4 +772,5 @@ class AlgoEngine:
             extra=dict(p.extra),
             created_at=p.created_at,
             updated_at=p.updated_at,
+            product=p.product,
         )

@@ -410,6 +410,7 @@ def build(settings: ServeSettings) -> Assembly:
         broker_login=kite.login if kite else None,
         broker_status=kite.status if kite else None,
         alerts=alerts,
+        protection=protection,
         scheduler=scheduler,
         reports=reports,
         ticks=ticks,

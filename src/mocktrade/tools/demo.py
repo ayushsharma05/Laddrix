@@ -187,6 +187,7 @@ async def main(
     scheduler.every(5, protection.run_check, between=("00:00", "23:59"), name="protection guard")
     app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler,
                      reports=reports, alerts=alerts, ticks=ticks, replay=feed,
+                     protection=protection,
                      replay_command=lambda d: f"python -m mocktrade.tools.demo --replay {d} "
                                               f"--port {port + 1}",
                      backtests=backtests, candles=candle_store, charts=charts,
