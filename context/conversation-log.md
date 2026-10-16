@@ -303,3 +303,13 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - a real `docs/design/README.md` index.
   - **Old stubs:** `docs/adr` now points to where decisions live; `docs/exchange` (CME-era) is removed.
   - **Diagrams:** rendered offline with a local Mermaid (`context/scripts/render-mermaid.cjs`), because the CDN is blocked here. Writing them caught one mistake in my first restart diagram: positions are compared *before* the gate decides, not after.
+- 16 Oct, #288 merged (PR #335). **#289 done** (release process):
+  - **Versions.** One version (`src/mocktrade/version.py`, `1.0.0-rc.1`) is kept in step with pyproject, `ui/package.json` and the lockfile by a test. The server reports it at `/api/health` with the image's commit, and the status bar shows it.
+  - **Notes.** `docs/releases/v1.0.0.md` (scope, migrations, known limits) and `CHANGELOG.md`.
+  - **Deploy and rollback.** `deploy/deploy.sh` checks the tag, refuses market hours (`window.sh`; `--emergency "reason"` is logged), backs up, keeps the previous image, builds, and checks health and the version, rolling back by itself on failure. `rollback.sh` (`--restore-data` for migrations). `docs/runbooks/release.md`.
+  - **Decided:** the `v1.0.0` tag waits for Ayush's live go-live run and his acceptance on #240. Everything is ready as `1.0.0-rc.1` until then.
+  - **The rehearsal** used real Docker in this sandbox (the daemon was started, base images came from Google's mirror of Docker Hub, and a local base image trusts the proxy's CA). It found three real problems:
+    1. the old checkout had no deploy script, so the script now runs from the release;
+    2. a rollback checks out code without its own script, so it now runs from a copy;
+    3. the old image's restore can't work in place on a volume, so restore now moves data aside inside `/data`, and `--restore-data` uses the newer image.
+  - **After the fixes:** 15/15. Mutation for backup and restore 26/26. The market-hours rule was first written in Python inside the image; it moved to `window.sh`, because the running image may predate it.

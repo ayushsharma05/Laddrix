@@ -47,6 +47,11 @@ s = s[: s.index("\n  caddy:")] + "\nvolumes:\n  data:\n"
 s = s.replace("      dockerfile: Dockerfile\n", "      dockerfile: Dockerfile\n      network: host\n")
 open("deploy/rehearsal.compose.yaml", "w").write(s)
 PY
+if ! docker image inspect mocktrade:old-main >/dev/null 2>&1; then  # the old version's image
+  git -c advice.detachedHead=false checkout -q v0.0.1
+  docker build --network host -q -t mocktrade:old-main . >/dev/null
+  git -c advice.detachedHead=false checkout -q "v$version"
+fi
 key=$(docker run --rm mocktrade:old-main python -m mocktrade.tools.users new-key | sed -n '1s/^[^=]*=//p')
 printf 'MOCKTRADE_DOMAIN=localhost\nMOCKTRADE_SECRET_KEY=%s\nMOCKTRADE_PRICES=sim\nMOCKTRADE_HOLIDAYS=\n' "$key" >deploy/.env
 

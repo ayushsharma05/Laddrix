@@ -16,6 +16,7 @@ What each layer of checks proves, how to run it, and what must pass before a rel
 | **Demo checks** (`check-*.py`) | A feature end to end over the real API on the demo | `python3 context/scripts/check-<area>.py` | no |
 | **Drills** | What must survive a bad day: a crash (`drill-restart.py`, plus `e2e-restart-bands.cjs`) and a backup restored into a fresh folder (`drill-backup-restore.py`) | each runs its own demo | no: before a release |
 | **Go-live, paper** | Every go-live step that can be shown on paper (`golive-paper.py`). Never evidence about Kite | `python3 context/scripts/golive-paper.py` | no: before a release |
+| **Deploy and rollback** | The real `deploy.sh` and `rollback.sh` with real images and a data volume on a staging copy: refused in market hours, deployed, rolled back, a bad release rolled back by itself, an emergency deploy logged, data restored (`drill-deploy-rollback.sh`) | `context/scripts/drill-deploy-rollback.sh <old-ref> <new-ref>` (needs Docker) | no: before a release |
 | **Go-live, live** | The same steps against Kite, by Ayush, with one share and his go-ahead | [go-live.md](../runbooks/go-live.md) | never automated |
 
 Two rules hold for every layer:
@@ -34,4 +35,4 @@ Two rules hold for every layer:
 8. **Go-live:** `golive-paper.py` 19/19. For a first live release, Ayush ticks the live boxes in [go-live.md](../runbooks/go-live.md).
 9. **Docs match the code:** the design docs, runbooks, glossary and release notes are updated, and known limitations are listed.
 
-The release steps themselves (tag, notes, deploying outside market hours, rollback) are in the release process (#289).
+The release steps themselves (version, notes, tag, deploying outside market hours, rollback) are in [release.md](../runbooks/release.md).
