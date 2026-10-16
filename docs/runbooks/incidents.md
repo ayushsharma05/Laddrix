@@ -138,6 +138,24 @@ The server's protection guard (`src/mocktrade/ops/protection.py`, V1.2 #328) the
 - a working **stop order** (SL or SL-M) is on the closing side (sell for a long, buy for a short);
 - an active **GTT** is on it.
 
+**Restore the stop it had (#264):** the band's **Restore stop** button (two clicks) starts the
+same stop again for the position as it is now: the same algo and settings, sized to what is
+still open. A bracket comes back as an OCO at its target and stop levels (its entry is done).
+A trailing stop starts trailing again from the current price, not from where it had got to.
+It is refused, saying why, when it could duplicate an exit:
+- the account is still being rebuilt after a restart;
+- an order of the old stop is still working, or one isn't answered by the broker yet: wait
+  for its cancel to settle;
+- another stop on it is still there, perhaps paused: resume or stop that one instead;
+- the position has flipped or closed;
+- MockTrade and the broker disagree on its size (see [Reconcile mismatch](#reconcile-mismatch)).
+
+**The band survives restarts (#264):** each lost stop is written to the audit trail
+(UNPROTECTED) and so is its resolution (PROTECTION_RESOLVED, with how). After any number of
+restarts, an unresolved one comes back. A stop you restored is itself held by MockTrade, so a
+later restart loses it too, and the band says so again. **Only a stop-loss order or a GTT held
+by the broker survives an outage.**
+
 ## Crash-and-restart drill (V1.2, #328)
 
 Run it before going live and after any change to recovery, orders or positions. It uses the demo only; nothing reaches a broker.

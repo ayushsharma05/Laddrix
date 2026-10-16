@@ -139,7 +139,21 @@ never both fill and turn an exit into a new position the other way.
 - **Honest about restarts**: these are held by MockTrade, so they work only while the server
   runs (a broker GTT, K9.3, survives our outages). At start, any protection algo that was
   running when the server stopped raises an ERROR alert naming it, and is noted
-  `ALGO_LOST` in the audit so it is reported once (`Platform.lost_protection`).
+  `ALGO_LOST` in the audit (`Platform.lost_protection`).
+- **The flag lasts until resolved** (#264): the guard (`ops/protection.py`) writes each lost
+  stop as an `UNPROTECTED` note, and its end as `PROTECTION_RESOLVED` (flat, covered again,
+  or restored). Each start rebuilds the unresolved ones from these notes, so a second restart
+  can't forget one.
+- **Restore, never automatic** (#264): `GET /api/accounts/{a}/protection` lists the
+  unprotected positions, each with what Restore would start or what stands in its way.
+  `POST …/protection/restore {instrument_id, confirm}` is allowed only for someone who trades
+  the account. It starts the same stop sized to what is still open (a bracket as an OCO at its
+  levels), and only when that can't duplicate an exit. It is refused while:
+  - the account is rebuilding;
+  - an old order is working or unanswered;
+  - another stop on the position is still there;
+  - the position flipped;
+  - the size is in doubt.
 
 ## The algo screen (`ui/src/widgets/algos/`, K6.4)
 
