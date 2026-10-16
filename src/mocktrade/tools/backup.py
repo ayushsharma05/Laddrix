@@ -1,27 +1,52 @@
-"""Back up MockTrade's databases safely while the server runs.
+"""Back up everything a restored MockTrade server needs, safely while the server runs (V1.3).
 
-    python -m mocktrade.tools.backup --to /data/backups            # keep 14 days
+    python -m mocktrade.tools.backup --to /data/backups               # keep 14 days
     python -m mocktrade.tools.backup --to /data/backups --keep 30
+    python -m mocktrade.tools.backup --to /data/backups --with-ticks  # recordings too (large)
 
-Copying a live SQLite file can give a torn copy (the newest writes sit in the -wal file),
-so each database is copied with SQLite's online backup, which is consistent even while
-the server writes. Each run makes one folder named by the time (UTC), checks every copy
-opens and passes SQLite's integrity check, then deletes folders older than `--keep` days.
+Each run makes one folder named by the time (UTC), written as `<name>.part` and renamed only
+when complete, so a half backup never looks like a backup. Then folders older than `--keep`
+days are deleted.
 
-What is backed up: users.db (users, accounts, sessions), events.db (the audit trail) and
-saved layouts within them. Broker tokens are not: they expire at 6 AM anyway.
-Copy the backup folder off the machine too (see docs/runbooks/server.md).
+What goes in (the data folder, $MOCKTRADE_DATA):
+
+    users.db, events.db  users, accounts, sessions, layouts, settings, limits; the audit trail
+                         (orders, fills, positions are rebuilt from it). Copied with SQLite's
+                         online backup: consistent even while the server writes, and checked
+                         with SQLite's integrity check.
+    rules/  reports/  alerts/  candles/  backtests/
+                         the traders' MTM limits, end-of-day reports, market alerts (with each
+                         user's webhook), imported candles, backtest results. Plain files, each
+                         written whole by the server (a temporary file renamed into place).
+    ticks/               the recorded days: only with --with-ticks (they are large, and
+                         losing them loses no trading state).
+
+What never goes in: secrets and things that expire. The broker tokens (kite_token_*.json:
+they expire at 6 AM anyway), the secret key and `.env` (from the password manager, not a
+backup folder), the daily instrument list (downloaded again), temporary files, and earlier
+backups. `manifest.json` lists every file with its size and SHA-256, so a restore can prove
+the backup is whole (mocktrade.tools.restore). Backups hold password hashes and users'
+webhook secrets: they are readable by their owner only. Copy them off the machine too
+(docs/runbooks/server.md).
 """
 
 import argparse
+import hashlib
+import json
 import os
 import shutil
 import sqlite3
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 DATABASES = ("users.db", "events.db")
+FOLDERS = ("rules", "reports", "alerts", "candles", "backtests")
+OPTIONAL = {"ticks": "recorded days (large): --with-ticks"}
+NEVER = ("kite_token_*.json", "*.key", ".env", "*.tmp", "*.part")  # inside the folders, too
+MANIFEST = "manifest.json"
+FORMAT = 1
 STAMP = "%Y%m%dT%H%M%SZ"
 
 
@@ -44,22 +69,63 @@ def backup_one(source: Path, target: Path) -> None:
         raise RuntimeError(f"backup of {source.name} failed its integrity check: {result}")
 
 
-def run_backup(data_dir: Path, to: Path, keep_days: int, now: datetime) -> Path:
-    """Back up every database in `data_dir` into a new folder under `to`; prune old ones."""
+def never(path: Path) -> bool:
+    """A secret, something that expires, or a half-written file: never in a backup."""
+    return any(path.match(pattern) for pattern in NEVER)
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def copy_folder(source: Path, target: Path) -> None:
+    """Every file of a folder the server writes, minus what never goes in a backup."""
+    for path in sorted(source.rglob("*")):
+        if path.is_file() and not path.is_symlink() and not never(path):
+            dest = target / path.relative_to(source)
+            dest.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            shutil.copy2(path, dest)
+
+
+def manifest(folder: Path, now: datetime, parts: list[str]) -> dict[str, Any]:
+    files = {}
+    for path in sorted(folder.rglob("*")):
+        if path.is_file():  # (made before the manifest is written)
+            name = path.relative_to(folder).as_posix()
+            files[name] = {"bytes": path.stat().st_size, "sha256": sha256(path)}
+    return {"format": FORMAT, "made_at": now.isoformat(), "parts": parts, "files": files}
+
+
+def run_backup(
+    data_dir: Path, to: Path, keep_days: int, now: datetime, *, with_ticks: bool = False
+) -> Path:
+    """Back up `data_dir` into a new folder under `to`; prune old ones. Returns the folder."""
     folder = to / now.strftime(STAMP)
     part = to / (folder.name + ".part")  # renamed only when complete: never a half backup
     shutil.rmtree(part, ignore_errors=True)
     to.mkdir(mode=0o700, parents=True, exist_ok=True)
     part.mkdir(mode=0o700)
-    copied = 0
-    for name in DATABASES:
-        source = data_dir / name
-        if source.exists():
-            backup_one(source, part / name)
-            copied += 1
-    if not copied:
-        shutil.rmtree(part)
-        raise FileNotFoundError(f"no databases in {data_dir}")
+    parts = []
+    try:
+        for name in DATABASES:
+            source = data_dir / name
+            if source.exists():
+                backup_one(source, part / name)
+                parts.append(name)
+        if not parts:
+            raise FileNotFoundError(f"no databases in {data_dir}")
+        for name in FOLDERS + (("ticks",) if with_ticks else ()):
+            if (data_dir / name).is_dir():
+                copy_folder(data_dir / name, part / name)
+                parts.append(f"{name}/")
+        (part / MANIFEST).write_text(json.dumps(manifest(part, now, parts), indent=1))
+    except BaseException:
+        shutil.rmtree(part, ignore_errors=True)
+        raise
     part.rename(folder)
     cutoff = now - timedelta(days=keep_days)
     for old in to.iterdir():
@@ -79,15 +145,17 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--data", type=Path, default=None, help="default: $MOCKTRADE_DATA or data")
     parser.add_argument("--to", type=Path, required=True)
     parser.add_argument("--keep", type=int, default=14, help="days of backups to keep")
+    parser.add_argument("--with-ticks", action="store_true", help=OPTIONAL["ticks"])
     args = parser.parse_args(argv)
-    os.umask(0o077)  # backups hold password hashes: owner only
+    os.umask(0o077)  # backups hold password hashes and webhook secrets: owner only
     data = args.data or Path(os.environ.get("MOCKTRADE_DATA", "data"))
     try:
-        folder = run_backup(data, args.to, args.keep, datetime.now(UTC))
+        folder = run_backup(data, args.to, args.keep, datetime.now(UTC), with_ticks=args.with_ticks)
     except (OSError, RuntimeError, sqlite3.Error) as exc:
         print(f"backup FAILED: {exc}", file=sys.stderr)
         return 1
-    print(f"backup OK: {folder}")
+    files = json.loads((folder / MANIFEST).read_text())["files"]
+    print(f"backup OK: {folder} ({len(files)} files)")
     return 0
 
 

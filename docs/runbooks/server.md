@@ -96,22 +96,57 @@ the cancel failed). Then check the Kite app.
 - [ ] Server: `placed: Kite order …`, `cancel sent`, `final status: CANCELLED`.
 - [ ] Laptop: the same command is refused by Kite (IP not allowed).
 
+## What a backup holds (V1.3, #329)
+
+The 21:45 cron job runs `python -m mocktrade.tools.backup`. One folder per run:
+
+| In the backup | What it is |
+|---|---|
+| `users.db` | users, accounts, sessions, saved layouts, settings (keys, theme), risk limits |
+| `events.db` | the audit trail: orders, fills and positions are rebuilt from it at start |
+| `rules/`, `reports/`, `alerts/` | MTM limits, end-of-day reports, market alerts (with each user's webhook) |
+| `candles/`, `backtests/` | imported candles, backtest results |
+| `ticks/` | recorded days: **only with `--with-ticks`** (large; losing them loses no trading state) |
+| `manifest.json` | every file with its size and SHA-256: a restore checks them first |
+
+**Never in a backup:** keep these in the password manager instead.
+- `MOCKTRADE_SECRET_KEY` and `deploy/.env`: the key decrypts the authenticator secrets stored in `users.db`.
+- The broker's API secret.
+- The broker tokens (`kite_token_*.json`). They expire at 6 AM anyway: log in again after a restore.
+- The daily instrument list. It is downloaded again.
+
+Backups hold password hashes and users' webhook secrets, so they are readable by their owner only.
+
 ## Restore from a backup
+
+**1. Check the backup first, without touching anything.** Restore it into an empty, isolated folder. A damaged or incomplete backup is refused at this step, naming the file.
+
+```bash
+docker compose -f deploy/compose.yaml run --rm --no-deps \
+  -v /var/backups/mocktrade/<YYYYMMDDTHHMMSSZ>:/restore:ro app \
+  python -m mocktrade.tools.restore --from /restore --to /tmp/check
+```
+
+**2. Then for real, with the app stopped:**
 
 ```bash
 cd /opt/mocktrade
 docker compose -f deploy/compose.yaml stop app
 docker compose -f deploy/compose.yaml run --rm --no-deps \
   -v /var/backups/mocktrade/<YYYYMMDDTHHMMSSZ>:/restore:ro app \
-  sh -c 'rm -f /data/*.db-wal /data/*.db-shm && cp /restore/*.db /data/'
+  python -m mocktrade.tools.restore --from /restore --to /data --replace
 docker compose -f deploy/compose.yaml start app
 ```
 
-This runs as the app's own user, so the files keep the right owner. It removes the old
-`-wal`/`-shm` files first: a stale one would be replayed onto the restored database.
+- `--replace` first moves the current data aside to `/data.before-restore-<time>`; nothing is deleted. Without it, a folder with data in it is refused.
+- The restore runs as the app's own user, so the files keep the right owner.
+- At the end the command lists what to put back by hand: the same `MOCKTRADE_SECRET_KEY` (without it, users must set up their authenticator again), `.env`, and a fresh Kite login.
 
-The same `MOCKTRADE_SECRET_KEY` is needed. Without it, users must set up their authenticator
-again. Keep a copy of `deploy/.env` in your password manager.
+**Practise it:** `context/scripts/drill-backup-restore.py` does all of this on the demo. Its last run passed 19/19; the output is in `context/evidence/v1-3-backup-restore-drill.txt`.
+- **Backed up while the server ran:** a second user, a trade, a layout, a theme, an MTM limit and a market alert.
+- **Restored into an isolated folder,** and started from there: everything was back, and every audit event was kept.
+- **The only addition** was the restart's own recovery note.
+- **A trade made after the backup** was not there, as it should not be.
 
 ## Measure speed on this server (#154)
 

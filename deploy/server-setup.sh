@@ -85,7 +85,7 @@ swapon --show
 step "7. daily backup"
 install -d -m 700 /var/backups/mocktrade
 cat >/etc/cron.d/mocktrade-backup <<EOF
-# MockTrade: back up the databases after market close (16:15 UTC = 21:45 India), Mon-Fri,
+# MockTrade: back up the data (databases, rules, reports, alerts, candles, backtests; never secrets) after market close (16:15 UTC = 21:45 India), Mon-Fri,
 # then copy the backup out of the container to /var/backups/mocktrade on this server.
 SHELL=/bin/bash
 15 16 * * 1-5 root { cd $REPO_DIR && docker compose -f deploy/compose.yaml exec -T app python -m mocktrade.tools.backup --to /data/backups --keep 14 && docker compose -f deploy/compose.yaml cp app:/data/backups/. /var/backups/mocktrade/ && find /var/backups/mocktrade -mindepth 1 -maxdepth 1 -type d -mtime +30 -exec rm -rf {} +; } >>/var/log/mocktrade-backup.log 2>&1
