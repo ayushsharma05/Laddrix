@@ -1,5 +1,10 @@
 # MockTrade status and next steps
 
+## Research backlog update — 16 Oct 2026
+
+Later-stage expansion #297 now tracks 25 detailed packages (#298–#322), linked from #241. See [feature-expansion-2026-10-16.md](feature-expansion-2026-10-16.md) for coverage, dependencies and evidence limits. This does not change active core priorities: complete #240, then hardening #257; retain security #279 and data decision #278. No application code changed. Decision-gated features need explicit approval before implementation. GitHub main already includes K13.2 via PR #296 at the inspected baseline; older handoff text below is historical and should be reconciled with live issues before continuing.
+
+
 As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
 
 **Current handoff:** merge the K13.2 PR (#282) on green CI and check `main` after; then K13.4 (#282, the admin screen with the first-login password change), K13.4 (#284), K13.5 (#285); then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
