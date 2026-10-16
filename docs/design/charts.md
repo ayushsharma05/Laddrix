@@ -91,3 +91,44 @@ Checks:
   - zoom showing 8 of 28 candles;
   - a drag panning back 5 minutes;
   - no page errors.
+
+
+## K12.3 Market alerts and webhooks (#233)
+
+```
+MarketData.tap ─► AlertEngine.on_tick ─► the alerts on that instrument (an index)
+                                          ─► crossed? fired ─► audit ALERT_FIRED
+                                                             ─► the user's screens (stream)
+                                                             ─► their webhook (if asked), signed
+REST create/change/delete ─► AlertStore: one JSON file per user (alerts + webhook), saved
+                             every second off the loop
+```
+
+- **Kinds**, published by `GET /api/alerts/spec` in the algo-spec format, so the screen draws the form and the server checks with the same description:
+  - price crosses above / below a level;
+  - moves X% from the previous close (up / down / either);
+  - day volume above;
+  - open interest changes X% from when the alert armed;
+  - spread (A − B) crosses above / below a level, evaluated when either leg ticks.
+- **Crossing, not touching.** An alert must first see its condition false (armed); it fires when the condition becomes true. A gap straight through the level counts, and exactly at the level counts.
+  - An alert made when the condition is already true says "already true: fires the next time it crosses" instead of firing at once.
+  - "Once" alerts are then done. "Every time" alerts arm again once the condition is false again, and wait out their cool-down (10 s to a day).
+  - After a restart, kept alerts start disarmed, so a crossing while the server was down doesn't fire late.
+- **Prices for alerts.** The engine keeps a market-data subscription on every instrument an alert needs, so Kite streams it even when no screen shows it.
+- **Each user's own.** `/api/alerts` lists, creates (201), changes (PATCH) and deletes (204) only the caller's alerts; another user's are 404. At most 200 each. Fired alerts and their state go only to that user's screens (stream `market_alert`, `market_alert_state`). Every change is audited (`ALERT_*`).
+- **Webhooks** (`/api/alerts/webhook` PUT/GET/DELETE, `…/test`):
+  - The URL must be https with a public host. IP literals and anything resolving to private, loopback, link-local or metadata addresses are refused, so a webhook can't reach the server's own network.
+  - The secret is shown once, when the URL is set.
+  - Each POST carries `X-MockTrade-Timestamp` and `X-MockTrade-Signature: sha256=HMAC(secret, "<timestamp>.<body>")`. The receiver recomputes the signature and refuses old timestamps, so a copied request can't be replayed.
+  - Each send has a 5 s timeout and is tried up to 4 times (1/2/4 s apart) on network errors, 429 and 5xx. A 4xx or a redirect is not retried. At most 500 sends wait at once.
+  - The result shows on the alert (`webhook_ok_at`, `webhook_error`).
+  - **Known limits:** the address check resolves the host and then connects, so a DNS answer that changes in between (rebinding) isn't stopped. A proxy-only network, where the server can't resolve names itself, refuses every webhook (fail closed).
+
+Checks:
+- `tests/test_market_alerts.py` (22):
+  - each kind worked by hand (exact level, gap through, already true, cool-down, a new day's volume, the OI baseline, either spread leg);
+  - checks, the index, a restart, any user id as a safe file name;
+  - webhook URL rules, the signature, retries, refusals, private resolution, the send cap;
+  - the API per user, webhook routes, the stream to that user only, instruments kept watched;
+- `context/scripts/mutate-alerts.py` (26/26);
+- `context/scripts/check-alerts.py` on a running demo. An alert just above the live price fired on the stream about 30 s later; already-true alerts said so; the audit rows were written. A real outside webhook couldn't be sent from the build sandbox (no direct DNS); use the test button once deployed.
