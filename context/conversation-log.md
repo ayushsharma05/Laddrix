@@ -375,4 +375,21 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Bad files:** a broken file is kept aside and named. A bad rule is named while the good ones are still watched. A lost state file holds auto-close for the day.
     - **Saves:** write, flush, rename.
   - **Checks:** 18 new tests, mutation 19/19 (after five test gaps were filled), and a demo restart check (`context/evidence/h-263-mtm-restart.txt`). The demo check found that the alert band only ran in market hours, so MTM problems now run on their own all-day job and once at start.
+- 16 Oct (late), #263 merged (PR #341). **Ayush asked to pause until Wednesday 21 Oct.** His weekly usage was at 62% and he wants it to last; he will spend five days understanding the code.
+  - **His ask:** fix only what really matters now, without lowering quality (postpone rather than rush), and write documentation explaining everything simply.
+  - **Decided:**
+    - **Nothing more is merged before Wednesday.** No live trading happens before then, so the remaining P0s can safely wait: #264 lost stops, #265 durable order intents, #267 price freshness, #270 resource ownership.
+    - **#264 is parked** half done on branch `h-264-protection`. It has a WIP commit and no PR: the server side only. Still needed: tests, the Restore button, the mutation check, docs.
+    - **Wrote `docs/GUIDE.md`:** the whole project in plain words, a five-day reading plan, one order traced through the code, each safety system, what's left, and his own steps. README links to it.
+  - **On Wednesday:** start with his questions, then finish #264, then #265, #267, #270.
 - 16 Oct (last, on the branch only): #264 tests written and pushed to `h-264-protection` (5 tests; all 1253 pass). They showed the intended behaviour: a restored stop is itself lost at the next restart and flagged again, because only broker-held stops survive outages. Wednesday: the Restore button, mutation check, docs, PR. Ayush's weekly usage is at 65% until Thursday, so be economical: finish #264, then #265, #267, #270.
+- 16 Oct (Ayush said to keep going until the 4-hour limit): **#264 done** (lost stops: a durable flag and a guarded Restore).
+  - **The defect (test first):** a lost stop was reported once (ALGO_LOST) and then forgotten, so after a second restart an open, unprotected position had no band.
+  - **Decided (the guarantee, written in docs and the API):** MockTrade-held stops work only while the server runs; only broker-held stop orders or GTTs survive an outage.
+  - **The fix:**
+    - **Durable notes:** every flag and every resolution is an audit note (UNPROTECTED / PROTECTION_RESOLVED), rebuilt at each start until resolved.
+    - **Restore (two clicks, by someone who trades the account):**
+      - it starts the same stop sized to what is open;
+      - a bracket comes back as an OCO at its levels;
+      - it is refused while rebuilding, while an old order is working or unanswered, while another stop is there, if the position flipped, or if the size is in doubt.
+  - **Checks:** 6 tests plus API and UI tests; mutation 12/12. Not yet a real-browser run: do one on Wednesday before relying on it.
