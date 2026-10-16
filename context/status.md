@@ -1,5 +1,18 @@
 # MockTrade status and next steps
 
+## Post-core design audit handoff — 16 October 2026
+
+User requested a deep design/implementation gap review and detailed issues immediately after core v1; no application changes were requested. Audited main: `3e215db99ae5cfce531165dd9f36c79c1efd44bd`; rechecked unchanged during this session. K12.4 work on `k12-4-market-screens` is WIP and must be rechecked after integration.
+
+**Delivery order: core acceptance #240 → hardening gate #257 (20 detailed issues #258–#277) → feature roadmap #241 (#242–#255).** All existing feature issues now explicitly carry the hardening prerequisite. These are documented planning dependencies, not an automatic GitHub enforcement mechanism. Continue unfinished core work first; consult live issues/PRs rather than older historical Next entries below.
+
+The hardening backlog covers product identity, unknown placement and mutation outcomes, exit coordination, STOP/flatten semantics, MTM/protection recovery, durable intents, daily rollover, fresh/non-conflated execution data, synchronized UI readiness, candle path containment, authorization, webhook destinations, backups, task supervision/single-writer ownership, workload isolation, execution accounting, external broker activity and terminal acceptance drills.
+
+Findings distinguish source-confirmed behaviour from design/validation gaps. Two isolated standard-library reproductions confirmed product rows overwriting during reconciliation and candle read/write escaping the intended root (entirely within a disposable temporary directory). The complete project test suite was not run in this audit environment. Other findings are source/design review, not claims of observed production incidents. Revalidate against accepted core before implementing; do not reopen previously fixed issues without new evidence.
+
+No application code changed, no trading action performed, no branches merged. Issues include pinned evidence, impact, implementation scope, acceptance criteria and dependencies. Follow repository design/mockup/testing/PR rules; retain generic product language and exclude employer details.
+
+
 As of 15 Oct 2026 (India time). Code and context are integrated through K9.1 by the recovery for #204. GitHub issues are the source of truth.
 
 **Current handoff:** next is **#200** (synthetic trailing stop, OCO and bracket), then #201 and #202. See [merge recovery](merge-recovery-2026-10-15.md). The historical table below records each original PR's checks; it is not a list of PRs still needing manual merges.

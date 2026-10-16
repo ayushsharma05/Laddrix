@@ -194,3 +194,17 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 ## 16 Oct 2026 — Codex: detailed post-v1 issue backlog
 
 Ayush asked to record every suggested later feature with what it does and why, for pickup only after core design/v1 completion. Created #240 (core acceptance evidence), #241 (parent roadmap and dependencies), and #242–#255 (14 detailed feature planning issues). Coverage: watchlists/search; presets/shortcuts/workspaces; notifications; charts/indicators/drawings; compound alerts/OI; advanced exits; conditional/scheduled orders/baskets; visual strategies; multi-leg definitions/accounting/execution; journal/execution analysis; robust research/optimisation; spreadsheet/API integrations; brokers/accounts/mobile. Each issue includes acceptance criteria and implementation constraints. Core K13 work is preserved, not deferred. Use existing merged functionality and split planning issues into bounded implementation children before coding. No application code or live trading was changed.
+
+
+## Post-core design audit handoff — 16 October 2026
+
+User requested a deep design/implementation gap review and detailed issues immediately after core v1; no application changes were requested. Audited main: `3e215db99ae5cfce531165dd9f36c79c1efd44bd`; rechecked unchanged during this session. K12.4 work on `k12-4-market-screens` is WIP and must be rechecked after integration.
+
+**Delivery order: core acceptance #240 → hardening gate #257 (20 detailed issues #258–#277) → feature roadmap #241 (#242–#255).** All existing feature issues now explicitly carry the hardening prerequisite. These are documented planning dependencies, not an automatic GitHub enforcement mechanism. Continue unfinished core work first; consult live issues/PRs rather than older historical Next entries below.
+
+The hardening backlog covers product identity, unknown placement and mutation outcomes, exit coordination, STOP/flatten semantics, MTM/protection recovery, durable intents, daily rollover, fresh/non-conflated execution data, synchronized UI readiness, candle path containment, authorization, webhook destinations, backups, task supervision/single-writer ownership, workload isolation, execution accounting, external broker activity and terminal acceptance drills.
+
+Findings distinguish source-confirmed behaviour from design/validation gaps. Two isolated standard-library reproductions confirmed product rows overwriting during reconciliation and candle read/write escaping the intended root (entirely within a disposable temporary directory). The complete project test suite was not run in this audit environment. Other findings are source/design review, not claims of observed production incidents. Revalidate against accepted core before implementing; do not reopen previously fixed issues without new evidence.
+
+No application code changed, no trading action performed, no branches merged. Issues include pinned evidence, impact, implementation scope, acceptance criteria and dependencies. Follow repository design/mockup/testing/PR rules; retain generic product language and exclude employer details.
+
