@@ -19,7 +19,7 @@ import time
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol
@@ -52,6 +52,7 @@ from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.portfolio.service import PortfolioError, snapshot_to_dict
 from mocktrade.reports.export import report_csv, report_pdf
 from mocktrade.reports.service import ReportError, Reports
+from mocktrade.research.replay import ReplayFeed
 from mocktrade.research.ticks import FileTickStore
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.risk.mtm import PortfolioRule, PositionRule
@@ -214,6 +215,12 @@ class PortfolioRuleIn(_Strict):
     auto_close: bool = False
 
 
+class ReplayIn(_Strict):
+    action: str = Field(pattern=r"^(pause|resume|speed|seek)$")
+    speed: float | None = None
+    at: datetime | None = None  # seek: the time to jump to (ahead only)
+
+
 class ConfirmIn(_Strict):
     confirm: bool
 
@@ -240,6 +247,7 @@ def create_app(
     scheduler: Scheduler | None = None,
     reports: Reports | None = None,
     ticks: FileTickStore | None = None,
+    replay: ReplayFeed | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -448,6 +456,34 @@ def create_app(
         if when not in store.days():
             raise HTTPException(404, f"nothing recorded on {day}")
         return await asyncio.to_thread(store.summary, when)
+
+    # --- a replay server's controls (K11.2) ------------------------------------------------------
+
+    @app.get("/api/replay")
+    async def replay_status(user: Me) -> dict[str, Any]:
+        if replay is None:
+            raise HTTPException(404, "this server isn't replaying a recorded day")
+        return replay.status()
+
+    @app.post("/api/replay")
+    async def replay_control(body: ReplayIn, user: Me) -> dict[str, Any]:
+        if replay is None:
+            raise HTTPException(404, "this server isn't replaying a recorded day")
+        try:
+            if body.action == "pause":
+                replay.pause()
+            elif body.action == "resume":
+                replay.resume()
+            elif body.action == "speed":
+                replay.set_speed(body.speed if body.speed is not None else -1)
+            else:
+                if body.at is None:
+                    raise ValueError("seek needs a time (at)")
+                replay.seek(body.at)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+        audit("REPLAY_CONTROL", f"{user.id}: {body.action}", body.model_dump(mode="json"))
+        return replay.status()
 
     # --- MTM limits and the square-off assistant --------------------------------------------------
 

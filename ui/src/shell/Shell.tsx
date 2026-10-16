@@ -19,6 +19,7 @@ import { allWidgets } from "../workspace/registry";
 import { Workspace } from "../workspace/Workspace";
 import { Bands, PRICES_OLD_MS } from "./Bands";
 import { EnvStrip } from "./EnvStrip";
+import { ReplayBar } from "./ReplayBar";
 import { StopDialog } from "./StopDialog";
 
 export const RATE_LIMIT_PER_MIN = 350; // the platform's own per-minute order limit (risk/throttle.py)
@@ -124,6 +125,7 @@ export function Shell() {
         )}
       </div>
       <EnvStrip />
+      <ReplayBar />
       <Bands />
       <Workspace controller={controller} />
       {dialog && <StopDialog mode={dialog} onClose={() => setDialog(null)} />}

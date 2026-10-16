@@ -437,3 +437,26 @@
 .login-form .btn.primary {
   height: 32px;
 }
+
+/* The replay bar (shell/ReplayBar.tsx): unmistakably not the live market */
+.replay-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 3px 10px;
+  background: #3b2a5c;
+  color: #efe6ff;
+  border-bottom: 1px solid #5b4490;
+}
+.replay-bar .replay-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.replay-bar .replay-speeds {
+  display: inline-flex;
+  gap: 2px;
+}
+.replay-bar .dim {
+  color: #c8b8e8;
+}

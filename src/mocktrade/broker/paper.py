@@ -141,8 +141,13 @@ class PaperBroker:
         starting_paise: int = 10_00_000_00,  # ₹10 lakh of paper money
         margins: PaperMargins | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        every_tick: bool = False,
     ) -> None:
+        """`every_tick`: see every tick as it arrives (MarketData.tap) instead of the newest per
+        instrument (a subscription, which skips ticks a busy loop couldn't take). A replay at
+        full speed needs it: the same day must give the same fills at any speed."""
         self.name = name
+        self.every_tick = every_tick
         self.starting_paise = starting_paise
         self.margins = margins or PaperMargins()
         self._clock = clock
@@ -158,6 +163,8 @@ class PaperBroker:
         self._tasks: set[asyncio.Task] = set()
         self._ids = itertools.count(1)
         self._subscription = market_data.subscribe()
+        if every_tick:
+            market_data.tap(self.on_tick)
         self._runner: asyncio.Task | None = None
         self._gtts: dict[str, _PaperGtt] = {}
         self._gtt_ids = itertools.count(1)
@@ -198,7 +205,8 @@ class PaperBroker:
         )
         self._orders[broker_id] = order
         self._by_instrument.setdefault(instrument.id, set()).add(broker_id)
-        self._subscription.add([instrument.id])
+        if not self.every_tick:
+            self._subscription.add([instrument.id])
         self._spawn(self._accept(order))
         return broker_id
 
@@ -477,8 +485,9 @@ class PaperBroker:
     # --- running against live prices ---------------------------------------------------
 
     def start(self) -> None:
-        """Begin reading live ticks from the market data cache."""
-        if self._runner is None:
+        """Begin reading live ticks from the market data cache (with `every_tick`, the tap
+        already delivers them: nothing to start)."""
+        if self._runner is None and not self.every_tick:
             self._runner = asyncio.create_task(self._run())
 
     async def aclose(self) -> None:

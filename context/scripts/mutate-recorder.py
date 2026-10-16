@@ -11,7 +11,7 @@ M = [
  (T, "        [list(level) for level in tick.bids], [list(level) for level in tick.asks],", "        [list(level) for level in tick.bids], [],"),
  (T, "            day = recorded_at.astimezone(IST).date()", "            day = recorded_at.astimezone(UTC).date()"),
  (T, "            with open(folder / f\"{segment}{SUFFIX}\", \"ab\") as f:", "            with open(folder / f\"{segment}{SUFFIX}\", \"wb\") as f:"),
- (T, "        for _, _, tick in heapq.merge(*streams):", "        for _, _, tick in sorted(x for s in streams for x in s)[::-1]:"),
+ (T, "        for recorded, _, tick in heapq.merge(*streams):", "        for recorded, _, tick in sorted(x for s in streams for x in s)[::-1]:"),
  (T, "                    if wanted is None or tick.instrument_id in wanted:", "                    if True:"),
  (T, "        except (EOFError, gzip.BadGzipFile, zlib.error, OSError) as exc:", "        except ZeroDivisionError as exc:"),
  (T, "        gone = days[: len(days) - self.keep_days]", "        gone = days[self.keep_days :]"),
