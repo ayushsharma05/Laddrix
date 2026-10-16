@@ -43,6 +43,8 @@ from mocktrade.domain.gtt import gtt_spec_to_dict, gtt_to_dict
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import spec_to_dict
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Validity
+from mocktrade.marketdata.movers import Movers, MoversError
+from mocktrade.marketdata.prints import TimeAndSales, print_to_dict
 from mocktrade.metrics import METRICS, process_gauges, since_us
 from mocktrade.ops.alerts import Alerts, alert_to_dict
 from mocktrade.ops.scheduler import Scheduler
@@ -316,6 +318,11 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="MockTrade", docs_url=None, redoc_url=None, openapi_url=None)
     chains = ChainService(platform.instruments, platform.market_data)
+    md = platform.market_data
+    prints = TimeAndSales(wanted=md.is_watched)  # trades between ticks, for watched contracts
+    md.tap(prints.on_tick)
+    movers = Movers(md.all_latest, platform.instruments.get)
+    md.tap(movers.on_tick)
     strategies = Strategies(chains)
     hub = StreamHub(
         platform,
@@ -1035,6 +1042,25 @@ def create_app(
             raise HTTPException(404, "no such instrument")
         volume, levels = platform.market_data.vap.snapshot(instrument_id)
         return {"volume": volume, "levels": [[p, q] for p, q in sorted(levels.items())]}
+
+    @app.get("/api/instruments/{instrument_id}/prints")
+    async def instrument_prints(instrument_id: str, user: Me, after: int = 0,
+                                limit: int = 100) -> dict[str, Any]:  # fmt: skip
+        if platform.instruments.get(instrument_id) is None:
+            raise HTTPException(404, f"unknown instrument {instrument_id}")
+        rows = prints.recent(instrument_id, after=max(0, after), limit=max(1, min(limit, 300)))
+        return {"instrument_id": instrument_id, "prints": [print_to_dict(p) for p in rows],
+                "kept": prints.keep, "watched": md.is_watched(instrument_id),
+                "estimate": "trades between price snapshots; the side is estimated from the "
+                            "touch before the trade"}  # fmt: skip
+
+    @app.get("/api/market/movers")
+    async def market_movers(user: Me, by: str = "gainers", limit: int = 10, exchange: str = "",
+                            kind: str = "") -> dict[str, Any]:  # fmt: skip
+        try:
+            return movers.top(by, limit=limit, exchange=exchange, kind=kind)
+        except MoversError as exc:
+            raise HTTPException(422, str(exc)) from None
 
     @app.get("/api/accounts/{account_id}/instruments/{instrument_id}/order-spec")
     async def get_order_spec(account_id: str, instrument_id: str, user: Me) -> dict[str, Any]:

@@ -92,6 +92,10 @@ class MarketData:
     def latest(self, instrument_id: InstrumentId) -> Tick | None:
         return self._latest.get(instrument_id)
 
+    def all_latest(self) -> list[Tick]:
+        """The newest tick of every instrument with a price (movers rank these)."""
+        return list(self._latest.values())
+
     def on_tick(self, tick: Tick) -> None:
         """Store the newest tick and tell everyone watching that instrument."""
         self.ticks_received += 1
@@ -111,6 +115,10 @@ class MarketData:
         subscription = Subscription(self, ())
         subscription.add(instrument_ids)
         return subscription
+
+    def is_watched(self, instrument_id: InstrumentId) -> bool:
+        """Does any subscriber watch it? (a dict lookup: safe to ask on every tick)"""
+        return bool(self._watchers.get(instrument_id))
 
     def watched(self) -> set[InstrumentId]:
         """Every instrument at least one subscriber is watching (what feeds must stream)."""
