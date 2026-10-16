@@ -132,3 +132,28 @@ Checks:
   - the API per user, webhook routes, the stream to that user only, instruments kept watched;
 - `context/scripts/mutate-alerts.py` (26/26);
 - `context/scripts/check-alerts.py` on a running demo. An alert just above the live price fired on the stream about 30 s later; already-true alerts said so; the audit rows were written. A real outside webhook couldn't be sent from the build sandbox (no direct DNS); use the test button once deployed.
+
+## K12.4 Alerts manager, time & sales, depth and movers (#234)
+
+Four screens, each fed by the server; the UI ranks, estimates and checks nothing on its own.
+
+- **Alerts manager** (`alerts` widget): the user's alerts with their state ("watching", "already true…", "fired …", off), and a form drawn from `GET /api/alerts/spec` (the same parameter inputs as the algo screen). Turn on/off, delete, set or test the webhook (its secret is shown once). A fired alert updates its row from the stream and adds a Messages line "Alert: …". Click a row: the link group switches to that contract.
+- **Time & sales** (`tape` widget, `GET /api/instruments/{id}/prints?after=&limit=`):
+  - Kite sends snapshots, not single trades. A "print" is what traded between two snapshots: the volume difference, at the newer last price and last-trade time. Two trades in one snapshot show as one.
+  - The side is estimated from the touch *before* the trade: at or above the previous best ask is BUY, at or below the previous best bid is SELL, in between is unknown. The screen says "sides estimated".
+  - Kept only for contracts some screen watches (the newest 300 each), so the work is a dict lookup per tick. A falling total volume means a new day and starts a new baseline.
+  - The screen asks every 1 s for the prints after the newest one it has. It filters by minimum quantity and shows the bought and sold totals of what it shows.
+- **Depth** (`depth` widget): the 5 levels Kite sends, with bars (share of the largest level), running totals, the whole book's waiting quantity when sent, the imbalance and the spread in paise and ticks. Straight from the tick stream.
+- **Movers** (`movers` widget, `GET /api/market/movers?by=gainers|losers|volume|oi&limit=&exchange=&kind=`):
+  - Ranked by the server from the latest tick of every contract it has a price for: % from the previous close, the day's volume, or the biggest open-interest move either way since the first OI seen today (Kite's ticks carry no previous-day OI, and the screen says so).
+  - It answers with the exchanges and kinds it has, so the filters list only those. It polls every 2 s; a new tab or filter asks at once.
+
+Two fixes found while checking these screens in a browser:
+- **A ticket that switched contract kept the old contract's price** (a bug from before K12.2). For one render after the switch, `useTick`, `useInstrument` and `useOrderSpec` still returned the previous contract's values, and the ticket started its price from them. Now each hook returns a value only when it is for the contract (and account) asked; otherwise the cached one for the new contract, or nothing. Test: "switching contract starts the price at the new contract's price, never the old one's".
+- **Simulator options showed absurd % changes.** Their day started at a placeholder price, and only their trading price came from the option model. They now open and close around the model price.
+
+Checks:
+- `tests/test_market_screens.py`: a hand-worked tape (BUY at the ask, SELL at the bid, unknown inside, nothing traded), a new day, unwatched contracts, the size kept; movers' ranking, ties, filters, limits, the OI day baseline; the API.
+- UI tests in `ui/src/widgets/market` and `ui/src/widgets/alerts`, the hook tests in `ui/src/app/context.test.tsx`, and the ticket test above.
+- `context/scripts/mutate-market.py` (39/39 caught: server, simulator, models, widgets, hooks).
+- `context/scripts/e2e-market.cjs` on the demo in a browser: depth, tape, movers, the linked ticket at the new contract's price after a Movers click, creating and firing an alert, no page errors.

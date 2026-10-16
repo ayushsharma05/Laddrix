@@ -73,7 +73,8 @@ export function useTick(instrumentId: string | undefined): Tick | null {
     if (!instrumentId) return;
     return stream.subscribeTicks(instrumentId, setTick);
   }, [stream, instrumentId]);
-  return tick;
+  // never the previous instrument's tick, even for the one render before the effect runs
+  return tick && tick.instrument_id === instrumentId ? tick : null;
 }
 
 /** Instrument details, or null while loading / if unknown. */
@@ -101,32 +102,39 @@ export function useInstrument(instrumentId: string | undefined): Instrument | nu
       live = false;
     };
   }, [instruments, instrumentId]);
-  return found;
+  // never the previous instrument (a ticket that switched would start at its price)
+  if (!instrumentId) return null;
+  if (found && found.id === instrumentId) return found;
+  return instruments.peek(instrumentId) ?? null;
 }
 
 /** What can be ordered on an instrument through an account, or null while loading / unavailable. */
 export function useOrderSpec(accountId: string | null | undefined, instrumentId: string | undefined): OrderSpec | null {
   const { specs } = useApp();
-  const [found, setFound] = useState<OrderSpec | null>(() =>
-    accountId && instrumentId ? (specs.peek(accountId, instrumentId) ?? null) : null,
+  const key = accountId && instrumentId ? `${accountId}|${instrumentId}` : null;
+  // kept with the account and instrument it is for: never another pair's rules
+  const [found, setFound] = useState<{ key: string; spec: OrderSpec | null } | null>(() =>
+    key ? { key, spec: specs.peek(accountId!, instrumentId!) ?? null } : null,
   );
   useEffect(() => {
     let live = true;
-    if (!accountId || !instrumentId) {
+    if (!key) {
       setFound(null);
       return;
     }
-    const known = specs.peek(accountId, instrumentId);
-    setFound(known ?? null);
+    const known = specs.peek(accountId!, instrumentId!);
+    setFound({ key, spec: known ?? null });
     if (known) return;
-    void specs.get(accountId, instrumentId).then((s) => {
-      if (live) setFound(s);
+    void specs.get(accountId!, instrumentId!).then((s) => {
+      if (live) setFound({ key, spec: s });
     });
     return () => {
       live = false;
     };
-  }, [specs, accountId, instrumentId]);
-  return found;
+  }, [specs, key, accountId, instrumentId]);
+  if (!key) return null;
+  if (found && found.key === key) return found.spec;
+  return specs.peek(accountId!, instrumentId!) ?? null;
 }
 
 /** Re-render every `ms` (clocks, "x seconds ago"). */

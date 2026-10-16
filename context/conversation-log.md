@@ -190,3 +190,8 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
     - Self-review found that user ids aren't restricted, so file names are now hashed.
     - The mutation script's one survivor led to a real gap: alert instruments weren't watched, so Kite would never have streamed a contract no screen showed. The engine now keeps them subscribed.
   - **Check:** an alert fired live on the demo. An outside webhook couldn't be tried from the sandbox; test it once deployed.
+- 16 Oct, K12.4 (#234) market screens:
+  - **Built:** alerts manager, time & sales (prints worked out on the server from tick volume, the side estimated from the touch before), depth window, movers (ranked on the server; OI change since the first OI seen today).
+  - **Found in the browser check:** the OI list showed zeros (now ranked by the biggest move either way, zeros left out), and simulator options showed absurd % changes (their day now starts at the model price).
+  - **Safety bug found and fixed (from before K12.2):** a linked ticket that switched contract started at the old contract's price for one render. The hooks now return values only for the contract asked. A test proved the bug and then the fix.
+  - Ayush said that while Claude's limits were used up, he had an outside AI tool review the whole code. It changed no code but opened issues #240–#279. **Decided order:** finish K12.4, then K13 (core scope), then the core v1 gate #240, the hardening gate #257 (#258–#277, with #279 security and #278 discussion), and only then the post-v1 features #241 (#242–#255). Each finding is rechecked against the code before work starts.

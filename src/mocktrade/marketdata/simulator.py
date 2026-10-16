@@ -71,7 +71,17 @@ class MarketSimulator:
                 instrument, price, price, close, close, max(price, close), min(price, close)
             )
             if instrument.kind in _OPTIONS:
-                self._walks[instrument.id].oi = instrument.lot_size * self._rng.randint(200, 4000)
+                walk = self._walks[instrument.id]
+                walk.oi = instrument.lot_size * self._rng.randint(200, 4000)
+                # an option trades at its model price: its day (open, close) starts there too,
+                # so its change from the close is a believable one (not from a placeholder)
+                priced = self._option_price(walk)
+                if priced is not None:
+                    close = max(priced - instrument.tick_paise * self._rng.randint(-40, 40),
+                                instrument.tick_paise)  # fmt: skip
+                    walk.anchor = walk.ltp = walk.open = priced
+                    walk.close = close
+                    walk.high, walk.low = max(priced, close), min(priced, close)
 
     @property
     def instruments(self) -> list[InstrumentId]:

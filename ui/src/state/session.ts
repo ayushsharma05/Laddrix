@@ -37,6 +37,7 @@ export class Session {
       stream.on("portfolio", (m) => store.applyMessage(m)),
       stream.on("charges", (m) => store.applyMessage(m)),
       stream.on("mtm", (m) => store.applyMessage(m)),
+      stream.on("market_alert", (m) => store.applyMessage(m)),
       stream.on("ops", (m) => store.applyMessage(m)),
       stream.on("error", (m) => store.applyMessage(m)),
     );
