@@ -400,6 +400,26 @@ def create_app(
             raise HTTPException(422, str(exc)) from None
         return bill_to_dict(bill, service.model.schedule)
 
+    # --- margin: what an order would block, against what's available -------------------------
+
+    @app.post("/api/accounts/{account_id}/margin")
+    async def order_margin(account_id: str, body: ChargesIn, user: Me) -> dict[str, Any]:
+        running = runtime(account_id, user)
+        if running.margin is None:
+            raise HTTPException(404, "no margin quote for this account")
+        request = OrderRequest("MQ", account_id, user.id, body.instrument_id, body.side,
+                               body.qty, OrderType.LIMIT, body.product,
+                               price_paise=body.price_paise)  # fmt: skip
+        result = await running.margin.check(request)
+        return {
+            "exit": result.exit,
+            "required_paise": result.required_paise,
+            "available_paise": result.available_paise,
+            "enough": result.enough,
+            "note": result.note,
+            "checked_before_sending": running.margin_check,
+        }
+
     # --- end-of-day reports and P&L history ---------------------------------------------------
 
     day_reports = reports or Reports(platform, None)

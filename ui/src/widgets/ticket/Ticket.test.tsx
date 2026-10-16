@@ -63,6 +63,23 @@ const send = () => screen.getByRole("button", { name: /^(BUY|SELL) / });
 const status = () => (document.querySelector(".ladder-status") as HTMLElement).textContent ?? "";
 
 describe("Order ticket", () => {
+  it("shows the margin the order would block against what's available, red when short", async () => {
+    setup({}, {
+      "POST /api/accounts/acc-a/margin": {
+        exit: false,
+        required_paise: 22507920,
+        available_paise: 15000000,
+        enough: false,
+        note: "",
+        checked_before_sending: true,
+      },
+    });
+    await ready();
+    const line = await screen.findByText("Margin ≈ ₹2,25,079.20 of ₹1,50,000.00");
+    expect(line.className).toContain("tone-bad");
+    expect(line.getAttribute("title")).toBe("Needs more than is available: it will be refused before sending");
+  });
+
   it("shows what the order would pay in charges, asked from the server", async () => {
     const { calls } = setup({}, {
       "POST /api/accounts/acc-a/charges/estimate": {

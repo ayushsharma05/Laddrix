@@ -15,6 +15,7 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from mocktrade.algos.engine import AlgoEngine, AlgoEvent, AlgoType
 from mocktrade.broker.base import Broker, GttBook
@@ -41,6 +42,7 @@ from mocktrade.risk.checks import RiskGate
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.risk.limits import RiskLimits
 from mocktrade.risk.loss_watch import DailyLossWatch
+from mocktrade.risk.margin import MarginGate
 from mocktrade.risk.throttle import OrderThrottle
 from mocktrade.store.events import EventLog
 
@@ -64,6 +66,8 @@ class AccountRuntime:
     gtt: GttService | None = None  # when the broker holds GTT orders
     portfolio: PortfolioService | None = None  # funds, holdings, trades (what the broker offers)
     charges: ChargesService | None = None  # the day's charges, and estimates for the ticket
+    margin: MarginGate | None = None  # quotes an order's margin (the ticket)...
+    margin_check: bool = False  # ...and, when on, refuses what the funds can't carry
 
 
 @dataclass
@@ -266,10 +270,12 @@ class Platform:
         algo_types: tuple[AlgoType, ...] = (),
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         recover_on_start: bool = False,
+        margin_check: bool = False,
     ) -> AccountRuntime:
         """`recover_on_start`: the server's setting. The account takes no new orders until
         its orders and positions are rebuilt from the audit trail and checked against the
-        broker (recovery.py). Needs the event log."""
+        broker (recovery.py). Needs the event log.
+        `margin_check`: refuse orders the funds can't carry (risk/margin.py; fails open)."""
         if recover_on_start and self.event_log is None:
             raise ValueError("recovery after a restart needs the event log")
         if account.id in self.accounts:
@@ -277,7 +283,7 @@ class Platform:
         limits = limits or RiskLimits()
         switch = KillSwitch(f"account {account.id}", clock=clock)
         book = PositionBook(account.id, clock=clock)
-        holder: dict[str, OrderManager] = {}  # the gate needs the manager it guards
+        holder: dict[str, Any] = {}  # the gates need what they guard (orders, portfolio)
         risk = RiskGate(
             limits,
             instruments=self.instruments.get,
@@ -291,12 +297,33 @@ class Platform:
         )
         throttle = throttle or OrderThrottle()
         recovery = RecoveryGate() if recover_on_start else None
+
+        # the margin quote exists for every account; the gate only when margin_check is on
+        async def available() -> int | None:
+            portfolio = holder.get("portfolio")
+            if portfolio is None or not portfolio.offers("funds"):
+                return None
+            funds = (await portfolio.read("funds")).items
+            equity = [f for f in funds if f.segment == "equity"] or list(funds)
+            return equity[0].available_paise if equity else None
+
+        def unchecked(request, why: str) -> None:
+            if self.event_log is not None:
+                self.event_log.record_note(
+                    "MARGIN_UNCHECKED", account.id,
+                    f"{request.side.value} {request.qty} {request.instrument_id} sent "
+                    f"without a margin check: {why}",
+                )  # fmt: skip
+
+        margin = MarginGate(broker, available, book.net_qty, on_unchecked=unchecked)
+        checks = (recovery, risk, margin if margin_check else None, throttle)
+        gates = [g for g in checks if g is not None]
         orders = OrderManager(
             account.id,
             broker,
             self.instruments.get,
             ids=ids,
-            gate=Gates([recovery, risk, throttle] if recovery else [risk, throttle]),
+            gate=Gates(gates),
             spec=spec_of(broker),
             clock=clock,
         )
@@ -363,6 +390,7 @@ class Platform:
             account.id, broker, self.market_data, client_id_of=client_id_of, clock=clock
         )
         orders.subscribe(portfolio.on_order_event)
+        holder["portfolio"] = portfolio
         charges = ChargesService(
             account.id, self.charges_model, orders, self.instruments.get, clock=clock
         )
@@ -383,6 +411,8 @@ class Platform:
             gtt,
             portfolio,
             charges,
+            margin,
+            margin_check,
         )
         self.accounts[account.id] = runtime
         return runtime

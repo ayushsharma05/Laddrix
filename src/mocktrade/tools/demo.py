@@ -85,7 +85,7 @@ async def main(port: int, origin: str, ui: Path | None) -> None:
         )
         platform.add_account(
             account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN,
-            recover_on_start=True,
+            recover_on_start=True, margin_check=True,
         )  # fmt: skip
     settings = ServerSettings(origin=origin, cookie_secure=False)
     reports = Reports(platform, ReportStore(DATA / "reports"))
