@@ -181,3 +181,12 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
     - The browser check found three real bugs the unit tests had missed: a crash after a drag, a stale older page landing after an interval switch, and two history reads at once making the chart wait more than 2.4 s.
     - It also found a bug already on main: linked widgets' tab titles didn't follow their instrument.
     - The mutation script caught a test that couldn't fail (a snapped price that was already on the tick).
+- K12.2 merged (#238). K12.3 (#233) market alerts:
+  - **Kinds and firing:** seven kinds in the algo-spec format. Crossing semantics: armed first, "already true" said instead of firing, cool-down for repeats, disarmed after a restart.
+  - **Storage:** per-user JSON, written off the loop.
+  - **Webhooks:** signed with HMAC and a timestamp, retried on 5xx/429 only, https to public hosts only (no reaching the server's own network).
+  - **Fixes:**
+    - A test caught a route-order bug: `DELETE /api/alerts/webhook` was taken as an alert id.
+    - Self-review found that user ids aren't restricted, so file names are now hashed.
+    - The mutation script's one survivor led to a real gap: alert instruments weren't watched, so Kite would never have streamed a contract no screen showed. The engine now keeps them subscribed.
+  - **Check:** an alert fired live on the demo. An outside webhook couldn't be tried from the sandbox; test it once deployed.

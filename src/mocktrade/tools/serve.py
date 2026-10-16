@@ -55,6 +55,7 @@ from urllib.parse import urlparse
 import uvicorn
 from fastapi import FastAPI
 
+from mocktrade.alerts.service import build_market_alerts
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.kite.http import BASE_URL
 from mocktrade.broker.kite.instruments import BROKER as KITE
@@ -379,6 +380,8 @@ def build(settings: ServeSettings) -> Assembly:
     else:
         history, history_name = None, ""
     charts = Charts(builder, history, events=events, history_name=history_name)
+    market_alerts = build_market_alerts(platform, settings.data_dir / "alerts")
+    jobs.append(market_alerts.store.run)
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
     jobs.append(scheduler.run)
@@ -398,6 +401,7 @@ def build(settings: ServeSettings) -> Assembly:
         backtests=backtests,
         candles=candle_store,
         charts=charts,
+        market_alerts=market_alerts,
         static_dir=ui,
     )
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)

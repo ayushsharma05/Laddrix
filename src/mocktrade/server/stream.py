@@ -31,6 +31,10 @@ from typing import Any, NamedTuple
 import orjson
 from fastapi import WebSocket, WebSocketDisconnect
 
+from mocktrade.alerts.engine import Alert as MarketAlert
+from mocktrade.alerts.engine import Fired
+from mocktrade.alerts.engine import alert_to_dict as market_alert_to_dict
+from mocktrade.alerts.service import MarketAlerts
 from mocktrade.algos.engine import AlgoEvent
 from mocktrade.charges.model import ChargeBill, bill_to_dict
 from mocktrade.charges.service import ChargesService
@@ -107,6 +111,7 @@ class StreamHub:
         alerts: Alerts | None = None,
         chains: ChainService | None = None,
         charts: Charts | None = None,
+        market_alerts: MarketAlerts | None = None,
     ) -> None:
         self._clock = clock
         self._platform = platform
@@ -127,6 +132,9 @@ class StreamHub:
         self.chain_interval_s = 1.0
         self._charts = charts
         self.candle_interval_s = 1.0
+        if market_alerts is not None:
+            market_alerts.on_fire(self._on_market_alert)
+            market_alerts.on_change(self._on_market_alert_state)
         if alerts is not None:
             alerts.subscribe(self._on_ops)
 
@@ -410,6 +418,20 @@ class StreamHub:
             connection.accounts = self._viewable(user)  # permissions can change
 
     # --- events from the platform ------------------------------------------------------------
+
+    def _on_market_alert(self, fired: Fired) -> None:
+        """A user's own alert fired: to that user's screens only."""
+        message = {"type": "market_alert", "alert": market_alert_to_dict(fired.alert),
+                   "text": fired.text, "at": fired.at.isoformat()}  # fmt: skip
+        for connection in list(self._connections):
+            if connection.user.id == fired.alert.user_id:
+                connection.put(message)
+
+    def _on_market_alert_state(self, alert: MarketAlert) -> None:
+        message = {"type": "market_alert_state", "alert": market_alert_to_dict(alert)}
+        for connection in list(self._connections):
+            if connection.user.id == alert.user_id:
+                connection.put(message)
 
     def _on_ops(self, alert: Alert) -> None:
         message = alert_to_dict(alert)

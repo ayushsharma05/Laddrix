@@ -25,6 +25,7 @@ from urllib.parse import parse_qs, urlparse
 
 import uvicorn
 
+from mocktrade.alerts.service import build_market_alerts
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.paper import PaperBroker
 from mocktrade.charts.candles import CandleBuilder
@@ -151,13 +152,16 @@ async def main(
     md.tap(builder.on_tick)
     charts = Charts(builder, RecordedHistory(recorded_ticks, clock=clock), events=log,
                     clock=clock, history_name="recorded ticks")  # fmt: skip
+    market_alerts = build_market_alerts(platform, data / "alerts", clock)  # each user's own
+    jobs.append(market_alerts.store.run())
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
     app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler,
                      reports=reports, alerts=alerts, ticks=ticks, replay=feed,
                      replay_command=lambda d: f"python -m mocktrade.tools.demo --replay {d} "
                                               f"--port {port + 1}",
-                     backtests=backtests, candles=candle_store, charts=charts)  # fmt: skip
+                     backtests=backtests, candles=candle_store, charts=charts,
+                     market_alerts=market_alerts)  # fmt: skip
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
     what = "demo" if feed is None else f"REPLAY of {replay_day} at {speed:g}×"
     code = "python -m mocktrade.tools.demo --code" + (f" --replay {replay_day}" if feed else "")
