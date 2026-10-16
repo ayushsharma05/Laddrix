@@ -288,3 +288,9 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - at the end it lists what comes from the password manager.
   - **The drill passed 19/19:** a running demo was backed up and restored into an isolated folder. A server started on it had every user, the position, the layout, the theme, the MTM limit, the alert and every audit event. A trade made after the backup was correctly absent.
   - **Mutation run, 24/24.** Along the way it found two pieces of dead code, now removed, and one missing test (a same-size tamper), now added.
+- 16 Oct, #329 merged (PR #333). **#330 done:**
+  - **`docs/runbooks/go-live.md`** covers six areas: before the day; login and expiry; orders, modifies, cancels and the broker check; market-data interruptions; protective orders; square-off; webhooks. Each step has how to check it, what pass means, paper or test evidence, and a live box.
+  - **Paper and live are never mixed:** paper evidence never ticks a live box. The 28 live boxes are Ayush's, with one share and his explicit go-ahead.
+  - **Paper run, 19/19** (`golive-paper.py`): limit rests, modify, cancel, refusals in words, market fill, broker check ok, SL-M and GTT placed and removed, square-off asks then closes MIS only, unsafe webhooks refused.
+  - **Every test the checklist cites exists and passes.**
+  - **A real webhook delivery needs the internet,** so it is a live step.

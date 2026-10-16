@@ -1,0 +1,26 @@
+--- orders
+PASS a market buy is accepted
+PASS and fills: position +75
+PASS a limit buy rests at 24,509.80
+PASS modified to 150 at 24,508.80
+PASS cancelled
+PASS off the tick grid: refused, saying why (2450983 paise is not a multiple of NIFTY26OCTFUT's tick of 10 paise)
+PASS not a whole lot: refused, saying why (50 is not a multiple of NIFTY26OCTFUT's lot size 75)
+--- positions and the broker check
+PASS the broker check ran (2026-10-16T15:44:17.788010+00:00) and agrees: {'checked_at': '2026-10-16T15:44:17.788010+00:00', 'ok': True, 'error': '', 'alerts': []}
+--- protection
+PASS a sell SL-M rests at trigger 24,259.70: OPEN
+PASS and is cancelled
+PASS a GTT stop is placed and listed active (201: G1)
+PASS and deleted
+--- square-off (intraday positions)
+PASS an MIS buy fills: +75
+PASS square-off without confirming is refused
+PASS square-off closes it: {'closed': [{'instrument_id': 'NFO:NIFTY26OCTFUT', 'qty': 75, 'orders': ['D2610167'], 'refused': []}]}
+PASS and leaves the overnight (NRML) position alone
+--- webhooks
+PASS refused: http://example.com/hook (the webhook must be an https:// address)
+PASS refused: https://127.0.0.1/hook (the webhook must be a public address)
+PASS refused: https://localhost/x (the webhook must be a public address)
+
+PAPER: 19/19 steps passed. None of this is evidence about Kite.
