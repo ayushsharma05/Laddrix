@@ -161,9 +161,11 @@ async def test_runs_are_kept_and_a_run_cut_by_a_restart_says_so(nifty_fut, store
         runs.start(spec("NFO:NOPE", side="HOLD"))
     with pytest.raises(BacktestError, match="no candles were imported"):
         runs.start(spec(fut), candles=True)
-    bad = runs.start(spec(fut, algo="NOPE"))
+    with pytest.raises(BacktestError, match="unknown algo 'NOPE'"):  # refused up front
+        runs.start(spec(fut, algo="NOPE"))
+    bad = runs.start(spec(fut, params={"slices": 0, "interval_s": 60}))  # the engine says no
     await runs.settle()
-    assert bad.state == "failed" and "there is no algo called 'NOPE'" in bad.error
+    assert bad.state == "failed" and "the algo couldn't start" in bad.error, bad.error
     # a fresh server reads the runs back; one that was running when it stopped is failed
     (tmp_path / run.run_id / "run.json").write_text(
         json.dumps(
@@ -223,6 +225,70 @@ async def test_the_backtest_api(tmp_path, nifty_fut):
     r = await c.post("/api/research/candles", json={"instrument_id": fut, "day": "2026-10-16",
                                                      "rows": rows})  # fmt: skip
     assert r.status_code == 201 and r.json()["rows"] == 1
+    await c.aclose()
+    w.log.close()
+    await asyncio.sleep(0)
+
+
+async def test_the_screens_api_form_and_a_day_as_csv_and_pdf(tmp_path, nifty_fut):
+    """K11.4: the server publishes the form (algos, days, products, defaults) and hands out
+    each run's day as the K10.3 report: JSON, CSV or PDF; a skipped day says why."""
+    from test_server import ORIGIN
+    from test_server import World as ServerWorld
+
+    from mocktrade.research.ticks import FileTickStore
+    from mocktrade.server.app import ServerSettings, create_app
+
+    w = ServerWorld(tmp_path, nifty_fut)
+    fut = nifty_fut.id
+    recorded = FileTickStore(tmp_path / "ticks")
+    for at in (T0 - timedelta(days=1), T0):
+        recorded.append([(book(fut, 2500000), at)])
+    runs = Backtests(tmp_path / "bt", w.platform.instruments, MODEL,
+                     ticks=lambda d: iter(day_ticks(fut)) if d == DAY else None)  # fmt: skip
+    cs = CandleStore(tmp_path / "candles")
+    rows = [{"time": T0.isoformat(), "open": 100, "high": 110, "low": 90, "close": 105}]
+    cs.put(fut, DAY, rows)
+    cs.put(
+        fut, DAY - timedelta(days=3), [{**rows[0], "time": (T0 - timedelta(days=3)).isoformat()}]
+    )
+    w.app = create_app(w.platform, w.users, ServerSettings(origin=ORIGIN), backtests=runs,
+                       candles=cs, ticks=recorded)  # fmt: skip
+    c = await w.logged_in()
+    form = (await c.get(f"/api/research/backtests/form?instrument_id={fut}")).json()
+    assert [a["code"] for a in form["algos"]][:2] == ["SLICER", "TWAP"]
+    assert form["algos"][0]["params"]  # each algo's settings, for the screen to draw
+    assert form["days"] == ["2026-10-16", "2026-10-15"]  # newest first
+    assert form["products"] == ["CNC", "MIS", "NRML"] and form["candles"] is True
+    assert form["defaults"] == {"product": "NRML", "start": "09:15", "capital_paise": 10**8}
+    assert form["candle_days"] == ["2026-10-16", "2026-10-13"] and form["max_days"] == 250
+    assert "candle_days" not in (await c.get("/api/research/backtests/form")).json()
+
+    body = {"days": ["2026-10-15", DAY.isoformat()], "algo": "SLICER", "instrument_id": fut,
+            "side": "BUY", "qty": 150,
+            "params": {"slices": 2, "interval_s": 60, "mode": "cross"}}  # fmt: skip
+    bad = await c.post("/api/research/backtests", json={**body, "algo": "NOPE"})
+    assert bad.status_code == 422 and "unknown algo 'NOPE'" in bad.json()["detail"]
+    run_id = (await c.post("/api/research/backtests", json=body)).json()["run_id"]
+    early = await c.get(f"/api/research/backtests/{run_id}/days/{DAY}")
+    assert early.status_code == 404 and "hasn't finished" in early.json()["detail"]
+    await runs.settle()
+    base = f"/api/research/backtests/{run_id}/days"
+    day = (await c.get(f"{base}/{DAY}")).json()
+    assert day["day"] == "2026-10-16" and day["totals"]["trades"] == 2 and day["equity_curve"]
+    csv = await c.get(f"{base}/{DAY}?format=csv")
+    assert csv.headers["content-type"].startswith("text/csv")
+    assert f'filename="mocktrade-backtest-{run_id}-2026-10-16.csv"' in csv.headers[
+        "content-disposition"]  # fmt: skip
+    assert "NIFTY26OCTFUT" in csv.text
+    pdf = await c.get(f"{base}/{DAY}?format=pdf")
+    assert pdf.content.startswith(b"%PDF") and pdf.headers["content-type"] == "application/pdf"
+    skipped = await c.get(f"{base}/2026-10-15")
+    assert skipped.status_code == 404 and "skipped: nothing recorded" in skipped.json()["detail"]
+    other = await c.get(f"{base}/2026-10-14")
+    assert other.status_code == 404 and "isn't one of the days" in other.json()["detail"]
+    assert (await c.get(f"{base}/{DAY}?format=xls")).status_code == 422
+    assert (await c.get(f"/api/research/backtests/BTnope/days/{DAY}")).status_code == 404
     await c.aclose()
     w.log.close()
     await asyncio.sleep(0)
