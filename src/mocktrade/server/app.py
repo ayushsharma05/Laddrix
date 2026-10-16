@@ -52,6 +52,7 @@ from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.portfolio.service import PortfolioError, snapshot_to_dict
 from mocktrade.reports.export import report_csv, report_pdf
 from mocktrade.reports.service import ReportError, Reports
+from mocktrade.research.backtest import BacktestError, Backtests, BacktestSpec, CandleStore
 from mocktrade.research.replay import ReplayFeed
 from mocktrade.research.ticks import FileTickStore
 from mocktrade.risk.kill_switch import stop_trading
@@ -221,6 +222,26 @@ class ReplayIn(_Strict):
     at: datetime | None = None  # seek: the time to jump to (ahead only)
 
 
+class BacktestIn(_Strict):
+    days: list[str] = Field(min_length=1, max_length=250)
+    algo: str = Field(min_length=1, max_length=40)
+    instrument_id: str = Field(min_length=3, max_length=64)
+    side: Side
+    qty: int = Field(gt=0, le=10_000_000)
+    params: dict[str, Any] = Field(default_factory=dict)
+    product: Product = Product.NRML
+    start: str = "09:15"
+    capital_paise: int = Field(default=10_00_000_00, gt=0, le=10**13)
+    name: str = Field(default="", max_length=80)
+    candles: bool = False
+
+
+class CandlesIn(_Strict):
+    instrument_id: str = Field(min_length=3, max_length=64)
+    day: date
+    rows: list[dict[str, Any]] = Field(min_length=1, max_length=2000)
+
+
 class ConfirmIn(_Strict):
     confirm: bool
 
@@ -248,6 +269,8 @@ def create_app(
     reports: Reports | None = None,
     ticks: FileTickStore | None = None,
     replay: ReplayFeed | None = None,
+    backtests: Backtests | None = None,
+    candles: CandleStore | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -456,6 +479,48 @@ def create_app(
         if when not in store.days():
             raise HTTPException(404, f"nothing recorded on {day}")
         return await asyncio.to_thread(store.summary, when)
+
+    # --- backtests (K11.3) ---------------------------------------------------------------------
+
+    def backtest_runs():
+        if backtests is None:
+            raise HTTPException(404, "backtests aren't set up on this server")
+        return backtests
+
+    @app.post("/api/research/backtests", status_code=201)
+    async def backtest_start(body: BacktestIn, user: Me) -> dict[str, Any]:
+        runs = backtest_runs()
+        spec = BacktestSpec(tuple(body.days), body.algo, body.instrument_id, body.side.value,
+                            body.qty, body.params, body.product.value, body.start,
+                            body.capital_paise, body.name)  # fmt: skip
+        try:
+            run = runs.start(spec, candles=body.candles)
+        except BacktestError as exc:
+            raise HTTPException(422, str(exc)) from None
+        audit("BACKTEST", f"{user.id} started {run.run_id}: {body.algo} {body.side.value} "
+              f"{body.qty} {body.instrument_id} over {len(body.days)} days", {})  # fmt: skip
+        return run.to_dict(full=False)
+
+    @app.get("/api/research/backtests")
+    async def backtest_list(user: Me) -> list[dict[str, Any]]:
+        return [r.to_dict(full=False) for r in backtest_runs().runs()]
+
+    @app.get("/api/research/backtests/{run_id}")
+    async def backtest_get(run_id: str, user: Me) -> dict[str, Any]:
+        run = backtest_runs().get(run_id)
+        if run is None:
+            raise HTTPException(404, f"no backtest {run_id}")
+        return run.to_dict()
+
+    @app.post("/api/research/candles", status_code=201)
+    async def candles_import(body: CandlesIn, user: Me) -> dict[str, Any]:
+        if candles is None:
+            raise HTTPException(404, "candles can't be imported on this server")
+        try:
+            n = candles.put(body.instrument_id, body.day, body.rows)
+        except BacktestError as exc:
+            raise HTTPException(422, str(exc)) from None
+        return {"instrument_id": body.instrument_id, "day": body.day.isoformat(), "rows": n}
 
     # --- a replay server's controls (K11.2) ------------------------------------------------------
 
