@@ -43,6 +43,71 @@
   --ladder-row: 20px;
 
   color-scheme: dark;
+
+  /* surfaces, ink, lines and tints the screens use (moved here from the stylesheets, K13.5) */
+  --control-border: #3a4452;
+  --control-hover: #2e3846;
+  --selected-fill: #2f4b73;
+  --accent: #3d86f0;
+  --on-strong: #ffffff;
+  --bad-ink: #ffc9cc;
+  --stop-hover: #5c2128;
+  --stop-now-border: #ffb3b8;
+  --focus-border: #4f78b0;
+  --bad-fill: #3d1418;
+  --bad-border: #7a2c33;
+  --warn-fill: #4a3a0a;
+  --warn-ink: #fff1bf;
+  --chrome-ink: #c6ceda;
+  --neutral-dot: #4a5566;
+  --live-ink: #bfebd7;
+  --login-fill: #5a2a14;
+  --login-ink: #ffd9c2;
+  --stopped-ink: #ffd2d5;
+  --firm-stopped-fill: #3d0f13;
+  --warn-strong-ink: #ffe89a;
+  --shadow: rgba(0,0,0,0.5);
+  --backdrop: rgba(8,10,13,0.55);
+  --replay-fill: #3b2a5c;
+  --replay-ink: #efe6ff;
+  --replay-border: #5b4490;
+  --replay-dim: #c8b8e8;
+  --drop-target: rgba(61,134,240,0.18);
+  --icon-hover: rgba(255,255,255,0.08);
+  --shadow-deep: rgba(0,0,0,0.55);
+  --tab-active: #313b48;
+  --tab-inactive: #2b3440;
+  --scrollbar: rgba(255,255,255,0.18);
+  --tab-link-border: rgba(0,0,0,0.35);
+  --grid-head-divider: #313a46;
+  --row-hover: #2a3440;
+  --flash-up: rgba(76,195,138,0.28);
+  --flash-down: rgba(240,100,108,0.28);
+  --panel-fill: #1b2129;
+  --panel-hover: #303a47;
+  --panel-on: #1f5f4a;
+  --lots-border: #4a5566;
+  --differs-fill: rgba(240,100,108,0.14);
+  --sell-soft-ink: #ffb3b8;
+  --timeline-divider: #2a323d;
+  --progress-tint: rgba(111,168,255,0.18);
+  --strike-fill: #232a34;
+  --call-oi-tint: rgba(111,168,255,0.16);
+  --put-oi-tint: rgba(240,100,108,0.16);
+  --itm-fill: rgba(255,214,102,0.07);
+  --atm-ink: #111111;
+  --atm-fill: #ffd666;
+  --atm-border: #ffd66655;
+  --profit-area: rgba(56,193,114,0.12);
+  --payoff-zero: #5c6776;
+  --payoff-forward: #ffd666;
+  --payoff-expiry: #6fa8ff;
+  --payoff-today: #c7a6ff;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --chart-grid-line: #222a34;
 }
 
 * {
@@ -111,7 +176,7 @@ select {
 .btn {
   height: 26px;
   padding: 0 10px;
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   border-radius: 2px;
   background: var(--chrome);
   color: var(--text);
@@ -120,39 +185,39 @@ select {
   cursor: pointer;
 }
 .btn:hover:not(:disabled) {
-  background: #2e3846;
+  background: var(--control-hover);
 }
 .btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
 .btn.on {
-  background: #2f4b73;
-  border-color: #3d86f0;
+  background: var(--selected-fill);
+  border-color: var(--accent);
 }
 .btn.primary {
   background: var(--primary);
   border-color: var(--primary-border);
-  color: #fff;
+  color: var(--on-strong);
   font-weight: 600;
 }
 .btn.stop {
   padding: 0 14px;
   border-color: var(--stop-border);
   background: var(--stop-bg);
-  color: #ffc9cc;
+  color: var(--bad-ink);
   font-weight: 700;
   letter-spacing: 0.06em;
 }
 .btn.stop:hover {
-  background: #5c2128;
+  background: var(--stop-hover);
 }
 .btn.stopped-btn,
 .btn.stop-now {
   padding: 0 14px;
-  border-color: #ffb3b8;
+  border-color: var(--stop-now-border);
   background: var(--work-sell);
-  color: #fff;
+  color: var(--on-strong);
   font-weight: 700;
   letter-spacing: 0.06em;
 }
@@ -190,19 +255,19 @@ select {
   height: 26px;
   padding: 0 8px;
   background: var(--well);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   border-radius: 0;
   color: var(--text);
 }
 .input:focus {
-  border-color: #4f78b0;
+  border-color: var(--focus-border);
   outline: none;
 }
 
 select {
   height: 22px;
   background: var(--well);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   color: var(--text);
 }
 
@@ -230,14 +295,14 @@ select {
   border: 1px solid;
 }
 .alert.bad {
-  background: #3d1418;
-  border-color: #7a2c33;
-  color: #ffc9cc;
+  background: var(--bad-fill);
+  border-color: var(--bad-border);
+  color: var(--bad-ink);
 }
 .alert.warn {
-  background: #4a3a0a;
+  background: var(--warn-fill);
   border-color: var(--pending);
-  color: #fff1bf;
+  color: var(--warn-ink);
 }
 
 .hint {

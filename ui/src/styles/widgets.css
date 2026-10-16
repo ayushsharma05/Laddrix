@@ -1,36 +1,36 @@
 /* Widgets inside dockview: the theme (tabs act as title bars) and the shared grid look. */
 
 .dockview-theme-mocktrade {
-  --dv-paneview-active-outline-color: #3d86f0;
+  --dv-paneview-active-outline-color: var(--accent);
   --dv-tabs-and-actions-container-font-size: 13px;
   --dv-tabs-and-actions-container-height: 24px;
-  --dv-drag-over-background-color: rgba(61, 134, 240, 0.18);
-  --dv-drag-over-border-color: #3d86f0;
-  --dv-tabs-container-scrollbar-color: #4a5566;
-  --dv-icon-hover-background-color: rgba(255, 255, 255, 0.08);
-  --dv-floating-box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+  --dv-drag-over-background-color: var(--drop-target);
+  --dv-drag-over-border-color: var(--accent);
+  --dv-tabs-container-scrollbar-color: var(--neutral-dot);
+  --dv-icon-hover-background-color: var(--icon-hover);
+  --dv-floating-box-shadow: 0 14px 34px var(--shadow-deep);
   --dv-overlay-z-index: 999;
   --dv-tab-font-size: 13px;
   --dv-border-radius: 0px;
   --dv-tab-margin: 0;
   --dv-sash-color: transparent;
-  --dv-active-sash-color: #3d86f0;
+  --dv-active-sash-color: var(--accent);
   --dv-active-sash-transition-duration: 0.1s;
   --dv-active-sash-transition-delay: 0.3s;
   --dv-group-view-background-color: var(--body);
   --dv-tabs-and-actions-container-background-color: var(--chrome);
-  --dv-activegroup-visiblepanel-tab-background-color: #313b48;
+  --dv-activegroup-visiblepanel-tab-background-color: var(--tab-active);
   --dv-activegroup-hiddenpanel-tab-background-color: var(--chrome);
-  --dv-inactivegroup-visiblepanel-tab-background-color: #2b3440;
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--tab-inactive);
   --dv-inactivegroup-hiddenpanel-tab-background-color: var(--chrome);
   --dv-tab-divider-color: var(--border);
   --dv-activegroup-visiblepanel-tab-color: var(--text);
   --dv-activegroup-hiddenpanel-tab-color: var(--text-2);
-  --dv-inactivegroup-visiblepanel-tab-color: #c6ceda;
+  --dv-inactivegroup-visiblepanel-tab-color: var(--chrome-ink);
   --dv-inactivegroup-hiddenpanel-tab-color: var(--text-2);
   --dv-separator-border: transparent;
   --dv-paneview-header-border-color: var(--border);
-  --dv-scrollbar-background-color: rgba(255, 255, 255, 0.18);
+  --dv-scrollbar-background-color: var(--scrollbar);
   background: var(--desktop);
 }
 .dockview-theme-mocktrade .dv-groupview {
@@ -57,7 +57,7 @@
   width: 10px;
   height: 10px;
   padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--tab-link-border);
   cursor: pointer;
 }
 .tab-close {
@@ -98,7 +98,7 @@
 }
 .grid-head > * {
   padding: 0 6px;
-  border-right: 1px solid #313a46;
+  border-right: 1px solid var(--grid-head-divider);
   overflow: hidden;
   white-space: nowrap;
 }
@@ -123,10 +123,10 @@
   background: var(--zebra);
 }
 .grid-body .row:hover {
-  background: #2a3440;
+  background: var(--row-hover);
 }
 .grid-body .row.selected {
-  background: #2f4b73;
+  background: var(--selected-fill);
 }
 
 /* --- watch list ------------------------------------------------------------------------------ */
@@ -161,11 +161,11 @@
   transition: background-color 0.4s;
 }
 .watch-row .flash-up {
-  background: rgba(76, 195, 138, 0.28);
+  background: var(--flash-up);
   transition: none;
 }
 .watch-row .flash-down {
-  background: rgba(240, 100, 108, 0.28);
+  background: var(--flash-down);
   transition: none;
 }
 .row-remove {
@@ -254,7 +254,7 @@
   gap: 4px;
   padding: 6px 5px;
   box-sizing: border-box;
-  background: #1b2129;
+  background: var(--panel-fill);
   border-right: 1px solid var(--border);
   overflow: hidden;
 }
@@ -273,15 +273,15 @@
   font-size: 12px;
   color: var(--text);
   background: var(--chrome);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   border-radius: 2px;
   cursor: pointer;
 }
 .ladder-side button:hover {
-  background: #303a47;
+  background: var(--panel-hover);
 }
 .ladder-side button.on {
-  background: #1f5f4a;
+  background: var(--panel-on);
 }
 .ladder-side-label {
   margin-top: 2px;
@@ -296,7 +296,7 @@
   font-size: 16px;
   font-weight: 700;
   background: var(--well);
-  border: 1px solid #4a5566;
+  border: 1px solid var(--lots-border);
 }
 .ladder-qty {
   font-size: 11px;
@@ -312,9 +312,9 @@
   height: 38px;
   line-height: 14px;
   font-weight: 600;
-  color: #ffc9cc;
+  color: var(--bad-ink);
   background: var(--stop-bg);
-  border-color: #7a2c33;
+  border-color: var(--bad-border);
 }
 .ladder-grid {
   flex: 1 1 auto;
@@ -351,7 +351,7 @@
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
-  color: #fff;
+  color: var(--on-strong);
   background: var(--body);
   border: 0;
   border-right: 1px solid var(--border-dark);
@@ -382,7 +382,7 @@ button.lc:disabled {
   outline-offset: -2px;
 }
 .lc.piq {
-  color: #c6ceda;
+  color: var(--chrome-ink);
 }
 .lc.bid {
   text-align: right;
@@ -407,7 +407,7 @@ button.lc:disabled {
   background: var(--price);
 }
 .lc.price.last {
-  color: #fff;
+  color: var(--on-strong);
   background: var(--last);
 }
 .lc.ltq {
@@ -421,7 +421,7 @@ button.lc:disabled {
 }
 .lc.vap {
   text-align: right;
-  color: #c6ceda;
+  color: var(--chrome-ink);
   background-image: linear-gradient(var(--vap-bar), var(--vap-bar));
   background-repeat: no-repeat;
   background-size: 0 100%;
@@ -499,7 +499,7 @@ button.lc:disabled {
 }
 .book-tab.on {
   color: var(--text);
-  background: #2f4b73;
+  background: var(--selected-fill);
 }
 .btn.small {
   height: 22px;
@@ -507,9 +507,9 @@ button.lc:disabled {
   font-size: 12px;
 }
 .btn.small.danger:not(:disabled) {
-  color: #ffc9cc;
+  color: var(--bad-ink);
   background: var(--stop-bg);
-  border-color: #7a2c33;
+  border-color: var(--bad-border);
 }
 .book-search {
   width: 110px;
@@ -517,7 +517,7 @@ button.lc:disabled {
   padding: 0 6px;
   font-size: 12px;
   background: var(--well);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
 }
 .book-row {
   display: grid;
@@ -556,10 +556,10 @@ button.lc:disabled {
   border-top: 1px solid var(--border);
 }
 .positions-row.differs {
-  background: rgba(240, 100, 108, 0.14) !important;
+  background: var(--differs-fill) !important;
 }
 .audit-row.sell > span:not([class*="tone-"]):not(.dim) {
-  color: #ffb3b8;
+  color: var(--sell-soft-ink);
 }
 .audit-main {
   flex: 1 1 auto;
@@ -581,7 +581,7 @@ button.lc:disabled {
   flex-direction: column;
   min-height: 0;
   border-left: 1px solid var(--border);
-  background: #1b2129;
+  background: var(--panel-fill);
 }
 .timeline {
   flex: 1 1 auto;
@@ -596,7 +596,7 @@ button.lc:disabled {
   grid-template-columns: 88px 1fr;
   gap: 0 6px;
   padding: 4px 0;
-  border-bottom: 1px solid #2a323d;
+  border-bottom: 1px solid var(--timeline-divider);
 }
 .timeline li > span:last-child {
   grid-column: 2;
@@ -695,16 +695,16 @@ button.lc:disabled {
   font-weight: 700;
   color: var(--text-3);
   background: var(--chrome);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   cursor: pointer;
 }
 .ticket-sides .side.buy.on {
-  color: #fff;
+  color: var(--on-strong);
   background: var(--bid);
   border-color: var(--work-buy);
 }
 .ticket-sides .side.sell.on {
-  color: #fff;
+  color: var(--on-strong);
   background: var(--ask);
   border-color: var(--work-sell);
 }
@@ -735,7 +735,7 @@ button.lc:disabled {
   padding: 0;
   color: var(--text);
   background: var(--chrome);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   cursor: pointer;
 }
 .stepper input {
@@ -746,7 +746,7 @@ button.lc:disabled {
   text-align: right;
   color: var(--text);
   background: var(--well);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   border-left: 0;
   border-right: 0;
 }
@@ -771,7 +771,7 @@ button.lc:disabled {
   flex: 1 1 auto;
   height: 34px;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-strong);
   border: 1px solid transparent;
   cursor: pointer;
   white-space: nowrap;
@@ -849,7 +849,7 @@ button.lc:disabled {
 }
 /* filled, with a bar showing how much of the parent is done */
 .algo-filled {
-  background: linear-gradient(to right, rgba(111, 168, 255, 0.18) var(--done, 0%), transparent var(--done, 0%));
+  background: linear-gradient(to right, var(--progress-tint) var(--done, 0%), transparent var(--done, 0%));
 }
 .algo-status {
   overflow: hidden;
@@ -860,7 +860,7 @@ button.lc:disabled {
 .algo-detail {
   padding: 4px 8px 6px 28px;
   font-size: 12px;
-  background: #1b2129;
+  background: var(--panel-fill);
   border-bottom: 1px solid var(--border);
 }
 .algo-facts {
@@ -884,7 +884,7 @@ button.lc:disabled {
   max-height: 60%;
   overflow: auto;
   border-bottom: 1px solid var(--border);
-  background: #1b2129;
+  background: var(--panel-fill);
 }
 .algo-form-row {
   display: flex;
@@ -905,7 +905,7 @@ button.lc:disabled {
   font-size: 13px;
   color: var(--text);
   background: var(--well);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
 }
 .algo-field.wide {
   min-width: 200px;
@@ -944,7 +944,7 @@ label.algo-field {
   padding: 4px 8px 4px 22px;
   font-size: 12px;
   color: var(--bad);
-  border: 1px solid #7a2c33;
+  border: 1px solid var(--bad-border);
 }
 .algo-form .ticket-send {
   flex: 0 1 auto;
@@ -983,7 +983,7 @@ label.algo-field {
   gap: 4px 12px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
-  background: #1b2129;
+  background: var(--panel-fill);
 }
 .chain-row {
   display: grid;
@@ -1003,7 +1003,7 @@ label.algo-field {
   color: var(--buy-text);
 }
 .chain-side-head.puts {
-  color: #ffb3b8;
+  color: var(--sell-soft-ink);
 }
 .chain-head {
   height: auto; /* two lines: CALLS/PUTS and the column names */
@@ -1029,7 +1029,7 @@ label.algo-field {
 .chain-strike {
   text-align: center;
   font-weight: 700;
-  background: #232a34;
+  background: var(--strike-fill);
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
 }
@@ -1045,13 +1045,13 @@ label.algo-field {
 }
 /* OI bar: how this strike's open interest compares with the largest shown */
 .chain-leg.call {
-  background: linear-gradient(to left, rgba(111, 168, 255, 0.16) var(--oi, 0%), transparent var(--oi, 0%));
+  background: linear-gradient(to left, var(--call-oi-tint) var(--oi, 0%), transparent var(--oi, 0%));
 }
 .chain-leg.put {
-  background: linear-gradient(to right, rgba(240, 100, 108, 0.16) var(--oi, 0%), transparent var(--oi, 0%));
+  background: linear-gradient(to right, var(--put-oi-tint) var(--oi, 0%), transparent var(--oi, 0%));
 }
 .chain-leg.itm {
-  background-color: rgba(255, 214, 102, 0.07);
+  background-color: var(--itm-fill);
 }
 .chain-leg:hover:not(:disabled),
 .chain-leg.selected {
@@ -1059,12 +1059,12 @@ label.algo-field {
   outline-offset: -1px;
 }
 .chain-row.atm .chain-strike {
-  color: #111;
-  background: #ffd666;
+  color: var(--atm-ink);
+  background: var(--atm-fill);
 }
 .chain-row.atm {
-  border-top: 1px solid #ffd66655;
-  border-bottom: 1px solid #ffd66655;
+  border-top: 1px solid var(--atm-border);
+  border-bottom: 1px solid var(--atm-border);
 }
 .chain-foot {
   flex: 0 0 auto;
@@ -1103,7 +1103,7 @@ label.algo-field {
   padding: 0 4px;
   color: var(--text);
   background: var(--well);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
 }
 .strategy-view {
   padding: 3px 8px;
@@ -1131,7 +1131,7 @@ label.algo-field {
   height: 20px;
   font-weight: 700;
   background: var(--chrome);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   cursor: pointer;
 }
 .strategy-lots {
@@ -1145,24 +1145,24 @@ label.algo-field {
   padding: 0;
   color: var(--text);
   background: var(--chrome);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   cursor: pointer;
 }
 .payoff {
   width: 100%;
   max-width: 1200px;
-  background: #1b2129;
+  background: var(--panel-fill);
   border: 1px solid var(--border);
 }
 .payoff-profit {
-  fill: rgba(56, 193, 114, 0.12);
+  fill: var(--profit-area);
 }
 .payoff-zero {
-  stroke: #5c6776;
+  stroke: var(--payoff-zero);
   stroke-width: 1;
 }
 .payoff-forward {
-  stroke: #ffd666;
+  stroke: var(--payoff-forward);
   stroke-width: 1;
   stroke-dasharray: 3 3;
 }
@@ -1172,12 +1172,12 @@ label.algo-field {
 }
 .payoff-expiry {
   fill: none;
-  stroke: #6fa8ff;
+  stroke: var(--payoff-expiry);
   stroke-width: 2;
 }
 .payoff-today {
   fill: none;
-  stroke: #c7a6ff;
+  stroke: var(--payoff-today);
   stroke-width: 1.5;
   stroke-dasharray: 5 4;
 }
@@ -1202,7 +1202,7 @@ label.algo-field {
   gap: 4px;
   padding: 6px 8px;
   font-size: 12px;
-  background: #1b2129;
+  background: var(--panel-fill);
   border: 1px solid var(--border);
 }
 .basket-bar {
@@ -1220,7 +1220,7 @@ label.algo-field {
   gap: 2px;
 }
 .btn.small.danger-confirm:not(:disabled) {
-  color: #fff;
+  color: var(--on-strong);
   background: var(--bid);
   border-color: var(--work-buy);
 }
@@ -1326,10 +1326,10 @@ label.algo-field {
 /* Research: recordings and backtests (widgets/research/) */
 .research {
   /* chart colour slots: validated for colour-blind readers on the dark surface (--body) */
-  --slot-0: #3987e5;
-  --slot-1: #d95926;
-  --slot-2: #199e70;
-  --slot-3: #c98500;
+  --slot-0: var(--series-1);
+  --slot-1: var(--series-2);
+  --slot-2: var(--series-3);
+  --slot-3: var(--series-4);
 }
 .research-body {
   padding: 4px 8px;
@@ -1555,9 +1555,9 @@ label.algo-field {
 /* Chart (widgets/chart/Chart.tsx). Candle colours: blue up (hollow), orange down (filled):
    validated for colour-blind readers on the dark surface; shape tells them apart as well. */
 .chart {
-  --candle-up: #3987e5;
-  --candle-down: #d95926;
-  --chart-grid: #222a34;
+  --candle-up: var(--series-1);
+  --candle-down: var(--series-2);
+  --chart-grid: var(--chart-grid-line);
   display: flex;
   flex-direction: column;
   height: 100%;
