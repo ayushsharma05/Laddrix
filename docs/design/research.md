@@ -103,6 +103,18 @@ GET /api/research/backtests, GET /api/research/backtests/{run}
 POST /api/research/candles {instrument_id, day, rows: [{time, open, high, low, close, volume?}]}
 ```
 
+- **Importing candles safely** (#269, after an outside review reproduced a path escaping its folder):
+  - **The contract must be known.** It must be in the instrument list; otherwise the server answers 422.
+  - **The store checks the id itself.** An id must be `EXCHANGE:SYMBOL` with no path characters, and its folder must sit directly under the candle folder. A planted link is not followed outside.
+  - **Each row is checked:**
+    - time with its zone, on that day, and no second candle at the same time;
+    - whole paise for prices, and low ≤ open, close ≤ high;
+    - a whole volume that isn't negative;
+    - no unknown fields.
+  - **Written whole or not at all.** The day goes to a `.part` file and is then moved into place, so a refused import leaves the earlier day as it was.
+  - **Recorded.** Each import is audited (`CANDLES_IMPORTED`: who, contract, day, rows).
+  - The folder layout is unchanged, so data imported before still reads.
+  - Account ids also become file names (MTM rules, broker tokens, reports), so the store accepts only letters, digits and dashes for them, from the API and the terminal tool alike.
 - **The same code as live:** the real algo engine, paper broker, risk gate, charges and report.
   A backtest can't be kinder than the platform would have been that day.
 - **Deterministic:** nothing sleeps or reads the wall clock. The same days and spec give the same
