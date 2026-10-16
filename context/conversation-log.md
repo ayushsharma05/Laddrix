@@ -235,3 +235,10 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 - 16 Oct, K13.2 (#282) admin screen:
   - **Built:** Users, Accounts and Limits, drawn from the server (roles, brokers, the limits spec); secrets shown once with a QR code; second clicks for dangerous and looser changes; risk read only; the first-login "Set your password" page; Admin offered only to admin and risk.
   - **Ayush restated the workspace design:** widgets open, close and size anywhere; pages are screens; with pop-outs they make one workspace. So the Admin widget was made to adapt to its own width. The rule "every widget works at any size" is now in `docs/design/ui.md`.
+
+
+## 16 October 2026 — researched later-stage expansion (Codex)
+
+Ayush asked for broad research across seven public trading product ecosystems, customer feedback and detailed later GitHub additions. Reviewed public documentation and available reviews; mapped existing foundations and avoided parallel replacement engines. Created parent #297 and 25 packages #298–#322, then linked them from #241. Each describes purpose, scope, dependencies and acceptance criteria. Coverage and evidence limits are in [feature-expansion-2026-10-16.md](feature-expansion-2026-10-16.md).
+
+Core #240 and hardening #257 remain first, with security #279, data rights #278 and applicable compliance #291 preserved. Mobile new-entry, public marketplace/performance sharing, assistant tools and institutional services are decision-gated. Reviews are qualitative, often dated; paid/private functionality and claimed performance were not independently tested. Requirements remain vendor-neutral. No application code or deployment was changed. Context handoff tracked by #323.
