@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { CandlesAnswer, ChartSpec } from "../../api/types";
+import { Rest } from "../../api/rest";
 import { AppProvider, createApp } from "../../app/context";
 import { fakeRest, fakeStream } from "../../test/fakes";
 import { ME } from "../../test/fixtures";
@@ -139,6 +140,101 @@ describe("Chart", () => {
     fireEvent.keyDown(chartImg(), { key: "+" });
     fireEvent.keyDown(chartImg(), { key: "Home" });
     expect(chartImg().getAttribute("aria-label")).toContain("2 of 2 candles");
+  });
+
+  it("dragging pans back in time; the click that ends a drag picks nothing", async () => {
+    const many: CandlesAnswer = { ...TODAY, candles: Array.from({ length: 120 }, (_, k) => candle(new Date(Date.parse(at("09:15")) + k * 300_000).toISOString(), 2500000 + k)) };
+    const { app } = setup({ [`GET /api/charts/${ENC}/candles?interval=5m`]: many });
+    await vi.waitFor(() => expect(chartImg().getAttribute("aria-label")).toContain("71 of 120 candles"));
+    const picks: number[] = [];
+    app.links.subscribePrice("pink", (p) => picks.push(p.pricePaise));
+    fireEvent.mouseMove(chartImg(), { clientX: 500, clientY: 50 });
+    const before = readout().textContent;
+    fireEvent.mouseDown(chartImg(), { clientX: 100, clientY: 50 });
+    // as a browser sends them: the move, the release and the click before React renders
+    await act(async () => {
+      fireEvent.mouseMove(chartImg(), { clientX: 180, clientY: 50 }); // 80 px = 10 candles back
+      fireEvent.mouseUp(chartImg(), { clientX: 180, clientY: 50 });
+      fireEvent.click(chartImg(), { clientX: 180, clientY: 50 });
+      await new Promise((r) => setTimeout(r, 5)); // the drag has ended before the pan is drawn
+    });
+    expect(picks).toEqual([]);
+    fireEvent.mouseMove(chartImg(), { clientX: 500, clientY: 50 });
+    expect(readout().textContent).not.toBe(before);
+    expect(readout().textContent).toContain("O 25,001.01"); // candle 101: ten older than the 111th under the pointer before
+    await screen.findByText("NIFTY26OCTFUT");
+    fireEvent.click(chartImg(), { clientX: 300, clientY: 60 }); // a plain click after the drag picks
+    expect(picks).toHaveLength(1);
+  });
+
+  it("an older page asked for one interval is dropped once another interval is shown", async () => {
+    resetChartSpec();
+    let release: (r: Response) => void = () => {};
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+    const rest = new Rest(async (path) => {
+      if (path === "/api/charts/spec") return json(SPEC);
+      if (path.startsWith(`/api/instruments/`)) return json(NIFTY);
+      if (path.includes("/marks")) return json({ marks: [] });
+      if (path.includes("interval=5m&start=")) return new Promise<Response>((r) => (release = r)); // held back
+      if (path.includes("interval=1m")) return json({ ...TODAY, interval: "1m", candles: [candle(at("09:21"), 2600000)] });
+      return json(TODAY);
+    });
+    const { stream, socket } = fakeStream();
+    const app = createApp({ rest, stream });
+    app.store.setMe(ME);
+    app.store.selectAccount("acc-a");
+    stream.start();
+    socket().open();
+    const props = { params: { link: "pink" as const, instrumentId: FUT, interval: "5m" }, setParams: vi.fn(), setInstrument: vi.fn(), publish: vi.fn(), open: vi.fn() };
+    const view = render(
+      <AppProvider app={app}>
+        <Chart {...props} />
+      </AppProvider>,
+    );
+    await vi.waitFor(() => expect(chartImg().getAttribute("aria-label")).toContain("5m chart: 2 of 2"));
+    view.rerender(
+      <AppProvider app={app}>
+        <Chart {...props} params={{ ...props.params, interval: "1m" }} />
+      </AppProvider>,
+    );
+    await vi.waitFor(() => expect(chartImg().getAttribute("aria-label")).toContain("1m chart: 1 of 1"));
+    await act(async () => release(json({ ...TODAY, candles: [candle(at("09:10"), 1), candle(at("09:05"), 2)] })));
+    expect(chartImg().getAttribute("aria-label")).toContain("1m chart: 1 of 1"); // the 5m page didn't join
+  });
+
+  it("older pages wait for the first load: never two history reads at once", async () => {
+    resetChartSpec();
+    let release: (r: Response) => void = () => {};
+    const asked: string[] = [];
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+    const rest = new Rest(async (path) => {
+      asked.push(path);
+      if (path === "/api/charts/spec") return json(SPEC);
+      if (path.startsWith(`/api/instruments/`)) return json(NIFTY);
+      if (path.includes("/marks")) return json({ marks: [] });
+      if (path.endsWith("candles?interval=5m")) return new Promise<Response>((r) => (release = r)); // slow
+      return json({ ...TODAY, candles: [] });
+    });
+    const { stream, socket } = fakeStream();
+    const app = createApp({ rest, stream });
+    app.store.setMe(ME);
+    app.store.selectAccount("acc-a");
+    stream.start();
+    socket().open();
+    render(
+      <AppProvider app={app}>
+        <Chart params={{ link: "pink", instrumentId: FUT, interval: "5m" }} setParams={vi.fn()} setInstrument={vi.fn()} publish={vi.fn()} open={vi.fn()} />
+      </AppProvider>,
+    );
+    await vi.waitFor(() => expect(socket().sent).toContainEqual({ op: "candles", instrument_id: FUT, interval: "5m" }));
+    act(() => socket().receive({ type: "candle", instrument_id: FUT, interval: "5m", candle: candle(at("09:25"), 2500000) }));
+    expect(await screen.findByText("loading history…")).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(asked.filter((p) => p.includes("&end="))).toEqual([]); // the first load hasn't answered
+    await act(async () => release(json(TODAY)));
+    await vi.waitFor(() => expect(asked.filter((p) => p.includes("&end=")).length).toBe(1));
+    expect(chartImg().getAttribute("aria-label")).toContain("3 of 3 candles");
+    expect(screen.queryByText("loading history…")).toBeNull();
   });
 
   it("history the server couldn't get is said, and a missing contract asks for one", async () => {

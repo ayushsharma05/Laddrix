@@ -102,9 +102,21 @@ function useLocation(api: IDockviewPanelHeaderProps<BaseParams>["api"]): string 
   return where;
 }
 
+/** The panel's title, kept current (a linked widget renames its tab when it switches). */
+function useTitle(api: IDockviewPanelHeaderProps<BaseParams>["api"]): string {
+  const [title, setTitle] = useState(api.title ?? "");
+  useEffect(() => {
+    setTitle(api.title ?? "");
+    const sub = api.onDidTitleChange((e) => setTitle(e.title));
+    return () => sub.dispose();
+  }, [api]);
+  return title;
+}
+
 export function WidgetTab({ api, params }: IDockviewPanelHeaderProps<BaseParams>) {
   const controller = useController();
   const where = useLocation(api);
+  const title = useTitle(api);
   const def = widget(api.component);
   const link: LinkGroup = params?.link ?? "none";
   const cycle = (e: React.MouseEvent) => {
@@ -131,7 +143,7 @@ export function WidgetTab({ api, params }: IDockviewPanelHeaderProps<BaseParams>
           onMouseDown={(e) => e.stopPropagation()}
         />
       )}
-      <span className="tab-title">{api.title}</span>
+      <span className="tab-title">{title}</span>
       {where === "popout" ? (
         <button
           type="button"

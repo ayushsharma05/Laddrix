@@ -5,7 +5,7 @@
 
 import type { Candle, ChartMark } from "../../api/types";
 import { price as fmtPrice } from "../../lib/format";
-import { priceScale, priceTicks, timeLabels, visible, type View, xOf } from "./model";
+import { priceScale, priceTicks, snapTick, timeLabels, visible, type View, xOf } from "./model";
 
 export interface Colours {
   up: string;
@@ -49,6 +49,7 @@ export interface Frame {
   hover: { i: number | null; y: number | null };
   daily: boolean;
   colours: Colours;
+  tick?: number; // the instrument's tick: the crosshair shows the price a click would pick
 }
 
 /** Paint one frame. `ctx` is any 2D context (a recording fake in tests). */
@@ -169,7 +170,8 @@ export function drawChart(ctx: CanvasRenderingContext2D, f: Frame): void {
       ctx.fillStyle = f.colours.cross;
       ctx.fillRect(plotW + 1, y - 8, AXIS_W - 2, 16);
       ctx.fillStyle = f.colours.surface;
-      ctx.fillText(fmtPrice(Math.round(scale.price(f.hover.y))), plotW + 6, y);
+      const at = Math.round(scale.price(f.hover.y));
+      ctx.fillText(fmtPrice(f.tick ? snapTick(at, f.tick) : at), plotW + 6, y);
     }
     ctx.setLineDash([]);
   }

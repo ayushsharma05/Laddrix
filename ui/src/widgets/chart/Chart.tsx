@@ -54,11 +54,14 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
   const [view, setView] = useState<View>(DEFAULT_VIEW);
   const [hover, setHover] = useState<{ i: number | null; y: number | null }>({ i: null, y: null });
   const [size, setSize] = useState({ width: 640, height: 320 });
-  const [olderState, setOlderState] = useState<"idle" | "loading" | "done">("idle");
+  // older pages: only after the first load has answered (never two history reads at once)
+  const [olderState, setOlderState] = useState<"wait" | "idle" | "loading" | "done">("wait");
   const [hint, setHint] = useState<string | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drag = useRef<{ x: number; moved: boolean; offset: number } | null>(null);
+  const dragged = useRef(false); // the click that ends a drag picks nothing
+  const load = useRef(0); // which load an answer belongs to: an interval change starts another
 
   useEffect(() => {
     let live = true;
@@ -80,14 +83,16 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
   useEffect(() => {
     if (!code) return;
     let live = true;
+    load.current += 1;
     setCandles([]);
     setView(DEFAULT_VIEW);
-    setOlderState("idle");
+    setOlderState("wait");
     rest
       .get<CandlesAnswer>(`${base}?interval=${code}`)
       .then((a) => {
         if (!live) return;
         setCandles((now) => mergeOlder(a.candles, now)); // a stream candle may have come first
+        setOlderState("idle");
         setAnswer({ live_from: a.live_from, note: a.note });
         setError(null);
       })
@@ -135,16 +140,18 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
   useEffect(() => {
     if (!interval || !candles.length || olderState !== "idle" || !needsOlder(view, candles.length, plotW)) return;
     setOlderState("loading");
+    const mine = load.current;
     const end = candles[0]!.t;
     const start = new Date(Date.parse(end) - interval.default_days * 86_400_000).toISOString();
     rest
       .get<CandlesAnswer>(`${base}?interval=${interval.code}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`)
       .then((a) => {
+        if (load.current !== mine) return; // for an interval no longer shown
         const before = a.candles.filter((c) => c.t < end);
         setCandles((list) => mergeOlder(before, list)); // the view counts from the newest: it stays put
         setOlderState(before.length ? "idle" : "done");
       })
-      .catch(() => setOlderState("done"));
+      .catch(() => load.current === mine && setOlderState("done"));
   }, [rest, base, interval, candles, view, plotW, olderState]);
 
   const byCandle = useMemo(() => marksByCandle(candles, marks), [candles, marks]);
@@ -159,8 +166,8 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
     canvas.width = size.width * dpr;
     canvas.height = size.height * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawChart(ctx, { width: size.width, height: size.height, candles, view, marks: byCandle, hover, daily, colours: readColours(boxRef.current) });
-  }, [candles, view, size, byCandle, hover, daily]);
+    drawChart(ctx, { width: size.width, height: size.height, candles, view, marks: byCandle, hover, daily, colours: readColours(boxRef.current), tick: instrument?.tick_paise });
+  }, [candles, view, size, byCandle, hover, daily, instrument]);
 
   const pointer = (e: React.MouseEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
@@ -169,17 +176,22 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
 
   const onMove = (e: React.MouseEvent) => {
     const { x, y } = pointer(e);
-    if (drag.current) {
-      const bars = (x - drag.current.x) / view.barW;
-      if (Math.abs(bars) >= 1) drag.current.moved = true;
-      setView((v) => pan({ ...v, offset: drag.current!.offset }, bars, candles.length, plotW));
+    const start = drag.current;
+    if (start) {
+      const bars = (x - start.x) / view.barW;
+      if (Math.abs(bars) >= 1) start.moved = true;
+      // `start`, not drag.current: the update runs later, after the drag may have ended
+      setView((v) => pan({ ...v, offset: start.offset }, bars, candles.length, plotW));
       return;
     }
     setHover({ i: x <= plotW ? indexAt(x, view, candles.length, plotW) : null, y });
   };
 
   const onClick = (e: React.MouseEvent) => {
-    if (drag.current?.moved) return;
+    if (dragged.current) {
+      dragged.current = false;
+      return;
+    }
     const { x, y } = pointer(e);
     if (x > plotW) return;
     const at = priceAtY(y, { width: size.width, height: size.height, candles, view });
@@ -244,6 +256,7 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
           </span>
         )}
         {olderState === "loading" && <span className="dim">loading older…</span>}
+        {olderState === "wait" && candles.length > 0 && <span className="dim">loading history…</span>}
       </div>
       {error && (
         <div className="empty-note tone-bad" role="alert">
@@ -267,7 +280,8 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
             drag.current = { x: pointer(e).x, moved: false, offset: view.offset };
           }}
           onMouseUp={() => {
-            setTimeout(() => (drag.current = null), 0); // the click after a drag is not a pick
+            dragged.current = drag.current?.moved ?? false;
+            drag.current = null;
           }}
           onClick={onClick}
           onDoubleClick={() => setView(DEFAULT_VIEW)}
