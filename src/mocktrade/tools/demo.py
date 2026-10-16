@@ -27,6 +27,9 @@ import uvicorn
 
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.paper import PaperBroker
+from mocktrade.charts.candles import CandleBuilder
+from mocktrade.charts.history import RecordedHistory
+from mocktrade.charts.service import Charts
 from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.marketdata.service import MarketData
 from mocktrade.marketdata.sim_universe import INSTRUMENTS
@@ -144,13 +147,17 @@ async def main(
         ticks=lambda d: recorded_ticks.read_timed(d) if d in recorded_ticks.days() else None,
         candles=candle_store.rows,
     )  # fmt: skip
+    builder = CandleBuilder(clock=clock)  # charts: candles from every tick, history recorded
+    md.tap(builder.on_tick)
+    charts = Charts(builder, RecordedHistory(recorded_ticks, clock=clock), events=log,
+                    clock=clock, history_name="recorded ticks")  # fmt: skip
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
     app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler,
                      reports=reports, alerts=alerts, ticks=ticks, replay=feed,
                      replay_command=lambda d: f"python -m mocktrade.tools.demo --replay {d} "
                                               f"--port {port + 1}",
-                     backtests=backtests, candles=candle_store)  # fmt: skip
+                     backtests=backtests, candles=candle_store, charts=charts)  # fmt: skip
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
     what = "demo" if feed is None else f"REPLAY of {replay_day} at {speed:g}×"
     code = "python -m mocktrade.tools.demo --code" + (f" --replay {replay_day}" if feed else "")

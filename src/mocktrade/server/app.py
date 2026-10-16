@@ -33,6 +33,8 @@ from mocktrade.algos.spec import spec_to_dict as algo_spec_to_dict
 from mocktrade.charges.model import bill_to_dict
 from mocktrade.charges.schedules import schedule_to_dict
 from mocktrade.charges.service import ChargesError
+from mocktrade.charts.candles import IST
+from mocktrade.charts.service import ChartError, Charts
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_view
 from mocktrade.domain.gtt import gtt_spec_to_dict, gtt_to_dict
 from mocktrade.domain.instruments import Instrument
@@ -279,6 +281,7 @@ def create_app(
     replay: ReplayFeed | None = None,
     backtests: Backtests | None = None,
     candles: CandleStore | None = None,
+    charts: Charts | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -292,6 +295,7 @@ def create_app(
         cookie_name=settings.cookie_name,
         alerts=alerts,
         chains=chains,
+        charts=charts,
     )
     app.state.hub = hub
     METRICS.gauge("stream_connections", lambda: hub.connections)
@@ -579,6 +583,52 @@ def create_app(
         except BacktestError as exc:
             raise HTTPException(422, str(exc)) from None
         return {"instrument_id": body.instrument_id, "day": body.day.isoformat(), "rows": n}
+
+    # --- charts (K12.1) ---------------------------------------------------------------------
+
+    def chart_service() -> Charts:
+        if charts is None:
+            raise HTTPException(404, "charts aren't set up on this server")
+        return charts
+
+    def chart_time(text: str, name: str) -> datetime | None:
+        if not text:
+            return None
+        try:
+            at = datetime.fromisoformat(text)
+        except ValueError:
+            raise HTTPException(422, f"{name}: not a time: {text!r} (ISO 8601)") from None
+        return at if at.tzinfo else at.replace(tzinfo=IST)  # a time without a zone is India's
+
+    def chart_instrument(instrument_id: str) -> str:
+        if platform.instruments.get(instrument_id) is None:
+            raise HTTPException(404, f"unknown instrument {instrument_id}")
+        return instrument_id
+
+    @app.get("/api/charts/spec")
+    async def chart_spec(user: Me) -> dict[str, Any]:
+        return chart_service().spec()
+
+    @app.get("/api/charts/{instrument_id}/candles")
+    async def chart_candles(instrument_id: str, user: Me, interval: str = "1m", start: str = "",
+                            end: str = "") -> dict[str, Any]:  # fmt: skip
+        service = chart_service()
+        first, last = chart_time(start, "start"), chart_time(end, "end")
+        try:
+            return await service.candles(chart_instrument(instrument_id), interval, first, last)
+        except ChartError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.get("/api/accounts/{account_id}/charts/{instrument_id}/marks")
+    async def chart_marks(account_id: str, instrument_id: str, user: Me, start: str = "",
+                          end: str = "") -> dict[str, Any]:  # fmt: skip
+        runtime(account_id, user)
+        service = chart_service()
+        last = chart_time(end, "end") or datetime.now(IST) + timedelta(minutes=1)
+        first = chart_time(start, "start") or last - timedelta(days=1)
+        marks = await asyncio.to_thread(service.marks, account_id, chart_instrument(instrument_id),
+                                        first, last)  # fmt: skip
+        return {"account_id": account_id, "instrument_id": instrument_id, "marks": marks}
 
     # --- a replay server's controls (K11.2) ------------------------------------------------------
 

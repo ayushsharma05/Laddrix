@@ -34,6 +34,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from mocktrade.algos.engine import AlgoEvent
 from mocktrade.charges.model import ChargeBill, bill_to_dict
 from mocktrade.charges.service import ChargesService
+from mocktrade.charts.service import ChartError, Charts
 from mocktrade.domain.accounts import User, can_view
 from mocktrade.domain.gtt import GttView, gtt_to_dict
 from mocktrade.domain.ticks import Tick
@@ -63,6 +64,7 @@ NOT_SENT = {EventKind.IGNORED}  # audit-only events stay in the event log
 
 
 MAX_CHAINS = 2  # option chains streaming per screen connection
+MAX_CHARTS = 8  # forming candles streaming per screen connection
 
 
 @dataclass(eq=False)  # each connection is its own object: compared by identity
@@ -77,6 +79,7 @@ class _Connection:
     too_slow: asyncio.Event = field(default_factory=asyncio.Event)
     positions_changed: asyncio.Event = field(default_factory=asyncio.Event)
     chains: dict[tuple[str, str], asyncio.Task] = field(default_factory=dict)  # option chains
+    charts: dict[tuple[str, str], asyncio.Task] = field(default_factory=dict)  # forming candles
 
     def put(self, message: "dict[str, Any] | _Raw", since_ns: int = 0) -> None:
         """Queue a message; `since_ns` is when its cause happened (default: now)."""
@@ -103,6 +106,7 @@ class StreamHub:
         clock: Callable[[], float] = time.monotonic,
         alerts: Alerts | None = None,
         chains: ChainService | None = None,
+        charts: Charts | None = None,
     ) -> None:
         self._clock = clock
         self._platform = platform
@@ -121,6 +125,8 @@ class StreamHub:
         self._alerts = alerts
         self._chains = chains
         self.chain_interval_s = 1.0
+        self._charts = charts
+        self.candle_interval_s = 1.0
         if alerts is not None:
             alerts.subscribe(self._on_ops)
 
@@ -204,8 +210,8 @@ class StreamHub:
             await asyncio.gather(*tasks, return_exceptions=True)
             self._connections.discard(connection)
             connection.ticks.close()
-            for chain in connection.chains.values():
-                chain.cancel()
+            for task in (*connection.chains.values(), *connection.charts.values()):
+                task.cancel()
 
     async def _send(self, websocket: WebSocket, connection: _Connection) -> None:
         while True:
@@ -236,6 +242,8 @@ class StreamHub:
                     self._change_subscription(connection, op, message.get("instruments"))
                 elif op in ("chain", "chain_stop"):
                     self._change_chain(connection, op, message)
+                elif op in ("candles", "candles_stop"):
+                    self._change_chart(connection, op, message)
                 else:
                     connection.put({"type": "error", "message": "unknown message"})
 
@@ -271,6 +279,52 @@ class StreamHub:
                 connection.put({"type": "chain", **watch.snapshot()})
                 await asyncio.sleep(self.chain_interval_s)
                 await watch.subscription.wait()
+        finally:
+            watch.close()
+
+    def _change_chart(self, connection: _Connection, op: str, message: dict) -> None:
+        """Start or stop a forming candle: {"op": "candles", "instrument_id", "interval"}."""
+        instrument_id, code = str(message.get("instrument_id")), str(message.get("interval"))
+        key = (instrument_id, code)
+        old = connection.charts.pop(key, None)
+        if old is not None:
+            old.cancel()
+        if op == "candles_stop":
+            return
+        if self._charts is None:
+            connection.put({"type": "error", "message": "charts aren't set up on this server"})
+            return
+        try:
+            self._charts.interval(code)
+        except ChartError as exc:
+            connection.put({"type": "error", "message": str(exc)})
+            return
+        if self._platform.instruments.get(instrument_id) is None:
+            connection.put({"type": "error", "message": f"unknown instrument {instrument_id}"})
+            return
+        if len(connection.charts) >= MAX_CHARTS:
+            connection.put({"type": "error", "message": f"at most {MAX_CHARTS} charts at a time"})
+            return
+        connection.charts[key] = asyncio.create_task(
+            self._stream_candle(connection, instrument_id, code)
+        )
+
+    async def _stream_candle(self, connection: _Connection, instrument_id: str, code: str) -> None:
+        """The forming candle at once, then at most once a second while it changes. The
+        instrument is watched meanwhile, so its ticks keep coming from the broker."""
+        assert self._charts is not None
+        watch = self._platform.market_data.subscribe([instrument_id])
+        last: Any = ()  # never a candle: the first one is always sent, even "none yet"
+        try:
+            while True:
+                candle = self._charts.forming(instrument_id, code)
+                if candle != last:
+                    connection.put({"type": "candle", "instrument_id": instrument_id,
+                                    "interval": code, "candle": candle})  # fmt: skip
+                    last = candle
+                await asyncio.sleep(self.candle_interval_s)
+                await watch.wait()
+                watch.drain()  # the candle is read from the builder, not these ticks
         finally:
             watch.close()
 

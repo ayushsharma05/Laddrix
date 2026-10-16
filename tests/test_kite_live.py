@@ -49,6 +49,9 @@ class FakeKiteHttp:
             return httpx.Response(403, json={"status": "error", "error_type": "TokenException"})
         if path == "/instruments":
             return httpx.Response(200, text=CSV)
+        if path.startswith("/instruments/historical/"):
+            return ok({"candles": [["2026-10-16T09:15:00+0530", 25010, 25020, 25000.5, 25015, 75,
+                                    1000]]})  # fmt: skip
         if path.startswith("/orders/"):
             return ok({"order_id": "K1"})
         if path == "/orders":
@@ -296,4 +299,26 @@ async def test_one_connection_carries_prices_and_the_list_downloads_once_a_day(w
     assert world.md.ticks_received == 1
     downloads = [c for c in world.kite.calls if c[1] == "/instruments"]
     assert len(downloads) == 1  # the second login reused today's list
+    await world.live.aclose()
+
+
+async def test_chart_history_goes_through_the_account_that_carries_prices(world):
+    from mocktrade.broker.kite.http import KiteAuthError
+    from mocktrade.broker.kite.instruments import BROKER
+    from mocktrade.charts.candles import BY_CODE
+    from mocktrade.charts.history import HistoryError, KiteHistory
+
+    world.live.add_account(AYUSH)
+    await world.live.start()
+    with pytest.raises(KiteAuthError, match="no Kite account is logged in"):
+        await world.live.request("GET", "/instruments/historical/1/minute")
+    await world.live.login.complete(AYUSH, "req-a")
+    await settle()
+    history = KiteHistory(world.live, lambda i: world.store.to_broker(BROKER, i))
+    day = datetime(2026, 10, 15, 18, 30, tzinfo=UTC)  # midnight on the 16th in India
+    rows = await history.fetch(FUT, BY_CODE["1m"], day, day + timedelta(days=1))
+    assert [(r.open, r.low, r.volume, r.oi) for r in rows] == [(2501000, 2500050, 75, 1000)]
+    assert ("GET", f"/instruments/historical/{NFO_TOKEN}/minute", "tok-a") in world.kite.calls
+    with pytest.raises(HistoryError, match="Kite has no history"):
+        await history.fetch("NSE:NOPE", BY_CODE["1m"], day, day + timedelta(days=1))
     await world.live.aclose()

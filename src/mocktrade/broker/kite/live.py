@@ -29,7 +29,7 @@ from mocktrade.broker.kite import token_store
 from mocktrade.broker.kite.broker import KiteBroker
 from mocktrade.broker.kite.daily_login import KiteDailyLogin
 from mocktrade.broker.kite.feed import KiteFeed
-from mocktrade.broker.kite.http import BASE_URL, KiteHttp
+from mocktrade.broker.kite.http import BASE_URL, KiteAuthError, KiteHttp
 from mocktrade.broker.kite.instruments import load_kite_instruments
 from mocktrade.broker.kite.session import KiteSession
 from mocktrade.broker.kite.ticker import WS_URL, KiteTicker
@@ -123,6 +123,13 @@ class KiteLive:
     def prices_from(self) -> str | None:
         """The account whose connection carries prices (None: no prices yet)."""
         return self._prices.account.id if self._prices else None
+
+    async def request(self, method: str, path: str, **kwargs: Any) -> Any:
+        """A read request (e.g. historical candles) through the account that carries prices."""
+        link = self._prices
+        if link is None or not link.live:
+            raise KiteAuthError("no Kite account is logged in", "TokenException")
+        return await link.http.request(method, path, **kwargs)
 
     async def start(self) -> None:
         """Yesterday's instruments (so screens can search), then any saved logins."""
