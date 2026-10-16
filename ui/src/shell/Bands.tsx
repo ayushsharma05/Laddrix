@@ -3,6 +3,7 @@
 
 import { useApp, useNow, useStore } from "../app/context";
 import { clock, shortName } from "../lib/format";
+import { RestoreStop } from "./RestoreStop";
 import { StopBand } from "./StopBand";
 
 export const PRICES_OLD_MS = 5000;
@@ -38,6 +39,7 @@ export function Bands() {
       <div key={`ops-${a.key}`} role={a.level === "ERROR" ? "alert" : "status"} className={`band ${a.level === "ERROR" ? "stopped" : "warn"}`}>
         <b>{a.level === "ERROR" ? "ACTION NEEDED" : "HEADS UP"}</b>
         <span>{a.text}</span>
+        {a.key.startsWith("unprotected:") && <RestoreStop alertKey={a.key} />}
       </div>,
     );
   }
