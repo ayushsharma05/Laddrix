@@ -7,7 +7,7 @@ Later-stage expansion #297 now tracks 25 detailed packages (#298–#322), linked
 
 As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
 
-**Current handoff:** K13 is done (#284 PR #325, #285 PR #326; #283 phone after v1). The core v1 gate #240 is split into #327 (recordings keep the day's instruments: PR open, merge on green and check `main`), #328 (crash-restart drill and an unprotected-position band), #329 (full backup and restore drill), #330 (go-live checklist; live steps need Ayush), plus #288 docs and #289 release. Then the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
+**Current handoff:** K13 is done (#284 PR #325, #285 PR #326; #283 phone after v1). The core v1 gate #240 is split into #327 (merged, PR #331), #328 (crash-restart drill and an unprotected-position band: PR open, merge on green and check `main`), #329 (full backup and restore drill), #330 (go-live checklist; live steps need Ayush), plus #288 docs and #289 release. Then the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
 
 **Outside review (16 Oct).** While Claude's limit was used up, Ayush had another AI tool review the code and the design. It changed no code. It opened #240–#279 and the docs PR #256; that PR's notes are folded in here, and it was closed. Its findings separate behaviour confirmed in the source from design gaps. Two were reproduced in a throwaway folder:
 - reconciliation overwrote one product's position with another's (#258);
@@ -18,6 +18,8 @@ Each finding must be rechecked against the code before work starts, and fixed de
 Ladder (K5.4) as built: ![K5.4 ladder](images/k5-4-ladder.png)
 
 Order book, positions, audit trail (K5.5) as built: ![K5.5 screens](images/k5-5-screens.png)
+
+Bands after the crash drill (V1.2): ![unprotected](images/v1-2-unprotected-band.png) ![prices old](images/v1-2-prices-old-band.png)
 
 Themes (K13.5): ![light](images/k13-5-theme-light.png) ![colour-blind safe](images/k13-5-theme-colour-blind.png)
 
@@ -161,9 +163,9 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    - #284 K13.4 keyboard shortcut editor: merged (PR #325). See `docs/design/ui.md` § Keyboard shortcuts.
    - #285 K13.5 themes (dark, light, colour-blind safe): merged (PR #326). See `docs/design/ui.md` § Themes.
 9. **Core v1 gate #240** (Ayush records acceptance at the end):
-   - #327 V1.1 each recorded day keeps its instrument list, so a real day replays on its own: **done** on branch `v1-1-recording-instruments` (PR "Closes #327"). See `docs/design/research.md` § V1.1.
-   - #328 V1.2 crash-and-restart drill, and an "unprotected position" warning on screen: **next**.
-   - #329 V1.3 back up all state, and a tested restore drill.
+   - #327 V1.1 each recorded day keeps its instrument list, so a real day replays on its own: merged (PR #331). See `docs/design/research.md` § V1.1.
+   - #328 V1.2 crash-and-restart drill, and an "unprotected position" warning on screen: **done** on branch `v1-2-restart-drill` (PR "Closes #328"). See `docs/runbooks/incidents.md` § Position UNPROTECTED and § Crash-and-restart drill.
+   - #329 V1.3 back up all state, and a tested restore drill: **next**.
    - #330 V1.4 go-live checklist (paper evidence; the live steps are Ayush's, and no live order without his go-ahead).
    - #288 design docs, #289 release process.
    - #283 K13.3 phone screens: **moved after core v1** (Ayush, 16 Oct; they don't change the core design).
