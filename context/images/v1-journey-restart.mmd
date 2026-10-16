@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    participant S as Server (starting)
+    participant G as RecoveryGate
+    participant L as Audit trail (events.db)
+    participant B as Broker
+    participant P as Protection guard
+    S->>G: "recovering": new orders and modifies wait (cancels pass)
+    S->>L: read today's orders and fills
+    S->>S: carried positions · replay each fill once · restore orders
+    S->>B: the broker's order list (can't ask yet, e.g. Kite before today's login: retry every 10 s)
+    B-->>S: each order's state
+    Note over S,B: a working order the broker doesn't list:<br/>paper → closed with the reason (paper orders don't survive a restart)<br/>Kite → a problem, named
+    S->>B: positions, per instrument and product
+    B-->>S: compared with what was rebuilt
+    alt no problem
+        S->>G: "ok": "N orders, M fills, K carried positions"
+    else any problem
+        S->>G: "failed": each problem in words · trading stays paused until a person fixes it and restarts
+    end
+    S->>P: stops held by MockTrade that were running → one UNPROTECTED band per open position

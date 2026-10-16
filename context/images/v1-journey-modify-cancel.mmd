@@ -1,0 +1,23 @@
+sequenceDiagram
+    autonumber
+    participant T as Trader
+    participant S as Server · OrderManager
+    participant B as Broker
+    T->>S: modify (qty / price / trigger)
+    S->>S: working? broker id known? no cancel on its way?<br/>new qty above the filled? rules · gate (modify)
+    alt refused
+        S-->>T: OrderError in words (e.g. "nothing to change")
+    else sent
+        S->>B: modify
+        B-->>S: ok → MODIFY_SENT (the new values shown)
+        Note over S,B: no clear answer → "check the order before retrying"
+    end
+    T->>S: cancel
+    S->>S: already asked? (a second click changes nothing)<br/>gate (cancels pass even when trading is stopped)
+    alt broker id not known yet
+        S->>S: pending = CANCEL, sent as soon as the id arrives
+    else
+        S->>B: cancel
+    end
+    B-->>S: update CANCELLED (filled part kept)
+    S-->>T: order CANCELLED

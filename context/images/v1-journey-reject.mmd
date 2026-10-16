@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    participant T as Trader
+    participant S as Server · OrderManager
+    participant R as Risk gate · throttle
+    participant B as Broker
+    T->>S: buy 50 (lot is 75)
+    S-->>T: REJECTED "50 is not a multiple of … lot size 75" (never sent)
+    T->>S: buy 75, value over the account's limit
+    S->>R: admit?
+    R-->>S: refused: the reason
+    S-->>T: REJECTED with that reason (never sent)
+    T->>S: buy 75 (within every limit)
+    S->>R: admit? → ok
+    S->>B: place
+    alt the broker refuses at once (BrokerError)
+        B-->>S: error with its reason
+        S-->>T: REJECTED with the broker's words
+    else the broker accepts, the exchange rejects later
+        B-->>S: order id → PENDING, then update REJECTED + reason
+        S-->>T: REJECTED with the reason
+    else no clear answer (timeout)
+        S-->>T: PENDING · UNCONFIRMED (never assumed rejected)
+        S->>B: order list (reconcile) settles it
+    end

@@ -7,7 +7,7 @@ Later-stage expansion #297 now tracks 25 detailed packages (#298–#322), linked
 
 As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
 
-**Current handoff:** K13 is done (#284 PR #325, #285 PR #326; #283 phone after v1). The core v1 gate #240 is split into #327 (merged, PR #331), #328 (merged, PR #332), #329 (merged, PR #333), #330 (go-live checklist: PR open; its live boxes are Ayush's), plus #288 docs and #289 release. Then the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
+**Current handoff:** K13 is done (#284 PR #325, #285 PR #326; #283 phone after v1). The core v1 gate #240 is split into #327 (merged, PR #331), #328 (merged, PR #332), #329 (merged, PR #333), #330 (merged, PR #334; its live boxes are Ayush's), #288 (design docs: PR open), plus #288 docs and #289 release. Then the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
 
 **Outside review (16 Oct).** While Claude's limit was used up, Ayush had another AI tool review the code and the design. It changed no code. It opened #240–#279 and the docs PR #256; that PR's notes are folded in here, and it was closed. Its findings separate behaviour confirmed in the source from design gaps. Two were reproduced in a throwaway folder:
 - reconciliation overwrote one product's position with another's (#258);
@@ -166,9 +166,9 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    - #327 V1.1 each recorded day keeps its instrument list, so a real day replays on its own: merged (PR #331). See `docs/design/research.md` § V1.1.
    - #328 V1.2 crash-and-restart drill, and an "unprotected position" warning on screen: merged (PR #332). See `docs/runbooks/incidents.md` § Position UNPROTECTED and § Crash-and-restart drill.
    - #329 V1.3 back up all state, and a tested restore drill: merged (PR #333). See `docs/runbooks/server.md` § What a backup holds, § Restore. Evidence: `context/evidence/v1-3-backup-restore-drill.txt`.
-   - #330 V1.4 go-live checklist: **done** on branch `v1-4-go-live` (PR "Closes #330"): `docs/runbooks/go-live.md`; paper steps 19/19 (`context/evidence/v1-4-golive-paper.txt`). **Its 28 live boxes are Ayush's to run and tick; no live order without his go-ahead.**
-   - **Next: #288 design docs, then #289 release process.** Then Ayush's live run of go-live.md and his v1 acceptance on #240.
-   - #288 design docs, #289 release process.
+   - #330 V1.4 go-live checklist: merged (PR #334): `docs/runbooks/go-live.md`; paper steps 19/19 (`context/evidence/v1-4-golive-paper.txt`). **Its 28 live boxes are Ayush's to run and tick; no live order without his go-ahead.**
+   - #288 design docs: **done** on branch `v1-5-design-docs` (PR "Closes #288"): glossary, domain model, order life story and seven journeys, test plan, index; 8 diagrams in `context/images/v1-*.png`.
+   - **Next: #289 release process.** Then Ayush's live run of go-live.md and his v1 acceptance on #240.
    - #283 K13.3 phone screens: **moved after core v1** (Ayush, 16 Oct; they don't change the core design).
    **Then, in this order (issues Ayush added on 16 Oct from an outside review; no code was changed):**
    1. #240 core v1 completion gate: restart/reconnect drills, backup and restore, recordings with their instrument list, a live-session checklist, docs matching code.
