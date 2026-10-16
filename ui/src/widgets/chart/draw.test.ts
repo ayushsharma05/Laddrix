@@ -81,9 +81,12 @@ describe("drawing a chart", () => {
     const at100 = priceAtY(100, f)!;
     expect(label).toContain((Math.round(at100) / 100).toFixed(2));
     const snapped = recorder();
-    drawChart(snapped.ctx, { ...f, tick: 5 });
+    drawChart(snapped.ctx, { ...f, tick: 1000 }); // a ₹10 tick: the raw price is not on it
     const labels = snapped.calls.filter((c) => c.op === "fillText").map((c) => c.args[0]);
-    expect(labels).toContain((Math.round(Math.round(at100) / 5) * 5 / 100).toFixed(2)); // the price a click would pick
+    const raw = Math.round(at100);
+    expect(raw % 1000).not.toBe(0);
+    expect(labels).toContain(((Math.round(raw / 1000) * 1000) / 100).toFixed(2)); // the price a click would pick
+    expect(labels).not.toContain((raw / 100).toFixed(2));
   });
 
   it("the price under the pointer, and none outside the price pane", () => {

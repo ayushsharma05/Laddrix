@@ -125,9 +125,9 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
 4. **K10.4 (#216) is merged** (PR #221). See `docs/design/margin.md`.
 5. **K10.5 (#217) is merged** (PR #222). **K10 is complete.**
 6. **K11 research is complete** (#223–#226, #235; PRs #227–#230, #236). **K12 issues (label `track: kite`):**
-   - #231 K12.1 candles and chart data API: **done** on branch `k12-1-candles` (PR "Closes #231"; merge on green CI if still open). See `docs/design/charts.md`.
-   - #232 K12.2 chart widget: **next**. Canvas candles with a volume pane and the live forming candle (stream op `candles`). Intervals come from `GET /api/charts/spec`. History loads as you pan left (`start`/`end`). Trade marks come from `…/charts/{i}/marks`. Click-to-trade goes through the ticket. Colours are validated.
-   - #233 K12.3 alerts engine and webhooks.
+   - #231 K12.1 candles and chart data API: merged (PR #237).
+   - #232 K12.2 chart widget: **done** on branch `k12-2-chart-widget` (PR "Closes #232"; merge on green CI if still open). See `docs/design/charts.md` § K12.2.
+   - #233 K12.3 alerts engine and webhooks: **next**. Kinds published by an alert spec, checked per tick via `MarketData.tap`, a JSON store per user, in-app via the stream, and signed (HMAC) webhooks with retries, off the trading loop.
    - #234 K12.4 alerts manager, time & sales, depth, movers.
 
    Known gap from K11.5: replaying a live Kite server's recordings needs that day's instrument list.

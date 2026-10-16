@@ -305,7 +305,7 @@ async def test_recorded_ticks_make_the_history_on_paper(tmp_path):
     store.append([(tick(t(9, 15, 30), 210, 80), t(9, 15, 30))])  # today grows; yesterday is kept
     assert hist.builds == 2
     soon = await hist.fetch(FUT, BY_CODE["1d"], t(0, 0), t(0, 0, 0, DAY + timedelta(days=1)))
-    assert [(c.close, c.volume) for c in soon] == [(200, 0)] and hist.builds == 2  # built moments ago
+    assert [(c.close, c.volume) for c in soon] == [(200, 0)] and hist.builds == 2  # just built
     mono[0] = 301.0  # five minutes on
     again = await hist.fetch(FUT, BY_CODE["1d"], t(0, 0, 0, y), t(0, 0, 0, DAY + timedelta(days=1)))
     assert [(c.start.date(), c.close, c.volume) for c in again] == [(y, 103, 150), (DAY, 210, 30)]
