@@ -539,6 +539,11 @@ class AlgoEngine:
             elif p.state is AlgoState.STOPPING:
                 self._maybe_stopped(p)
 
+    @property
+    def busy(self) -> bool:
+        """An order call a strategy made is still under way (backtests drain it per tick)."""
+        return any(not t.done() for t in self._tasks)
+
     async def settle(self) -> None:
         """Wait for every order call the strategies made (tests)."""
         while pending := [t for t in self._tasks if not t.done()]:

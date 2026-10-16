@@ -51,6 +51,7 @@ from mocktrade.store.events import EventLog
 log = logging.getLogger(__name__)
 ACCOUNT = "backtest"
 BEAT = timedelta(seconds=HEARTBEAT_S)
+DRAIN_TURNS = 200  # far more than one order's path needs (about a dozen)
 
 
 class BacktestError(Exception):
@@ -171,7 +172,18 @@ async def run_day(
             next_sample = now + timedelta(minutes=1)
 
     md.tap(on_tick)
-    feed = ReplayFeed(lambda: _chain(first, ticks), md, clock, day=day, speed=0)
+
+    async def drain(_seconds: float) -> None:
+        """Between ticks: let everything a tick started finish (an algo's order through the
+        gates, the broker's acceptance, its fills, the order manager's events), so each fill is
+        stamped with the time of the tick that caused it, as it would be live."""
+        for _ in range(DRAIN_TURNS):
+            await asyncio.sleep(0)
+            if broker.idle and not rt.algos.busy:
+                return
+        log.warning("%s: still busy after %d loop turns", day, DRAIN_TURNS)
+
+    feed = ReplayFeed(lambda: _chain(first, ticks), md, clock, day=day, speed=0, sleep=drain)
     runner = asyncio.create_task(rt.orders.run())
     try:
         await feed.run()
