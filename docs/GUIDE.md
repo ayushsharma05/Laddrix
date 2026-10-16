@@ -1,5 +1,9 @@
 # MockTrade: the guide (start here)
 
+> **Want it slower, with pictures and from zero?** Read the full guide in
+> [docs/guide/](guide/README.md): nine short chapters, starting with "what is a market?".
+> This page is the one-page summary.
+
 Written for Ayush on 16 Oct 2026. Plain words, no assumed knowledge. It explains what the
 project is, how the parts fit, how one order travels through the code, how each safety system
 works, and what is left. Read it with the code open beside you.
