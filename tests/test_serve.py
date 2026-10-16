@@ -126,7 +126,7 @@ async def test_paper_accounts_run_and_others_are_listed_not_run(tmp_path):
         assert "MOCKTRADE_PRICES=kite" in built.not_running["acc-kite"]
         transport = httpx.ASGITransport(app=built.app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            assert (await client.get("/api/health")).json() == {"status": "ok"}
+            assert (await client.get("/api/health")).json()["status"] == "ok"
             page = await client.get("/")
             assert page.status_code == 200 and "MockTrade" in page.text
     finally:

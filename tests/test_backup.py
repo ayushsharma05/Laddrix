@@ -2,6 +2,7 @@
 folder a restored server needs, never a secret, with a manifest a restore checks first."""
 
 import json
+import shutil
 import sqlite3
 from datetime import UTC, datetime, timedelta
 
@@ -162,9 +163,21 @@ def test_a_failed_backup_leaves_nothing_half_made(tmp_path, monkeypatch):
 # --- restore ------------------------------------------------------------------------------------
 
 
+KEPT_TOP = ["alerts", "backtests", "candles", "reports", "rules", "users.db"]
+
+
 def backed_up(tmp_path):
     a_server(tmp_path / "data")
     return run_backup(tmp_path / "data", tmp_path / "b", 14, NOW)
+
+
+def test_a_folder_holding_only_backups_counts_as_empty(tmp_path):
+    folder = backed_up(tmp_path)
+    data = tmp_path / "volume"
+    (data / "backups").mkdir(parents=True)
+    shutil.copytree(folder, data / "backups" / folder.name)  # the backup lives in the volume
+    assert restore(data / "backups" / folder.name, data, replace=False, now=NOW) is None
+    assert rows(data / "users.db", "users") == 1
 
 
 def test_a_restore_into_a_fresh_folder_gives_back_every_file(tmp_path):
@@ -188,11 +201,17 @@ def test_a_restore_never_overwrites_without_being_told_and_never_deletes(tmp_pat
         restore(folder, live, replace=False, now=NOW)
     assert (live / "users.db").read_text() == "today's data"
     later = NOW.replace(hour=19)
+    (live / "backups").mkdir()
+    (live / "backups" / "keep.txt").write_text("a backup")
     moved = restore(folder, live, replace=True, now=later)
-    assert moved == tmp_path / "live.before-restore-20261014T190000Z"
+    assert moved == live / ".before-restore-20261014T190000Z"  # inside: a volume can't move
     assert (moved / "users.db").read_text() == "today's data"  # kept, not deleted
+    assert (moved / "events.db-wal").exists() and not (moved / "backups").exists()
+    assert (live / "backups" / "keep.txt").read_text() == "a backup"  # left where it was
     assert rows(live / "users.db", "users") == 1
     assert not (live / "events.db-wal").exists()  # a stale one would be replayed onto it
+    again = restore(folder, live, replace=True, now=later.replace(hour=20))
+    assert sorted(p.name for p in again.iterdir()) == sorted(KEPT_TOP)  # not the earlier aside
     assert restore_main(["--from", str(folder), "--to", str(live), "--replace"]) == 0
     out = capsys.readouterr().out
     assert "restore OK" in out and "is kept in" in out

@@ -1,0 +1,35 @@
+--- 1. production runs the old version
+PASS old version running ((none) -), user: ayush
+--- 2. inside market hours: refused
+PASS deploy at Fri 10:00 IST refused (exit 3): refused: deploy outside market hours, or pass --emergency "reason"
+PASS nothing changed: still (none) -
+--- 3. outside market hours: deployed
+PASS deploy v1.0.0-rc.1 OK (exit 0): health says 1.0.0-rc.1 5f11e86
+PASS data kept: ayush
+PASS a backup was taken first: /data/backups/20261016T161034Z
+--- 4. rollback
+PASS rolled back (exit 0): (none) -, code at v0.0.1
+PASS data kept: ayush
+--- 5. a deploy whose version check fails rolls itself back
+PASS v9.9.9 refused by its own check (exit 5): FAILED (health healthy, version 1.0.0-rc.1): rolling back
+PASS and rolled back: (none) -
+--- 6. emergency deploy, then rollback with the data as it was
+PASS emergency deploy went ahead (exit 0): 1.0.0-rc.1 5f11e86
+PASS and was logged with who and why
+PASS a user added after the deploy: ayush late
+PASS rollback --restore-data (exit 0): (none) -, users: ayush
+PASS what was replaced is kept, not deleted: /data/.before-restore-20261016T161129Z
+--- the deploy log
+2026-10-16T16:10:34Z deploy v1.0.0-rc.1 by root: from v0.0.1, backup /data/backups/20261016T161034Z
+2026-10-16T16:10:44Z deploy v1.0.0-rc.1 OK: version 1.0.0-rc.1, healthy
+2026-10-16T16:10:54Z rollback from v1.0.0-rc.1 by root: now v0.0.1, version none, healthy
+2026-10-16T16:10:56Z deploy v9.9.9 by root: from v0.0.1, backup /data/backups/20261016T161056Z
+2026-10-16T16:11:06Z deploy v9.9.9 FAILED (health healthy, version 1.0.0-rc.1): rolling back
+2026-10-16T16:11:14Z rollback from v9.9.9 by root: now v0.0.1, version none, healthy
+2026-10-16T16:11:15Z EMERGENCY deploy of v1.0.0-rc.1 in market hours by root: rehearsal: a fix that can't wait
+2026-10-16T16:11:16Z deploy v1.0.0-rc.1 by root: from v0.0.1, backup /data/backups/20261016T161116Z
+2026-10-16T16:11:25Z deploy v1.0.0-rc.1 OK: version 1.0.0-rc.1, healthy
+2026-10-16T16:11:29Z rollback from v1.0.0-rc.1 by root: data restored from /data/backups/20261016T161116Z
+2026-10-16T16:11:37Z rollback from v1.0.0-rc.1 by root: now v0.0.1, version none, healthy
+
+15/15 checks passed

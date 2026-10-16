@@ -6,8 +6,9 @@
     backup folder ─► check: manifest.json present, every file there, sizes and SHA-256 match,
                      each database passes SQLite's integrity check; anything wrong ─► nothing
                      is touched, and the problem is named
-                  ─► the data folder: empty (a fresh server), or --replace: what is there now
-                     is moved aside to <data>.before-restore-<time> first (never deleted)
+                  ─► the data folder: empty (a fresh server; its backups/ may stay), or
+                     --replace: what is there now is moved aside to
+                     <data>/.before-restore-<time>/ first (never deleted)
                   ─► copy everything into the empty folder: no stale -wal/-shm file can be
                      left to be replayed onto the restored databases
                   ─► say what does not come from a backup and must be put back by hand
@@ -72,18 +73,32 @@ def check_backup(folder: Path) -> dict:
     return listed
 
 
+LEFT_IN_PLACE = ("backups",)  # the backups themselves (the source may be one of them)
+ASIDE = ".before-restore-"
+
+
 def restore(source: Path, data_dir: Path, *, replace: bool, now: datetime) -> Path | None:
-    """Restore `source` into `data_dir`. Returns where the old data was moved, if any."""
+    """Restore `source` into `data_dir`. Returns where the old data was moved, if any.
+
+    The old data is moved into `<data>/.before-restore-<time>/`, inside the same folder: the
+    data folder is often a volume's mount point, which can't itself be renamed, and the
+    backups (left in place) may be inside it too."""
     listed = check_backup(source)
+    present = []
+    if data_dir.exists():
+        present = [p for p in data_dir.iterdir()
+                   if p.name not in LEFT_IN_PLACE and not p.name.startswith(ASIDE)]  # fmt: skip
     moved = None
-    if data_dir.exists() and any(data_dir.iterdir()):
+    if present:
         if not replace:
             raise RestoreError(
                 f"{data_dir} is not empty: restore into an empty folder, or pass --replace "
                 "(what is there now is moved aside first, not deleted)"
             )
-        moved = data_dir.with_name(f"{data_dir.name}.before-restore-{now.strftime(STAMP)}")
-        data_dir.rename(moved)
+        moved = data_dir / f"{ASIDE}{now.strftime(STAMP)}"
+        moved.mkdir(mode=0o700)
+        for path in present:
+            path.rename(moved / path.name)
     data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     for name in listed["files"]:
         target = data_dir / name

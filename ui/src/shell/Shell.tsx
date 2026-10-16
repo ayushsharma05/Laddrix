@@ -5,7 +5,7 @@
 //   env strip    PAPER · orders fill against live prices, nothing goes to the exchange
 //   bands        (only when needed)
 //   desktop      dockview widgets
-//   page tabs    Main | + ……………………………… working count · layout saved
+//   page tabs    Main | + ……………………………… working count · layout saved · version
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp, useKeyBindings, useNow, useStore } from "../app/context";
@@ -21,6 +21,7 @@ import { Workspace } from "../workspace/Workspace";
 import { Bands, PRICES_OLD_MS } from "./Bands";
 import { EnvStrip } from "./EnvStrip";
 import { ReplayBar } from "./ReplayBar";
+import { ServerVersion } from "./ServerVersion";
 import { StopDialog } from "./StopDialog";
 import { ThemePick } from "./ThemePick";
 
@@ -137,7 +138,7 @@ export function Shell() {
       <EnvStrip />
       <ReplayBar />
       <Bands />
-      <Workspace controller={controller} />
+      <Workspace controller={controller} footer={<ServerVersion />} />
       {dialog && <StopDialog mode={dialog} onClose={() => setDialog(null)} />}
     </div>
   );
