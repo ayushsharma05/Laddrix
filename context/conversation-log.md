@@ -208,3 +208,7 @@ Findings distinguish source-confirmed behaviour from design/validation gaps. Two
 
 No application code changed, no trading action performed, no branches merged. Issues include pinned evidence, impact, implementation scope, acceptance criteria and dependencies. Follow repository design/mockup/testing/PR rules; retain generic product language and exclude employer details.
 
+
+
+## 16 October 2026 — multi-user data access discussion pending
+Ayush asked whether each user needs a paid Zerodha data API subscription or one subscription is shared, and requested an issue because the explanation was not clear. Discussion #278 records plain-language examples, current shared-feed implementation, personal versus approved platform options, pricing/permission checks and decision criteria. Claude must explain first and obtain Ayush's product-model choice before implementation. No access/pricing model has been selected; multi-user application support does not itself establish market-data redistribution rights. Resolve before public/multi-customer deployment. No application code changed.

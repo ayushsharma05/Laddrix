@@ -174,3 +174,7 @@ Old milestones Phase 0–8 and v0.1–v1.0 stay open but their 95 open issues ca
 ## Tool limits seen in Claude's GitHub access
 - GraphQL blocked: no Projects boards or issue transfers from Claude; Ayush does those.
 - Repo settings and new repos: Ayush does those.
+
+
+## 16 October 2026 — multi-user data access discussion pending
+Ayush asked whether each user needs a paid Zerodha data API subscription or one subscription is shared, and requested an issue because the explanation was not clear. Discussion #278 records plain-language examples, current shared-feed implementation, personal versus approved platform options, pricing/permission checks and decision criteria. Claude must explain first and obtain Ayush's product-model choice before implementation. No access/pricing model has been selected; multi-user application support does not itself establish market-data redistribution rights. Resolve before public/multi-customer deployment. No application code changed.
