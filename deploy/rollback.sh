@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
 # Go back to the version that ran before the last deploy (V1.6, #289; docs/runbooks/release.md).
 #
-#   deploy/rollback.sh                 the previous image and code; the data as it is now
-#   deploy/rollback.sh --restore-data  also the data as it was just before the deploy
+#   bash deploy/rollback.sh                 the previous image and code; the data as it is now
+#   bash deploy/rollback.sh --restore-data  also the data as it was just before the deploy
 #
 # The plain rollback is enough when the new version changed no data. Use --restore-data when
 # its release notes name a migration that can't run backwards. Note that this loses what
 # happened since the deploy: the audit trail of those hours stays in the folder moved aside.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# it checks out older code, which may not have this file: run from a copy
+if [ -z "${MOCKTRADE_ROLLBACK_COPY:-}" ]; then
+  copy=$(mktemp)
+  cp "$0" "$copy"
+  MOCKTRADE_ROLLBACK_COPY=1 exec bash "$copy" "$@"
+fi
+cd "$(git rev-parse --show-toplevel)"
 COMPOSE=${COMPOSE:-deploy/compose.yaml}
 DEPLOY_LOG=${DEPLOY_LOG:-/var/log/mocktrade-deploy.log}
 SERVICES=${SERVICES:-app caddy}

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Deploy a tagged version of MockTrade on the server (V1.6, #289; docs/runbooks/release.md).
+# Run it FROM THE RELEASE being deployed, inside the server's checkout (/opt/mocktrade): the
+# running version may be older than this script.
 #
-#   deploy/deploy.sh v1.0.0                              outside market hours
-#   deploy/deploy.sh v1.0.1 --emergency "reason"         inside them: logged with who and why
+#   git fetch --tags && git show v1.0.0:deploy/deploy.sh >/tmp/deploy.sh
+#   bash /tmp/deploy.sh v1.0.0                              outside market hours
+#   bash /tmp/deploy.sh v1.0.1 --emergency "reason"         inside them: logged, who and why
 #
 # 1. the tag exists and the checkout has no local changes
 # 2. not in market hours (09:00-15:45 India time on trading days), unless --emergency
@@ -14,7 +17,7 @@
 # Settings (for rehearsals): COMPOSE (default deploy/compose.yaml), ENV_FILE (deploy/.env),
 # DEPLOY_LOG (default /var/log/mocktrade-deploy.log), SERVICES (default "app caddy").
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(git rev-parse --show-toplevel)"  # the server's checkout (run from inside it)
 COMPOSE=${COMPOSE:-deploy/compose.yaml}
 DEPLOY_LOG=${DEPLOY_LOG:-/var/log/mocktrade-deploy.log}
 SERVICES=${SERVICES:-app caddy}
@@ -36,10 +39,10 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   exit 2
 fi
 
-# 2. the market-hours window (on this server, whichever version is running)
+# 2. the market-hours window: the release's own rule, run on this server
 ENV_FILE=${ENV_FILE:-deploy/.env}
 holidays=$(sed -n 's/^MOCKTRADE_HOLIDAYS=//p' "$ENV_FILE" 2>/dev/null | tail -1)
-if ! MOCKTRADE_HOLIDAYS="$holidays" deploy/window.sh; then
+if ! git show "$tag:deploy/window.sh" | MOCKTRADE_HOLIDAYS="$holidays" bash -s; then
   if [ -z "$emergency" ]; then
     echo "refused: deploy outside market hours, or pass --emergency \"reason\"" >&2
     exit 3
@@ -73,7 +76,7 @@ done
 got=$(dc exec -T app python -c "import json,urllib.request as u; print(json.load(u.urlopen('http://127.0.0.1:8000/api/health'))['version'])" 2>/dev/null || echo none)
 if [ "$state" != healthy ] || [ "$got" != "$want" ]; then
   log "deploy $tag FAILED (health $state, version $got): rolling back"
-  deploy/rollback.sh
+  bash deploy/rollback.sh
   exit 5
 fi
 log "deploy $tag OK: version $got, healthy"
