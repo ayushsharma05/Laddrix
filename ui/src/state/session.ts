@@ -1,6 +1,7 @@
 // The session: logging in and out, and keeping the Store in step with the server.
 //
 //   boot() ─► GET /api/me ─┬─ 401 ─► login screen
+//                          ├─ must_change_password ─► "set your password" (no stream yet)
 //                          └─ ok  ─► start the stream
 //   stream "hello" (first connect and every reconnect)
 //          ─► GET /api/me, then orders + positions for every account ─► Store (merge by time)
@@ -48,7 +49,7 @@ export class Session {
     try {
       const me = await this.rest.get<Me>("/api/me");
       this.store.setMe(me);
-      this.stream.start();
+      if (!me.user.must_change_password) this.stream.start(); // the server refuses it until then
       return true;
     } catch (err) {
       if (err instanceof ApiError && err.loggedOut) {
@@ -62,7 +63,16 @@ export class Session {
   async login(username: string, password: string, code: string): Promise<void> {
     const me = await this.rest.post<Me>("/api/session", { username, password, code });
     this.store.setMe(me);
-    this.stream.start();
+    if (!me.user.must_change_password) this.stream.start(); // first their own password
+  }
+
+  /** The user's own new password (also the first step after an admin's reset). Then the
+   *  terminal starts as after a sign-in. */
+  async changePassword(old: string, password: string): Promise<void> {
+    await this.rest.post("/api/me/password", { old, new: password });
+    const me = await this.rest.get<Me>("/api/me");
+    this.store.setMe(me);
+    if (!me.user.must_change_password) this.stream.start();
   }
 
   async logout(): Promise<void> {

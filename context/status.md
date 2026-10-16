@@ -2,7 +2,7 @@
 
 As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
 
-**Current handoff:** merge #294 (#258) on green CI, then K13.2 (#282, the admin screen with the first-login password change), K13.4 (#284), K13.5 (#285); then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
+**Current handoff:** merge the K13.2 PR (#282) on green CI and check `main` after; then K13.4 (#282, the admin screen with the first-login password change), K13.4 (#284), K13.5 (#285); then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
 
 **Outside review (16 Oct).** While Claude's limit was used up, Ayush had another AI tool review the code and the design. It changed no code. It opened #240–#279 and the docs PR #256; that PR's notes are folded in here, and it was closed. Its findings separate behaviour confirmed in the source from design gaps. Two were reproduced in a throwaway folder:
 - reconciliation overwrote one product's position with another's (#258);
@@ -149,7 +149,8 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    - #258 (positions in different products overwrite each other during reconciliation): done on branch `fix-258-products` (PR #294).
 8. **K13 admin & phone** (issues #281–#285, label `track: kite`):
    - #281 K13.1 admin API (users, roles, accounts, per-account limits): merged (PR #286). See `docs/design/admin.md`.
-   - #282 K13.2 admin panel screen: **next**. It includes the first-login password change screen; the API answers 403 "set a new password first" until then. Its form is drawn from `GET /api/admin/limits/spec`, which adds the kinds `money`, `choices` and `instruments` that `ParamInput` doesn't draw yet. Ask twice before a change marked `looser`.
+   - #282 K13.2 admin screen and the first-login password page: **done** on branch `k13-2-admin-screen` (PR "Closes #282"; merge on green CI, then **check main's CI too**). See `docs/design/admin.md` § K13.2.
+   - #284 K13.4 keyboard shortcut editor: **next**, then #285 K13.5 themes.
    - #283 K13.3 phone screens: **moved after core v1** (Ayush, 16 Oct; they don't change the core design).
    - #284 K13.4 keyboard shortcut editor.
    - #285 K13.5 themes (dark, light, colour-blind safe).
@@ -162,7 +163,7 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
 
 **How each piece is built (keep the quality):** brainstorm the traps → code with the "backend provides, frontend displays" rule (specs from the server, no market rules in the UI) → Python tests + UI tests → a mutation script in `context/scripts/mutate-*.py` (restores files in `finally`, a hang counts as caught; **run one at a time, never kill one mid-run**: it can leave a mutant in the source) → real browser or real server check against the demo (`context/scripts/e2e-*.cjs`) → docs in `docs/design/` → context files → PR → green CI → merge.
 
-**Session lessons:** anchor `pkill -f` patterns with `^` (an unanchored pattern matches the calling shell and kills it); TOTP codes are single-use: wait for the next 30 s window before logging in again; `rm -rf data/demo` for a fresh demo; rebuild `ui/dist` before browser checks; positions add up across demo runs (±1500 limit).
+**Session lessons:** after merging, check `main`'s CI too, not only the PR's (16 Oct: two merges left main red because of a test that read the audit trail before it was written; fixed in #295 with `await log.flush()`). Every widget must work at any size (Ayush's workspace rule): test it in a narrow pane too. Anchor `pkill -f` patterns with `^` (an unanchored pattern matches the calling shell and kills it); TOTP codes are single-use: wait for the next 30 s window before logging in again; `rm -rf data/demo` for a fresh demo; rebuild `ui/dist` before browser checks; positions add up across demo runs (±1500 limit).
 
 ## Earlier notes
 - K6 algo engine: new algos need only a strategy + `AlgoSpec` registered in `algos/builtin.py`; the screen draws them. Live Kite: `broker/kite/live.py`; server entry `python -m mocktrade.tools.serve`; Docker in a cloud session: start `dockerd`, pull from `mirror.gcr.io/library/<image>`, proxy CA only in local base images.

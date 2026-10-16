@@ -99,4 +99,58 @@ An older `users.db` gets the new column (`must_change`) and table when the serve
   - the audit rows were written;
   - after a restart, the account ran with its saved limit.
 
-**Until K13.2:** the screens don't offer the password change yet. A user created from the API logs in, then sets their password with `POST /api/me/password`; K13.2 adds that screen.
+
+## K13.2 The admin screen (#282)
+
+![Users tab](../../context/images/k13-2-admin-users.png)
+
+**Who sees it.** The **Admin** widget is offered in Widgets ▾ only to admins and risk users (`roles` on a widget's registration; the server checks every call anyway).
+- Risk users get it read only: no buttons, and the limit fields are disabled.
+- Anyone else who opens a saved layout containing it sees "For admin and risk users", and nothing is asked of the server.
+
+**Users tab:**
+- The list shows each user's state in words: on, signed in on N browsers, locked by failed logins, must set a password, off.
+- New user, Roles…, Turn off…, Unlock, New password… and New authenticator… are available. The role names and what each allows come from `GET /api/admin/roles`.
+- A new user's one-time password and authenticator are shown **once**:
+  - the password;
+  - the key in groups of four, for typing in by hand;
+  - a **QR code** to scan (`components/QrCode.tsx`, drawn as an SVG from `qrcode-generator`, MIT, no dependencies).
+- "Done: I've handed these over" removes them for good.
+- You can't turn yourself off; the server refuses it too.
+
+**Accounts tab:**
+- The list shows each account's state: running, not running and why, or off (closing trades only).
+- New account offers only the brokers this server can run.
+- Traders…, Turn off… and a Limits button that opens the Limits tab on that account.
+
+**Limits tab** ![Limits tab](../../context/images/k13-2-admin-limits.png)
+- The form is drawn **entirely from the limits spec**; nothing in the screen names a limit:
+  - money as rupees with Indian grouping, sent as paise (never through floats);
+  - lots and counts as whole numbers;
+  - percent and seconds as decimals;
+  - flags as tick boxes;
+  - `choices` as a tick box per choice;
+  - `instruments` as a list with search.
+- The price bands sit together.
+- Problems are said before anything is sent, then the server checks again.
+- **Check changes** asks the server for a preview (`?dry_run=true`): what changes, each marked looser or not, and the warnings for what is open now.
+- **Save** sends exactly what was checked. Editing after a check removes the preview, so a new check is needed.
+- A change marked **looser** takes a second click ("Confirm: loosen and save").
+
+**Second clicks** also guard: turning a user or an account off, a new password, and a new authenticator.
+
+**First sign-in.** A user with a one-time password sees only **Set your password**:
+- They enter the one-time password, then the new one twice. The two must match, and the rules are the server's (its answer is shown as given).
+- The live stream doesn't start until then, because the server would refuse it.
+- After the change, the terminal opens. They can also sign out instead.
+
+**Any size.** Every widget works at any size, so Admin adapts to its own width (a CSS container query): in a narrow pane each user or account becomes a short block with its buttons underneath, and the widget scrolls.
+
+**Checks:**
+- UI tests: `widgets/admin` (model and widget), `shell/SetPassword.test.tsx`, `workspace/registry.test.ts`.
+- `context/scripts/mutate-admin-ui.py`: 32/32 caught. The first run's one survivor, the password match on Enter, now has a test.
+- `context/scripts/e2e-admin.cjs` on the demo in a real browser:
+  - the admin adds a user; the one-time password, key and QR code are shown once, then gone;
+  - the user signs in elsewhere and sees only Set your password; a short password gets the server's words; their own opens the terminal, without the Admin widget;
+  - the admin tightens the per-order limit to 1 lot (check, then save), and a 2-lot order is refused; the loosening back takes two clicks;
+  - no page errors.

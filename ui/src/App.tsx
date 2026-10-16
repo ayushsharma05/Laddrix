@@ -1,8 +1,10 @@
-// The page: checks the session, then shows either the sign-in or the terminal.
+// The page: checks the session, then shows the sign-in, the "set your password" page (after an
+// admin's reset) or the terminal.
 
 import { useEffect, useState } from "react";
 import { useApp, useStore } from "./app/context";
 import { Login } from "./shell/Login";
+import { SetPassword } from "./shell/SetPassword";
 import { Shell } from "./shell/Shell";
 
 export function App() {
@@ -36,5 +38,6 @@ export function App() {
       </div>
     );
   }
-  return me ? <Shell /> : <Login />;
+  if (!me) return <Login />;
+  return me.user.must_change_password ? <SetPassword /> : <Shell />;
 }

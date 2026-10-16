@@ -227,3 +227,11 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 
   The audit's case (NRML +75, MIS −75) no longer raises a false difference. The mutation run found 5 gaps in the tests, all now covered (19/19).
 - 16 Oct, Ayush asked about 22 "in progress" issues on the GitHub Project linked to the repo. Claude's GitHub tools can't read Project boards. Ayush was asked to send the list (or a CSV export) so it can be checked against the clean-up.
+- 16 Oct, main CI red after #293/#294: Ayush noticed it in the Actions tab.
+  - **Cause:** the new admin and candle-import tests read the audit trail before its background writer had written it. They passed on the PRs and lost the race on main.
+  - **Fix (#295):** await `log.flush()`. Proven with a deliberately slowed writer: 6 failures before, none after, and the full suite green. Main is green again.
+  - **Lesson:** check main after every merge.
+- 16 Oct, Ayush's board showed 22 "In Progress" cards. All were closed issues with merged PRs; the project's "closed → Done" workflow is off. Ayush was given the steps to bulk-move them and switch the workflow on.
+- 16 Oct, K13.2 (#282) admin screen:
+  - **Built:** Users, Accounts and Limits, drawn from the server (roles, brokers, the limits spec); secrets shown once with a QR code; second clicks for dangerous and looser changes; risk read only; the first-login "Set your password" page; Admin offered only to admin and risk.
+  - **Ayush restated the workspace design:** widgets open, close and size anywhere; pages are screens; with pop-outs they make one workspace. So the Admin widget was made to adapt to its own width. The rule "every widget works at any size" is now in `docs/design/ui.md`.

@@ -17,6 +17,14 @@ class Role(Enum):
     RISK = "risk"  # read everything, trigger kill switches, no trading
 
 
+# what each role allows, in words (the admin screen shows these; the checks are in the code)
+ROLE_HELP: dict[Role, str] = {
+    Role.ADMIN: "manage users, accounts and limits; stop trading",
+    Role.TRADER: "place and manage orders and algos on their own and allowed accounts",
+    Role.RISK: "see every account and stop trading; no orders",
+}
+
+
 @dataclass(frozen=True)
 class User:
     """Someone who can log in to MockTrade."""

@@ -15,7 +15,7 @@ import { clock, rupees } from "../lib/format";
 import { browserStorage, LayoutStore } from "../workspace/layouts";
 import { WorkspaceController } from "../workspace/controller";
 import { buildDefault } from "../workspace/defaults";
-import { allWidgets } from "../workspace/registry";
+import { widgetsFor } from "../workspace/registry";
 import { Workspace } from "../workspace/Workspace";
 import { Bands, PRICES_OLD_MS } from "./Bands";
 import { EnvStrip } from "./EnvStrip";
@@ -27,6 +27,7 @@ export const RATE_LIMIT_PER_MIN = 350; // the platform's own per-minute order li
 export function Shell() {
   const app = useApp();
   const me = useStore((s) => s.me)!;
+  const roles = me.user.roles;
   const controller = useMemo(
     () =>
       new WorkspaceController({
@@ -77,7 +78,7 @@ export function Shell() {
       <div className="toolbar">
         <Menu label="Widgets ▾">
           {(close) =>
-            allWidgets().map((w) => (
+            widgetsFor(roles).map((w) => (
               <button
                 key={w.kind}
                 type="button"

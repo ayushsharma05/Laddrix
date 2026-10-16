@@ -21,3 +21,4 @@ import "./market/Depth";
 import "./market/TimeAndSales";
 import "./market/Movers";
 import "./alerts/AlertsManager";
+import "./admin/Admin";
