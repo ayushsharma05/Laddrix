@@ -79,6 +79,9 @@ class OrderRequest:
     # product, minus other closes on their way, so overlapping exits never open a reverse
     # position. Ours alone: brokers aren't told.
     reduce_only: bool = False
+    # sent by the exit desk (risk/closing.py) to close a position: the one order a kill
+    # switch lets through, and only when it is also reduce-only (#262). Never from the API.
+    forced_close: bool = False
 
     @property
     def from_algo(self) -> bool:

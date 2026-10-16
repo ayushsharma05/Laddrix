@@ -297,6 +297,12 @@ class ConfirmIn(_Strict):
     confirm: bool
 
 
+class FlattenIn(_Strict):
+    confirm: bool
+    instrument_id: str | None = None  # one instrument only (else every open position)
+    product: Product | None = None  # with instrument_id: one product only
+
+
 class StopIn(_Strict):
     reason: str = Field(min_length=1, max_length=200)
 
@@ -850,6 +856,32 @@ def create_app(
             raise HTTPException(422, "square-off needs the trader's confirmation")
         return {"closed": await running.squareoff.close_all(user.id)}
 
+    # --- flatten: closing positions on purpose, STOP or not (#262) ------------------------------
+
+    def flattener(account_id: str, user: User):
+        running = runtime(account_id, user)
+        account = users.get_account(account_id)
+        if not ((account and can_manage(user, account)) or _risk_or_admin(user)):
+            raise HTTPException(403, "you can't close positions on this account")
+        if running.flatten is None:
+            raise HTTPException(404, "no flatten for this account")
+        return running.flatten
+
+    @app.get("/api/accounts/{account_id}/flatten")
+    async def flatten_status(account_id: str, user: Me) -> dict[str, Any]:
+        running = runtime(account_id, user)
+        if running.flatten is None:
+            raise HTTPException(404, "no flatten for this account")
+        return running.flatten.status()
+
+    @app.post("/api/accounts/{account_id}/flatten")
+    async def flatten(account_id: str, body: FlattenIn, user: Me) -> dict[str, Any]:
+        service = flattener(account_id, user)
+        if not body.confirm:
+            raise HTTPException(422, "flatten needs a confirmation")
+        return await service.run(user.id, instrument_id=body.instrument_id,
+                                 product=body.product)  # fmt: skip
+
     # --- margin: what an order would block, against what's available -------------------------
 
     @app.post("/api/accounts/{account_id}/margin")
@@ -1336,8 +1368,10 @@ def create_app(
         account = users.get_account(account_id)  # now (an admin may have changed traders)
         if not ((account and can_manage(user, account)) or _risk_or_admin(user)):
             raise HTTPException(403, "you can't stop trading on this account")
+        before = _stop_snapshot([running])
         failures = await stop_trading(running.switch, [running.orders], body.reason, by=user.id)
-        return {"stopped": True, "failed_cancels": _failures(failures)}
+        reports = _stop_reports([running], before, failures, user.id, body.reason)
+        return {"stopped": True, "failed_cancels": _failures(failures), "reports": reports}
 
     @app.post("/api/accounts/{account_id}/resume")
     async def resume_account(account_id: str, user: Me) -> dict[str, Any]:
@@ -1352,9 +1386,12 @@ def create_app(
     async def stop_firm(body: StopIn, user: Me) -> dict[str, Any]:
         if not _risk_or_admin(user):
             raise HTTPException(403, "only risk or an admin can stop the whole firm")
-        managers = [r.orders for r in platform.accounts.values()]
+        runs = list(platform.accounts.values())
+        before = _stop_snapshot(runs)
+        managers = [r.orders for r in runs]
         failures = await stop_trading(platform.firm_switch, managers, body.reason, by=user.id)
-        return {"stopped": True, "failed_cancels": _failures(failures)}
+        reports = _stop_reports(runs, before, failures, user.id, body.reason)
+        return {"stopped": True, "failed_cancels": _failures(failures), "reports": reports}
 
     @app.post("/api/firm/resume")
     async def resume_firm(user: Me) -> dict[str, Any]:
@@ -1507,6 +1544,27 @@ def _me(
         "accounts": accounts,
         "firm_stopped": platform.firm_switch.engaged,
     }
+
+
+def _stop_snapshot(runs) -> dict[str, tuple[list, int]]:
+    """Before a STOP: each account's working orders and running algos, for its report."""
+    return {
+        r.account.id: (r.orders.working(), sum(not a.state.is_final for a in r.algos.algos()))
+        for r in runs
+    }
+
+
+def _stop_reports(runs, before, failures, who: str, reason: str) -> list[dict[str, Any]]:
+    """What the STOP did on each account, in words (risk/flatten.py), kept for the screens."""
+    reports = []
+    for r in runs:
+        if r.flatten is None:
+            continue
+        working, algos = before[r.account.id]
+        report = r.flatten.stop_report(working, failures.get(r.account.id, []), algos, who,
+                                       reason)  # fmt: skip
+        reports.append({"account_id": r.account.id, **report})
+    return reports
 
 
 def _failures(failures: dict[str, list[tuple[str, str]]]) -> list[dict[str, str]]:
