@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/rest";
 import type { Instrument, OrderView, Side, Tick } from "../../api/types";
-import { useApp, useInstrument, useOrderSpec, useStore } from "../../app/context";
+import { useApp, useInstrument, useKeyAction, useOrderSpec, useStore } from "../../app/context";
 import { SearchBox } from "../../components/SearchBox";
 import { change, price, qty as fmtQty, rupees, shortName, shortVolume } from "../../lib/format";
 import { cancelBlock, tradingBlock } from "../../state/gate";
@@ -76,6 +76,7 @@ function PickInstrument({ onPick }: { onPick: (id: string) => void }) {
 }
 
 function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams> & { instrument: Instrument }) {
+  const keyAction = useKeyAction("ladder");
   const app = useApp();
   const { rest, stream, store } = app;
   const id = instrument.id;
@@ -328,14 +329,15 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
       className={`ladder${blocked ? " blocked" : ""}`}
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === " ") {
-          e.preventDefault();
-          recentre();
-        } else if (e.key === "Escape") {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return; // its own fields
+        const action = keyAction(e); // the user's keys for the ladder (K13.4)
+        if (action === "ladder-centre") recentre();
+        else if (action === "ladder-clear") {
           setSelected(null);
           setArmed(null);
           setParams({ lots: 0 });
-        }
+        } else return;
+        e.preventDefault();
       }}
     >
       <div className="ladder-head">

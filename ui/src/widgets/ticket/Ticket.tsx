@@ -6,14 +6,16 @@
 //   Value ₹37,51,500.00 · charges ≈ ₹21.40 · worst position +225 · +0.00% from last
 //   [ BUY 150 NIFTY26OCTFUT @ 25,010.00 ]     → over "confirm over": [CONFIRM BUY 150] [Back]
 //
-// Enter sends, Esc clears, ↑/↓ move the price one tick. The same gate as the ladder
+// Enter sends, Esc clears, ↑/↓ move the price one tick (the defaults: the user can change them,
+// K13.4, and the hint at the bottom shows theirs). The same gate as the ladder
 // (tradingBlock) runs before every send, and the server checks everything again.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { chargeLines, marginText, useChargeEstimate, useMarginCheck } from "./useChargeEstimate";
 import { ApiError } from "../../api/rest";
 import type { Instrument, OrderSpec, OrderView, Side } from "../../api/types";
-import { useApp, useInstrument, useOrderSpec, useStore, useTick } from "../../app/context";
+import { useApp, useInstrument, useKeyAction, useKeyBindings, useOrderSpec, useStore, useTick } from "../../app/context";
+import { keyText } from "../../keys/model";
 import { SearchBox } from "../../components/SearchBox";
 import { price as fmtPrice, qty as fmtQty, rupees, shortName } from "../../lib/format";
 import { tradingBlock } from "../../state/gate";
@@ -100,6 +102,9 @@ function TicketBody({
   const ltp = tick?.ltp_paise ?? instrument.ltp_paise ?? null;
 
   const [side, setSide] = useState<Side>("BUY");
+  const keyAction = useKeyAction("ticket");
+  const bindings = useKeyBindings();
+  const k = (id: string) => keyText(id, bindings);
   const [priceText, setPriceText] = useState("");
   const [triggerText, setTriggerText] = useState("");
   // "Confirm" belongs to one exact order: armed only while nothing about it has changed.
@@ -272,16 +277,16 @@ function TicketBody({
     <div
       className={`ticket ${side === "BUY" ? "buy" : "sell"}${blocked ? " blocked" : ""}`}
       onKeyDown={(e) => {
-        if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement)) {
-          e.preventDefault();
-          send();
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          clear();
-        } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !(e.target instanceof HTMLSelectElement)) {
-          e.preventDefault();
-          nudge(e.target instanceof HTMLInputElement && e.target.name === "trigger" ? "trigger" : "price", e.key === "ArrowUp" ? 1 : -1);
-        }
+        // the user's keys for the ticket (K13.4); sending still goes through its confirm rules
+        const action = keyAction(e);
+        const field = e.target instanceof HTMLInputElement && e.target.name === "trigger" ? "trigger" : "price";
+        if (action === "ticket-send" && !(e.target instanceof HTMLButtonElement)) send();
+        else if (action === "ticket-clear") clear();
+        else if (action === "ticket-buy") setSide("BUY");
+        else if (action === "ticket-sell") setSide("SELL");
+        else if ((action === "ticket-up" || action === "ticket-down") && !(e.target instanceof HTMLSelectElement)) nudge(field, action === "ticket-up" ? 1 : -1);
+        else return;
+        e.preventDefault();
       }}
     >
       {tabs}
@@ -439,7 +444,7 @@ function TicketBody({
 
       <div className="ladder-status" role="status">
         <span className={`dot ${blocked || problem || note?.level === "WARN" ? "WARN" : "INFO"}`} />
-        <span className="text">{blocked ? `Trading paused: ${blocked}` : problem ? `Fix: ${problem}` : (note?.text ?? "Enter sends · Esc clears · ↑↓ one tick")}</span>
+        <span className="text">{blocked ? `Trading paused: ${blocked}` : problem ? `Fix: ${problem}` : (note?.text ?? `${k("ticket-send")} sends · ${k("ticket-clear")} clears · ${k("ticket-up")}${k("ticket-down")} one tick`)}</span>
       </div>
     </div>
   );

@@ -54,6 +54,13 @@ CREATE TABLE IF NOT EXISTS account_limits (
     updated_at TEXT NOT NULL,
     updated_by TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id TEXT NOT NULL REFERENCES users(id),
+    name TEXT NOT NULL,                 -- one of SETTINGS (keys, theme)
+    value TEXT NOT NULL,                -- the screens' own JSON, stored as given
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, name)
+);
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -74,6 +81,9 @@ CREATE TABLE IF NOT EXISTS layouts (
 _ADDED = (("users", "must_change", "INTEGER NOT NULL DEFAULT 0"),)
 
 MAX_LAYOUT_BYTES = 256 * 1024
+# a user's own screen settings, kept on the server so they follow the user to another machine
+SETTINGS = frozenset({"keys", "theme"})  # keyboard shortcuts (K13.4), theme (K13.5)
+MAX_SETTING_BYTES = 16 * 1024
 MAX_LAYOUTS_PER_USER = 50
 
 
@@ -418,6 +428,37 @@ class UserStore:
                 db.execute(
                     "DELETE FROM sessions WHERE token_hash = ?", (security.token_digest(token),)
                 )
+
+    # --- a user's own screen settings (shortcuts, theme) -------------------------------------
+
+    def get_setting(self, user_id: str, name: str) -> str | None:
+        if name not in SETTINGS:
+            raise ValueError(f"no setting called {name!r}")
+        with self._db() as db:
+            row = db.execute(
+                "SELECT value FROM user_settings WHERE user_id = ? AND name = ?", (user_id, name)
+            ).fetchone()
+        return row["value"] if row else None
+
+    def set_setting(self, user_id: str, name: str, value: str | None) -> None:
+        """Store (or with None, forget: back to the defaults) one setting, as given."""
+        if name not in SETTINGS:
+            raise ValueError(f"no setting called {name!r}")
+        with self._db() as db:
+            if value is None:
+                db.execute("DELETE FROM user_settings WHERE user_id = ? AND name = ?",
+                           (user_id, name))  # fmt: skip
+                return
+            if len(value.encode()) > MAX_SETTING_BYTES:
+                raise ValueError(
+                    f"the {name} setting is larger than {MAX_SETTING_BYTES // 1024} KB"
+                )
+            db.execute(
+                "INSERT INTO user_settings (user_id, name, value, updated_at) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT (user_id, name) DO UPDATE SET value = excluded.value, "
+                "updated_at = excluded.updated_at",
+                (user_id, name, value, self._clock().isoformat()),
+            )
 
     # --- saved workspace layouts --------------------------------------------------------------
 

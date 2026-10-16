@@ -183,3 +183,34 @@ where the thumb rests.
   login, no sync delay. Pop-outs are saved in the layout. Works in the browser (pop-ups allowed)
   and in the desktop app (`ui/desktop/`, Electron), where they are real app windows on any
   monitor; each costs ~20–25 MB there (measured, see `ui/desktop/README.md`).
+
+## Keyboard shortcuts (K13.4, #284)
+
+- **One list of actions** (`ui/src/keys/model.ts`). Each action has an id, a label, where it works and its default keys:
+  - **anywhere:** STOP, search, save the layout, open a ticket, ladder or chart;
+  - **order ticket:** send, clear, buy or sell side, price ↑↓;
+  - **ladder:** centre, clear;
+  - **chart:** pan, zoom, back to the latest.
+
+  Widgets ask "which action is this key?" for their own scope (`useKeyAction(scope)`) and never hard-code a key. The ticket's hint line shows the user's actual keys.
+- **Key names** are the same on every machine: "Ctrl+Shift+K", "Alt+B", "Enter", "/". ⌘ on a Mac counts as Ctrl. With Alt or Ctrl the letter is read from its place on the keyboard (macOS turns Alt+B into "∫"). Shift is named only where it matters ("?" is just "?").
+- **Rules:**
+  - Two actions of one scope can't share a key.
+  - A global key can't also be a widget key, because both would fire.
+  - Different widgets may share one (Escape clears both the ticket and the ladder).
+  - Keys the browser keeps for itself (closing, reloading, switching tabs, Tab between fields) are refused, said in words.
+  - Plain keys don't fire while typing in a box ("/" in a search field is a slash); keys with Ctrl or Alt, and function keys, do.
+- **STOP always keeps Ctrl+Shift+K**, whatever else it is given. It can't be removed, and no other action can take it.
+- **The Keyboard shortcuts widget:**
+  - "+ key", then press the key (Esc cancels);
+  - × removes a key;
+  - "Default" resets one action;
+  - "All back to the defaults" takes a second click.
+  - Sending an order by key still goes through the ticket's own confirm rules.
+- **Saved per user on the server** (`GET`/`PUT /api/me/settings/keys`), so the keys follow the user to another machine.
+  - It is a small per-user settings store (`users.db`, `user_settings`). Only the known names `keys` and `theme` are accepted, at most 16 KB each, and `null` forgets a setting.
+  - Saved choices are cleaned when they load: an action that no longer exists, a browser key, or a clash falls back to the defaults, so no key is ever left dead.
+- **Checks:**
+  - `ui/src/keys/model.test.ts`, `widgets/keys`, the ticket's own-keys test, and `tests/test_server.py` (settings);
+  - `context/scripts/mutate-keys.py` (27/27 caught);
+  - `context/scripts/e2e-keys.cjs` on the demo, in a real browser. Ctrl+W was refused in words and the tab stayed open. F2 opened a chart. F9 opened the stop dialog, and Ctrl+Shift+K still did. The keys survived a reload. "Back to the defaults" took two clicks. No page errors.

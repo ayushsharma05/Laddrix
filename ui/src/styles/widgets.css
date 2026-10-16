@@ -1807,3 +1807,52 @@ label.algo-field {
     justify-content: flex-start;
   }
 }
+
+/* --- keyboard shortcuts (K13.4) -------------------------------------------------------------- */
+.keys-editor {
+  container-type: inline-size;
+}
+.keys-group {
+  padding: 4px 8px 8px;
+}
+.keys-group h3 {
+  margin: 6px 0 4px;
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.keys-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(200px, 1.4fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 26px;
+  border-bottom: 1px solid var(--border-dark);
+}
+.keys-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.keys-chip {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  background: var(--well);
+  font: inherit;
+}
+.keys-chip.fixed {
+  border-color: var(--stop-border);
+}
+.keys-capture {
+  border-color: var(--select);
+}
+@container (max-width: 520px) {
+  .keys-row {
+    grid-template-columns: 1fr;
+    padding: 3px 0;
+  }
+}
