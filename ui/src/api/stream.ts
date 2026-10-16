@@ -9,7 +9,7 @@
 //   "open" again so screens reload their snapshots (nothing is silently missing).
 // - Close 4401 (logged out) stops for good: the app shows the login screen.
 
-import type { OptionChain, ServerMessage, Tick } from "./types";
+import type { Candle, OptionChain, ServerMessage, Tick } from "./types";
 
 export interface ChainRequest {
   underlying: string;
@@ -51,6 +51,7 @@ export class StreamClient {
   private statusListeners = new Set<(s: Status) => void>();
   private latest = new Map<string, Tick>(); // newest tick per watched instrument
   private chains = new Map<string, { req: ChainRequest; listeners: Set<(c: OptionChain) => void> }>();
+  private candles = new Map<string, Set<(c: Candle | null) => void>>(); // "instrument|interval"
   private attempt = 0;
   private timer: Timer | null = null;
   private wanted = false;
@@ -127,6 +128,28 @@ export class StreamClient {
     };
   }
 
+  /**
+   * Watch a chart's forming candle (the server sends it at once, then at most once a second
+   * while it changes). Charts on the same instrument and interval share one server stream.
+   */
+  subscribeCandles(instrumentId: string, interval: string, listener: (c: Candle | null) => void): () => void {
+    const key = `${instrumentId}|${interval}`;
+    let set = this.candles.get(key);
+    if (!set) this.candles.set(key, (set = new Set()));
+    set.add(listener);
+    if (set.size === 1) this.send({ op: "candles", instrument_id: instrumentId, interval });
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      set!.delete(listener);
+      if (set!.size === 0 && this.candles.get(key) === set) {
+        this.candles.delete(key);
+        this.send({ op: "candles_stop", instrument_id: instrumentId, interval });
+      }
+    };
+  }
+
   /** Instruments with at least one watcher (for tests and the status bar). */
   watched(): string[] {
     return [...this.refs.keys()];
@@ -155,6 +178,10 @@ export class StreamClient {
       const ids = [...this.refs.keys()];
       if (ids.length) socket.send(JSON.stringify({ op: "subscribe", instruments: ids }));
       for (const { req } of this.chains.values()) socket.send(JSON.stringify({ op: "chain", ...req }));
+      for (const key of this.candles.keys()) {
+        const [instrument_id, interval] = splitKey(key);
+        socket.send(JSON.stringify({ op: "candles", instrument_id, interval }));
+      }
       this.setStatus("open");
     };
     socket.onmessage = (ev) => this.dispatch(String(ev.data));
@@ -202,6 +229,15 @@ export class StreamClient {
         }
       }
     }
+    if (message.type === "candle") {
+      for (const listener of this.candles.get(`${message.instrument_id}|${message.interval}`) ?? []) {
+        try {
+          listener(message.candle);
+        } catch (err) {
+          console.error("candle listener failed", err);
+        }
+      }
+    }
     for (const listener of this.listeners.get(message.type) ?? []) {
       try {
         listener(message);
@@ -221,4 +257,10 @@ export class StreamClient {
     this.status = status;
     for (const listener of this.statusListeners) listener(status);
   }
+}
+
+/** "NFO:NIFTY26OCTFUT|5m" -> [instrument, interval] (an instrument id never holds "|"). */
+function splitKey(key: string): [string, string] {
+  const at = key.lastIndexOf("|");
+  return [key.slice(0, at), key.slice(at + 1)];
 }

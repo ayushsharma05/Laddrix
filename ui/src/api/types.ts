@@ -166,6 +166,7 @@ export type ServerMessage =
   | { type: "mtm"; account_id: string; kind: "position" | "portfolio"; key: string; text: string; closing: boolean }
   | { type: "ops"; key: string; level: "INFO" | "WARN" | "ERROR" | "OK"; text: string; active: boolean; at: string }
   | ({ type: "chain" } & OptionChain)
+  | { type: "candle"; instrument_id: string; interval: string; candle: Candle | null }
   | { type: "error"; message: string }
   | { type: "pong" };
 
@@ -626,4 +627,48 @@ export interface BacktestRun {
   created_at: string;
   summary?: BacktestSummary;
   daily?: BacktestDay[]; // only when one run is asked for
+}
+
+// --- charts (K12): candles and the account's fills as marks -----------------------------------
+
+/** One candle: prices in paise; `t` its start in India time (ISO). */
+export interface Candle {
+  t: string;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
+  oi: number | null;
+}
+
+export interface ChartInterval {
+  code: string;
+  label: string;
+  seconds: number;
+  max_range_days: number;
+  default_days: number;
+}
+
+export interface ChartSpec {
+  intervals: ChartInterval[];
+  history: string | null; // where past candles come from
+  stream_every_s: number;
+}
+
+export interface CandlesAnswer {
+  instrument_id: string;
+  interval: string;
+  candles: Candle[];
+  live_from: string | null;
+  note: string | null; // why history is missing, if it is
+}
+
+export interface ChartMark {
+  t: string;
+  side: Side;
+  qty: number;
+  price_paise: number;
+  client_order_id: string;
+  strategy: string;
 }
