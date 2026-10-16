@@ -400,6 +400,7 @@ async def test_a_new_user_logs_in_and_must_set_a_password_first(world):
                                                 "new": "meera's own long password"})  # fmt: skip
     assert ok.status_code == 204
     assert (await m.get("/api/instruments")).status_code == 200
+    await world.log.flush()  # the audit trail is written in the background
     kinds = [e.kind for e in world.log.notes("-", ["ADMIN_USER_CREATED", "PASSWORD_CHANGED"])]
     assert kinds == ["ADMIN_USER_CREATED", "PASSWORD_CHANGED"]
     assert made["temporary_password"] not in json.dumps([e.extra for e in world.log.notes(
@@ -416,6 +417,7 @@ async def test_the_lock_out_guards_over_the_api(world):
     assert demote.status_code == 409 and "last active admin" in demote.json()["detail"]
     changed = await c.patch("/api/admin/users/riya", json={"roles": ["trader", "admin"]})
     assert changed.json()["roles"] == ["admin", "trader"]
+    await world.log.flush()  # the audit trail is written in the background
     note = world.log.notes("-", ["ADMIN_USER_CHANGED"])[-1]
     assert note.extra["before"]["roles"] == ["trader"] and note.extra["by"] == "ayush"
     assert (await c.patch("/api/admin/users/nobody", json={"name": "N"})).status_code == 404
@@ -460,6 +462,7 @@ async def test_an_admins_new_account_runs_at_once(world):
         base = {"id": "acc-x", "broker": "paper", "broker_client_id": "X1", "owner": "riya"}
         bad = await c.post("/api/admin/accounts", json={**base, **body})
         assert (bad.status_code, words in bad.json()["detail"]) == (code, True), bad.json()
+    await world.log.flush()  # the audit trail is written in the background
     assert [e.kind for e in world.log.notes("acc-meera", ["ADMIN_ACCOUNT_CREATED"])]
     await c.aclose()
 
@@ -483,6 +486,7 @@ async def test_turning_an_account_off_over_the_api(world):
     bad = await c.patch("/api/admin/accounts/acc-ayush", json={"traders": ["zed"]})
     assert bad.status_code == 422
     assert (await c.patch("/api/admin/accounts/acc-nope", json={"active": True})).status_code == 404
+    await world.log.flush()  # the audit trail is written in the background
     note = world.log.notes("acc-ayush", ["ADMIN_ACCOUNT_CHANGED"])[0]
     assert note.extra["before"]["active"] is True and note.extra["after"]["active"] is False
     await c.aclose()
@@ -506,11 +510,13 @@ async def test_limits_preview_apply_audit_and_survive_a_restart(world, nifty_fut
     assert applied["applied"] is True
     big = (await c.post("/api/accounts/acc-ayush/orders", json={**ORDER, "qty": 150})).json()
     assert big["status"] == "REJECTED" and "1-lot" in big["reason"]
+    await world.log.flush()  # the audit trail is written in the background
     note = world.log.notes("acc-ayush", ["ADMIN_LIMITS_CHANGED"])
     assert len(note) == 1 and note[0].extra["changes"][0] == {
         "name": "max_order_lots", "old": 10, "new": 1, "looser": False}  # fmt: skip
     same = (await c.put("/api/admin/accounts/acc-ayush/limits", json={"limits": wanted})).json()
     assert same["applied"] is False and same["changes"] == []  # nothing to do, nothing audited
+    await world.log.flush()  # the audit trail is written in the background
     assert len(world.log.notes("acc-ayush", ["ADMIN_LIMITS_CHANGED"])) == 1
     bad = await c.put("/api/admin/accounts/acc-ayush/limits",
                       json={"limits": {"max_order_lots": 0, "max_open_orders": "x"}})  # fmt: skip

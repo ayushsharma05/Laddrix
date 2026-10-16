@@ -97,6 +97,7 @@ async def test_the_import_api_wants_a_known_contract_and_records_who(tmp_path, n
     ok = await c.post(path, json={"instrument_id": nifty_fut.id, "day": "2026-10-16",
                                   "rows": [GOOD]})  # fmt: skip
     assert ok.status_code == 201
+    await w.log.flush()  # the audit trail is written in the background
     (note,) = w.log.notes("-", ["CANDLES_IMPORTED"])
     assert note.extra == {"by": "ayush", "instrument_id": nifty_fut.id, "day": "2026-10-16",
                           "rows": 1}  # fmt: skip
