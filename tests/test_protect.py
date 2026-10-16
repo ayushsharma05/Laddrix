@@ -310,7 +310,8 @@ async def test_protection_running_at_a_restart_is_reported_once(tmp_path, nifty_
 
     p, rt, log = platform()  # the restart
     (lost,) = p.lost_protection("acc")
-    assert lost.startswith("TRAILING_STOP SELL 75 NFO:NIFTY26OCTFUT (A1, ayush)")
+    assert lost.instrument_id == FUT
+    assert lost.words.startswith("TRAILING_STOP SELL 75 NFO:NIFTY26OCTFUT (A1, ayush)")
     await log.flush()
     assert p.lost_protection("acc") == []  # reported once
     await log.aclose()

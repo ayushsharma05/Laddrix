@@ -17,7 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from mocktrade.algos.engine import AlgoEngine, AlgoEvent, AlgoType
 from mocktrade.broker.base import Broker, GttBook
@@ -49,6 +49,14 @@ from mocktrade.risk.mtm import MtmWatch
 from mocktrade.risk.squareoff import SquareOff
 from mocktrade.risk.throttle import OrderThrottle
 from mocktrade.store.events import EventLog
+
+
+class LostProtection(NamedTuple):
+    """A protection algo that was running when the server stopped (it doesn't survive one)."""
+
+    instrument_id: str
+    words: str  # "TRAILING_STOP SELL 75 NFO:NIFTY26OCTFUT (A1, ayush)"
+
 
 ALGO_ENDS = ("DONE", "STOPPED", "FAILED", "LOST")  # audit kinds ALGO_<end>: no longer running
 
@@ -197,7 +205,7 @@ class Platform:
             await runtime.recovery.finished.wait()
         await loop()
 
-    def lost_protection(self, account_id: str) -> list[str]:
+    def lost_protection(self, account_id: str) -> list[LostProtection]:
         """At start: protection algos (stops held by MockTrade) that were running when the
         server last stopped. They don't survive a restart, so each is named, in words, for
         an alert; and noted as lost in the audit, so it is reported once."""
@@ -218,7 +226,7 @@ class Platform:
                 f"{a.get('code')} {a.get('side')} {a.get('qty')} {a.get('instrument_id')} "
                 f"({algo_id}, {a.get('user_id')})"
             )
-            lost.append(words)
+            lost.append(LostProtection(str(a.get("instrument_id", "")), words))
             log.record_note("ALGO_LOST", account_id, f"not running after a restart: {words}", a)
         return lost
 
