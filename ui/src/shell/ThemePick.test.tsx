@@ -34,12 +34,17 @@ describe("Theme picker", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("a refused save says why and shows the old theme", async () => {
-    const { root } = setup(() => ({ status: 403, body: { detail: "not allowed" } }));
+  it("a refused save says why and shows the old theme; a later save clears the message", async () => {
+    let refuse = true;
+    const { root } = setup(() => (refuse ? { status: 403, body: { detail: "not allowed" } } : { status: 200, body: {} }));
     const pick = screen.getByRole("combobox", { name: "Theme" }) as HTMLSelectElement;
     fireEvent.change(pick, { target: { value: "light" } });
     await vi.waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/^Theme not saved: /));
     expect(pick.value).toBe("system");
     expect(root.dataset.theme).toBe("dark");
+    refuse = false;
+    fireEvent.change(pick, { target: { value: "light" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    await vi.waitFor(() => expect(pick.value).toBe("light"));
   });
 });

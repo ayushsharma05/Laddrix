@@ -78,6 +78,8 @@ describe("themes", () => {
     const orangeish = (c: string) => hue(c) >= 20 && hue(c) <= 45;
     for (const k of ["--good", "--bid", "--buy-text", "--work-buy"]) expect(blueish(t[k]!), k).toBe(true);
     for (const k of ["--bad", "--ask", "--sell-text", "--work-sell"]) expect(orangeish(t[k]!), k).toBe(true);
+    // the last traded price sits between the bids and the asks: neither blue nor orange
+    expect(blueish(t["--last"]!) || orangeish(t["--last"]!)).toBe(false);
   });
 
   it("no colour is written anywhere but in theme.css's token blocks", () => {

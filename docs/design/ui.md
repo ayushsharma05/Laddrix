@@ -214,3 +214,15 @@ where the thumb rests.
   - `ui/src/keys/model.test.ts`, `widgets/keys`, the ticket's own-keys test, and `tests/test_server.py` (settings);
   - `context/scripts/mutate-keys.py` (27/27 caught);
   - `context/scripts/e2e-keys.cjs` on the demo, in a real browser. Ctrl+W was refused in words and the tab stayed open. F2 opened a chart. F9 opened the stop dialog, and Ctrl+Shift+K still did. The keys survived a reload. "Back to the defaults" took two clicks. No page errors.
+
+## Themes (K13.5, #285)
+
+- **Three themes:** dark (the default), light, and colour-blind safe. The colour-blind one is dark with blue for buy, bids and profit, orange for sell, asks and loss, and purple for the last traded price, so nothing depends on telling red from green.
+- **Every colour is a named token** in `ui/src/styles/theme.css` (for example `--bid`, `--ladder-ink`, `--on-strong`). The other stylesheets only use tokens; a test fails if a colour is written anywhere else. A theme is one block, `:root[data-theme="light"] { … }`, that sets the tokens again. Canvases (the chart) read the tokens when they draw, and redraw when the theme changes.
+- **Readable in every theme:** a test checks every text colour on the surface it sits on against WCAG AA (contrast at least 4.5:1). Making all three pass needed a few dark colours a little deeper (bid, ask, last, the buy and sell buttons). The colour-blind test also checks the hues: buy colours blue, sell colours orange, the last price neither.
+- **Choosing:** the Theme menu in the top bar. Until the user chooses, the screen follows the computer's own light or dark setting, and changes with it. A choice shows at once (no reload) and is saved for the user on the server (`PUT /api/me/settings/theme`, the store from K13.4), so it follows them. "Same as the computer" saves nothing. If the server refuses, the old theme comes back and the reason is shown.
+- **No flash on load:** this browser keeps a copy of the last choice, so the sign-in page already has the right colours before the server answers. Blocked browser storage changes nothing else.
+- **Checks:**
+  - `ui/src/styles/themes.test.ts` (contrast, hues, every token set, no stray colours), `ui/src/theme/theme.test.ts`, `ui/src/shell/ThemePick.test.tsx`;
+  - `context/scripts/mutate-themes.py` (18/18 caught; it found two gaps, now fixed);
+  - `context/scripts/e2e-themes.cjs` on the demo in a real browser: a computer set to light shows light; Dark, Colour-blind and Light each switch without a reload and repaint the chart; the choice survives a reload; no page errors. Screenshots: `context/images/k13-5-theme-*.png`.

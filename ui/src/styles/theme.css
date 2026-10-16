@@ -227,7 +227,7 @@
 :root[data-theme="cb"] {
   --ask: #a8510b;
   --ask-empty: #4a2c10;
-  --last: #2a6f9e;
+  --last: #7b4d93; /* purple: apart from both the blue bids and the orange asks */
   --work-sell: #a8510b;
   --flash-up: rgba(86, 180, 233, 0.28);
   --flash-down: rgba(230, 159, 0, 0.28);

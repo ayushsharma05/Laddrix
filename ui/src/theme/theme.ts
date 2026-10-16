@@ -10,10 +10,10 @@ export type ThemeName = "dark" | "light" | "cb";
 export type ThemeChoice = ThemeName | "system";
 
 export const THEME_CHOICES: { value: ThemeChoice; label: string }[] = [
-  { value: "system", label: "Follow the computer (dark or light)" },
+  { value: "system", label: "Same as the computer" },
   { value: "dark", label: "Dark" },
   { value: "light", label: "Light" },
-  { value: "cb", label: "Colour-blind safe (dark, blue and orange)" },
+  { value: "cb", label: "Colour-blind safe" },
 ];
 
 const PATH = "/api/me/settings/theme";
@@ -36,13 +36,7 @@ export const browserEnv: ThemeEnv = {
     return () => q.removeEventListener("change", listener);
   },
   root: () => document.documentElement,
-  storage: () => {
-    try {
-      return window.localStorage;
-    } catch {
-      return null; // blocked (private window): the server copy still counts
-    }
-  },
+  storage: () => window.localStorage, // may throw when blocked: every use is wrapped in try
 };
 
 /** What a choice shows now. */
