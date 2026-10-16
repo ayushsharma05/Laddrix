@@ -54,7 +54,7 @@ from mocktrade.risk.throttle import OrderThrottle
 from mocktrade.store.events import EventLog
 
 
-def _unknown_size(reconciler: PositionReconciler) -> Callable[[str, Product], str | None]:
+def unknown_size(reconciler: PositionReconciler) -> Callable[[str, Product], str | None]:
     """Why a position's size isn't known (#262), or None: the broker and MockTrade disagree
     on it (a reconcile alert), or a difference is being re-checked."""
 
@@ -76,6 +76,7 @@ class LostProtection(NamedTuple):
 
     instrument_id: str
     words: str  # "TRAILING_STOP SELL 75 NFO:NIFTY26OCTFUT (A1, ayush)"
+    algo: dict | None = None  # what it was (code, side, qty, params, product…), to restore it
 
 
 ALGO_ENDS = ("DONE", "STOPPED", "FAILED", "LOST")  # audit kinds ALGO_<end>: no longer running
@@ -226,6 +227,11 @@ class Platform:
             await runtime.recovery.finished.wait()
         await loop()
 
+    def unknown_size_of(self, account_id: str, instrument_id: str, product) -> str | None:
+        """Why this position's size isn't known (the broker disagrees), or None."""
+        runtime = self.accounts.get(account_id)
+        return None if runtime is None else unknown_size(runtime.reconciler)(instrument_id, product)
+
     def lost_protection(self, account_id: str) -> list[LostProtection]:
         """At start: protection algos (stops held by MockTrade) that were running when the
         server last stopped. They don't survive a restart, so each is named, in words, for
@@ -247,7 +253,9 @@ class Platform:
                 f"{a.get('code')} {a.get('side')} {a.get('qty')} {a.get('instrument_id')} "
                 f"({algo_id}, {a.get('user_id')})"
             )
-            lost.append(LostProtection(str(a.get("instrument_id", "")), words))
+            record = {k: a.get(k) for k in ("code", "side", "qty", "params", "product", "user_id")}
+            lost.append(LostProtection(str(a.get("instrument_id", "")), words,
+                                       {"algo_id": algo_id, **record}))  # fmt: skip
             log.record_note("ALGO_LOST", account_id, f"not running after a restart: {words}", a)
         return lost
 
@@ -319,6 +327,7 @@ class Platform:
                         "filled_qty": a.filled_qty,
                         "params": a.params,
                         "user_id": a.user_id,
+                        "product": a.product.value,
                     },
                     ts=event.ts,
                 )
@@ -499,7 +508,7 @@ class Platform:
         mtm = MtmWatch(
             account.id, book, orders, self.instruments.get, max_lots=limits.max_order_lots,
             path=rules_dir / f"mtm-{account.id}.json" if rules_dir else None,
-            audit=note, clock=clock, desk=desk, unknown=_unknown_size(reconciler),
+            audit=note, clock=clock, desk=desk, unknown=unknown_size(reconciler),
             ready=lambda: recovery is None or recovery.state == "ok",
         )  # fmt: skip
         book.subscribe(mtm.check)
@@ -513,7 +522,7 @@ class Platform:
             return next((sw.state for sw in (switch, firm) if sw.engaged), None)
 
         flatten = Flatten(account.id, book, orders, desk, self.instruments.get,
-                          max_lots=limits.max_order_lots, unknown=_unknown_size(reconciler),
+                          max_lots=limits.max_order_lots, unknown=unknown_size(reconciler),
                           stopped=stopped, algos=lambda: algos, audit=note,
                           clock=clock)  # fmt: skip
         runtime = AccountRuntime(

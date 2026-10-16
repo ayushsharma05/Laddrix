@@ -393,12 +393,16 @@ def build(settings: ServeSettings) -> Assembly:
     jobs.append(market_alerts.store.run)
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
-    scheduler.every(60, guards.check_mtm_job, between=("00:00", "23:59"), name="mtm closes")
+    scheduler.every(
+        60, guards.check_mtm_job, between=("00:00", "23:59"), name="mtm closes", any_day=True
+    )
     # stops held by MockTrade that a restart (or a pause, stop or failure) left off an open
     # position: one band per position until it is flat or protected again (V1.2)
     protection = ProtectionGuard(platform, alerts)
     protection.after_restart(running)
-    scheduler.every(5, protection.run_check, between=("00:00", "23:59"), name="protection guard")
+    scheduler.every(
+        5, protection.run_check, between=("00:00", "23:59"), name="protection guard", any_day=True
+    )
     jobs.append(scheduler.run)
     ui = settings.ui_dir if (settings.ui_dir / "index.html").exists() else None
     if ui is None:
@@ -410,6 +414,7 @@ def build(settings: ServeSettings) -> Assembly:
         broker_login=kite.login if kite else None,
         broker_status=kite.status if kite else None,
         alerts=alerts,
+        protection=protection,
         scheduler=scheduler,
         reports=reports,
         ticks=ticks,

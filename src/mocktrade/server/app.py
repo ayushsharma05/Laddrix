@@ -48,6 +48,7 @@ from mocktrade.marketdata.movers import Movers, MoversError
 from mocktrade.marketdata.prints import TimeAndSales, print_to_dict
 from mocktrade.metrics import METRICS, process_gauges, since_us
 from mocktrade.ops.alerts import Alerts, alert_to_dict
+from mocktrade.ops.protection import GUARANTEE, ProtectionGuard, RestoreError
 from mocktrade.ops.scheduler import Scheduler
 from mocktrade.options.chain import ChainService
 from mocktrade.options.strategy import Strategies, StrategyError
@@ -302,6 +303,11 @@ class MtmRetryIn(_Strict):
     confirm: bool
 
 
+class RestoreIn(_Strict):
+    instrument_id: str = Field(min_length=1, max_length=60)
+    confirm: bool
+
+
 class FlattenIn(_Strict):
     confirm: bool
     instrument_id: str | None = None  # one instrument only (else every open position)
@@ -341,6 +347,7 @@ def create_app(
     charts: Charts | None = None,
     market_alerts: MarketAlerts | None = None,
     starter: AccountStarter | None = None,
+    protection: ProtectionGuard | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -872,6 +879,29 @@ def create_app(
         if not body.confirm:
             raise HTTPException(422, "square-off needs the trader's confirmation")
         return {"closed": await running.squareoff.close_all(user.id)}
+
+    # --- lost stops: what is unprotected, and restoring a stop (#264) ---------------------------
+
+    @app.get("/api/accounts/{account_id}/protection")
+    async def protection_status(account_id: str, user: Me) -> dict[str, Any]:
+        runtime(account_id, user)
+        rows = protection.status(account_id) if protection is not None else []
+        return {"unprotected": rows, "guarantee": list(GUARANTEE)}
+
+    @app.post("/api/accounts/{account_id}/protection/restore")
+    async def protection_restore(account_id: str, body: RestoreIn, user: Me) -> dict[str, Any]:
+        runtime(account_id, user, trade=True)  # only someone who trades this account
+        if protection is None:
+            raise HTTPException(404, "no protection guard on this server")
+        if not body.confirm:
+            raise HTTPException(422, "restoring a stop needs a confirmation")
+        try:
+            view = protection.restore(account_id, body.instrument_id, user.id)
+        except RestoreError as exc:
+            raise HTTPException(409, str(exc)) from None
+        except AlgoError as exc:
+            raise HTTPException(422, exc.reason) from None
+        return algo_to_dict(view)
 
     # --- flatten: closing positions on purpose, STOP or not (#262) ------------------------------
 
