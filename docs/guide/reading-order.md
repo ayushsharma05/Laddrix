@@ -4,6 +4,50 @@
 
 Tip: tick each file off as you read it. A file that feels hard: read its test first.
 
+## The map (read the stages in this order)
+
+```
+ STAGE 1  the words         domain/            money, instruments, orders, ticks
+    │                                          ("what things ARE", no logic yet)
+    ▼
+ STAGE 2  the lists         refdata/, marketdata/   which instruments exist; prices flowing
+    ▼
+ STAGE 3  the broker plug   broker/base, fake, rules, paper   where orders go (pretend first)
+    ▼
+ STAGE 4  THE HEART         orders/            the order manager: send → answer → fill
+    ▼
+ STAGE 5  the accountant    positions/         what you hold, profit and loss
+    ▼
+ STAGE 6  the guards        risk/              every check, STOP, loss limits, safe closing
+    ▼
+ STAGE 7  memory            store/             the ledger (events.db)
+    ▼
+ STAGE 8  wiring            platform.py, recovery.py   everything joined; surviving restarts
+    ▼
+ STAGE 9  the door          server/            login, the API, the live stream
+    ▼
+ STAGE 10 helpers           algos/, ops/       robots that trade; warnings and timers
+    ▼
+ STAGE 11 extras            charges, charts, alerts, options, portfolio, reports, research
+    ▼
+ STAGE 12 the real world    broker/kite/, tools/   Zerodha itself; the programs you run
+    ▼
+ SCREENS  ui/src/           api → state → shell → workspace → widgets (orders first)
+```
+
+**How to read one file (10 minutes each):**
+1. Read the line next to it in this list.
+2. Open the file and read the top comment: often there's a little drawing.
+3. Find the main class or function. Read only its names first, then its body.
+4. Open its test and read only the test names. They are sentences saying what it promises.
+5. Say in one sentence what the file does, then tick it.
+
+**If you're short on time, read just these 12 first** (they explain 80% of the system):
+`domain/money.py` → `domain/orders.py` → `broker/base.py` → `broker/paper.py` →
+`orders/manager.py` → `positions/book.py` → `risk/checks.py` → `risk/kill_switch.py` →
+`store/events.py` → `platform.py` → `server/app.py` (search for `def place`) →
+`ui/src/state/store.ts`
+
 ## Part A · The server (Python), 115 files
 
 
