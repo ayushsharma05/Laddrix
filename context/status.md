@@ -7,7 +7,7 @@ Later-stage expansion #297 now tracks 25 detailed packages (#298–#322), linked
 
 As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
 
-**Current handoff:** K13.4 (#284) is merged. Merge the K13.5 PR (#285, themes) on green CI and check `main` after; then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
+**Current handoff:** K13 is done (#284 PR #325, #285 PR #326; #283 phone after v1). The core v1 gate #240 is split into #327 (recordings keep the day's instruments: PR open, merge on green and check `main`), #328 (crash-restart drill and an unprotected-position band), #329 (full backup and restore drill), #330 (go-live checklist; live steps need Ayush), plus #288 docs and #289 release. Then the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
 
 **Outside review (16 Oct).** While Claude's limit was used up, Ayush had another AI tool review the code and the design. It changed no code. It opened #240–#279 and the docs PR #256; that PR's notes are folded in here, and it was closed. Its findings separate behaviour confirmed in the source from design gaps. Two were reproduced in a throwaway folder:
 - reconciliation overwrote one product's position with another's (#258);
@@ -159,7 +159,13 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    - #282 K13.2 admin screen and the first-login password page: merged (PR #296). See `docs/design/admin.md` § K13.2.
    - #282 merged (PR #296).
    - #284 K13.4 keyboard shortcut editor: merged (PR #325). See `docs/design/ui.md` § Keyboard shortcuts.
-   - #285 K13.5 themes (dark, light, colour-blind safe): **done** on branch `k13-5-themes` (PR "Closes #285"; merge on green CI, then check main's CI). See `docs/design/ui.md` § Themes.
+   - #285 K13.5 themes (dark, light, colour-blind safe): merged (PR #326). See `docs/design/ui.md` § Themes.
+9. **Core v1 gate #240** (Ayush records acceptance at the end):
+   - #327 V1.1 each recorded day keeps its instrument list, so a real day replays on its own: **done** on branch `v1-1-recording-instruments` (PR "Closes #327"). See `docs/design/research.md` § V1.1.
+   - #328 V1.2 crash-and-restart drill, and an "unprotected position" warning on screen: **next**.
+   - #329 V1.3 back up all state, and a tested restore drill.
+   - #330 V1.4 go-live checklist (paper evidence; the live steps are Ayush's, and no live order without his go-ahead).
+   - #288 design docs, #289 release process.
    - #283 K13.3 phone screens: **moved after core v1** (Ayush, 16 Oct; they don't change the core design).
    **Then, in this order (issues Ayush added on 16 Oct from an outside review; no code was changed):**
    1. #240 core v1 completion gate: restart/reconnect drills, backup and restore, recordings with their instrument list, a live-session checklist, docs matching code.

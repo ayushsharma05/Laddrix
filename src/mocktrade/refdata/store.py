@@ -5,7 +5,10 @@ live only here, as a two-way mapping per broker, so the rest of MockTrade only
 ever sees our ids ("NSE:RELIANCE").
 """
 
-from mocktrade.domain.instruments import Instrument, InstrumentId, InstrumentKind
+from datetime import date
+from typing import Any
+
+from mocktrade.domain.instruments import Exchange, Instrument, InstrumentId, InstrumentKind
 
 _DERIVATIVES = (InstrumentKind.FUTURE, InstrumentKind.CALL, InstrumentKind.PUT)
 
@@ -68,3 +71,37 @@ class InstrumentStore:
         found = [i for i in self._by_id.values() if i.symbol.upper().startswith(needle)]
         found.sort(key=lambda i: (len(i.symbol), i.symbol, i.exchange.value))
         return found[:limit]
+
+
+def instrument_record(instrument: Instrument) -> dict[str, Any]:
+    """One instrument as plain JSON (kept with a day's recording, so the day replays on its own)."""
+    return {
+        "exchange": instrument.exchange.value,
+        "symbol": instrument.symbol,
+        "kind": instrument.kind.value,
+        "tick_paise": instrument.tick_paise,
+        "lot_size": instrument.lot_size,
+        "expiry": instrument.expiry.isoformat() if instrument.expiry else None,
+        "strike_paise": instrument.strike_paise,
+        "underlying": instrument.underlying,
+    }
+
+
+def instrument_from_record(record: dict[str, Any]) -> Instrument:
+    """The instrument back; ValueError (saying which field) if the record is broken."""
+    try:
+        expiry = record.get("expiry")
+        return Instrument(
+            Exchange(record["exchange"]),
+            str(record["symbol"]),
+            InstrumentKind(record["kind"]),
+            int(record["tick_paise"]),
+            int(record["lot_size"]),
+            date.fromisoformat(expiry) if expiry else None,
+            None if record.get("strike_paise") is None else int(record["strike_paise"]),
+            record.get("underlying"),
+        )
+    except KeyError as exc:
+        raise ValueError(f"instrument record without {exc.args[0]!r}") from None
+    except (TypeError, AttributeError) as exc:
+        raise ValueError(f"instrument record is not valid: {exc}") from None

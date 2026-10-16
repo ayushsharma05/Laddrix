@@ -4,6 +4,12 @@
                    ─► every `flush_s`, in a worker thread ─► TickStore.append(batch)
     FileTickStore:  <root>/<YYYY-MM-DD>/<segment>.ticks.gz   one file per India day and segment
                     <root>/<YYYY-MM-DD>/index.json           tick counts per instrument
+                    <root>/<YYYY-MM-DD>/instruments.json     what each recorded instrument was
+                                                             that day (V1.1, #327)
+
+The instrument list makes a day replayable on its own: a contract that has since expired, or
+a day recorded on another server, still has its lot, tick and expiry. An instrument's details
+are written before its first ticks, so a crash never leaves ticks nobody can describe.
 
 Each flush appends one gzip member (gzip files may hold many, read back as one stream), so a
 crash loses at most the last unflushed second, and a member cut short by a crash is skipped on
@@ -29,11 +35,18 @@ from pathlib import Path
 from typing import Any, Protocol
 from zoneinfo import ZoneInfo
 
+from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.ticks import DepthLevel, Tick
+from mocktrade.refdata.store import instrument_from_record, instrument_record
 
 log = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
 SUFFIX = ".ticks.gz"
+INSTRUMENTS = "instruments.json"
+
+
+class NoInstrumentList(LookupError):
+    """A day recorded before recordings kept their instrument list (or the list was deleted)."""
 
 
 class TickStore(Protocol):
@@ -50,6 +63,8 @@ class TickStore(Protocol):
     def today(self) -> date: ...
 
     def delete(self, day: date) -> None: ...
+
+    def instruments(self, day: date) -> list[Instrument]: ...
 
 
 # --- one tick as one line ------------------------------------------------------------------------
@@ -104,10 +119,13 @@ class FileTickStore:
         *,
         keep_days: int = 30,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        describe: Callable[[str], Instrument | None] | None = None,
     ) -> None:
         self.root = Path(root)
         self.keep_days = keep_days
         self._clock = clock
+        self._describe = describe  # the instrument master's lookup; None: no list is kept
+        self._described: dict[date, set[str]] = {}  # per day, instruments already in the list
 
     def append(self, batch: list[tuple[Tick, datetime]]) -> None:
         """Write one batch (a worker thread calls this, never the trading loop)."""
@@ -119,6 +137,8 @@ class FileTickStore:
             groups.setdefault((day, segment), []).append(encode(tick, recorded_at))
             per_day = counts.setdefault(day, {})
             per_day[tick.instrument_id] = per_day.get(tick.instrument_id, 0) + 1
+        for day, per_instrument in counts.items():  # describe first: no tick goes undescribed
+            self._remember(day, per_instrument)
         for (day, segment), lines in groups.items():
             folder = self.root / day.isoformat()
             folder.mkdir(parents=True, exist_ok=True)
@@ -192,7 +212,51 @@ class FileTickStore:
         shutil.rmtree(folder)
         log.info("tick recordings of %s deleted on request", day)
 
+    def instruments(self, day: date) -> list[Instrument]:
+        """What each instrument recorded that day was (NoInstrumentList if the day has none;
+        ValueError, naming the day, if the list is broken)."""
+        path = self.root / day.isoformat() / INSTRUMENTS
+        try:
+            text = path.read_text()
+        except FileNotFoundError:
+            raise NoInstrumentList(f"{day}: no instrument list ({INSTRUMENTS})") from None
+        try:
+            return [instrument_from_record(r) for r in json.loads(text).values()]
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(f"{day}: the instrument list {path} is broken: {exc}") from None
+
     # --- inside -----------------------------------------------------------------------------
+
+    def _remember(self, day: date, instrument_ids: Iterable[str]) -> None:
+        """Add the details of instruments new to this day's list (those the master knows)."""
+        if self._describe is None:
+            return
+        known = self._described.get(day)
+        if known is None:
+            known = self._described[day] = set(self._saved(day))
+        new = {}
+        for instrument_id in instrument_ids:
+            if instrument_id in known:
+                continue
+            instrument = self._describe(instrument_id)
+            if instrument is not None:  # unknown to the master: nothing to say about it
+                new[instrument_id] = instrument_record(instrument)
+        if not new:
+            return
+        records = {**self._saved(day), **new}
+        folder = self.root / day.isoformat()
+        folder.mkdir(parents=True, exist_ok=True)
+        tmp = folder / f"{INSTRUMENTS}.tmp"
+        tmp.write_text(json.dumps(records, sort_keys=True))
+        os.replace(tmp, folder / INSTRUMENTS)
+        known.update(new)
+
+    def _saved(self, day: date) -> dict[str, Any]:
+        try:
+            saved = json.loads((self.root / day.isoformat() / INSTRUMENTS).read_text())
+        except (OSError, ValueError):
+            return {}  # none yet, or broken: rewritten whole from what is described now
+        return saved if isinstance(saved, dict) else {}
 
     def _lines(self, path: Path, wanted: set[str] | None) -> Iterator[tuple[int, int, Tick]]:
         n = 0

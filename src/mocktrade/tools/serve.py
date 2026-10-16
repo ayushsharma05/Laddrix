@@ -373,7 +373,9 @@ def build(settings: ServeSettings) -> Assembly:
     scheduler.daily("16:00", reports.close_of_day, "end-of-day reports")
     ticks = None
     if settings.record_days > 0:
-        ticks = FileTickStore(settings.data_dir / "ticks", keep_days=settings.record_days)
+        ticks = FileTickStore(
+            settings.data_dir / "ticks", keep_days=settings.record_days, describe=instruments.get
+        )  # each day keeps its instrument list
         recorder = TickRecorder(ticks)
         md.tap(recorder.on_tick)
         jobs.append(recorder.run)

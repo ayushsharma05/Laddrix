@@ -206,3 +206,28 @@ Checks:
 - `ui/src/widgets/research/research.test.tsx`;
 - `context/scripts/mutate-recordings.py` (13/13);
 - `context/scripts/e2e-recordings.cjs`, a real browser on the demo. It deleted an older day (files gone, audit row written), today offered no delete, and the copied replay command was run and started a replay server.
+
+## V1.1 Each recorded day keeps its instrument list (#327)
+
+**Why:** a recording used to keep only ticks. Instrument details (lot, tick, expiry) came from the live instrument list, which is replaced every morning. So a day with a contract that has since expired, or a day recorded on another server, could replay its prices, but every order on it failed with "unknown instrument".
+
+**What happens now:**
+
+    tick arrives ─► TickRecorder (on the trading loop: one append)
+                 ─► every second, in a worker thread: FileTickStore.append(batch)
+                       1. instruments new to this day's list ─► instrument master ─► instruments.json
+                       2. then the ticks ─► <segment>.ticks.gz
+
+- **What is saved:** `<day>/instruments.json` holds, for each instrument recorded that day: exchange, symbol, kind, tick, lot, expiry, strike and underlying (`instrument_record()` in `refdata/store.py`). Each instrument is described once a day, before its first ticks are written, so a crash can't leave ticks nobody can describe.
+- **After a restart:** the list on disk is added to, not replaced. An instrument the master doesn't know yet is left out and asked about again later.
+- **Replaying** (`python -m mocktrade.tools.demo --replay <day> --ticks <folder>`):
+  - The server is built from the day's own list (`replay_instruments()` in `research/replay.py`). It needs no broker login and no live list.
+  - Days recorded before this change have no list. They still replay if every instrument is one of the demo's own.
+  - Otherwise the replay refuses to start, naming the day and the instruments with no details (the first five, then "and N more"), and creates nothing. Refusing is better than trading prices you can't place orders on.
+  - A broken list is refused the same way, naming the file.
+- **Evidence:** `context/scripts/e2e-recording-instruments.sh` on the demo:
+  1. The demo recorded 72 instruments and described all 72.
+  2. An expired, non-demo contract (BANKNIFTY25JANFUT on 20 Jan 2025) was replayed with the real command. The contract was found with that day's lot size (30). A two-lot buy was accepted. A 45-quantity buy was refused: "45 is not a multiple of BANKNIFTY25JANFUT's lot size 30".
+  3. With its list removed, the same day refused to start and said why.
+- **Checks:** `tests/test_recording_instruments.py` (17 tests); `context/scripts/mutate-recording-instruments.py` (22/22 caught; it found four gaps in the tests, now covered).
+- **Known limit:** a **backtest** still looks contracts up in the live instrument list, so a backtest of an expired contract's day is refused with "unknown instrument". The day's list makes this fixable; it is noted for the hardening phase.

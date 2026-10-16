@@ -11,17 +11,23 @@ the 15:00 square-off window and the end-of-day report all follow the day being r
 Controls: pause, resume, speed (1×, 10×, 60×, 0 = as fast as possible), and jump ahead to a
 time (the ticks in between are fed at once, so prices, VAP and resting orders stay consistent;
 going back means starting the replay again). A replay runs in its own server with its own data
-folder (tools/replay.py), so practice never mixes with live or live-paper results.
+folder (`tools/demo.py --replay`), so practice never mixes with live or live-paper results.
+
+Instruments come from the day itself (V1.1, #327): the recording keeps what each instrument
+was that day (lot, tick, expiry), so a real broker's day, with contracts that have since
+expired, replays and trades on paper with no broker login and no live instrument list.
 """
 
 import asyncio
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
+from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
+from mocktrade.research.ticks import FileTickStore, NoInstrumentList
 
 log = logging.getLogger(__name__)
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -29,6 +35,49 @@ SPEEDS = (0, 1, 10, 60)  # 0: as fast as possible
 TURNS = 3  # event-loop turns between ticks at full speed: an order placed on one tick is
 # accepted (a task) before the next, as it always is live, where ticks are milliseconds apart
 MAX_WAIT_S = 5.0  # a long quiet gap (e.g. lunch) never stalls the replay longer than this
+
+
+class ReplayInstrumentsError(ValueError):
+    """The day can't be replayed for trading: what's missing, and what to do about it."""
+
+
+def replay_instruments(
+    store: FileTickStore, day: date, fallback: Iterable[Instrument] = ()
+) -> list[Instrument]:
+    """Every instrument recorded on `day`, as it was that day.
+
+    The day's own list first; an instrument it doesn't describe may come from `fallback` (the
+    demo's simulated market, whose days were recorded before lists were kept). Anything still
+    undescribed is refused, naming it: replaying its prices would work, but every order on it
+    would fail with "unknown instrument", which is worse than saying so before starting."""
+    try:
+        saved = store.instruments(day)
+    except NoInstrumentList:
+        saved = []
+    except ValueError as exc:
+        raise ReplayInstrumentsError(
+            f"{exc}. Delete or fix that file; without it the day can only be replayed if "
+            f"every instrument is one of the demo's own."
+        ) from None
+    found = {i.id: i for i in saved}
+    others = {i.id: i for i in fallback}
+    recorded = sorted(store.summary(day)["instruments"])
+    missing = []
+    for instrument_id in recorded:
+        if instrument_id not in found:
+            if instrument_id in others:
+                found[instrument_id] = others[instrument_id]
+            else:
+                missing.append(instrument_id)
+    if missing:
+        more = f" and {len(missing) - 5} more" if len(missing) > 5 else ""
+        shown = ", ".join(missing[:5]) + more
+        raise ReplayInstrumentsError(
+            f"{day}: {len(missing)} recorded instrument(s) have no details (lot, tick, expiry): "
+            f"{shown}. Days recorded before MockTrade kept each day's instrument list can only "
+            f"be replayed for the demo's own instruments; days recorded from now on keep it."
+        )
+    return [found[i] for i in recorded]
 
 
 class ReplayClock:
