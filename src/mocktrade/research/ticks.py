@@ -47,9 +47,7 @@ class TickStore(Protocol):
 
     def read(self, day: date, instruments: Iterable[str] | None = None) -> Iterator[Tick]: ...
 
-    def today(self) -> date:
-        """The India day being written now."""
-        return self._clock().astimezone(IST).date()
+    def today(self) -> date: ...
 
     def delete(self, day: date) -> None: ...
 
