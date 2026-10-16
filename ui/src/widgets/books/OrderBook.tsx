@@ -150,7 +150,14 @@ export function OrderBook({ params, setParams, publish, open }: WidgetProps<Orde
                 >
                   <span className="dim">{clock(o.created_at)}</span>
                   <span>{shortName(o.request.instrument_id)}</span>
-                  <span className={o.request.side === "BUY" ? "buy-text" : "sell-text"}>{o.request.side}</span>
+                  <span className={o.request.side === "BUY" ? "buy-text" : "sell-text"}>
+                    {o.request.side}
+                    {o.request.reduce_only && (
+                      <span className="dim" title="A close: it can never close more than is open, so it can't reverse the position">
+                        {" "}close
+                      </span>
+                    )}
+                  </span>
                   <span className="num">{qty(o.request.qty)}</span>
                   <span className="num">{qty(o.filled_qty)}</span>
                   <span className="num">{orderPrice(o)}</span>

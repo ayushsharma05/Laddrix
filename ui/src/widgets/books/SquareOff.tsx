@@ -45,10 +45,15 @@ export function SquareOffButton() {
   const send = () => {
     setBusy(true);
     rest
-      .post<{ closed: { instrument_id: string; orders: string[]; refused: string[] }[] }>(base, { confirm: true })
+      .post<{ closed: { instrument_id: string; orders: string[]; refused: string[]; summary?: string }[] }>(base, { confirm: true })
       .then((r) => {
         for (const c of r.closed) {
-          const text = c.refused.length ? `Square-off ${c.instrument_id}: refused: ${c.refused.join("; ")}` : `Square-off ${c.instrument_id}: sent ${c.orders.join(", ")}`;
+          // the server's own words: what it sent, cancelled, stopped, and left to other closes
+          const text = c.summary
+            ? `Square-off: ${c.summary}`
+            : c.refused.length
+              ? `Square-off ${c.instrument_id}: refused: ${c.refused.join("; ")}`
+              : `Square-off ${c.instrument_id}: sent ${c.orders.join(", ")}`;
           store.addMessage(c.refused.length ? "ERROR" : "INFO", c.instrument_id, text);
         }
       })

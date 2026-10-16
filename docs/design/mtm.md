@@ -10,11 +10,44 @@ position or price changes ─► MtmWatch.check (risk/mtm.py)
     portfolio rule: day P&L ≤ −stop, or ≥ +target
   reached (once a day per rule) ─► stream "mtm" → Messages; band alert (ops/guards.py)
                                 ─► audit MTM_BREACHED
-                                ─► auto-close on? closing orders (risk/closing.py), audit MTM_CLOSE
+                                ─► auto-close on? the exit desk (risk/closing.py), audit MTM_CLOSE
 from 15:00 IST ─► DayGuards every minute: band "N intraday positions open; the broker squares
                   off in M min" ─► Positions bar: [Square off MIS (N) · 15:25] → [Confirm] →
-                  closing orders for every open MIS position, audit SQUARE_OFF (who asked)
+                  the exit desk for every open MIS position, audit SQUARE_OFF (who asked)
 ```
+
+## Coordinated exits (#261)
+
+Several things can close one position: a loss limit, the square-off, a stop algo, a target
+the trader left resting, the trader's own click. Before #261 each sized its close from the
+position it last saw, so two of them at once could close it twice and leave the account
+**short where it was long** (or the other way round).
+
+- **Every closing order is marked reduce-only:** the desk's closes, and the exits of stops,
+  OCO targets and bracket targets (never a bracket's entry). The risk gate refuses a
+  reduce-only order that would close more than is open in its product, counting the other
+  reduce-only orders still working on that side, whatever their state (in doubt included):
+  "would close more than is open: 150 open in MIS, 75 already being closed".
+- **One exit desk per account** handles every forced close (loss limits and square-off):
+
+```
+lock this position (instrument + product): a second forced close waits, then sees what's left
+  ─► stop the algos on it ("forced close: …"): their stops would race, entries would reopen
+  ─► cancel the resting orders that would also close it, and wait up to 3 s for them
+     (a fill meanwhile is fine: it is in the position)
+  ─► read the position now; take off what closing orders still working will close
+     (a cancel that didn't take; an order whose fate is unknown is never cancelled blind)
+  ─► send closing orders for the rest only; say what it left: "75 left to orders already
+     closing it", in the audit trail (MTM_CLOSE / SQUARE_OFF) and the square-off message
+```
+
+- **Stop algos size their exit to what is still open:** a trailing stop, OCO or bracket stop
+  that fires after something else closed the position exits only the rest, and if nothing is
+  left it finishes saying "the position is already closed (another exit got there first)".
+- **A plain sell is the trader's own** (it may be meant to open a short): the risk gate doesn't
+  limit it. The desk still cancels it before a forced close, since it would close too.
+- **The order book marks closes** ("SELL close"), so a person sees which orders can't reverse
+  anything.
 
 ## Rules (each a real failure)
 

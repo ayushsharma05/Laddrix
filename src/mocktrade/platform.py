@@ -41,6 +41,7 @@ from mocktrade.positions.reconcile import PositionReconciler
 from mocktrade.recovery import RecoveryGate, recover, recover_until_done, session_start
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.risk.checks import RiskGate
+from mocktrade.risk.closing import ExitDesk, position_of
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.risk.limits import RiskLimits
 from mocktrade.risk.loss_watch import DailyLossWatch
@@ -266,6 +267,7 @@ class Platform:
         switch: KillSwitch,
         types: tuple[AlgoType, ...],
         clock: Callable[[], datetime],
+        book: PositionBook | None = None,
     ) -> AlgoEngine:
         """The account's algos: blocked while a kill switch is on, stopped when one engages,
         every state change audited."""
@@ -310,6 +312,7 @@ class Platform:
             blocked=blocked,
             clock=clock,
             audit=audit,
+            position=None if book is None else position_of(book),
         )
 
         def on_switch(_name: str, state) -> None:
@@ -421,7 +424,7 @@ class Platform:
                     },
                 )
             )
-        algos = self._algo_engine(account.id, orders, switch, algo_types, clock)
+        algos = self._algo_engine(account.id, orders, switch, algo_types, clock, book)
         basket_audit = None
         if self.event_log is not None:
             log = self.event_log
@@ -472,14 +475,16 @@ class Platform:
             def note(kind: str, detail: str, extra: dict) -> None:
                 log.record_note(kind, account.id, detail, extra)
 
+        desk = ExitDesk(orders, position_of(book), algos=lambda: algos)  # every forced close
         mtm = MtmWatch(
             account.id, book, orders, self.instruments.get, max_lots=limits.max_order_lots,
             path=rules_dir / f"mtm-{account.id}.json" if rules_dir else None,
-            audit=note, clock=clock,
+            audit=note, clock=clock, desk=desk,
         )  # fmt: skip
         book.subscribe(mtm.check)
         squareoff = SquareOff(account.id, book, orders, self.instruments.get,
-                              max_lots=limits.max_order_lots, audit=note, clock=clock)  # fmt: skip
+                              max_lots=limits.max_order_lots, audit=note, clock=clock,
+                              desk=desk)  # fmt: skip
         runtime = AccountRuntime(
             account,
             broker,

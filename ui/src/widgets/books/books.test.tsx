@@ -86,6 +86,16 @@ describe("Order book", () => {
     await vi.waitFor(() => expect(screen.queryAllByRole("button", { name: /^Cancel BUY/ })).toHaveLength(0));
   });
 
+  it("a closing order is marked as a close; a plain order is not", () => {
+    const base = order("c1", "OPEN", T);
+    const close = { ...base, request: { ...base.request, side: "SELL" as const, reduce_only: true } };
+    const s = setup((p) => <OrderBook {...p} />, { tab: "working" });
+    act(() => s.app.store.applyOrders("acc-a", [close, order("p1", "OPEN", T)]));
+    const [c1, p1] = ["c1", "p1"].map((id) => rows("Orders").find((r) => r.title.startsWith(id))!);
+    expect(within(c1!).getByTitle(/can't reverse the position/).textContent).toBe(" close");
+    expect(within(p1!).queryByTitle(/can't reverse the position/)).toBeNull();
+  });
+
   it("an unanswered order is marked never placed in two clicks, by the server", async () => {
     const unanswered = order("u1", "PENDING", T, { pending: "UNCONFIRMED", broker_order_id: null });
     const settled = order("u1", "REJECTED", T, { reason: "settled by ayush: not in the broker's own order book, so never placed" });

@@ -80,6 +80,7 @@ class RiskGate:
             or self._loss_problem(request, request.qty, others)
             or self._open_orders_problem(others)
             or self._duplicate_problem(request, others)
+            or self._reduce_only_problem(request, request.qty, others)
         )
         return reason
 
@@ -131,12 +132,39 @@ class RiskGate:
             or (self._position_problem(instrument, new, leaves, others) if grows else None)
             or (self._loss_problem(new, leaves, others) if grows else None)
             or (self._off_problem(new, leaves, others) if grows else None)
+            or (self._reduce_only_problem(new, leaves, others) if grows else None)
         )
 
     async def admit_cancel(self, order: OrderView) -> str | None:
         return None  # cancelling only ever reduces risk
 
     # --- the checks -------------------------------------------------------------------------
+
+    def _reduce_only_problem(
+        self, request: OrderRequest, qty: int, others: Sequence[OrderView]
+    ) -> str | None:
+        """A close (reduce-only) may close what is still open in its product, no more: other
+        closes on their way (any outcome, known or not) have taken their part (#261)."""
+        if not request.reduce_only:
+            return None
+        held = self._product_position(request.instrument_id, request.product)
+        closable = held if request.side is Side.SELL else -held  # what this side reduces
+        taken = sum(
+            o.leaves_qty
+            for o in others
+            if o.request.reduce_only
+            and o.request.instrument_id == request.instrument_id
+            and o.request.product is request.product
+            and o.request.side is request.side
+        )
+        if closable <= 0:
+            return f"nothing to close: no {request.product.value} position this order reduces"
+        if qty > closable - taken:
+            return (
+                f"would close more than is open: {closable} open in {request.product.value}, "
+                f"{taken} already being closed"
+            )
+        return None
 
     def _kill_problem(self) -> str | None:
         for switch in self._switches:

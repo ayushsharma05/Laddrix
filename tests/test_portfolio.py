@@ -185,7 +185,7 @@ def _fut():
 
 
 class Paper:
-    def __init__(self, nifty_fut, tmp_path=None, *, recover=False, clock=None):
+    def __init__(self, nifty_fut, tmp_path=None, *, recover=False, clock=None, algo_types=()):
         self.store, self.md = InstrumentStore(), MarketData()
         for i in (nifty_fut, EQ):
             self.store.add(i)
@@ -204,7 +204,8 @@ class Paper:
             ids=ClientIds("MT", self.log.last_counter("MT") if self.log else 0),
             limits=RiskLimits(max_order_value_paise=10**12, max_position_lots=1000,
                               max_order_lots=1000),
-            recover_on_start=recover, **({"clock": clock} if clock else {}),
+            recover_on_start=recover, algo_types=algo_types,
+            **({"clock": clock} if clock else {}),
         )  # fmt: skip
         self.task = asyncio.create_task(self.platform.run(reconcile=False))
 

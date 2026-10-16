@@ -82,7 +82,20 @@ class _Stop(BaseStrategy):
     def send_exit(self, ctx: AlgoContext, qty: int, exit_side: Side, **kw) -> bool:
         price = self.exit_price(ctx, exit_side)
         kind = OrderType.MARKET if price is None else OrderType.LIMIT
-        return ctx.send(qty, price, side=exit_side, order_type=kind, **kw)
+        return ctx.send(qty, price, side=exit_side, order_type=kind, reduce_only=True, **kw)
+
+    @staticmethod
+    def capped(ctx: AlgoContext, qty: int, exit_side: Side) -> int | None:
+        """`qty` cut to what is still open to close (#261): another exit (an MTM close, a
+        square-off, a person) may have closed some or all of it. None: nothing is left, and
+        the algo has finished saying so."""
+        closable = ctx.closable(exit_side)
+        if closable is None:  # positions unknown here (tests, tools): the risk gate still guards
+            return qty
+        if closable <= 0:
+            ctx.finish("the position is already closed (another exit got there first)")
+            return None
+        return min(qty, closable)
 
     def exit_words(self, ctx: AlgoContext, exit_side: Side) -> str:
         price = self.exit_price(ctx, exit_side)
@@ -158,7 +171,7 @@ class TrailingStop(_Stop):
     def _exit(self, ctx: AlgoContext) -> None:
         if ctx.working() or ctx.sending or ctx.held:
             return
-        qty = ctx.remaining()
+        qty = ctx.remaining() and self.capped(ctx, ctx.remaining(), ctx.side)
         if qty and self.send_exit(ctx, qty, ctx.side):
             assert self.stop is not None and self.triggered_at is not None
             ctx.say(
@@ -200,7 +213,7 @@ class OcoExit(_Stop):
         if tick is not None and touched(ctx.side, tick.ltp_paise, self.stop):
             return ctx.fail(f"the last price {rupees(tick.ltp_paise)} is already past the stop")
         ctx.report(target_paise=self.target, stop_paise=self.stop)
-        if ctx.send(ctx.qty, self.target):
+        if ctx.send(ctx.qty, self.target, reduce_only=True):
             ctx.say(f"target {rupees(self.target)} working; stop {rupees(self.stop)} watched")
 
     def on_tick(self, ctx: AlgoContext, tick: Tick) -> None:
@@ -226,7 +239,7 @@ class OcoExit(_Stop):
                 ctx.cancel(c.client_order_id)
         if targets or ctx.working() or ctx.sending or ctx.held:
             return  # the target's cancel isn't confirmed yet, or the exit is working
-        qty = ctx.remaining()
+        qty = ctx.remaining() and self.capped(ctx, ctx.remaining(), ctx.side)
         if qty and self.send_exit(ctx, qty, ctx.side):
             ctx.say(f"stop touched: exiting {qty} {self.exit_words(ctx, ctx.side)}")
 
@@ -332,7 +345,8 @@ class Bracket(_Stop):
         if self.triggered_at is None:
             if open_qty - covered > 0:
                 qty = open_qty - covered
-                if ctx.send(qty, self.target, side=exit_side, check_remaining=False):
+                if ctx.send(qty, self.target, side=exit_side, check_remaining=False,
+                            reduce_only=True):  # fmt: skip
                     self.exit_sending += qty
                     ctx.say(
                         f"{lots_text(entered // ctx.instrument().lot_size)} in; target "
@@ -348,9 +362,10 @@ class Bracket(_Stop):
                 ctx.cancel(c.client_order_id)
         if others or exits or self.exit_sending:
             return
-        if open_qty > 0 and self.send_exit(ctx, open_qty, exit_side, check_remaining=False):
-            self.exit_sending += open_qty
-            ctx.say(f"stop touched: exiting {open_qty} {self.exit_words(ctx, exit_side)}")
+        qty = open_qty > 0 and self.capped(ctx, open_qty, exit_side)
+        if qty and self.send_exit(ctx, qty, exit_side, check_remaining=False):
+            self.exit_sending += qty
+            ctx.say(f"stop touched: exiting {qty} {self.exit_words(ctx, exit_side)}")
 
     def _set_levels(self, ctx: AlgoContext) -> None:
         price = ctx.average_price()

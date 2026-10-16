@@ -7,7 +7,7 @@ Later-stage expansion #297 now tracks 25 detailed packages (#298–#322), linked
 
 As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
 
-**Ayush's instruction (16 Oct, evening):** he trusts Claude to finish everything that can be finished, then learn the project from a plain-language guide that Claude writes at the end. Don't stop to ask him things he can't yet judge; leave the steps only he can do (the live go-live run, his v1 acceptance on #240, the v1.0.0 tag) for that guide. The hardening gate #257 is in progress: #259 merged (PR #337); #260 done (PR open); next #261.
+**Ayush's instruction (16 Oct, evening):** he trusts Claude to finish everything that can be finished, then learn the project from a plain-language guide that Claude writes at the end. Don't stop to ask him things he can't yet judge; leave the steps only he can do (the live go-live run, his v1 acceptance on #240, the v1.0.0 tag) for that guide. The hardening gate #257 is in progress: #259 merged (PR #337); #260 merged (PR #338); #261 done (coordinated exits, PR open); next #262.
 
 **Current handoff:** K13 is done (#284 PR #325, #285 PR #326; #283 phone after v1). The core v1 gate #240 is split into #327 (merged, PR #331), #328 (merged, PR #332), #329 (merged, PR #333), #330 (merged, PR #334; its live boxes are Ayush's), #288 (merged, PR #335), #289 (release process: PR open), plus #288 docs and #289 release. Then the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
 

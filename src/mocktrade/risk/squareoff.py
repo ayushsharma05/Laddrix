@@ -18,7 +18,7 @@ from typing import Any
 from mocktrade.domain.orders import Product
 from mocktrade.positions.book import PositionBook
 from mocktrade.recovery import IST
-from mocktrade.risk.closing import close_position
+from mocktrade.risk.closing import ExitDesk, position_of
 
 CUTOFFS: dict[str, time] = {"NSE": time(15, 20), "BSE": time(15, 20),
                             "NFO": time(15, 25), "BFO": time(15, 25)}  # fmt: skip
@@ -38,6 +38,7 @@ class SquareOff:
         warn_from: time = WARN_FROM,
         audit: Callable[[str, str, dict], None] | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        desk: ExitDesk | None = None,  # the account's exit desk (#261)
     ) -> None:
         self.account_id = account_id
         self._book = book
@@ -48,6 +49,7 @@ class SquareOff:
         self.warn_from = warn_from
         self._audit = audit
         self._clock = clock
+        self._desk = desk or ExitDesk(orders, position_of(book))
 
     def status(self) -> dict[str, Any]:
         """What the screens show: the cut-offs, the window, the open MIS positions."""
@@ -97,16 +99,16 @@ class SquareOff:
             instrument = self._instrument(p.instrument_id)
             if instrument is None:
                 continue
-            sent = await close_position(self._orders, instrument, p.product, p.qty,
-                                        user_id=user_id, max_lots=self.max_lots,
-                                        basket_id=basket)  # fmt: skip
-            ids = [o.client_order_id for o in sent]
-            refused = [o.reason for o in sent if o.status.value == "REJECTED"]
+            result = await self._desk.close(instrument, p.product, user_id=user_id,
+                                            max_lots=self.max_lots, basket_id=basket,
+                                            why=f"square-off by {user_id}")  # fmt: skip
+            ids, refused = result.ids, result.refused
             done.append({"instrument_id": p.instrument_id, "qty": p.qty, "orders": ids,
-                         "refused": refused})  # fmt: skip
+                         "refused": refused, "left_open": result.left_open,
+                         "stopped_algos": result.stopped_algos,
+                         "cancelled": result.cancelled,
+                         "summary": result.words()})  # fmt: skip
             if self._audit is not None:
-                detail = f"{user_id} squared off {p.qty:+d} {p.instrument_id} MIS: {', '.join(ids)}"
-                if refused:
-                    detail += f" (refused: {'; '.join(refused)})"
+                detail = f"{user_id} squared off {p.qty:+d} {p.instrument_id} MIS: {result.words()}"
                 self._audit("SQUARE_OFF", detail, {"user_id": user_id, "orders": ids})
         return done

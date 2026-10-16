@@ -75,6 +75,10 @@ class OrderRequest:
     algo_id: str | None = None  # the EXCHANGE-issued algo id (SEBI framework), when we have one
     parent_id: str | None = None  # our algo's parent order, if an algo sent this
     basket_id: str | None = None  # sent together with other legs (orders/basket.py)
+    # it only closes (#261): the risk gate refuses it past the position still open in its
+    # product, minus other closes on their way, so overlapping exits never open a reverse
+    # position. Ours alone: brokers aren't told.
+    reduce_only: bool = False
 
     @property
     def from_algo(self) -> bool:
