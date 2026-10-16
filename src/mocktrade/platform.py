@@ -350,6 +350,7 @@ class Platform:
             switches=(self.firm_switch, switch),
             clock=clock,
             positions=book.net_by_instrument,
+            product_position=book.qty,
         )
         throttle = throttle or OrderThrottle()
         recovery = RecoveryGate() if recover_on_start else None
@@ -395,7 +396,7 @@ class Platform:
             )
             book.subscribe(loss_watch.check)
         reconciler = PositionReconciler(
-            book.net_by_instrument, broker, account_id=account.id, clock=clock
+            book.qty_by_product, broker, account_id=account.id, clock=clock
         )
         if self.event_log is not None:
             log = self.event_log
@@ -404,7 +405,12 @@ class Platform:
                     f"POSITION_MISMATCH_{what.upper()}",
                     account.id,
                     m.message,
-                    {"instrument_id": m.instrument_id, "ours": m.ours, "broker": m.broker},
+                    {
+                        "instrument_id": m.instrument_id,
+                        "ours": m.ours,
+                        "broker": m.broker,
+                        "product": m.product.value if m.product else None,
+                    },
                 )
             )
         algos = self._algo_engine(account.id, orders, switch, algo_types, clock)

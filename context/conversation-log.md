@@ -219,3 +219,11 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
   - **Decided:** the two defects the review actually reproduced are fixed now, ahead of the hardening phase, because they are small and safety-related.
     - **#269** (candle paths could escape their folder) is fixed: the store checks ids and containment, rows are checked whole and written atomically, imports are audited, and account ids are safe file names. A test showed the bug before the fix.
     - **#258** is next.
+- 16 Oct, #258 fixed. Positions are now compared and closed per instrument *and* product, in all of these places:
+  - the periodic broker check and the restart rebuild (`differences()` in `positions/reconcile.py`);
+  - the paper broker, which now lists one row per product;
+  - the "only closing trades" rule, which uses that product's position and its own working orders;
+  - the alerts, on the server and the screen.
+
+  The audit's case (NRML +75, MIS −75) no longer raises a false difference. The mutation run found 5 gaps in the tests, all now covered (19/19).
+- 16 Oct, Ayush asked about 22 "in progress" issues on the GitHub Project linked to the repo. Claude's GitHub tools can't read Project boards. Ayush was asked to send the list (or a CSV export) so it can be checked against the clean-up.

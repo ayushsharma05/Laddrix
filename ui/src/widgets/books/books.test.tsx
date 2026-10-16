@@ -160,12 +160,15 @@ describe("Positions", () => {
 
   it("a position that differs from the broker is marked on its row and in the bar", () => {
     const { app, socket } = setup((x) => <Positions {...x} />, {});
-    act(() => app.store.applyPositions("acc-a", { ...SNAP, positions: [p("NFO:NIFTY26OCTFUT", 75)] }));
+    act(() => app.store.applyPositions("acc-a", { ...SNAP, positions: [p("NFO:NIFTY26OCTFUT", 75), { ...p("NFO:NIFTY26OCTFUT", -75), product: "MIS" }] }));
     act(() =>
-      socket().receive({ type: "position_alert", account_id: "acc-a", state: "raised", instrument_id: "NFO:NIFTY26OCTFUT", ours: 75, broker: 150, message: "MockTrade shows +75, the broker shows +150" }),
+      socket().receive({ type: "position_alert", account_id: "acc-a", state: "raised", instrument_id: "NFO:NIFTY26OCTFUT", product: "NRML", ours: 75, broker: 150, message: "MockTrade shows +75, the broker shows +150" }),
     );
-    expect(rows("Positions")[0]!.textContent).toContain("broker 150");
-    expect(rows("Positions")[0]!.className).toContain("differs");
+    const nrml = rows("Positions").find((r) => r.textContent!.includes("NRML"))!;
+    const mis = rows("Positions").find((r) => r.textContent!.includes("MIS"))!;
+    expect(nrml.textContent).toContain("broker 150");
+    expect(nrml.className).toContain("differs");
+    expect(mis.className).not.toContain("differs"); // only the product that differs is marked
     expect(screen.getByText("✗ 1 differs from broker")).toBeTruthy();
   });
 });

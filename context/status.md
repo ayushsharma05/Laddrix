@@ -2,7 +2,7 @@
 
 As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
 
-**Current handoff:** fix #258 (positions by product in reconciliation), then K13.2 (#282, the admin screen with the first-login password change), K13.4 (#284), K13.5 (#285); then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
+**Current handoff:** merge #294 (#258) on green CI, then K13.2 (#282, the admin screen with the first-login password change), K13.4 (#284), K13.5 (#285); then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
 
 **Outside review (16 Oct).** While Claude's limit was used up, Ayush had another AI tool review the code and the design. It changed no code. It opened #240–#279 and the docs PR #256; that PR's notes are folded in here, and it was closed. Its findings separate behaviour confirmed in the source from design gaps. Two were reproduced in a throwaway folder:
 - reconciliation overwrote one product's position with another's (#258);
@@ -145,8 +145,8 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    What NG taught that is still missing is now in #287 (operations), #288 (design docs), #289 (release process), #290 (F&O expiry day), #291 (compliance) and #292 (a decision: user-written strategies). The old milestones (Phase 0–8, v0.1–v1.0) can now be closed by Ayush; Claude's tools can't close milestones.
 
    **Confirmed defects fixed ahead of hardening:**
-   - #269 (candle paths could escape their folder): done on branch `fix-269-candle-paths`;
-   - #258 (positions in different products overwrite each other during reconciliation): next.
+   - #269 (candle paths could escape their folder): merged (PR #293);
+   - #258 (positions in different products overwrite each other during reconciliation): done on branch `fix-258-products` (PR #294).
 8. **K13 admin & phone** (issues #281–#285, label `track: kite`):
    - #281 K13.1 admin API (users, roles, accounts, per-account limits): merged (PR #286). See `docs/design/admin.md`.
    - #282 K13.2 admin panel screen: **next**. It includes the first-login password change screen; the API answers 403 "set a new password first" until then. Its form is drawn from `GET /api/admin/limits/spec`, which adds the kinds `money`, `choices` and `instruments` that `ParamInput` doesn't draw yet. Ask twice before a change marked `looser`.

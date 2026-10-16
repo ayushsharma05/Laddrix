@@ -1277,6 +1277,7 @@ def create_app(
                 "alerts": [
                     {
                         "instrument_id": m.instrument_id,
+                        "product": m.product.value if m.product else None,  # None: the net
                         "ours": m.ours,
                         "broker": m.broker,
                         "since": m.since.isoformat(),

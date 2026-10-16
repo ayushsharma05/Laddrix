@@ -200,6 +200,15 @@ class PositionBook:
             net[instrument_id] = net.get(instrument_id, 0) + position.qty
         return net
 
+    def qty_by_product(self) -> dict[tuple[InstrumentId, Product], int]:
+        """Quantity per instrument and product, as brokers list positions (reconciling)."""
+        return {key: p.qty for key, p in self._positions.items()}
+
+    def qty(self, instrument_id: InstrumentId, product: Product) -> int:
+        """One product's quantity: what an order in that product can close."""
+        position = self._positions.get((instrument_id, product))
+        return position.qty if position else 0
+
     def realised_paise(self) -> int:
         return _round(sum((p.realised for p in self._positions.values()), Fraction(0)))
 

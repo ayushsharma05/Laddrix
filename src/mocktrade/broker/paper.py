@@ -300,14 +300,13 @@ class PaperBroker:
         self._book = book
 
     async def positions(self) -> list[BrokerPosition]:
-        """Net per instrument across products, as brokers report it for reconciling."""
-        result = []
-        for instrument_id, net in sorted(self._book.net_by_instrument().items()):
-            views = [p for p in self._book.positions() if p.instrument_id == instrument_id]
-            same_side = [p for p in views if p.qty and (p.qty > 0) == (net > 0)]
-            avg = round(same_side[0].avg_price_paise) if net and same_side else 0
-            result.append(BrokerPosition(instrument_id, net, avg))
-        return result
+        """One row per instrument and product, as Kite lists them (for reconciling)."""
+        return [
+            BrokerPosition(
+                p.instrument_id, p.qty, round(p.avg_price_paise) if p.qty else 0, product=p.product
+            )  # fmt: skip
+            for p in self._book.positions()
+        ]
 
     # --- holdings, funds, tradebook (what the account holds and owns) -------------------
 

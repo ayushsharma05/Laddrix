@@ -37,6 +37,7 @@ from mocktrade.domain.portfolio import Holding, Trade
 from mocktrade.domain.ticks import Tick
 from mocktrade.orders.model import OrderView
 from mocktrade.positions.book import PositionBook
+from mocktrade.positions.reconcile import differences
 from mocktrade.store.events import EventLog
 
 log = logging.getLogger(__name__)
@@ -209,14 +210,13 @@ async def recover(
         broker.adopt(carried=carried, trades=trades, holdings=holdings,
                      earlier_pnl_paise=round(earlier_pnl))  # fmt: skip
         broker_positions = await broker.positions()
-    ours = {i: q for i, q in book.net_by_instrument().items() if q}
-    theirs = {p.instrument_id: p.qty for p in broker_positions if p.qty}
-    for instrument_id in sorted(set(ours) | set(theirs)):
-        a, b = ours.get(instrument_id, 0), theirs.get(instrument_id, 0)
-        if a != b:
-            report.problems.append(
-                f"{instrument_id}: MockTrade rebuilt {a:+d}, the broker shows {b:+d}"
-            )
+    # per instrument and product, as the broker lists them (#258: never one row over another)
+    different = differences(book.qty_by_product(), broker_positions)
+    for (instrument_id, product), (a, b) in sorted(
+        different.items(), key=lambda kv: (kv[0][0], kv[0][1].value if kv[0][1] else "")
+    ):
+        what = f"{instrument_id} {product.value}" if product else instrument_id
+        report.problems.append(f"{what}: MockTrade rebuilt {a:+d}, the broker shows {b:+d}")
     return report
 
 

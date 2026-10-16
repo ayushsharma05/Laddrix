@@ -1,7 +1,7 @@
 import type { Position, PositionsSnapshot } from "../api/types";
 import { ME, order } from "../test/fixtures";
 import { cancelBlock, tradingBlock } from "./gate";
-import { describeOrderEvent, MAX_MESSAGES, Store } from "./store";
+import { alertFor, describeOrderEvent, MAX_MESSAGES, Store } from "./store";
 
 function position(qty: number, updated: string): Position {
   return {
@@ -99,15 +99,23 @@ describe("Store", () => {
       account_id: "acc-a",
       state: "raised" as const,
       instrument_id: "NFO:NIFTY26OCTFUT",
+      product: "MIS" as string | null,
       ours: 75,
       broker: 150,
       message: "differs",
     };
     store.applyMessage(alert);
-    expect(store.getState().books["acc-a"]!.alerts["NFO:NIFTY26OCTFUT"]!.broker).toBe(150);
+    store.applyMessage({ ...alert, product: "NRML", broker: 0 }); // another product: kept apart
+    store.applyMessage({ ...alert, instrument_id: "NSE:SBIN", product: null, broker: 9 }); // the net
+    const alerts = store.getState().books["acc-a"]!.alerts;
+    expect(Object.keys(alerts).sort()).toEqual(["NFO:NIFTY26OCTFUT|MIS", "NFO:NIFTY26OCTFUT|NRML", "NSE:SBIN|"]);
+    expect(alertFor(alerts, { instrument_id: "NFO:NIFTY26OCTFUT", product: "MIS" })!.broker).toBe(150);
+    expect(alertFor(alerts, { instrument_id: "NFO:NIFTY26OCTFUT", product: "CNC" })).toBeUndefined();
+    expect(alertFor(alerts, { instrument_id: "NSE:SBIN", product: "CNC" })!.broker).toBe(9); // net: every row
     expect(store.getState().messages[0]!.level).toBe("WARN");
     store.applyMessage({ ...alert, state: "cleared" });
-    expect(store.getState().books["acc-a"]!.alerts).toEqual({});
+    expect(Object.keys(store.getState().books["acc-a"]!.alerts).sort()).toEqual(["NFO:NIFTY26OCTFUT|NRML", "NSE:SBIN|"]);
+    expect(store.getState().messages[0]!.text).toBe("NIFTY26OCTFUT MIS: positions match the broker again");
   });
 
   it("keeps at most MAX_MESSAGES, newest first", () => {

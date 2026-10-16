@@ -42,7 +42,7 @@ def broker():
 
 @pytest.fixture
 def rec(book, broker, clock):
-    return PositionReconciler(book.net_by_instrument, broker, account_id="acc-1", clock=clock)
+    return PositionReconciler(book.qty_by_product, broker, account_id="acc-1", clock=clock)
 
 
 def kite_has(broker, **positions):
@@ -63,7 +63,7 @@ async def test_a_missing_fill_shows_up_as_an_alert(rec, book, broker, clock):
     book.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)
     kite_has(broker, fut=150)  # Kite has a fill we never received
     first = await rec.check()
-    assert not first.ok and first.alerts == () and first.suspected == (FUT,)
+    assert not first.ok and first.alerts == () and first.suspected == ((FUT, None),)
     clock.now += timedelta(seconds=10)
     second = await rec.check()
     (alert,) = second.alerts
@@ -77,7 +77,7 @@ async def test_a_missing_fill_shows_up_as_an_alert(rec, book, broker, clock):
 
 async def test_a_fill_still_on_its_way_is_not_an_alert(rec, book, broker):
     kite_has(broker, fut=75)  # Kite filled; our fill message hasn't arrived yet
-    assert (await rec.check()).suspected == (FUT,)
+    assert (await rec.check()).suspected == ((FUT, None),)
     book.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)  # ...now it has
     result = await rec.check()
     assert result.ok and result.alerts == () and result.suspected == ()
@@ -187,3 +187,72 @@ def test_net_by_instrument_adds_products(book):
     book.apply_fill(FUT, Product.MIS, Side.SELL, 75, 2501000)
     book.apply_fill(REL, Product.CNC, Side.BUY, 5, 140000)
     assert book.net_by_instrument() == {FUT: 75, REL: 5}
+
+
+# --- #258: per instrument AND product -----------------------------------------------------------
+
+
+def rows(*items):
+    return [BrokerPosition(i, q, 0, product=p) for i, p, q in items]
+
+
+async def test_the_audit_case_long_in_one_product_short_in_another(rec, book, broker):
+    """Kite lists NRML +75 and MIS −75 for one contract. Comparing per instrument let the second
+    row overwrite the first (broker −75 against our net 0): a false alarm. Per product, they
+    match."""
+    book.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)
+    book.apply_fill(FUT, Product.MIS, Side.SELL, 75, 2501000)
+    broker.broker_positions = rows((FUT, Product.NRML, 75), (FUT, Product.MIS, -75))
+    assert (await rec.check()).ok
+
+
+async def test_a_difference_in_one_product_is_named_with_it(rec, book, broker, clock):
+    book.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)
+    book.apply_fill(FUT, Product.MIS, Side.SELL, 75, 2501000)
+    broker.broker_positions = rows((FUT, Product.NRML, 75), (FUT, Product.MIS, -150))
+    first = await rec.check()
+    assert first.suspected == ((FUT, Product.MIS),)
+    clock.now += timedelta(seconds=10)
+    (alert,) = (await rec.check()).alerts
+    assert (alert.key, alert.ours, alert.broker) == ((FUT, Product.MIS), -75, -150)
+    assert alert.message.startswith(f"{FUT} MIS: MockTrade shows -75, the broker shows -150")
+    # the net across products would have hidden it in the other direction too:
+    broker.broker_positions = rows((FUT, Product.NRML, 0), (FUT, Product.MIS, 0))
+    book_net = sum(book.qty_by_product().values())
+    assert book_net == 0  # ours nets to zero, the broker's too: still two real differences
+    clock.now += timedelta(seconds=10)
+    await rec.check()
+    clock.now += timedelta(seconds=10)
+    keys = {m.key for m in (await rec.check()).alerts}
+    assert keys == {(FUT, Product.MIS), (FUT, Product.NRML)}
+
+
+async def test_a_row_without_its_product_is_compared_on_the_net(rec, book, broker):
+    book.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)
+    book.apply_fill(FUT, Product.MIS, Side.BUY, 75, 2501000)
+    book.apply_fill(REL, Product.CNC, Side.BUY, 10, 140000)
+    broker.broker_positions = [BrokerPosition(FUT, 150, 0),  # product not said
+                               *rows((REL, Product.CNC, 10))]  # fmt: skip
+    assert (await rec.check()).ok
+    broker.broker_positions = [BrokerPosition(FUT, 75, 0), *rows((REL, Product.CNC, 10))]
+    assert (await rec.check()).suspected == ((FUT, None),)  # the net differs
+
+
+async def test_the_paper_broker_lists_one_row_per_product():
+    from mocktrade.broker.paper import PaperBroker
+    from mocktrade.marketdata.service import MarketData
+    from mocktrade.refdata.store import InstrumentStore
+
+    paper = PaperBroker(MarketData(), InstrumentStore())
+    paper._book.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)
+    paper._book.apply_fill(FUT, Product.MIS, Side.SELL, 150, 2502000)
+    got = {(p.instrument_id, p.product, p.qty, p.avg_price_paise) for p in await paper.positions()}
+    assert got == {(FUT, Product.MIS, -150, 2502000), (FUT, Product.NRML, 75, 2501000)}
+
+
+async def test_rows_without_a_product_add_up_and_our_own_rows_count(rec, book, broker):
+    book.apply_fill(FUT, Product.NRML, Side.BUY, 150, 2501000)
+    broker.broker_positions = [BrokerPosition(FUT, 75, 0), BrokerPosition(FUT, 75, 0)]
+    assert (await rec.check()).ok  # two rows of one instrument: 75 + 75, never the last one
+    book.apply_fill(REL, Product.CNC, Side.BUY, 10, 140000)  # the broker lists nothing for it
+    assert (await rec.check()).suspected == ((REL, Product.CNC),)

@@ -230,6 +230,35 @@ async def test_a_position_difference_keeps_trading_shut(tmp_path, nifty_fut):
     await s.stop()
 
 
+async def test_after_a_restart_each_product_is_checked_on_its_own(tmp_path, nifty_fut):
+    """#258: Kite lists NRML +75 and MIS −75 for one contract (both carried in). Compared per
+    instrument the second row overwrote the first; per product, each is rebuilt and matches."""
+    broker = FakeBroker()
+    broker.broker_positions = [
+        BrokerPosition(FUT, 75, ASK, overnight_qty=75, close_paise=2490000, product=Product.NRML),
+        BrokerPosition(FUT, -75, ASK, overnight_qty=-75, close_paise=2490000, product=Product.MIS),
+    ]  # fmt: skip
+    s = Server(tmp_path, nifty_fut, broker=broker)
+    await s.ready()  # opens: no false difference
+    assert s.runtime.positions.qty_by_product() == {
+        (FUT, Product.NRML): 75,
+        (FUT, Product.MIS): -75,
+    }
+    await s.stop()
+
+
+async def test_a_difference_in_one_product_is_named_after_a_restart(tmp_path, nifty_fut):
+    broker = FakeBroker()
+    broker.broker_positions = [
+        BrokerPosition(FUT, 75, ASK, overnight_qty=75, close_paise=2490000, product=Product.NRML),
+        BrokerPosition(FUT, -75, ASK, product=Product.MIS),  # made today outside MockTrade
+    ]  # fmt: skip
+    s = Server(tmp_path, nifty_fut, broker=broker)
+    gate = await s.ready("failed")
+    assert f"{FUT} MIS: MockTrade rebuilt +0, the broker shows -75" in gate.reason
+    await s.stop()
+
+
 async def test_kite_carried_positions_are_seeded_at_the_previous_close(tmp_path, nifty_fut):
     broker = FakeBroker()
     broker.broker_positions = [

@@ -186,6 +186,12 @@ sequenceDiagram
 - **Our order id** goes into Kite's `tag` field (max 20 characters). When an update arrives, we know exactly which of our orders it belongs to.
 - Every step is written to the **event log** before anything else depends on it. That makes up the audit trail.
 - On reconnect (after a network blip), the order manager calls `GET /orders` and **reconciles**: it compares Kite's view with ours and fixes any differences. No order is ever "lost".
+- **Positions are kept, compared and closed per instrument *and* product** (MIS, NRML, CNC), as Kite lists them (#258). The same contract can be long in one product and short in another. Comparing per instrument let one of Kite's rows overwrite the other: a false difference, or a hidden one.
+  - The position check (every few minutes) and the rebuild after a restart compare each product on its own. Only where the broker doesn't say a row's product is that contract compared on its net.
+  - The paper broker lists one row per product, like Kite.
+  - "Only closing trades" (past the daily loss limit, or on a turned-off account) means closing *that product's* position: a MIS sell doesn't close an NRML long, because at the broker it opens a MIS short.
+  - Exposure limits still count the net across products.
+  - Alerts name the product, and the Positions screen marks only that row.
 
 ### 4.2 A price's journey
 
