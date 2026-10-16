@@ -67,14 +67,18 @@ async def test_a_position_limit_alerts_once_and_closes_only_when_asked(day):
     p.rt.mtm.subscribe(seen.append)
     await p.buy(FUT, 75, 2501010, Product.MIS)
     p.rt.mtm.set_position_rule(PositionRule(FUT, "MIS", max_loss_paise=1_500_00), "ayush")
-    await move(p, 2499000)  # 75 × −20.10 = −₹1,507.50: past the ₹1,500 limit
+    await move(p, 2499000)  # 75 × −20.10 = −₹1,507.50: just past the ₹1,500 limit
+    assert len(seen) == 1
     await move(p, 2498000)  # further down: no second alert today
     assert len(seen) == 1 and seen[0].key == f"{FUT}|MIS" and not seen[0].closing
     assert "reached the loss limit ₹1,500.00; alert only (auto-close is off)" in seen[0].text
     assert p.rt.positions.net_qty(FUT) == 75  # alert only: nothing sent
+    p.rt.mtm.set_position_rule(PositionRule(FUT, "MIS", max_loss_paise=3_000_00), "ayush")
+    await move(p, 2496000)  # a new limit is watched afresh: −₹3,757.50
+    assert len(seen) == 2
     await p.log.flush()
-    assert notes(p, "MTM_RULE") == [f"{FUT}|MIS: loss ₹1,500.00, alert only (by ayush)"]
-    assert len(notes(p, "MTM_BREACHED")) == 1
+    assert notes(p, "MTM_RULE")[0] == f"{FUT}|MIS: loss ₹1,500.00, alert only (by ayush)"
+    assert len(notes(p, "MTM_BREACHED")) == 2
 
 
 async def test_a_percent_limit_with_auto_close_exits_through_the_normal_path(day):
