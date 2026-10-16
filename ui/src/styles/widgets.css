@@ -1297,7 +1297,7 @@ label.algo-field {
   grid-template-columns: minmax(120px, 1.6fr) 84px minmax(90px, 1fr) 80px minmax(90px, 1fr);
 }
 .report-trade-row {
-  grid-template-columns: 64px minmax(110px, 1.4fr) 42px 64px 90px minmax(90px, 1fr);
+  grid-template-columns: 72px minmax(110px, 1.4fr) 42px 64px 90px minmax(90px, 1fr);
 }
 .report-notes {
   margin: 0;
@@ -1321,4 +1321,221 @@ label.algo-field {
 }
 .mtm-row input:not([type="checkbox"]) {
   width: 100%;
+}
+
+/* Research: recordings and backtests (widgets/research/) */
+.research {
+  /* chart colour slots: validated for colour-blind readers on the dark surface (--body) */
+  --slot-0: #3987e5;
+  --slot-1: #d95926;
+  --slot-2: #199e70;
+  --slot-3: #c98500;
+}
+.research-body {
+  padding: 4px 8px;
+}
+.research-body h4 {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  color: var(--text-2);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rec-row {
+  grid-template-columns: 100px 100px 84px 90px minmax(140px, 2fr);
+  cursor: pointer;
+}
+.rec-instruments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 2px 0 6px;
+  padding: 4px 12px;
+  list-style: none;
+  background: var(--well);
+}
+.rec-instruments li {
+  cursor: pointer;
+}
+.bt-row {
+  grid-template-columns: 64px minmax(160px, 2fr) minmax(150px, 1.6fr) 100px 48px 120px;
+  cursor: pointer;
+  align-items: center;
+}
+.bt-row > span:nth-child(3) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bt-day-row {
+  grid-template-columns: minmax(110px, 1.2fr) 64px minmax(90px, 1fr) 80px minmax(90px, 1fr) 96px;
+  cursor: pointer;
+}
+.bt-skipped {
+  grid-column: 2 / -1;
+}
+.bt-downloads {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.bt-downloads a.btn {
+  text-decoration: none;
+}
+.bt-detail {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+}
+.bt-spec {
+  margin-bottom: 4px;
+}
+.bt-days {
+  border: 1px solid var(--border);
+  margin: 4px 0;
+  padding: 4px 8px;
+}
+.bt-days legend {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.bt-day-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  max-height: 120px;
+  overflow: auto;
+}
+.bt-day-picks label.on {
+  color: var(--text);
+}
+.bt-compare-table {
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+.bt-compare-table th,
+.bt-compare-table td {
+  padding: 2px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-weight: normal;
+}
+.bt-compare-table td.num {
+  text-align: right;
+}
+.bt-compare-table thead th {
+  color: var(--text-2);
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 3px;
+  margin: 0 4px 2px 0;
+  vertical-align: middle;
+  border-radius: 2px;
+  background: var(--slot-0);
+}
+.swatch.slot-1 {
+  background: var(--slot-1);
+}
+.swatch.slot-2 {
+  background: var(--slot-2);
+}
+.swatch.slot-3 {
+  background: var(--slot-3);
+}
+
+/* the research line chart (widgets/research/LineChart.tsx) */
+.line-chart {
+  margin: 6px 0;
+  position: relative;
+}
+.line-chart figcaption {
+  display: flex;
+  gap: 12px;
+  color: var(--text-2);
+  margin-bottom: 2px;
+}
+.chart-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--text);
+}
+.chart-box {
+  display: flex;
+  gap: 6px;
+}
+.chart-y {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 84px;
+  text-align: right;
+  color: var(--text-2);
+  font-size: 11px;
+}
+.line-chart svg {
+  flex: 1;
+  height: 160px;
+  background: var(--well);
+}
+.chart-x {
+  display: flex;
+  justify-content: space-between;
+  margin-left: 90px;
+  color: var(--text-2);
+  font-size: 11px;
+}
+.chart-zero {
+  stroke: var(--border);
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+.chart-cross {
+  stroke: var(--text-2);
+  stroke-width: 1;
+}
+.chart-line {
+  fill: none;
+  stroke: var(--slot-0);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.chart-dot {
+  stroke: var(--slot-0);
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+.chart-line.slot-1 {
+  stroke: var(--slot-1);
+}
+.chart-line.slot-2 {
+  stroke: var(--slot-2);
+}
+.chart-line.slot-3 {
+  stroke: var(--slot-3);
+}
+.chart-dot.slot-1 {
+  stroke: var(--slot-1);
+}
+.chart-dot.slot-2 {
+  stroke: var(--slot-2);
+}
+.chart-dot.slot-3 {
+  stroke: var(--slot-3);
+}
+.chart-tip {
+  position: absolute;
+  top: 18px;
+  right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px;
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  pointer-events: none;
+  font-size: 12px;
 }

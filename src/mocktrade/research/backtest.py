@@ -31,6 +31,7 @@ from typing import Any
 
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.algos.engine import HEARTBEAT_S, AlgoError
+from mocktrade.algos.spec import spec_to_dict
 from mocktrade.broker.paper import PaperBroker
 from mocktrade.charges.model import ChargesModel
 from mocktrade.domain.accounts import BrokerAccount
@@ -52,6 +53,7 @@ log = logging.getLogger(__name__)
 ACCOUNT = "backtest"
 BEAT = timedelta(seconds=HEARTBEAT_S)
 DRAIN_TURNS = 200  # far more than one order's path needs (about a dozen)
+MAX_DAYS = 250  # about a year of trading days in one run
 
 
 class BacktestError(Exception):
@@ -285,6 +287,8 @@ class Backtests:
         problems = spec.problems()
         if self._instruments.get(spec.instrument_id) is None:
             problems.append(f"unknown instrument {spec.instrument_id}")
+        if spec.algo not in {t.spec.code for t in BUILTIN}:
+            problems.append(f"unknown algo {spec.algo!r}")
         if candles and self._candles is None:
             problems.append("no candles were imported")
         if problems:
@@ -300,6 +304,20 @@ class Backtests:
 
     def get(self, run_id: str) -> Run | None:
         return self._runs.get(run_id)
+
+    def day(self, run_id: str, day: str) -> dict[str, Any]:
+        """One day of a finished run: the K10.3 report (for CSV/PDF) or why there is none."""
+        run = self._runs.get(run_id)
+        if run is None:
+            raise LookupError(f"no backtest {run_id}")
+        if run.result is None:
+            raise LookupError(f"backtest {run_id} hasn't finished ({run.state})")
+        for d in run.result["daily"]:
+            if d["day"] == day:
+                if "skipped" in d:
+                    raise LookupError(f"{day} was skipped: {d['skipped']}")
+                return d
+        raise LookupError(f"{day} isn't one of the days of {run_id}")
 
     def runs(self) -> list[Run]:
         return sorted(self._runs.values(), key=lambda r: r.created_at, reverse=True)
@@ -367,6 +385,20 @@ class Backtests:
                 log.warning("backtest %s can't be read: %s", path, exc)
 
 
+def form_spec(ticks_days: list[date], *, candles: bool) -> dict[str, Any]:
+    """What a backtest screen offers (drawn by the screen, not hard-coded there): the algos
+    with their settings, the recorded days, the products and the defaults."""
+    d = BacktestSpec(days=(), algo="", instrument_id="", side="BUY", qty=1)
+    return {
+        "algos": [spec_to_dict(t.spec) for t in BUILTIN],
+        "days": [x.isoformat() for x in reversed(ticks_days)],  # newest first
+        "products": [p.value for p in Product],
+        "candles": candles,  # candle-based runs are possible (imported candles)
+        "defaults": {"product": d.product, "start": d.start, "capital_paise": d.capital_paise},
+        "max_days": MAX_DAYS,
+    }
+
+
 def _chain(first, rest):
     yield first
     yield from rest
@@ -398,6 +430,11 @@ class CandleStore:
         rows = sorted(rows, key=lambda r: datetime.fromisoformat(r["time"]))
         (folder / f"{day.isoformat()}.json").write_text(json.dumps(rows))
         return len(rows)
+
+    def days(self, instrument_id: str) -> list[str]:
+        """The days with candles for an instrument, newest first."""
+        folder = self.root / instrument_id.replace(":", "_")
+        return sorted((p.stem for p in folder.glob("*.json")), reverse=True)
 
     def rows(self, instrument_id: str, day: date) -> list[dict[str, Any]] | None:
         path = self.root / instrument_id.replace(":", "_") / f"{day.isoformat()}.json"

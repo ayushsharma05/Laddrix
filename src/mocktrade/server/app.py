@@ -52,7 +52,14 @@ from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.portfolio.service import PortfolioError, snapshot_to_dict
 from mocktrade.reports.export import report_csv, report_pdf
 from mocktrade.reports.service import ReportError, Reports
-from mocktrade.research.backtest import BacktestError, Backtests, BacktestSpec, CandleStore
+from mocktrade.research.backtest import (
+    MAX_DAYS,
+    BacktestError,
+    Backtests,
+    BacktestSpec,
+    CandleStore,
+    form_spec,
+)
 from mocktrade.research.replay import ReplayFeed
 from mocktrade.research.ticks import FileTickStore
 from mocktrade.risk.kill_switch import stop_trading
@@ -223,7 +230,7 @@ class ReplayIn(_Strict):
 
 
 class BacktestIn(_Strict):
-    days: list[str] = Field(min_length=1, max_length=250)
+    days: list[str] = Field(min_length=1, max_length=MAX_DAYS)
     algo: str = Field(min_length=1, max_length=40)
     instrument_id: str = Field(min_length=3, max_length=64)
     side: Side
@@ -504,6 +511,32 @@ def create_app(
     @app.get("/api/research/backtests")
     async def backtest_list(user: Me) -> list[dict[str, Any]]:
         return [r.to_dict(full=False) for r in backtest_runs().runs()]
+
+    @app.get("/api/research/backtests/form")
+    async def backtest_form_spec(user: Me, instrument_id: str = "") -> dict[str, Any]:
+        backtest_runs()
+        days = await asyncio.to_thread(ticks.days) if ticks is not None else []
+        out = form_spec(days, candles=candles is not None)
+        if candles is not None and instrument_id:
+            out["candle_days"] = await asyncio.to_thread(candles.days, instrument_id)
+        return out
+
+    @app.get("/api/research/backtests/{run_id}/days/{day}", response_model=None)
+    async def backtest_day(run_id: str, day: str, user: Me, format: str = "json") -> Any:
+        if format not in ("json", "csv", "pdf"):
+            raise HTTPException(422, "format must be json, csv or pdf")
+        try:
+            data = backtest_runs().day(run_id, day)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from None
+        if format == "json":
+            return data
+        name = f"mocktrade-backtest-{run_id}-{data['day']}"
+        disposition = {"Content-Disposition": f'attachment; filename="{name}.{format}"'}
+        if format == "csv":
+            return Response(report_csv(data), media_type="text/csv; charset=utf-8",
+                            headers=disposition)  # fmt: skip
+        return Response(report_pdf(data), media_type="application/pdf", headers=disposition)
 
     @app.get("/api/research/backtests/{run_id}")
     async def backtest_get(run_id: str, user: Me) -> dict[str, Any]:

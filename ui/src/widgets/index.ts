@@ -14,3 +14,5 @@ import "./reports/Reports";
 import "./mtm/MtmLimits";
 import "./chain/OptionChain";
 import "./strategy/StrategyBuilder";
+import "./research/Recordings";
+import "./research/Backtests";
