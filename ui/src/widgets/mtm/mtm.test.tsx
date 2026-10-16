@@ -113,4 +113,22 @@ describe("MTM limits", () => {
     expect(app.store.getState().messages[0]).toMatchObject({ level: "ERROR", instrumentId: FUT, text: "MTM NIFTY: loss reached; closing" });
     expect(ruleText({ max_loss_paise: null, target_paise: 500000, auto_close: false, fired_today: true })).toBe("target ₹5,000.00 · alert only · reached today");
   });
+
+  it("shows each limit reached in the server's words, retries only a blocked close after a confirmation, and says what is unprotected", async () => {
+    const breach = (state: string, detail: string) => ({ id: `2026-10-16|${FUT}|MIS`, key: `${FUT}|MIS`, kind: "position", text: "loss reached", state, detail, attempts: 1, at: "" });
+    const blocked = { ...RULES, breaches: [breach("BLOCKED", `${FUT} MIS +150 still open: refused (MT2: price band); retry when ready`)], problem: "rules: 1 saved MTM limit(s) can't be used and are NOT watched" };
+    const { calls } = setup(<MtmLimits params={{ link: "none" }} setParams={vi.fn()} setInstrument={vi.fn()} publish={vi.fn()} open={vi.fn()} />, {
+      "GET /api/accounts/acc-a/mtm": blocked,
+      "POST /api/accounts/acc-a/mtm/retry": { ...RULES, breaches: [breach("REQUESTED", "closing")] },
+    });
+    expect(await screen.findByText(`${FUT} MIS +150 still open: refused (MT2: price band); retry when ready`)).toBeTruthy();
+    expect(screen.getByText("blocked").className).toContain("tone-bad");
+    expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain("rules: 1 saved MTM limit(s) can't be used and are NOT watched");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(calls.filter((c) => c.method === "POST")).toHaveLength(0); // one click only arms it
+    fireEvent.click(screen.getByRole("button", { name: "Confirm: close again" }));
+    await vi.waitFor(() => expect(calls.find((c) => c.method === "POST")?.body).toEqual({ key: `${FUT}|MIS`, confirm: true }));
+    expect(await screen.findByText("requested")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull(); // nothing to retry while it closes
+  });
 });

@@ -206,3 +206,30 @@ unknown (Unconfirmed). Nothing is wrong yet; the position isn't closed twice.
 
 A refused close reading "would close more than is open" means the same thing from the other
 side: something else is already closing that part.
+
+## MTM close blocked or unclear (#263)
+
+**You see:** a red band "`<account>` MTM `<position>`: close blocked: … still open: refused
+(…); retry when ready", or "close unclear: …". The MTM Limits screen lists it under the limits
+reached, with its state.
+
+1. **Blocked:** read the reason (a risk refusal, a broker reject, a failure, or a restart while
+   closing). Fix what it names if you can (e.g. trading stopped: use Flatten), then press
+   **Retry**, then **Confirm**. It closes only what is still open.
+2. **Unclear:** an order the broker hasn't answered, or MockTrade and the broker disagree on the
+   size. Don't retry. Check the broker's own order book and positions; see
+   [An order says Unconfirmed](#an-order-says-unconfirmed) or [Reconcile mismatch](#reconcile-mismatch).
+3. The band clears itself once the position is closed and the broker agrees.
+
+## MTM limits can't be read (#263)
+
+**You see:** a red band "`<account>` MTM rules: the saved MTM limits can't be read …; NO loss
+limits are watched …".
+
+1. Your limits are **not** being watched. Set them again on the MTM Limits screen now; the band
+   clears.
+2. The damaged file is kept next to it (`mtm-<account>.unreadable-<time>.json`) to see what
+   was there.
+3. "What the MTM limits did today can't be read" means auto-close is held for today (it can't
+   know whether it already closed). Check positions and orders by hand; tomorrow it starts
+   fresh.

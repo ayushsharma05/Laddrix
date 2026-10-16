@@ -596,6 +596,18 @@ async def test_flatten_while_stopped_who_may_and_a_confirmation(world):
         await c.aclose()
 
 
+async def test_an_mtm_retry_needs_a_confirmation_and_a_blocked_close(world):
+    c = await world.logged_in("riya")
+    base = "/api/accounts/acc-riya/mtm"
+    assert (await c.post(f"{base}/retry", json={"key": "portfolio", "confirm": False})
+            ).status_code == 422  # fmt: skip
+    r = await c.post(f"{base}/retry", json={"key": "portfolio", "confirm": True})
+    assert r.status_code == 409 and "only a blocked close can be retried" in r.json()["detail"]
+    body = (await c.get(base)).json()
+    assert (body["breaches"], body["problem"]) == ([], "")
+    await c.aclose()
+
+
 # --- the broker's daily login ---
 
 

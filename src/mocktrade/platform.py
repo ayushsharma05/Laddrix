@@ -499,9 +499,11 @@ class Platform:
         mtm = MtmWatch(
             account.id, book, orders, self.instruments.get, max_lots=limits.max_order_lots,
             path=rules_dir / f"mtm-{account.id}.json" if rules_dir else None,
-            audit=note, clock=clock, desk=desk,
+            audit=note, clock=clock, desk=desk, unknown=_unknown_size(reconciler),
+            ready=lambda: recovery is None or recovery.state == "ok",
         )  # fmt: skip
         book.subscribe(mtm.check)
+        orders.subscribe(mtm.on_order_event)  # a refused close moves no position (#263)
         squareoff = SquareOff(account.id, book, orders, self.instruments.get,
                               max_lots=limits.max_order_lots, audit=note, clock=clock,
                               desk=desk)  # fmt: skip
