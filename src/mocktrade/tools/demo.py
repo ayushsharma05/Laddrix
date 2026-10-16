@@ -39,6 +39,7 @@ from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.reports.service import Reports
 from mocktrade.reports.store import ReportStore
+from mocktrade.research.backtest import Backtests, CandleStore
 from mocktrade.research.replay import EPOCH, SPEEDS, ReplayClock, ReplayFeed
 from mocktrade.research.ticks import IST, FileTickStore, TickRecorder
 from mocktrade.risk.kill_switch import KillSwitch
@@ -136,10 +137,18 @@ async def main(
     else:
         feed.subscribe(lambda status: _replay_band(alerts, status))
         _replay_band(alerts, feed.status())
+    recorded_ticks = FileTickStore(data / "ticks" if feed is None else ticks_dir)
+    candle_store = CandleStore(data / "candles")
+    backtests = Backtests(
+        data / "backtests", instruments, platform.charges_model,
+        ticks=lambda d: recorded_ticks.read_timed(d) if d in recorded_ticks.days() else None,
+        candles=candle_store.rows,
+    )  # fmt: skip
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
     app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler,
-                     reports=reports, alerts=alerts, ticks=ticks, replay=feed)  # fmt: skip
+                     reports=reports, alerts=alerts, ticks=ticks, replay=feed,
+                     backtests=backtests, candles=candle_store)  # fmt: skip
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
     what = "demo" if feed is None else f"REPLAY of {replay_day} at {speed:g}×"
     code = "python -m mocktrade.tools.demo --code" + (f" --replay {replay_day}" if feed else "")

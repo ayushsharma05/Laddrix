@@ -84,3 +84,45 @@ Checks:
 - `ui/src/shell/ReplayBar.test.tsx`;
 - `context/scripts/mutate-replay.py` (11/11);
 - real browser `context/scripts/e2e-replay.cjs <day>`, against a replay of a demo recording.
+
+## K11.3 Backtest runner (#225)
+
+```
+POST /api/research/backtests {days, algo, instrument_id, side, qty, params, product, start, capital_paise, candles?}
+  ─► Backtests (one run at a time, in the background) ─► per day, a fresh platform on a ReplayClock:
+       recorded ticks (or ticks made from candles), as fast as possible; each tick:
+         paper broker (every tick) ─► positions marked ─► algo engine on_tick
+         every 100 ms of replayed time: the engine's heartbeat (its timers)
+         between ticks: drain (the broker idle, the engine not busy), so each fill carries
+                        the time of the tick that caused it
+       at `start` (India time): the algo starts, with the normal risk checks
+       the day's end: the K10.3 report (gross, charges, net) at the last prices + intraday equity
+  ─► the run: equity curve (cumulative net by day), max drawdown, winning days (net > 0), trades
+  ─► kept: <data>/backtests/<run>/run.json (+ each day's audit trail)
+GET /api/research/backtests, GET /api/research/backtests/{run}
+POST /api/research/candles {instrument_id, day, rows: [{time, open, high, low, close, volume?}]}
+```
+
+- **The same code as live:** the real algo engine, paper broker, risk gate, charges and report.
+  A backtest can't be kinder than the platform would have been that day.
+- **Deterministic:** nothing sleeps or reads the wall clock. The same days and spec give the same
+  report, byte for byte (tested).
+- **Hand-worked** (`tests/test_backtest.py`): SLICER buys 2 × 75 crossing the spread on a tiny day.
+  Fills at 25,000.10 and 25,002.10 at the times of their ticks; ₹585.00 unrealised at the last
+  price; charges equal to the K10.2 bill for those two orders.
+- **Candles** (when no ticks were recorded) become ticks: open, then the adverse extreme first
+  (the low of a rising candle, the high of a falling one), the other extreme, then the close.
+  Each has one tick of spread, so market orders pay it and resting orders fill only when the price
+  trades through them. The run is labelled `candle_based`. Imported rows are checked
+  (low ≤ open/close ≤ high, time zone, day).
+- **Runs survive a restart.** A run that was going when the server stopped is marked failed,
+  saying so, never left "running".
+- **Speed:** the demo's recording (5,328 ticks, 72 instruments) runs in 0.3 s
+  (`context/scripts/check-backtest.py`).
+- **Limits:** one algo per run; strategies that trade on their own signals come later. Positions
+  are valued at the day's last price (MTM), not closed.
+
+Checks:
+- `tests/test_backtest.py`;
+- `context/scripts/mutate-backtest.py` (12/12);
+- `context/scripts/check-backtest.py` on the demo recording.

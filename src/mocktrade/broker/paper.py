@@ -498,6 +498,11 @@ class PaperBroker:
         for task in list(self._tasks):
             task.cancel()
 
+    @property
+    def idle(self) -> bool:
+        """Nothing under way: no acknowledgement pending, every update taken (backtests)."""
+        return all(t.done() for t in self._tasks) and self._queue.empty()
+
     async def settle(self) -> None:
         """Wait until every pending acknowledgement has been processed (for tests)."""
         while pending := [t for t in self._tasks if not t.done()]:

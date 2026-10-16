@@ -78,6 +78,7 @@ from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.reports.service import Reports
 from mocktrade.reports.store import ReportStore
+from mocktrade.research.backtest import Backtests, CandleStore
 from mocktrade.research.ticks import FileTickStore, TickRecorder
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.server.app import ServerSettings, create_app
@@ -357,6 +358,12 @@ def build(settings: ServeSettings) -> Assembly:
         md.tap(recorder.on_tick)
         jobs.append(recorder.run)
         scheduler.daily("16:30", _rotate(ticks), "tick recordings rotation")
+    candle_store = CandleStore(settings.data_dir / "candles")
+    backtests = Backtests(
+        settings.data_dir / "backtests", instruments, platform.charges_model,
+        ticks=(lambda d: ticks.read_timed(d) if ticks and d in ticks.days() else None),
+        candles=candle_store.rows,
+    )  # fmt: skip
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
     jobs.append(scheduler.run)
@@ -373,6 +380,8 @@ def build(settings: ServeSettings) -> Assembly:
         scheduler=scheduler,
         reports=reports,
         ticks=ticks,
+        backtests=backtests,
+        candles=candle_store,
         static_dir=ui,
     )
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)
