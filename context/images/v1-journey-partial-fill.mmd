@@ -1,0 +1,18 @@
+sequenceDiagram
+    autonumber
+    participant T as Trader (ladder/ticket)
+    participant S as Server · OrderManager
+    participant B as Broker (Kite / paper)
+    participant P as PositionBook
+    T->>S: buy 150 LIMIT
+    S->>S: rules · risk gate · throttle
+    S->>B: place (tag = our client id)
+    B-->>S: broker order id → PENDING (SENT)
+    B-->>S: update OPEN
+    B-->>S: update PARTIAL, filled 75 (last fill 75 @ price)
+    S->>P: Fill 75 → position +75
+    S-->>T: order PARTIAL 75/150, position +75
+    B-->>S: update FILLED, filled 150
+    S->>P: Fill 75 (only the new quantity)
+    S-->>T: order FILLED, position +150
+    Note over S: a repeated or older update (filled 75 again) is IGNORED: filled never shrinks, a fill is never counted twice

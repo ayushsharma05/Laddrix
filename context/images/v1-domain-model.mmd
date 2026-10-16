@@ -1,0 +1,67 @@
+classDiagram
+    direction LR
+    class User {
+      id · name
+      roles: admin, trader, risk
+      active · must_change_password
+    }
+    class BrokerAccount {
+      id · broker: kite or paper
+      broker_client_id
+      owner_user_id · traders
+      active
+    }
+    class Instrument {
+      id = EXCHANGE:SYMBOL
+      kind: EQ / FUT / CE / PE / INDEX
+      tick_paise · lot_size
+      expiry · strike_paise · underlying
+    }
+    class OrderRequest {
+      client_order_id: ours, sent as the broker tag
+      account_id · user_id · instrument_id
+      side · qty · order_type · product · validity
+      price_paise · trigger_paise · market_protection
+      parent_id: an algo's · basket_id
+    }
+    class OrderView {
+      request · broker_order_id
+      status · filled_qty · avg_price_paise
+      reason · pending: NONE / UNCONFIRMED / CANCEL
+    }
+    class OrderUpdate {
+      from the broker: status · filled_qty
+      last_fill_qty · last_fill_price_paise · reason
+    }
+    class Fill {
+      client_order_id · qty · price_paise · exact
+    }
+    class PositionView {
+      instrument_id · product
+      qty: +long, -short · avg_price_paise
+      realised · unrealised · buy_qty · sell_qty
+    }
+    class Tick {
+      instrument_id · ltp_paise
+      volume · OI · OHLC
+      bids · asks: depth levels
+    }
+    class GttView {
+      gtt_id · request: one or two legs
+      status · order_id once fired
+    }
+    class AlgoView {
+      algo_id · code · instrument_id · side · qty
+      state · filled_qty · children
+    }
+    User "1" --> "*" BrokerAccount : owns / trades
+    BrokerAccount "1" --> "*" OrderView : one OrderManager per account
+    OrderRequest "1" --o "1" OrderView : what was asked
+    OrderUpdate ..> OrderView : moves it forward (never back)
+    OrderView ..> Fill : each new filled quantity
+    Fill ..> PositionView : instrument + product
+    Instrument "1" --> "*" OrderRequest : checked against lot and tick
+    Instrument "1" --> "*" Tick : prices
+    Tick ..> PositionView : marks unrealised P&L
+    AlgoView "1" --> "*" OrderView : children (parent_id)
+    BrokerAccount "1" --> "*" GttView : held by the broker

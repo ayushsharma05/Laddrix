@@ -1,0 +1,23 @@
+stateDiagram-v2
+    direction LR
+    [*] --> REJECTED : our rules, risk or throttle refuse (never sent)
+    [*] --> PENDING : sent to the broker
+    PENDING --> OPEN : broker accepts
+    PENDING --> PARTIAL
+    PENDING --> FILLED
+    PENDING --> CANCELLED
+    PENDING --> REJECTED : broker refuses
+    OPEN --> PARTIAL : part fills
+    OPEN --> FILLED
+    OPEN --> CANCELLED
+    OPEN --> REJECTED
+    PARTIAL --> FILLED
+    PARTIAL --> CANCELLED : the rest is cancelled
+    FILLED --> [*]
+    CANCELLED --> [*]
+    REJECTED --> [*]
+    note right of PENDING
+      UNCONFIRMED: place got no clear answer
+      (timeout, dropped connection). Never assumed
+      rejected; the broker's order list settles it.
+    end note
