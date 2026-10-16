@@ -1,0 +1,18 @@
+sequenceDiagram
+    autonumber
+    participant T as Trader / risk / admin
+    participant S as Server
+    participant K as Kill switch (account or firm)
+    participant O as OrderManager
+    participant A as Algo engine
+    participant B as Broker
+    T->>S: STOP (Ctrl+Shift+K → reason → confirm)
+    S->>K: engage FIRST (nothing new can slip in)
+    K->>A: stop every algo ("trading stopped: reason")
+    S->>O: cancel every working order
+    O->>B: cancels (they always pass the gate)
+    B-->>O: CANCELLED …
+    S-->>T: stopped · any cancel that failed is listed, to act on
+    Note over S: band TRADING STOPPED on every screen<br/>new orders and modifies refused · positions kept
+    T->>S: resume (owner, risk or admin)
+    S->>K: reset → trading allowed again

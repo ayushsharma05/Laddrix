@@ -1,0 +1,15 @@
+sequenceDiagram
+    autonumber
+    participant K as Kite (WebSocket)
+    participant S as Server
+    participant U as Screens
+    K--xS: connection drops
+    S->>S: reconnect: 1 s, 2 s, 4 s … up to 30 s · resubscribe
+    U->>U: no price for 5 s → band PRICES n s OLD
+    S->>U: after a minute: alert "No prices" (and the phone webhook)
+    Note over U: working orders at the exchange are unaffected<br/>don't click stale ladder prices
+    K-->>S: connected again
+    S->>K: resubscribe the watched instruments
+    S->>K: order book → reconcile (updates missed while away)
+    S->>U: prices flow · the band and the alert clear
+    Note over S,K: Kite says "logged out" → retrying stops: log in to Kite again

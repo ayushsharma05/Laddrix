@@ -294,3 +294,12 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Paper run, 19/19** (`golive-paper.py`): limit rests, modify, cancel, refusals in words, market fill, broker check ok, SL-M and GTT placed and removed, square-off asks then closes MIS only, unsafe webhooks refused.
   - **Every test the checklist cites exists and passes.**
   - **A real webhook delivery needs the internet,** so it is a live step.
+- 16 Oct, **#288 done** (design docs). Each statement was checked against the code before it was written: `ALLOWED`, `Pending`, the event kinds, the modify and cancel rules, recovery's summary, the kill switch order, the throttle numbers, the cited tests.
+  - **New docs:**
+    - `docs/design/glossary.md` (about 90 terms);
+    - `domain-model.md` (types, fields, the rules they keep);
+    - `order-life.md` (the state diagram, the `ALLOWED` table, and partial fill, modify and cancel, rejects, restart, disconnect and STOP as sequence diagrams);
+    - `docs/test/README.md` (every test layer, how to run it, the release scenarios);
+    - a real `docs/design/README.md` index.
+  - **Old stubs:** `docs/adr` now points to where decisions live; `docs/exchange` (CME-era) is removed.
+  - **Diagrams:** rendered offline with a local Mermaid (`context/scripts/render-mermaid.cjs`), because the CDN is blocked here. Writing them caught one mistake in my first restart diagram: positions are compared *before* the gate decides, not after.
