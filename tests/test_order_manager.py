@@ -194,12 +194,15 @@ async def test_reconcile_finds_an_unconfirmed_order_the_broker_did_receive(om, b
     assert om.by_broker_id("K9") == found
 
 
-async def test_reconcile_rejects_an_unconfirmed_order_the_broker_never_got(om, broker):
+async def test_one_list_without_an_unconfirmed_order_proves_nothing(om, broker):
+    # a slow broker lists an order late: one list that misses it never rejects it (#259;
+    # the full rule is in test_unconfirmed.py)
     broker.place = _raises(ConnectionError("reset"))
     view = await om.submit(req())
     assert om.reconcile([]) == []
-    gone = om.get(view.client_order_id)
-    assert (gone.status, gone.reason) == (S.REJECTED, "the broker never received this order")
+    still = om.get(view.client_order_id)
+    assert (still.status, still.pending) == (S.PENDING, Pending.UNCONFIRMED)
+    await om.aclose()
 
 
 def _raises(exc):

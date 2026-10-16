@@ -90,16 +90,26 @@ def modify_params(
     return {k: v for k, v in params.items() if v is not None}
 
 
-def to_update(order: dict[str, Any]) -> OrderUpdate | None:
+def to_update(order: dict[str, Any]) -> OrderUpdate:
     """A Kite order (from GET /orders or a WebSocket "order" message) as our update.
 
-    Returns None for a status we don't know, so a new Kite status can never break
-    order handling; the next reconcile picks the order up again."""
+    A status we don't know is never dropped: dropping it would make the order look missing,
+    and an unanswered order of ours missing from the list counts towards rejecting it (#259).
+    It comes back as PENDING with the raw status in `reason`: proof the order exists, which
+    can't move a known order backwards (the manager ignores that, and records it)."""
     raw_status = str(order.get("status") or "").upper()
     status = STATUS_MAP.get(raw_status)
     if status is None:
         log.warning("unknown Kite order status %r for order %s", raw_status, order.get("order_id"))
-        return None
+        return OrderUpdate(
+            client_order_id=_tag(order),
+            broker_order_id=str(order["order_id"]),
+            status=S.PENDING,
+            filled_qty=int(order.get("filled_quantity") or 0),
+            avg_price_paise=to_paise(order.get("average_price")),
+            reason=f"the broker reports a status MockTrade doesn't know: {raw_status or '(none)'}",
+            ts=_timestamp(order),
+        )
     reason = ""
     if status in (S.REJECTED, S.CANCELLED):
         reason = order.get("status_message") or order.get("status_message_raw") or ""

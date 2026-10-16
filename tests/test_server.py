@@ -364,6 +364,31 @@ async def test_modify_and_cancel_with_readable_refusals(world):
     await c.aclose()
 
 
+async def test_an_unanswered_order_is_settled_by_a_person_after_confirming(world):
+    broker = world.brokers["acc-ayush"]
+
+    async def no_answer(_):
+        raise TimeoutError("read timed out")
+
+    broker.place = no_answer
+    orders = world.platform.accounts["acc-ayush"].orders
+    orders._follow_up_s = ()  # no background follow-up in this test
+    c = await world.logged_in()
+    placed = (await c.post("/api/accounts/acc-ayush/orders", json=ORDER)).json()
+    assert placed["pending"] == "UNCONFIRMED"
+    path = f"/api/accounts/acc-ayush/orders/{placed['request']['client_order_id']}/settle"
+    asked = await c.post(path, json={"confirm": False})
+    assert asked.status_code == 422
+    assert "check the broker's own order book" in asked.json()["detail"]
+    done = (await c.post(path, json={"confirm": True})).json()
+    assert done["status"] == "REJECTED"
+    assert done["reason"] == "settled by ayush: not in the broker's own order book, so never placed"
+    again = await c.post(path, json={"confirm": True})
+    assert again.status_code == 409 and "only an unconfirmed order" in again.json()["detail"]
+    await orders.aclose()
+    await c.aclose()
+
+
 async def test_an_orders_audit_history(world):
     c = await world.logged_in()
     placed = (await c.post("/api/accounts/acc-ayush/orders", json=ORDER)).json()

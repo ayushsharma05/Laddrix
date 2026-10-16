@@ -124,9 +124,7 @@ class KiteBroker:
         updates = []
         for row in rows or []:
             self._varieties.setdefault(str(row["order_id"]), row.get("variety") or REGULAR)
-            update = to_update(row)
-            if update is not None:
-                updates.append(update)
+            updates.append(to_update(row))  # every row, even a status we don't know (#259)
         return updates
 
     async def positions(self) -> list[BrokerPosition]:
@@ -213,9 +211,6 @@ class KiteBroker:
             update = to_update(data)
         except (KeyError, ValueError, TypeError) as exc:
             log.warning("unreadable Kite order message: %r (%s)", data, exc)
-            self.ignored_messages += 1
-            return
-        if update is None:
             self.ignored_messages += 1
             return
         self._queue.put_nowait(update)

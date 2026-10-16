@@ -16,8 +16,14 @@ Rules it keeps:
 - `submit` with an id we already have returns that order instead of placing twice.
 - A broker's BrokerError is a clear refusal. Any other failure (timeout, dropped
   connection) means we don't know the outcome, so the order is never assumed
-  rejected: it stays PENDING, marked UNCONFIRMED, until the broker's order list
-  settles it (`reconcile`).
+  rejected: it stays PENDING, marked UNCONFIRMED (its risk still counted), until the
+  broker's order list settles it (`reconcile`). The manager asks the broker again by
+  itself, a few times over about three minutes (`follow_unconfirmed`). One list that
+  doesn't show the order proves nothing (a slow broker lists it late): it becomes
+  REJECTED only when UNSEEN_CHECKS lists over at least UNSEEN_AFTER all miss it, and
+  the reason says so. Still unsettled after that: it stays UNCONFIRMED until a person
+  checks the broker's own order book and settles it (`settle_unconfirmed`). Never a
+  blind retry (#259).
 - Cancel before the broker's id is known is remembered and sent as soon as it is.
 
 One manager per broker account (the "sharding" in the architecture): accounts never
@@ -27,9 +33,9 @@ share state, so they can later run in separate processes.
 import asyncio
 import logging
 import time
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from collections.abc import Awaitable, Callable, Iterable, Sequence
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime, timedelta
 
 from mocktrade.broker.base import Broker, BrokerError
 from mocktrade.domain.instruments import Instrument
@@ -60,6 +66,9 @@ ALLOWED: dict[OrderStatus, frozenset[OrderStatus]] = {
 }
 
 Listener = Callable[[OrderEvent], None]
+UNSEEN_CHECKS = 3  # broker order lists that must all miss an UNCONFIRMED order...
+UNSEEN_AFTER = timedelta(seconds=60)  # ...the last at least this long after it was sent
+FOLLOW_UP_S = (2, 5, 10, 20, 30, 60, 60)  # when to ask the broker again (about 3 minutes)
 MAX_PARKED = 1000  # unmatched broker ids we remember before dropping the oldest
 
 
@@ -77,6 +86,8 @@ class _Order:
     sent: bool = False  # has `place` been called?
     cancel_requested: bool = False
     cancel_sent: bool = False  # guards against sending the same cancel twice
+    unseen: list[datetime] = field(default_factory=list)  # broker lists that didn't show it
+    following: bool = False  # a follow-up is asking the broker about it
 
     def view(self) -> OrderView:
         return OrderView(
@@ -103,8 +114,13 @@ class OrderManager:
         gate: OrderGate | None = None,
         spec: Callable[[Instrument], OrderSpec] | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        follow_up_s: Sequence[float] = FOLLOW_UP_S,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self.account_id = account_id
+        self._follow_up_s = tuple(follow_up_s)
+        self._sleep = sleep
+        self._followers: set[asyncio.Task] = set()  # not awaited by settle(): they wait
         self._spec = spec  # what the broker offers per instrument (order types, validities...)
         self._broker = broker
         self._broker_name = getattr(broker, "name", type(broker).__name__)
@@ -188,6 +204,7 @@ class OrderManager:
         except Exception as exc:  # no clear answer: never guess, reconcile will tell
             log.warning("place %s: no clear answer: %r", request.client_order_id, exc)
             self._mark_unconfirmed(order, f"no answer from broker: {exc!r}")
+            self.follow_unconfirmed()  # ask the broker again, by itself
             return order.view()
 
         self._register_broker_id(order, broker_order_id)
@@ -456,7 +473,8 @@ class OrderManager:
 
     def _ignore(self, order: _Order, update: OrderUpdate, why: str) -> bool:
         log.debug("ignored update for %s: %s", order.request.client_order_id, why)
-        self._emit(EventKind.IGNORED, order, detail=f"{update.status.value}: {why}")
+        said = f" ({update.reason})" if update.reason else ""  # e.g. a status we don't know
+        self._emit(EventKind.IGNORED, order, detail=f"{update.status.value}: {why}{said}")
         return False
 
     # --- reconciliation ---------------------------------------------------------------------
@@ -485,11 +503,78 @@ class OrderManager:
             if self._external.get(snapshot.broker_order_id) is not snapshot.status:
                 self._external[snapshot.broker_order_id] = snapshot.status
                 self._emit_external(snapshot)
+        now = self._clock()
         for order in self._orders.values():
-            if order.pending is Pending.UNCONFIRMED and order.broker_order_id is None:
+            if not self._unsettled(order):  # (listed: its broker id settled it above)
+                continue
+            order.unseen.append(now)  # one more list without it: evidence, not proof
+            if len(order.unseen) >= UNSEEN_CHECKS and now - order.created_at >= UNSEEN_AFTER:
+                first, last = order.unseen[0], order.unseen[-1]
                 order.pending = Pending.NONE
-                self._reject_locally(order, "the broker never received this order")
+                self._reject_locally(
+                    order,
+                    f"the broker never received this order: not in its order list at "
+                    f"{len(order.unseen)} checks from {first:%H:%M:%S} to {last:%H:%M:%S} UTC, "
+                    f"{(now - order.created_at).total_seconds():.0f} s after it was sent",
+                )
         return external
+
+    def follow_unconfirmed(self) -> None:
+        """Ask the broker again about every UNCONFIRMED order, in the background, a few times
+        over about three minutes (after a failed place, and after a restart's recovery)."""
+        for order in self._orders.values():
+            if self._unsettled(order) and not order.following:
+                order.following = True
+                task = asyncio.get_running_loop().create_task(self._follow(order))
+                self._followers.add(task)
+                task.add_done_callback(self._followers.discard)
+
+    async def _follow(self, order: _Order) -> None:
+        try:
+            for delay in self._follow_up_s:
+                if not self._unsettled(order):
+                    return  # settled (by an update, a reconcile or a person): stop asking
+                await self._sleep(delay)
+                if not self._unsettled(order):
+                    return
+                try:
+                    self.reconcile(await self._broker.orders())
+                except Exception as exc:  # the broker can't answer either: try again later
+                    log.warning("follow-up of %s: %r", order.request.client_order_id, exc)
+            if self._unsettled(order):
+                self._emit(
+                    EventKind.UNCONFIRMED, order,
+                    detail="still not settled after asking the broker "
+                    f"{len(self._follow_up_s)} times: check the broker's own order book, "
+                    "then settle it here",
+                )  # fmt: skip
+        finally:
+            order.following = False
+
+    def settle_unconfirmed(self, client_order_id: str, *, by: str) -> OrderView:
+        """A person checked the broker's own order book: the order isn't there. Only for an
+        UNCONFIRMED order with no broker id (anything the broker named settles itself)."""
+        order = self._orders.get(client_order_id)
+        if order is None:
+            raise OrderError(f"no order {client_order_id}")
+        if not self._unsettled(order):
+            raise OrderError("only an unconfirmed order the broker never named can be settled")
+        order.pending = Pending.NONE
+        self._reject_locally(
+            order, f"settled by {by}: not in the broker's own order book, so never placed"
+        )
+        return order.view()
+
+    async def aclose(self) -> None:
+        """Stop the follow-ups (shutdown, tests)."""
+        for task in list(self._followers):
+            task.cancel()
+        await asyncio.gather(*list(self._followers), return_exceptions=True)
+
+    @staticmethod
+    def _unsettled(order: _Order) -> bool:
+        """No answer yet (an order the broker named is never UNCONFIRMED: its id settles it)."""
+        return order.pending is Pending.UNCONFIRMED
 
     async def resync(self) -> list[OrderUpdate]:
         """Fetch the broker's order book and reconcile with it (after a reconnect, at

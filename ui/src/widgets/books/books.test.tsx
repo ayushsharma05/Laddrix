@@ -86,6 +86,19 @@ describe("Order book", () => {
     await vi.waitFor(() => expect(screen.queryAllByRole("button", { name: /^Cancel BUY/ })).toHaveLength(0));
   });
 
+  it("an unanswered order is marked never placed in two clicks, by the server", async () => {
+    const unanswered = order("u1", "PENDING", T, { pending: "UNCONFIRMED", broker_order_id: null });
+    const settled = order("u1", "REJECTED", T, { reason: "settled by ayush: not in the broker's own order book, so never placed" });
+    const s = setup((p) => <OrderBook {...p} />, { tab: "working" }, { "POST /api/accounts/acc-a/orders/u1/settle": settled });
+    act(() => s.app.store.applyOrders("acc-a", [unanswered, order("w1", "OPEN", T)]));
+    expect(screen.getAllByRole("button", { name: "Not placed?" })).toHaveLength(1); // only the unanswered one
+    fireEvent.click(screen.getByRole("button", { name: "Not placed?" }));
+    expect(changes(s.calls)).toHaveLength(0); // the first click only asks
+    fireEvent.click(screen.getByRole("button", { name: "Confirm: not in the broker's book" }));
+    await vi.waitFor(() => expect(changes(s.calls)).toEqual([{ method: "POST", path: "/api/accounts/acc-a/orders/u1/settle", body: { confirm: true } }]));
+    await vi.waitFor(() => expect(screen.queryByRole("button", { name: /Not placed|Confirm: not/ })).toBeNull());
+  });
+
   it("Cancel all still works while trading is stopped: getting out must always work", async () => {
     const routes = { "DELETE /api/accounts/acc-a/orders/w1": order("w1", "CANCELLED", "2026-10-14T04:42:00+00:00"), "DELETE /api/accounts/acc-a/orders/p1": order("p1", "CANCELLED", "2026-10-14T04:42:00+00:00") };
     const { calls, socket } = withOrders("working", routes);

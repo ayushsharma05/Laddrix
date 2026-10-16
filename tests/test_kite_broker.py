@@ -185,7 +185,11 @@ async def test_messages_for_another_user_or_unreadable_are_ignored(broker):
     broker.on_order_message({"user_id": "AB1234", "order_id": "2", "status": "BRAND NEW"})
     broker.on_order_message({"user_id": "AB1234", "status": "OPEN"})  # no order id
     broker.on_order_message({"order_id": "3", "status": "OPEN", "filled_quantity": "x"})
-    assert broker.ignored_messages == 4
+    assert broker.ignored_messages == 3
+    # a status we don't know is passed on, never dropped (#259): proof the order exists
+    kept = await asyncio.wait_for(anext(broker.updates()), 0.5)
+    assert (kept.broker_order_id, kept.status) == ("2", S.PENDING)
+    assert "doesn't know: BRAND NEW" in kept.reason
     with pytest.raises(TimeoutError):
         await asyncio.wait_for(anext(broker.updates()), 0.05)
 
@@ -193,7 +197,7 @@ async def test_messages_for_another_user_or_unreadable_are_ignored(broker):
 # --- reading the order book and positions ---
 
 
-async def test_orders_reads_the_book_and_skips_unknown_statuses(broker, kite):
+async def test_orders_reads_the_book_and_keeps_unknown_statuses(broker, kite):
     kite.reply(
         "GET",
         "/orders",
@@ -206,7 +210,11 @@ async def test_orders_reads_the_book_and_skips_unknown_statuses(broker, kite):
         ),
     )
     orders = await broker.orders()
-    assert [(o.broker_order_id, o.status) for o in orders] == [("1", S.FILLED), ("3", S.OPEN)]
+    assert [(o.broker_order_id, o.status) for o in orders] == [
+        ("1", S.FILLED),
+        ("2", S.PENDING),
+        ("3", S.OPEN),
+    ]  # an unknown status kept (#259)
     await broker.cancel("3")
     assert kite.requests[-1][1] == "/orders/amo/3"
 
