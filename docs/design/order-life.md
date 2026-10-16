@@ -24,6 +24,10 @@ Next to the status, `pending` says what we're waiting on:
   - it becomes REJECTED only when **3 lists over at least 60 seconds** all miss it, and the reason says so ("not in its order list at 3 checks from … to …, 75 s after it was sent");
   - still unclear after every follow-up: it stays UNCONFIRMED and asks for a person. They check the broker's own order book, then press **Not placed?** in the order book, confirm, and the order is settled with their name;
   - placing is never retried blindly.
+- **MODIFY**: a change is on its way (#260). Only one change at a time per order: a second one is refused in words, even while the first waits at the gate, so answers can never arrive out of order and undo a newer change. A cancel is still allowed, and wins.
+  - **A change with no clear answer** may or may not have been made. Until the broker's own terms say (an update, or its order list, which the follow-up asks for), the order counts the **larger quantity** of the two, so risk is never understated. The audit trail shows **Replace unconfirmed**.
+  - **Terms in updates:** broker updates now carry the order's terms (quantity, price, trigger). A streamed update older than our last confirmed change can't undo it. The broker's order list, fetched now, is the order as it is.
+- **CANCEL with no clear answer** stays "cancel on its way": it may have gone through. The follow-up asks the broker. If its list still has the order working, the cancel didn't happen: the order goes back to working, and you can cancel again. Pressing cancel again is always allowed in this state.
 - **CANCEL**: a cancel is on its way, or is waiting for the broker's id to arrive.
 
 An update that would move an order backwards, or that repeats one already applied, is **IGNORED** and still recorded in the audit trail. An order we never placed (one made in Kite's own app) appears as **EXTERNAL**.
@@ -49,7 +53,7 @@ Each broker update carries the order's total filled quantity. Only the new part 
 - the new quantity isn't above what has filled;
 - it breaks the order rules or the gate.
 
-**A cancel always passes the gate**, even while trading is stopped. A second click changes nothing. If the broker's id hasn't arrived yet, the cancel is remembered and sent as soon as it does.
+**After the throttle makes an order wait for its turn**, the risk checks run again, so a limit tightened or a STOP pressed during the wait counts. **A cancel always passes the gate**, even while trading is stopped. A second click changes nothing. If the broker's id hasn't arrived yet, the cancel is remembered and sent as soon as it does.
 
 ### Rejects
 

@@ -14,6 +14,7 @@ export type Tone = "buy" | "good" | "bad" | "pending" | "dim" | "";
 export function statusText(o: OrderView): string {
   if (o.pending === "UNCONFIRMED") return "Unconfirmed";
   if (o.pending === "CANCEL") return "Pending cancel";
+  if (o.pending === "MODIFY") return "Pending change";
   switch (o.status) {
     case "PENDING":
       return "Pending new";
@@ -165,6 +166,8 @@ export function execType(e: AuditEvent): { text: string; tone: Tone } {
       return o && o.filled_qty >= o.request.qty ? { text: "Fill", tone: "good" } : { text: "Partial fill", tone: "good" };
     case "MODIFY_SENT":
       return { text: "Pending replace", tone: "pending" };
+    case "MODIFY_UNCONFIRMED":
+      return { text: "Replace unconfirmed", tone: "pending" };
     case "CANCEL_SENT":
       return { text: "Pending cancel", tone: "pending" };
     case "CANCELLED_LOCALLY":

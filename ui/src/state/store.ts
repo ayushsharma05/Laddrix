@@ -422,6 +422,8 @@ export function describeOrderEvent(
         level: "WARN",
         text: `${what}: the broker didn't answer; checking its order book before anything else is sent${reason ? ` (${reason})` : ""}`,
       };
+    case "MODIFY_UNCONFIRMED":
+      return { level: "WARN", text: `${what}: the broker didn't answer the change; checking what it has (${reason})` };
     case "CANCELLED_LOCALLY":
       return { level: "WARN", text: `${what} cancelled here: ${reason || "never reached the broker"}` };
     case "EXTERNAL":

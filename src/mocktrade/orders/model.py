@@ -17,6 +17,7 @@ class Pending(Enum):
     NONE = "NONE"
     UNCONFIRMED = "UNCONFIRMED"  # place got no clear answer: we don't know if the broker has it
     CANCEL = "CANCEL"  # cancel asked for, not yet confirmed
+    MODIFY = "MODIFY"  # a change sent and not yet confirmed: risk counts the larger quantity
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,7 @@ class EventKind(Enum):
     UPDATED = "UPDATED"  # the broker reported a new state
     FILL = "FILL"  # new quantity traded (comes with an UPDATED event)
     MODIFY_SENT = "MODIFY_SENT"
+    MODIFY_UNCONFIRMED = "MODIFY_UNCONFIRMED"  # no answer to a change: the broker's terms decide
     CANCEL_SENT = "CANCEL_SENT"
     CANCELLED_LOCALLY = "CANCELLED_LOCALLY"  # cancelled before it was ever sent
     IGNORED = "IGNORED"  # a duplicate, stale or impossible update: kept for the audit trail

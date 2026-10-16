@@ -88,6 +88,9 @@ class _Order:
     cancel_sent: bool = False  # guards against sending the same cancel twice
     unseen: list[datetime] = field(default_factory=list)  # broker lists that didn't show it
     following: bool = False  # a follow-up is asking the broker about it
+    cancel_unclear: bool = False  # the last cancel got no clear answer: it may have worked
+    change_sent_at: datetime | None = None  # a change with no clear answer was sent then
+    terms_at: datetime | None = None  # when our terms were last confirmed (a change, the broker)
 
     def view(self) -> OrderView:
         return OrderView(
@@ -264,12 +267,20 @@ class OrderManager:
         price_paise: int | None = None,
         trigger_paise: int | None = None,
     ) -> OrderView:
-        """Change a working order. Raises OrderError with a readable reason if it can't."""
+        """Change a working order. Raises OrderError with a readable reason if it can't.
+
+        One change at a time per order (#260): a second one while the first is on its way is
+        refused, so answers can never arrive out of order and undo a newer change. A change
+        with no clear answer may or may not have been made: until the broker's own terms say
+        (an update, or its order list, asked by a follow-up), the order counts the larger
+        quantity of the two, so risk is never understated."""
         order = self._working_order(client_order_id)
         if order.broker_order_id is None:
             raise OrderError("the broker hasn't acknowledged this order yet: try again shortly")
         if order.pending is Pending.CANCEL:
             raise OrderError("a cancel is already on its way for this order")
+        if order.pending is Pending.MODIFY:
+            raise OrderError("a change to this order is already on its way: wait for it")
         if qty is None and price_paise is None and trigger_paise is None:
             raise OrderError("nothing to change")
         new = order.request
@@ -283,8 +294,16 @@ class OrderManager:
             new = replace(new, trigger_paise=trigger_paise)
         if (problem := self._rule_problem(new)) is not None:
             raise OrderError(problem)
-        if (reason := await self._gate.admit_modify(order.view(), new)) is not None:
-            raise OrderError(reason)
+        order.pending = Pending.MODIFY  # from here: no second change, even while gates wait
+        try:
+            if (reason := await self._gate.admit_modify(order.view(), new)) is not None:
+                raise OrderError(reason)
+            if order.status.is_final or order.cancel_requested:  # while it waited at the gate
+                raise OrderError("the order finished or is being cancelled: nothing changed")
+        except OrderError:
+            if order.pending is Pending.MODIFY:
+                order.pending = Pending.NONE
+            raise
         started = time.perf_counter_ns()
         try:
             await self._broker.modify(
@@ -292,13 +311,32 @@ class OrderManager:
             )
             self._timed("modify", started)
         except BrokerError as exc:
+            if order.pending is Pending.MODIFY:
+                order.pending = Pending.NONE
             raise OrderError(exc.reason) from None
-        except Exception as exc:
+        except Exception as exc:  # it may or may not have been made: never guess
             log.warning("modify %s: no clear answer: %r", client_order_id, exc)
-            raise OrderError("no answer from the broker: check the order before retrying") from None
+            if not order.status.is_final and order.pending is Pending.MODIFY:
+                old = order.request
+                order.request = replace(new, qty=max(old.qty, new.qty))  # the worse case
+                order.change_sent_at = self._clock()
+                self._touch(order)
+                self._emit(
+                    EventKind.MODIFY_UNCONFIRMED, order,
+                    detail=f"{_describe_changes(qty, price_paise, trigger_paise)}: no answer "
+                    f"({exc!r}); counting {order.request.qty} until the broker's terms say",
+                )  # fmt: skip
+                self.follow_unconfirmed()
+            raise OrderError(
+                "no answer from the broker: the change may or may not have been made. "
+                "MockTrade is asking the broker; risk counts the larger quantity meanwhile"
+            ) from None
+        if order.pending is Pending.MODIFY:
+            order.pending = Pending.NONE
         if order.status.is_final:  # finished while the modify was on its way
             return order.view()
         order.request = new
+        order.terms_at = self._clock()  # broker terms older than this can't undo the change
         self._touch(order)
         self._emit(
             EventKind.MODIFY_SENT, order, detail=_describe_changes(qty, price_paise, trigger_paise)
@@ -308,8 +346,11 @@ class OrderManager:
     async def cancel(self, client_order_id: str) -> OrderView:
         """Ask to cancel a working order. The CANCELLED status arrives as a broker update."""
         order = self._working_order(client_order_id)
-        if order.cancel_requested:
+        if order.cancel_requested and not order.cancel_unclear:
             return order.view()  # already asked: a second click changes nothing
+        if order.cancel_unclear:  # the last one got no answer: asking again is safe
+            order.cancel_unclear = False
+            order.cancel_requested = order.cancel_sent = False
         if (reason := await self._gate.admit_cancel(order.view())) is not None:
             raise OrderError(reason)
         order.cancel_requested = True
@@ -347,15 +388,23 @@ class OrderManager:
         try:
             await self._broker.cancel(order.broker_order_id)
             self._timed("cancel", started)
-        except Exception as exc:
+        except BrokerError as exc:  # a clear refusal (e.g. already filled): nothing changed
             if not order.status.is_final:
                 order.pending = Pending.NONE
             order.cancel_requested = order.cancel_sent = False
             self._touch(order)
-            if isinstance(exc, BrokerError):
-                raise OrderError(exc.reason) from None
+            raise OrderError(exc.reason) from None
+        except Exception as exc:  # it may have worked: still "cancel on its way" (#260)
             log.warning("cancel %s: no clear answer: %r", order.request.client_order_id, exc)
-            raise OrderError("no answer from the broker: check the order before retrying") from None
+            order.cancel_unclear = True
+            order.change_sent_at = self._clock()
+            self._touch(order)
+            self._emit(EventKind.CANCEL_SENT, order, detail=f"no clear answer ({exc!r})")
+            self.follow_unconfirmed()
+            raise OrderError(
+                "no answer from the broker: the cancel may have gone through. MockTrade is "
+                "asking the broker; you can press cancel again"
+            ) from None
         if not order.status.is_final:
             self._touch(order)
             self._emit(EventKind.CANCEL_SENT, order)
@@ -375,7 +424,8 @@ class OrderManager:
         then `reconcile` with the broker's list. Returns how many were loaded.
 
         An order that was PENDING without a broker id may or may not have reached the
-        broker when we stopped, so it comes back UNCONFIRMED: reconcile decides.
+        broker when we stopped, so it comes back UNCONFIRMED: reconcile decides. A change or
+        a cancel that was on its way comes back in doubt the same way.
         """
         loaded = 0
         for view in views:
@@ -397,6 +447,10 @@ class OrderManager:
                 sent=True,
                 cancel_requested=pending is Pending.CANCEL,
                 cancel_sent=pending is Pending.CANCEL,
+                # a change or cancel on its way when we stopped: whether it happened is not
+                # known, so both are in doubt until the broker's list says (#260)
+                cancel_unclear=pending is Pending.CANCEL,
+                change_sent_at=view.updated_at if pending is Pending.MODIFY else None,
             )
             self._orders[view.client_order_id] = order
             if view.broker_order_id:
@@ -411,8 +465,12 @@ class OrderManager:
         async for update in self._broker.updates():
             self.apply(update)
 
-    def apply(self, update: OrderUpdate) -> bool:
-        """Apply one broker update. Returns True if it changed the order."""
+    def apply(self, update: OrderUpdate, *, current: bool = False) -> bool:
+        """Apply one broker update. Returns True if it changed the order.
+
+        `current`: from the broker's order list, fetched now (reconcile), so its terms are
+        the order as it is. A streamed update's terms count only when it is newer than our
+        last confirmed change: an old one arriving late can't undo a newer change (#260)."""
         order = self._orders.get(update.client_order_id)
         if order is None:
             order = self._by_broker_id.get(update.broker_order_id)
@@ -424,7 +482,7 @@ class OrderManager:
             self._replay_parked(update.broker_order_id)  # older updates first
             if order.cancel_requested:
                 self._spawn(self._send_cancel_if_requested(order))
-        return self._apply_to(order, update)
+        return self._apply_to(order, update, current)
 
     def _park(self, update: OrderUpdate) -> None:
         """Keep an update whose order we can't match yet (its place call hasn't returned)."""
@@ -434,12 +492,13 @@ class OrderManager:
             del self._parked[oldest]
         self._parked.setdefault(update.broker_order_id, []).append(update)
 
-    def _apply_to(self, order: _Order, update: OrderUpdate) -> bool:
+    def _apply_to(self, order: _Order, update: OrderUpdate, current: bool = False) -> bool:
         status = _normalise(update.status, update.filled_qty, order.request.qty)
         if update.filled_qty < order.filled_qty:
             return self._ignore(order, update, "stale: reports less filled than we know")
+        terms = self._broker_terms(order, update, current)
         if status is order.status:
-            if update.filled_qty == order.filled_qty:
+            if update.filled_qty == order.filled_qty and terms is None:
                 return self._ignore(order, update, "duplicate")
         elif status not in ALLOWED[order.status]:
             return self._ignore(order, update, f"{order.status.value} can't become {status.value}")
@@ -450,13 +509,46 @@ class OrderManager:
         order.avg_price_paise = update.avg_price_paise
         if status in (S.CANCELLED, S.REJECTED):
             order.reason = update.reason
+        detail = update.reason
+        if terms is not None:  # the broker's word on what the order is now
+            if terms != order.request:
+                detail = detail or f"the broker's terms: {_terms_text(terms)}"
+            order.request = terms
+            order.terms_at = self._clock() if current else update.ts
+            if order.pending is Pending.MODIFY and order.change_sent_at is not None:
+                order.pending = Pending.NONE  # a change with no answer: settled by its terms
+                order.change_sent_at = None
         if status.is_final:
             order.pending = Pending.NONE
+            order.cancel_unclear = False
+            order.change_sent_at = None
         self._touch(order)
-        self._emit(EventKind.UPDATED, order, detail=update.reason)
+        self._emit(EventKind.UPDATED, order, detail=detail)
         if fill is not None:
             self._emit(EventKind.FILL, order, fill=fill)
         return True
+
+    @staticmethod
+    def _broker_terms(order: _Order, update: OrderUpdate, current: bool) -> OrderRequest | None:
+        """The order's request with the broker's terms, when the update gives them and they
+        count; None when it gives none, or they are older than ours, or change nothing."""
+        if update.qty is None and update.price_paise is None and update.trigger_paise is None:
+            return None
+        if not current:
+            since = order.change_sent_at or order.terms_at
+            if since is not None and update.ts < since:
+                return None  # older than our last change: it can't undo it
+        r = order.request
+        terms = replace(
+            r,
+            qty=update.qty if update.qty is not None else r.qty,
+            price_paise=update.price_paise if update.price_paise is not None else r.price_paise,
+            trigger_paise=(
+                update.trigger_paise if update.trigger_paise is not None else r.trigger_paise
+            ),
+        )
+        doubt = order.pending is Pending.MODIFY and order.change_sent_at is not None
+        return terms if terms != r or doubt else None
 
     def _fill_from(self, order: _Order, update: OrderUpdate) -> Fill | None:
         """The new quantity traded since the last update we applied, and its price."""
@@ -496,7 +588,8 @@ class OrderManager:
                 snapshot.broker_order_id in self._by_broker_id
             )
             if known:
-                self.apply(snapshot)
+                self.apply(snapshot, current=True)
+                self._cancel_did_not_take(snapshot)
                 continue
             external.append(snapshot)
             self._parked.pop(snapshot.broker_order_id, None)  # not ours: stop waiting for it
@@ -523,7 +616,7 @@ class OrderManager:
         """Ask the broker again about every UNCONFIRMED order, in the background, a few times
         over about three minutes (after a failed place, and after a restart's recovery)."""
         for order in self._orders.values():
-            if self._unsettled(order) and not order.following:
+            if self._in_doubt(order) and not order.following:
                 order.following = True
                 task = asyncio.get_running_loop().create_task(self._follow(order))
                 self._followers.add(task)
@@ -532,21 +625,23 @@ class OrderManager:
     async def _follow(self, order: _Order) -> None:
         try:
             for delay in self._follow_up_s:
-                if not self._unsettled(order):
+                if not self._in_doubt(order):
                     return  # settled (by an update, a reconcile or a person): stop asking
                 await self._sleep(delay)
-                if not self._unsettled(order):
+                if not self._in_doubt(order):
                     return
                 try:
                     self.reconcile(await self._broker.orders())
                 except Exception as exc:  # the broker can't answer either: try again later
                     log.warning("follow-up of %s: %r", order.request.client_order_id, exc)
-            if self._unsettled(order):
+            if self._in_doubt(order):
+                what = ("the order" if self._unsettled(order)
+                        else "the cancel" if order.cancel_unclear else "the change")  # fmt: skip
                 self._emit(
                     EventKind.UNCONFIRMED, order,
-                    detail="still not settled after asking the broker "
-                    f"{len(self._follow_up_s)} times: check the broker's own order book, "
-                    "then settle it here",
+                    detail=f"{what} is still not settled after asking the broker "
+                    f"{len(self._follow_up_s)} times: check the broker's own order book"
+                    + (", then settle it here" if self._unsettled(order) else ""),
                 )  # fmt: skip
         finally:
             order.following = False
@@ -570,6 +665,30 @@ class OrderManager:
         for task in list(self._followers):
             task.cancel()
         await asyncio.gather(*list(self._followers), return_exceptions=True)
+
+    def _cancel_did_not_take(self, snapshot: OrderUpdate) -> None:
+        """An unanswered cancel, and the broker's current list still has the order working:
+        the cancel didn't happen. Say so, and let the trader cancel again."""
+        order = self._orders.get(snapshot.client_order_id) or self._by_broker_id.get(
+            snapshot.broker_order_id
+        )
+        if order is None or not order.cancel_unclear or order.status.is_final:
+            return
+        order.cancel_unclear = order.cancel_requested = order.cancel_sent = False
+        order.change_sent_at = None
+        order.pending = Pending.NONE
+        self._touch(order)
+        why = "the cancel didn't go through: the broker still has it working"
+        self._emit(EventKind.UPDATED, order, detail=why)
+
+    @classmethod
+    def _in_doubt(cls, order: _Order) -> bool:
+        """Something sent about it got no clear answer: the order, a change, or a cancel."""
+        return (
+            cls._unsettled(order)
+            or (order.pending is Pending.MODIFY and order.change_sent_at is not None)
+            or order.cancel_unclear
+        )
 
     @staticmethod
     def _unsettled(order: _Order) -> bool:
@@ -661,6 +780,15 @@ def _normalise(status: OrderStatus, filled_qty: int, qty: int) -> OrderStatus:
     if status is OrderStatus.OPEN and 0 < filled_qty < qty:
         return OrderStatus.PARTIAL
     return status
+
+
+def _terms_text(r: OrderRequest) -> str:
+    parts = [f"qty {r.qty}"]
+    if r.price_paise is not None:
+        parts.append(f"price {r.price_paise}")
+    if r.trigger_paise is not None:
+        parts.append(f"trigger {r.trigger_paise}")
+    return ", ".join(parts)
 
 
 def _describe_changes(qty: int | None, price: int | None, trigger: int | None) -> str:
