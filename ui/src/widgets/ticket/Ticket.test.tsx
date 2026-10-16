@@ -263,5 +263,19 @@ describe("Order ticket", () => {
     expect(fresh.app.links.freshPick("pink")?.pricePaise).toBe(2500500);
     expect(fresh.app.links.freshPick("none")).toBeUndefined();
   });
+
+  it("switching contract starts the price at the new contract's price, never the old one's", async () => {
+    const NOV = "NFO:NIFTY26NOVFUT";
+    const { app, rerender } = setup({}, {
+      [`GET /api/instruments/${encodeURIComponent(NOV)}`]: { ...NIFTY, id: NOV, symbol: "NIFTY26NOVFUT", ltp_paise: 2514800 },
+      [`GET /api/accounts/acc-a/instruments/${encodeURIComponent(NOV)}/order-spec`]: orderSpec(NOV),
+    });
+    await ready();
+    await app.instruments.get(NOV); // known already (as when a watch list has shown it)
+    await app.specs.get("acc-a", NOV);
+    rerender({ instrumentId: NOV });
+    await vi.waitFor(() => expect(screen.getByText("NIFTY26NOVFUT")).toBeTruthy());
+    await vi.waitFor(() => expect((screen.getByLabelText("Price") as HTMLInputElement).value).toBe("25,148.00"));
+  });
 });
 

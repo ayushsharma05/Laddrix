@@ -67,3 +67,22 @@ async def test_run_publishes_until_cancelled():
     with pytest.raises(asyncio.CancelledError):
         await s.run()
     assert steps == [1.0, 1.0, 1.0]
+
+
+def test_options_start_their_day_at_their_model_price():
+    """An option's previous close sits near the price it trades at (within 40 ticks), not near a
+    placeholder start price, so its change from the close is believable (Movers, Watch)."""
+    from mocktrade.marketdata.sim_universe import INSTRUMENTS
+
+    md = MarketData()
+    sim = MarketSimulator(md, {i: p for i, p in INSTRUMENTS}, seed=7)
+    options = [i for i, _ in INSTRUMENTS if i.kind in (InstrumentKind.CALL, InstrumentKind.PUT)]
+    assert options
+    for t in sim.step():
+        i = next((o for o in options if o.id == t.instrument_id), None)
+        if i is not None:
+            assert abs(t.ltp_paise - t.close_paise) <= 45 * i.tick_paise, (
+                i.id,
+                t.ltp_paise,
+                t.close_paise,
+            )
