@@ -8,9 +8,9 @@
 # its release notes name a migration that can't run backwards. Note that this loses what
 # happened since the deploy: the audit trail of those hours stays in the folder moved aside.
 set -euo pipefail
-cd "$(dirname "$0")/.."
-# it checks out older code, which may not have this file: run from a copy
+# it checks out older code, which may not have this file: run from a copy (in the checkout)
 if [ -z "${MOCKTRADE_ROLLBACK_COPY:-}" ]; then
+  cd "$(dirname "$0")/.."
   copy=$(mktemp)
   cp "$0" "$copy"
   MOCKTRADE_ROLLBACK_COPY=1 exec bash "$copy" "$@"
