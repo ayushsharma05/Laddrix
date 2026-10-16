@@ -7,7 +7,7 @@ Later-stage expansion #297 now tracks 25 detailed packages (#298–#322), linked
 
 As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
 
-**Current handoff:** merge the K13.2 PR (#282) on green CI and check `main` after; then K13.4 (#282, the admin screen with the first-login password change), K13.4 (#284), K13.5 (#285); then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
+**Current handoff:** merge the K13.4 PR (#284, keyboard shortcuts) on green CI and check `main` after; then K13.5 (#285, themes; the per-user settings store is ready for it); then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
 
 **Outside review (16 Oct).** While Claude's limit was used up, Ayush had another AI tool review the code and the design. It changed no code. It opened #240–#279 and the docs PR #256; that PR's notes are folded in here, and it was closed. Its findings separate behaviour confirmed in the source from design gaps. Two were reproduced in a throwaway folder:
 - reconciliation overwrote one product's position with another's (#258);
@@ -154,8 +154,10 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    - #258 (positions in different products overwrite each other during reconciliation): done on branch `fix-258-products` (PR #294).
 8. **K13 admin & phone** (issues #281–#285, label `track: kite`):
    - #281 K13.1 admin API (users, roles, accounts, per-account limits): merged (PR #286). See `docs/design/admin.md`.
-   - #282 K13.2 admin screen and the first-login password page: **done** on branch `k13-2-admin-screen` (PR "Closes #282"; merge on green CI, then **check main's CI too**). See `docs/design/admin.md` § K13.2.
-   - #284 K13.4 keyboard shortcut editor: **next**, then #285 K13.5 themes.
+   - #282 K13.2 admin screen and the first-login password page: merged (PR #296). See `docs/design/admin.md` § K13.2.
+   - #282 merged (PR #296).
+   - #284 K13.4 keyboard shortcut editor: **done** on branch `k13-4-shortcuts` (PR "Closes #284"; merge on green CI, then check main's CI). See `docs/design/ui.md` § Keyboard shortcuts.
+   - #285 K13.5 themes: **next**. Save the choice with `PUT /api/me/settings/theme` (the store from K13.4).
    - #283 K13.3 phone screens: **moved after core v1** (Ayush, 16 Oct; they don't change the core design).
    - #284 K13.4 keyboard shortcut editor.
    - #285 K13.5 themes (dark, light, colour-blind safe).

@@ -242,3 +242,10 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 Ayush asked for broad research across seven public trading product ecosystems, customer feedback and detailed later GitHub additions. Reviewed public documentation and available reviews; mapped existing foundations and avoided parallel replacement engines. Created parent #297 and 25 packages #298–#322, then linked them from #241. Each describes purpose, scope, dependencies and acceptance criteria. Coverage and evidence limits are in [feature-expansion-2026-10-16.md](feature-expansion-2026-10-16.md).
 
 Core #240 and hardening #257 remain first, with security #279, data rights #278 and applicable compliance #291 preserved. Mobile new-entry, public marketplace/performance sharing, assistant tools and institutional services are decision-gated. Reviews are qualitative, often dated; paid/private functionality and claimed performance were not independently tested. Requirements remain vendor-neutral. No application code or deployment was changed. Context handoff tracked by #323.
+- 16 Oct (after Claude's limit reset):
+  - Ayush had ChatGPT survey seven similar products. It opened later-roadmap issues #297–#322 (all after core and hardening; several need decisions) and the docs PR #324. Claude reviewed #324 (vendor-neutral, docs only, the same order of work) and merged it.
+  - **K13.4 (#284) keyboard shortcuts done:**
+    - one list of actions with scopes; the user's keys saved on the server (a new per-user settings store, reused by themes next);
+    - an editor widget that refuses browser keys and clashes in words; STOP's fixed Ctrl+Shift+K;
+    - the ticket, ladder and chart follow the user's keys, and the ticket's hint shows them;
+    - mutation 27/27; the browser check passed.
