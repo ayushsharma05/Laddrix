@@ -67,7 +67,7 @@ export async function buildDefault(api: DockviewApi, pageName: string, instrumen
     ticketAnchor ? { position: { referencePanel: ticketAnchor.id, direction: "right" } } : undefined,
   );
 
-  // the bottom row: order book (+ algos and GTT tabs) | positions (+ holdings, funds, reports) | audit trail (+ messages)
+  // the bottom row: order book (+ algos and GTT tabs) | positions (+ holdings, funds, reports, MTM limits) | audit trail (+ messages)
   const book = add(
     "orders",
     {},
@@ -87,6 +87,7 @@ export async function buildDefault(api: DockviewApi, pageName: string, instrumen
   add("holdings", {}, positions ? { position: { referencePanel: positions.id, direction: "within" } } : undefined);
   add("funds", {}, positions ? { position: { referencePanel: positions.id, direction: "within" } } : undefined);
   add("reports", {}, positions ? { position: { referencePanel: positions.id, direction: "within" } } : undefined);
+  add("mtm", {}, positions ? { position: { referencePanel: positions.id, direction: "within" } } : undefined);
   if (positions) {
     try {
       positions.api.setActive();

@@ -48,6 +48,7 @@ from mocktrade.portfolio.service import Snapshot, snapshot_to_dict
 from mocktrade.positions.book import PositionView
 from mocktrade.positions.reconcile import Mismatch
 from mocktrade.risk.kill_switch import KillState
+from mocktrade.risk.mtm import MtmEvent
 from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.users import UserStore
 
@@ -144,6 +145,8 @@ class StreamHub:
             runtime.gtt.subscribe(self._on_gtt)
         if runtime.portfolio is not None:
             runtime.portfolio.subscribe(self._on_portfolio)
+        if runtime.mtm is not None:
+            runtime.mtm.subscribe(self._on_mtm)
         if runtime.charges is not None:
             charges = runtime.charges
             charges.subscribe(lambda account_id, bill: self._on_charges(account_id, bill, charges))
@@ -420,6 +423,14 @@ class StreamHub:
                    **bill_to_dict(bill, service.model.schedule)}  # fmt: skip
         for connection in list(self._connections):
             if account_id in connection.accounts:
+                connection.put(message)
+
+    def _on_mtm(self, event: MtmEvent) -> None:
+        """An MTM limit reached (and maybe closing): never conflated or dropped."""
+        message = {"type": "mtm", "account_id": event.account_id, "kind": event.kind,
+                   "key": event.key, "text": event.text, "closing": event.closing}  # fmt: skip
+        for connection in list(self._connections):
+            if event.account_id in connection.accounts:
                 connection.put(message)
 
     def _on_kill(self, name: str, state: KillState) -> None:

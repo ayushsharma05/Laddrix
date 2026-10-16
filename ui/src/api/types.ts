@@ -163,6 +163,7 @@ export type ServerMessage =
   | { type: "gtt"; account_id: string; gtt: GttView }
   | ({ type: "portfolio" } & PortfolioSnapshot)
   | ({ type: "charges"; account_id: string } & ChargeBill)
+  | { type: "mtm"; account_id: string; kind: "position" | "portfolio"; key: string; text: string; closing: boolean }
   | { type: "ops"; key: string; level: "INFO" | "WARN" | "ERROR" | "OK"; text: string; active: boolean; at: string }
   | ({ type: "chain" } & OptionChain)
   | { type: "error"; message: string }
@@ -523,4 +524,30 @@ export interface MarginCheck {
   enough: boolean | null; // null: can't be told (the order still goes, with a warning)
   note: string;
   checked_before_sending: boolean; // the account refuses orders without enough margin
+}
+
+// --- MTM limits and the square-off assistant (…/mtm, …/square-off) ----------------------------
+
+export interface MtmPositionRule {
+  key: string; // "instrument_id|product"
+  instrument_id: string;
+  product: string;
+  max_loss_paise: number | null;
+  max_loss_pct: number | null;
+  auto_close: boolean;
+  fired_today: boolean;
+}
+
+export interface MtmRules {
+  positions: MtmPositionRule[];
+  portfolio: { max_loss_paise: number | null; target_paise: number | null; auto_close: boolean; fired_today: boolean } | null;
+}
+
+export interface SquareOffStatus {
+  account_id: string;
+  now: string;
+  warn_from: string; // "15:00", India
+  cutoffs: Record<string, string>; // by exchange: when the broker squares off MIS
+  window_open: boolean;
+  positions: { instrument_id: string; qty: number; cutoff: string | null; minutes_left: number | null; pnl_paise: number }[];
 }

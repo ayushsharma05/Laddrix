@@ -1306,3 +1306,19 @@ label.algo-field {
 .reports .book-bar a.btn {
   text-decoration: none;
 }
+
+/* MTM Limits (widgets/mtm/MtmLimits.tsx) */
+.mtm-portfolio {
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.mtm-portfolio input:not([type="checkbox"]) {
+  width: 90px;
+}
+.mtm-row {
+  grid-template-columns: minmax(130px, 1.4fr) minmax(90px, 1fr) 90px 56px 40px minmax(150px, 2fr) 90px;
+  align-items: center;
+}
+.mtm-row input:not([type="checkbox"]) {
+  width: 100%;
+}

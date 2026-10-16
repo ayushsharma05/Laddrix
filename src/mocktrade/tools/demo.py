@@ -24,6 +24,8 @@ from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.marketdata.service import MarketData
 from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
+from mocktrade.ops.alerts import Alerts
+from mocktrade.ops.guards import DayGuards
 from mocktrade.ops.scheduler import Scheduler
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
@@ -86,12 +88,17 @@ async def main(port: int, origin: str, ui: Path | None) -> None:
         platform.add_account(
             account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN,
             recover_on_start=True, margin_check=True,
+            rules_dir=DATA / "rules",
         )  # fmt: skip
     settings = ServerSettings(origin=origin, cookie_secure=False)
     reports = Reports(platform, ReportStore(DATA / "reports"))
     scheduler = Scheduler()
     scheduler.daily("16:00", reports.close_of_day, "end-of-day reports")
-    app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler, reports=reports)
+    alerts = Alerts()
+    guards = DayGuards(platform, alerts)
+    scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
+    app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler,
+                     reports=reports, alerts=alerts)  # fmt: skip
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
     print(f"\nMockTrade demo on http://localhost:{port}  (pages from {origin})")
     print(f"user: {USER}   password: {PASSWORD}   code: python -m mocktrade.tools.demo --code\n")

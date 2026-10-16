@@ -68,6 +68,7 @@ from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.metrics import freeze_heap, watch_loop_lag
 from mocktrade.ops.alerts import Alerts
 from mocktrade.ops.checks import Checks
+from mocktrade.ops.guards import DayGuards
 from mocktrade.ops.notify import WebhookNotifier
 from mocktrade.ops.scheduler import Scheduler, parse_holidays
 from mocktrade.orders.model import ClientIds
@@ -288,6 +289,7 @@ def build(settings: ServeSettings) -> Assembly:
             account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN,
             recover_on_start=True,  # no new orders until rebuilt and checked (recovery.py)
             margin_check=True,  # refuse what the funds can't carry (risk/margin.py; fails open)
+            rules_dir=settings.data_dir / "rules",  # the trader's MTM limits survive a restart
         )  # fmt: skip
         running.append(account.id)
     if kite is not None:
@@ -340,6 +342,8 @@ def build(settings: ServeSettings) -> Assembly:
         is_trading_day=scheduler.is_trading_day,
     )
     scheduler.daily("16:00", reports.close_of_day, "end-of-day reports")
+    guards = DayGuards(platform, alerts)
+    scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
     jobs.append(scheduler.run)
     ui = settings.ui_dir if (settings.ui_dir / "index.html").exists() else None
     if ui is None:

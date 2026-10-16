@@ -15,6 +15,7 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from mocktrade.algos.engine import AlgoEngine, AlgoEvent, AlgoType
@@ -43,6 +44,8 @@ from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.risk.limits import RiskLimits
 from mocktrade.risk.loss_watch import DailyLossWatch
 from mocktrade.risk.margin import MarginGate
+from mocktrade.risk.mtm import MtmWatch
+from mocktrade.risk.squareoff import SquareOff
 from mocktrade.risk.throttle import OrderThrottle
 from mocktrade.store.events import EventLog
 
@@ -68,6 +71,8 @@ class AccountRuntime:
     charges: ChargesService | None = None  # the day's charges, and estimates for the ticket
     margin: MarginGate | None = None  # quotes an order's margin (the ticket)...
     margin_check: bool = False  # ...and, when on, refuses what the funds can't carry
+    mtm: MtmWatch | None = None  # the trader's own loss limits (per position, portfolio)
+    squareoff: SquareOff | None = None  # intraday positions before the broker's cut-off
 
 
 @dataclass
@@ -271,11 +276,13 @@ class Platform:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         recover_on_start: bool = False,
         margin_check: bool = False,
+        rules_dir: Path | None = None,
     ) -> AccountRuntime:
         """`recover_on_start`: the server's setting. The account takes no new orders until
         its orders and positions are rebuilt from the audit trail and checked against the
         broker (recovery.py). Needs the event log.
-        `margin_check`: refuse orders the funds can't carry (risk/margin.py; fails open)."""
+        `margin_check`: refuse orders the funds can't carry (risk/margin.py; fails open).
+        `rules_dir`: where the trader's MTM limits are kept (risk/mtm.py; None: memory)."""
         if recover_on_start and self.event_log is None:
             raise ValueError("recovery after a restart needs the event log")
         if account.id in self.accounts:
@@ -395,6 +402,21 @@ class Platform:
             account.id, self.charges_model, orders, self.instruments.get, clock=clock
         )
         orders.subscribe(charges.on_order_event)
+        note = None
+        if self.event_log is not None:
+            log = self.event_log
+
+            def note(kind: str, detail: str, extra: dict) -> None:
+                log.record_note(kind, account.id, detail, extra)
+
+        mtm = MtmWatch(
+            account.id, book, orders, self.instruments.get, max_lots=limits.max_order_lots,
+            path=rules_dir / f"mtm-{account.id}.json" if rules_dir else None,
+            audit=note, clock=clock,
+        )  # fmt: skip
+        book.subscribe(mtm.check)
+        squareoff = SquareOff(account.id, book, orders, self.instruments.get,
+                              max_lots=limits.max_order_lots, audit=note, clock=clock)  # fmt: skip
         runtime = AccountRuntime(
             account,
             broker,
@@ -413,6 +435,8 @@ class Platform:
             charges,
             margin,
             margin_check,
+            mtm,
+            squareoff,
         )
         self.accounts[account.id] = runtime
         return runtime

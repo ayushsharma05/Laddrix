@@ -43,3 +43,5 @@ from the repo root (elsewhere it creates a second demo user with a different sec
 | `e2e-reports.cjs` | Real browser on a fresh demo: a futures round trip, the Reports tab (preview follows fills), CSV and PDF downloaded and read back, History | `node context/scripts/e2e-reports.cjs` |
 | `mutate-margin.py` | 15 mutations of the margin gate, the paper quote and the wiring; all caught | `python3 context/scripts/mutate-margin.py` (alone) |
 | `e2e-margin.cjs` | Real browser on a fresh demo: ticket margin line (1 and 5 lots), 2+2 lots bought, 1 more refused with both numbers, the exits accepted | `node context/scripts/e2e-margin.cjs` |
+| `mutate-mtm.py` | 18 mutations of the MTM watch, the square-off assistant, closing and the band; all caught | `python3 context/scripts/mutate-mtm.py` (alone) |
+| `e2e-mtm.cjs` | Real browser on a fresh demo: Square off MIS with its confirmation; an MTM ₹1 limit with auto-close set on the MTM Limits tab closes the position; the message | `node context/scripts/e2e-mtm.cjs` |
