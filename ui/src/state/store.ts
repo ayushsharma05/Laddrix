@@ -311,6 +311,11 @@ export class Store {
         this.addMessage(m.closing ? "ERROR" : "WARN", id, `MTM ${m.text}`);
         break;
       }
+      case "market_alert": {
+        // the user's own alert fired: Messages (the Alerts widget follows the state itself)
+        this.addMessage("WARN", m.alert.instrument_id, `Alert: ${m.text}`);
+        break;
+      }
       case "charges": {
         const { type: _type, account_id, ...bill } = m;
         this.applyCharges(account_id, bill);

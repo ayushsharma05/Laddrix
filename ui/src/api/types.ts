@@ -167,6 +167,8 @@ export type ServerMessage =
   | { type: "ops"; key: string; level: "INFO" | "WARN" | "ERROR" | "OK"; text: string; active: boolean; at: string }
   | ({ type: "chain" } & OptionChain)
   | { type: "candle"; instrument_id: string; interval: string; candle: Candle | null }
+  | { type: "market_alert"; alert: MarketAlert; text: string; at: string }
+  | { type: "market_alert_state"; alert: MarketAlert }
   | { type: "error"; message: string }
   | { type: "pong" };
 
@@ -671,4 +673,79 @@ export interface ChartMark {
   price_paise: number;
   client_order_id: string;
   strategy: string;
+}
+
+// --- market alerts (K12.3) and market screens (K12.4) ----------------------------------------
+
+/** What the alert form offers (GET /api/alerts/spec): kinds in the algo-spec format. */
+export interface AlertSpec {
+  kinds: AlgoSpec[];
+  repeat: string[];
+  cooldown_s: { min: number; max: number; default: number };
+  max_alerts: number;
+  note_max: number;
+}
+
+export interface MarketAlert {
+  alert_id: string;
+  user_id: string;
+  kind: string;
+  instrument_id: string;
+  params: Record<string, unknown>;
+  repeat: string;
+  cooldown_s: number;
+  note: string;
+  webhook: boolean;
+  enabled: boolean;
+  created_at: string;
+  armed: boolean;
+  done: boolean;
+  active: boolean;
+  fired_count: number;
+  last_fired_at: string | null;
+  last_text: string;
+  status: string;
+  webhook_error: string;
+  webhook_ok_at: string | null;
+}
+
+export interface WebhookSettings {
+  url: string | null;
+  set: boolean;
+  secret?: string; // only in the answer that sets it
+}
+
+export interface Print {
+  seq: number;
+  t: string | null;
+  price_paise: number;
+  qty: number;
+  side: "BUY" | "SELL" | "";
+}
+
+export interface PrintsAnswer {
+  instrument_id: string;
+  prints: Print[];
+  kept: number;
+  watched: boolean;
+  estimate: string;
+}
+
+export interface MoverRow {
+  instrument_id: string;
+  symbol: string;
+  ltp_paise: number;
+  change_pct: number | null;
+  volume: number | null;
+  oi: number | null;
+  oi_change_pct: number | null;
+}
+
+export interface MoversAnswer {
+  by: "gainers" | "losers" | "volume" | "oi";
+  rows: MoverRow[];
+  of: number;
+  note: string;
+  exchanges: string[];
+  kinds: string[];
 }

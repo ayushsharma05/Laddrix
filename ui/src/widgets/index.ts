@@ -17,3 +17,7 @@ import "./strategy/StrategyBuilder";
 import "./research/Recordings";
 import "./research/Backtests";
 import "./chart/Chart";
+import "./market/Depth";
+import "./market/TimeAndSales";
+import "./market/Movers";
+import "./alerts/AlertsManager";

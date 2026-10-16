@@ -1597,3 +1597,71 @@ label.algo-field {
   cursor: crosshair;
   outline: none;
 }
+
+/* Market screens (widgets/market/) and Alerts (widgets/alerts/) */
+.depth-row {
+  grid-template-columns: 52px minmax(70px, 1fr) minmax(84px, 1fr) minmax(84px, 1fr) minmax(70px, 1fr) 52px;
+}
+.depth-bar {
+  position: relative;
+  z-index: 0;
+}
+.depth-bar::before {
+  content: "";
+  position: absolute;
+  inset: 2px 0;
+  z-index: -1;
+  width: calc(var(--share, 0) * 100%);
+  opacity: 0.35;
+}
+.depth-bar.bid::before {
+  right: 0;
+  background: var(--bid);
+}
+.depth-bar.ask::before {
+  left: 0;
+  background: var(--ask);
+}
+.depth-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+}
+.tape-row {
+  grid-template-columns: 76px minmax(84px, 1fr) minmax(64px, 1fr) 52px;
+}
+.tape .book-bar input {
+  width: 64px;
+}
+.movers-row {
+  grid-template-columns: minmax(110px, 1.6fr) minmax(84px, 1fr) 76px minmax(76px, 1fr);
+  cursor: pointer;
+}
+.alerts-body {
+  padding: 4px 8px;
+}
+.alert-row {
+  grid-template-columns: minmax(100px, 1fr) minmax(200px, 2.4fr) minmax(140px, 1.6fr) 48px 64px 60px 150px;
+  align-items: center;
+  cursor: pointer;
+}
+.alert-row > span:nth-child(2),
+.alert-row > span:nth-child(3) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.alert-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.webhook-secret {
+  margin: 6px 0;
+  padding: 6px 8px;
+  background: var(--well);
+  border: 1px solid var(--pending);
+  word-break: break-all;
+}
