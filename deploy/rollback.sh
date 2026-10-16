@@ -29,16 +29,18 @@ backup=$(sed -n 's/^backup=//p' deploy/.previous)
 from=$(sed -n 's/^tag=//p' deploy/.previous)
 
 docker image inspect mocktrade:previous >/dev/null
-git -c advice.detachedHead=false checkout --quiet "$ref"
-docker image tag mocktrade:previous mocktrade:latest
 if [ "${1:-}" = "--restore-data" ]; then
   dc stop app
-  # the backup is inside the data volume: what is there now is moved into
-  # /data/.before-restore-<time>/ (kept, never deleted), then the backup is copied in
+  # with the image being rolled back FROM: its restore tool is the newest (an older one may
+  # not restore in place). The backup is inside the data volume: what is there now is moved
+  # into /data/.before-restore-<time>/ (kept, never deleted), then the backup is copied in.
+  # Refused (a damaged backup): stop here, nothing else changed; start it again by hand.
   dc run --rm --no-deps -T app python -m mocktrade.tools.restore \
     --from "$backup" --to /data --replace
   log "rollback from $from by $who: data restored from $backup"
 fi
+git -c advice.detachedHead=false checkout --quiet "$ref"
+docker image tag mocktrade:previous mocktrade:latest
 # shellcheck disable=SC2086  # SERVICES is a list
 dc up -d --no-build $SERVICES
 for _ in $(seq 1 60); do
