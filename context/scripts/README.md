@@ -49,3 +49,5 @@ from the repo root (elsewhere it creates a second demo user with a different sec
 | `check-recording.py` | Reads a real recording (the demo's) back: ticks, bytes per tick, busiest instruments, read speed | `python3 context/scripts/check-recording.py [data/demo/ticks]` |
 | `mutate-replay.py` | 11 mutations of the replay feed (pace, cap, loop turns, pause, clock, seek, speeds) and the paper broker's every-tick mode; all caught | `python3 context/scripts/mutate-replay.py` (alone) |
 | `e2e-replay.cjs` | Real browser on a replay server (`demo --replay <day> --port 8001`, after the demo recorded that day): bar and band, the replayed time moving, an order filled, pause, speed, jump | `node context/scripts/e2e-replay.cjs <day>` |
+| `mutate-backtest.py` | 12 mutations of the backtest runner (start time, heartbeat, drain, candle path and spread, drawdown, winning days, restart, checks); all caught | `python3 context/scripts/mutate-backtest.py` (alone) |
+| `check-backtest.py` | A real backtest over a recording (the demo's): state, time taken, summary, trades | `python3 context/scripts/check-backtest.py [ticks dir] [ALGO] [INSTRUMENT]` |

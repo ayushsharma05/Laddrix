@@ -117,6 +117,8 @@ def test_the_run_summary_drawdown_and_winning_days():
     assert s["days_skipped"] == ["2026-10-14"] and s["net_paise"] == -150
     assert s["charges_paise"] == 30 and s["gross_paise"] == -120
     assert summarise([])["win_rate"] is None
+    lost_to_charges = summarise([d("2026-10-12", -5)])  # gross +5, net −5: not a winning day
+    assert (lost_to_charges["winning_days"], lost_to_charges["win_rate"]) == (0, 0.0)
 
 
 def test_candles_become_ticks_adverse_path_first(nifty_fut):
