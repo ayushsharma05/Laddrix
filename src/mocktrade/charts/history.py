@@ -119,8 +119,9 @@ class KiteHistory:
 
 
 class RecordedHistory:
-    TODAY_FOR_S = 60.0  # today's recording grows: built again at most once a minute (the live
-    # builder has the newest minutes anyway; this only fills what came before a restart)
+    TODAY_FOR_S = 300.0  # today's recording grows: built again at most every five minutes. The
+    # live builder supplies every bucket from its start on; history only fills what came before
+    # (a restart), which a later recording doesn't change. A build reads the whole day's file.
 
     def __init__(
         self,
@@ -134,6 +135,7 @@ class RecordedHistory:
         self._monotonic = monotonic
         self._cache: dict[tuple[InstrumentId, date], list[Candle]] = {}
         self._today: dict[InstrumentId, tuple[date, float, list[Candle]]] = {}
+        self._building: dict[tuple[InstrumentId, date], asyncio.Future] = {}  # shared, not twice
         self.builds = 0
 
     async def fetch(
@@ -154,14 +156,30 @@ class RecordedHistory:
         if day < today:  # a finished day never changes
             key = (instrument_id, day)
             if key not in self._cache:
-                self._cache[key] = await asyncio.to_thread(self._build, instrument_id, day)
+                self._cache[key] = await self._shared_build(instrument_id, day)
             return self._cache[key]
         kept = self._today.get(instrument_id)
         if kept is not None and kept[0] == day and self._monotonic() - kept[1] < self.TODAY_FOR_S:
             return kept[2]
-        minutes = await asyncio.to_thread(self._build, instrument_id, day)
+        minutes = await self._shared_build(instrument_id, day)
         self._today[instrument_id] = (day, self._monotonic(), minutes)
         return minutes
+
+    async def _shared_build(self, instrument_id: InstrumentId, day: date) -> list[Candle]:
+        """One build per instrument and day at a time: a second request waits for the first."""
+        key = (instrument_id, day)
+        running = self._building.get(key)
+        if running is not None:
+            return await asyncio.shield(running)
+        task = asyncio.ensure_future(asyncio.to_thread(self._build, instrument_id, day))
+        self._building[key] = task
+        try:
+            return await asyncio.shield(task)
+        finally:
+            if task.done():
+                self._building.pop(key, None)
+            else:
+                task.add_done_callback(lambda _t: self._building.pop(key, None))
 
     def _build(self, instrument_id: InstrumentId, day: date) -> list[Candle]:
         self.builds += 1

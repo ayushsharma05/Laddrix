@@ -17,6 +17,7 @@ import { useApp, useInstrument, useOrderSpec, useStore, useTick } from "../../ap
 import { SearchBox } from "../../components/SearchBox";
 import { price as fmtPrice, qty as fmtQty, rupees, shortName } from "../../lib/format";
 import { tradingBlock } from "../../state/gate";
+import type { PricePick } from "../../workspace/links";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
 import { StartForm, useAlgoSpecs } from "../algos/AlgoManager";
 import { GttForm, useGttSpec } from "../gtt/GttBook";
@@ -111,6 +112,27 @@ function TicketBody({
   useEffect(() => {
     if (priceText === "" && ltp !== null) setPriceText(toText(snap(ltp, tickSize)));
   }, [ltp, priceText, tickSize]);
+
+  // a price picked on a linked chart: fill it in (a priced type if this one has no price);
+  // a pick made just before this ticket switched to that instrument counts too
+  const { links } = useApp();
+  const takenPick = useRef(0);
+  const link = params.link ?? "none";
+  useEffect(() => {
+    const take = (pick: PricePick) => {
+      if (pick.instrumentId !== id || pick.seq <= takenPick.current) return;
+      takenPick.current = pick.seq;
+      setPriceText(toText(snap(pick.pricePaise, tickSize)));
+      if (!needsPrice(type)) {
+        const priced = spec.order_types.find(needsPrice);
+        if (priced) setParams({ type: priced.code });
+      }
+      setNote({ level: "INFO", text: `Price ${fmtPrice(snap(pick.pricePaise, tickSize))} from the chart: check it, then send` });
+    };
+    const fresh = links.freshPick(link);
+    if (fresh) take(fresh);
+    return links.subscribePrice(link, take);
+  }, [links, link, id, tickSize, type, spec, setParams]);
 
   const price = parsePrice(priceText);
   const trigger = parsePrice(triggerText);

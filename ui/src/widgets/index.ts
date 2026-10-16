@@ -16,3 +16,4 @@ import "./chain/OptionChain";
 import "./strategy/StrategyBuilder";
 import "./research/Recordings";
 import "./research/Backtests";
+import "./chart/Chart";

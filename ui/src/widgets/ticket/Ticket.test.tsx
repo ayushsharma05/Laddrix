@@ -240,4 +240,28 @@ describe("Order ticket", () => {
     rerender({ mode: "gtt" });
     expect(await screen.findByRole("button", { name: /Place GTT BUY 150 NIFTY26OCTFUT/ })).toBeTruthy(); // the ticket's side and lots
   });
+
+  it("takes a price picked on a linked chart: snapped to the tick, a priced type, said in the note", async () => {
+    const { app, setParams, rerender, calls } = setup({ type: "MKT" });
+    await screen.findByLabelText("Price");
+    act(() => app.links.pickPrice("pink", ID, 2499987));
+    expect(setParams).toHaveBeenCalledWith({ type: "LIMIT" }); // a market order has no price
+    rerender({ type: "LIMIT" }); // (the workspace saves the change; here by hand)
+    await vi.waitFor(() => expect((screen.getByLabelText("Price") as HTMLInputElement).value).toBe("24,999.90"));
+    expect(screen.getByText("Price 24,999.90 from the chart: check it, then send")).toBeTruthy();
+    act(() => app.links.pickPrice("blue", ID, 2400000)); // another group: not this ticket's
+    act(() => app.links.pickPrice("pink", "NSE:RELIANCE", 250000)); // another instrument
+    expect((screen.getByLabelText("Price") as HTMLInputElement).value).toBe("24,999.90");
+    expect(posts(calls)).toHaveLength(0); // a pick never sends anything
+  });
+
+  it("a ticket that switches instrument for a pick takes it; an old pick isn't taken", async () => {
+    const fresh = setup();
+    act(() => fresh.app.links.pickPrice("pink", ID, 2500500)); // made just before the ticket showed it
+    await vi.waitFor(() => expect((screen.getByLabelText("Price") as HTMLInputElement).value).toBe("25,005.00"));
+    expect(fresh.app.links.freshPick("pink", Date.now() + 5001)).toBeUndefined();
+    expect(fresh.app.links.freshPick("pink")?.pricePaise).toBe(2500500);
+    expect(fresh.app.links.freshPick("none")).toBeUndefined();
+  });
 });
+

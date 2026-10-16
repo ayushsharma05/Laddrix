@@ -173,3 +173,11 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
   - **History sources:** Kite's historical API is in the ₹500 plan (checked on the web). Its range limits and 3/s rate come from the forum only and are flagged to verify. On paper and the demo, history comes from the recordings.
   - **Fixes:** self-review caught a performance trap: today's recording was re-read on every request. It is now rebuilt at most once a minute. The mutation script found two gaps in the tests (quotes in a new minute; the per-connection chart limit), now covered.
   - **Check:** on the demo, a minute from the API matched the same minute worked by hand from the recording.
+- K12.1 merged (#237). K12.2 (#232) chart widget:
+  - **Built:** canvas candles with a volume pane, the live forming candle, the account's fills as ▲▼ marks, and older pages as you pan.
+  - **Click-to-trade:** a click picks a price for the linked ticket over the link bus. A pick never sends an order; the ticket's confirm still applies.
+  - **Colours:** green/red failed the colour-blind check, so candles are blue/orange with hollow up and filled down.
+  - **Found and fixed:**
+    - The browser check found three real bugs the unit tests had missed: a crash after a drag, a stale older page landing after an interval switch, and two history reads at once making the chart wait more than 2.4 s.
+    - It also found a bug already on main: linked widgets' tab titles didn't follow their instrument.
+    - The mutation script caught a test that couldn't fail (a snapped price that was already on the tick).

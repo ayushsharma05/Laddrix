@@ -45,3 +45,49 @@ Checks:
 - `tests/test_kite_live.py` (history through the live account);
 - `context/scripts/mutate-charts.py` (23/23);
 - `context/scripts/check-charts.py` on a running demo. One complete minute from the API equalled the same minute worked by hand from the recorded ticks, and a real paper fill came back as a mark.
+
+
+## K12.2 The chart widget (#232)
+
+```
+[1m 3m 5m 15m 30m 1h 1d]  NIFTY26OCTFUT  10-16 11:45 O … H … L … C … V 21K ▲ BUY 75 @ 25,009.40
+┌──────────────────────────────────────────────┬──────────┐
+│ candles: up hollow, down filled ▲buys ▼sells │ price    │  canvas; the readout above is
+│ volume                                       │ axis     │  text (screen readers, tests)
+└──────────────────────────────────────────────┴──────────┘
+```
+
+- **From the server only.**
+  - Intervals come from `GET /api/charts/spec`, candles from `…/candles`, and the forming candle from the stream op `candles` (shared per instrument and interval, asked again after a reconnect).
+  - Marks come from `…/charts/{i}/marks` and are read again after every fill.
+  - Older pages load as the view nears the left edge, and stop when a page adds nothing.
+  - An older page waits for the first load to answer, so there are never two history reads at once. An answer for an interval no longer shown is dropped.
+- **Reading it.**
+  - Drag or ←/→ pans; the wheel or +/− zooms (3–40 px a candle); Home or a double-click goes back to the newest.
+  - Hovering shows the candle under the pointer: OHLCV, OI, and the fills in it.
+  - The x axis counts candles, not time, so nights and holidays leave no gaps; a new day shows its date.
+  - Prices snap to the instrument's tick on the crosshair and on a click.
+- **Click a price → the linked ticket.** The link bus (`workspace/links.ts`) carries a picked price with a sequence number and a time.
+  - The ticket on the same link group and instrument fills in the price and switches to a priced type if it was on Market. It says "Price … from the chart: check it, then send".
+  - A pick never sends an order: the ticket's own confirm and gate still apply.
+  - A ticket that switches instrument for the pick takes it if it is under 5 s old.
+  - An unlinked chart says how to link it.
+- **Colours.** Green/red failed the colour-blind check (ΔE 5.3 for deutan). The candles use the validated blue (up) and orange (down) pair, and up candles are hollow while down ones are filled, so shape tells them apart too.
+- **Found by the browser check and fixed:**
+  - A drag crashed the chart after the release: the pan update read the drag state after it had been cleared.
+  - An older page asked for one interval could land after switching to another.
+  - History was read twice at once, with no answer for over 2.4 s.
+  - The tab titles of linked widgets didn't follow their instrument. This was already happening for the ladder and the ticket; the tab now listens to the title change.
+
+Checks:
+- `ui/src/widgets/chart/*.test.ts(x)` cover the model, the drawing (a recording 2D context) and the widget (load, stream, older pages, races, marks, picks, drag, keys);
+- the ticket and stream tests, and `ui/src/workspace/Panel.test.tsx`;
+- `context/scripts/mutate-chart-ui.py` (32/32);
+- `context/scripts/e2e-chart.cjs`, a real browser on the demo. It checked:
+  - canvas pixels painted, and the forming candle moving;
+  - a real fill marked;
+  - a click filling the ticket's price exactly;
+  - tabs renamed;
+  - zoom showing 8 of 28 candles;
+  - a drag panning back 5 minutes;
+  - no page errors.

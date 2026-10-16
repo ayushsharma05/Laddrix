@@ -28,6 +28,41 @@ describe("StreamClient subscriptions", () => {
     expect(stream.watched()).toEqual([]);
   });
 
+  it("charts share a forming-candle stream per instrument and interval, asked again after a reconnect", () => {
+    const { stream, socket, timers } = fakeStream();
+    stream.start();
+    socket().open();
+    const a = vi.fn();
+    const b = vi.fn();
+    const other = vi.fn();
+    const stopA = stream.subscribeCandles("NSE:NIFTY 50", "5m", a);
+    const stopB = stream.subscribeCandles("NSE:NIFTY 50", "5m", b);
+    stream.subscribeCandles("NSE:NIFTY 50", "1m", other);
+    expect(socket().sent).toEqual([
+      { op: "candles", instrument_id: "NSE:NIFTY 50", interval: "5m" },
+      { op: "candles", instrument_id: "NSE:NIFTY 50", interval: "1m" },
+    ]);
+    const candle = { t: "2026-10-16T09:15:00+05:30", o: 1, h: 2, l: 1, c: 2, v: 5, oi: null };
+    socket().receive({ type: "candle", instrument_id: "NSE:NIFTY 50", interval: "5m", candle });
+    expect(a).toHaveBeenCalledWith(candle);
+    expect(b).toHaveBeenCalledWith(candle);
+    expect(other).not.toHaveBeenCalled();
+    socket().drop();
+    timers.shift()!.fn(); // reconnect
+    socket().open();
+    expect(socket().sent).toEqual([
+      { op: "candles", instrument_id: "NSE:NIFTY 50", interval: "5m" },
+      { op: "candles", instrument_id: "NSE:NIFTY 50", interval: "1m" },
+    ]);
+    stopA();
+    stopA(); // twice changes nothing
+    expect(socket().sent).toHaveLength(2);
+    stopB();
+    expect(socket().sent[2]).toEqual({ op: "candles_stop", instrument_id: "NSE:NIFTY 50", interval: "5m" });
+    socket().receive({ type: "candle", instrument_id: "NSE:NIFTY 50", interval: "5m", candle });
+    expect(a).toHaveBeenCalledTimes(1); // stopped: nothing more
+  });
+
   it("gives a second widget the last price at once", () => {
     const { stream, socket } = fakeStream();
     stream.start();
