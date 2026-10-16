@@ -631,10 +631,15 @@ def create_app(
     async def candles_import(body: CandlesIn, user: Me) -> dict[str, Any]:
         if candles is None:
             raise HTTPException(404, "candles can't be imported on this server")
+        if platform.instruments.get(body.instrument_id) is None:
+            raise HTTPException(422, f"unknown instrument {body.instrument_id}")
         try:
-            n = candles.put(body.instrument_id, body.day, body.rows)
+            n = await asyncio.to_thread(candles.put, body.instrument_id, body.day, body.rows)
         except BacktestError as exc:
             raise HTTPException(422, str(exc)) from None
+        audit("CANDLES_IMPORTED", f"{user.id} imported {n} candles for {body.instrument_id} on "
+              f"{body.day.isoformat()}", {"by": user.id, "instrument_id": body.instrument_id,
+                                          "day": body.day.isoformat(), "rows": n})  # fmt: skip
         return {"instrument_id": body.instrument_id, "day": body.day.isoformat(), "rows": n}
 
     # --- charts (K12.1) ---------------------------------------------------------------------

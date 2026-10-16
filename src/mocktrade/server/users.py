@@ -297,6 +297,9 @@ class UserStore:
     # --- broker accounts -----------------------------------------------------------------------
 
     def add_account(self, account: BrokerAccount) -> None:
+        # the id names files (MTM rules, broker tokens, reports): letters, digits, dashes only
+        if not account.id.isascii() or not account.id.replace("-", "").isalnum():
+            raise ValueError("account id must be letters, digits or dashes")
         if self.get_user(account.owner_user_id) is None:
             raise ValueError(f"no user {account.owner_user_id}")
         try:

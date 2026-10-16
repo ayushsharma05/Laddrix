@@ -208,6 +208,17 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
   - **Checks:**
     - The mutation run found 5 real gaps in the tests, all now covered; 2 of its mutants were equivalent and are left out.
     - On the demo, every step worked, and so did a restart.
+- 16 Oct, issue clean-up and the first confirmed defect:
+  - **Asked:** Ayush said the phone screens can wait (they don't affect the core design). He asked Claude to check every open and in-progress issue and keep only what is relevant. The repo first existed to understand NG, which the design came from, so NG-derived issues may still matter.
+  - **Done:**
+    - All ~98 paused-track issues were compared with the code by two helpers and checked by Claude.
+    - Each was closed with a note: done on the Kite track, not relevant (COMEX, fake exchange, several sites), or carried on.
+    - What NG taught that is still missing became #287–#292: operations; design docs; release process; F&O expiry day; compliance and the SEBI algo id; and a decision for Ayush on user-written strategies.
+    - #283 (phone) moved after v1.
+    - The outside review's docs PR #256 was folded into the context and closed; its content was notes only.
+  - **Decided:** the two defects the review actually reproduced are fixed now, ahead of the hardening phase, because they are small and safety-related.
+    - **#269** (candle paths could escape their folder) is fixed: the store checks ids and containment, rows are checked whole and written atomically, imports are audited, and account ids are safe file names. A test showed the bug before the fix.
+    - **#258** is next.
 - 16 Oct, #258 fixed. Positions are now compared and closed per instrument *and* product, in all of these places:
   - the periodic broker check and the restart rebuild (`differences()` in `positions/reconcile.py`);
   - the paper broker, which now lists one row per product;
@@ -215,4 +226,4 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
   - the alerts, on the server and the screen.
 
   The audit's case (NRML +75, MIS −75) no longer raises a false difference. The mutation run found 5 gaps in the tests, all now covered (19/19).
-- 16 Oct, Ayush asked about about 22 "in progress" issues on the GitHub Project linked to the repo. Claude's GitHub tools can't read Project boards. Ayush was asked to send the list (or a CSV export) so it can be checked against the clean-up.
+- 16 Oct, Ayush asked about 22 "in progress" issues on the GitHub Project linked to the repo. Claude's GitHub tools can't read Project boards. Ayush was asked to send the list (or a CSV export) so it can be checked against the clean-up.
