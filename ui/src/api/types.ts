@@ -5,7 +5,7 @@ export type OrderType = "MARKET" | "LIMIT" | "SL" | "SL-M";
 export type Product = "CNC" | "MIS" | "NRML";
 export type Validity = "DAY" | "IOC";
 export type OrderStatus = "PENDING" | "OPEN" | "PARTIAL" | "FILLED" | "CANCELLED" | "REJECTED";
-export type Pending = "NONE" | "UNCONFIRMED" | "CANCEL";
+export type Pending = "NONE" | "UNCONFIRMED" | "CANCEL" | "MODIFY"; // MODIFY: a change on its way
 
 export interface OrderRequest {
   client_order_id: string;

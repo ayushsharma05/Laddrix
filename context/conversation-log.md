@@ -326,3 +326,17 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Unknown statuses** are kept as PENDING with the raw status, and are visible in the audit trail.
     - **A person can settle it:** after checking the broker's book, two clicks on **Not placed?** in the order book, recorded with their name.
   - **Checks:** mutation 14/14, after removing two redundant conditions it exposed and adding a restart test.
+- 16 Oct, #259 merged (PR #337). **#260 done** (changes and cancels in doubt).
+  - **Defects confirmed:**
+    - two overlapping changes could answer out of order and revert the newer one;
+    - a change with no answer kept the old terms, so a bigger change's risk was understated;
+    - a cancel with no answer cleared its flags, so the order looked normally working;
+    - risk checks were not re-run after the throttle made an algo's order wait.
+  - **The fix:**
+    - **One change at a time** per order, marked before the gate wait.
+    - **A change with no answer** counts the larger quantity (Pending MODIFY, a MODIFY_UNCONFIRMED event) until the broker's terms settle it.
+    - **Broker terms:** updates carry terms (Kite: quantity, price, trigger), and older streamed terms can't undo a confirmed change. The broker's list counts as current.
+    - **A cancel with no answer** stays on its way and is followed up; if the broker's list still shows it working, it didn't take. Pressing cancel again is allowed.
+    - **Restart:** changes or cancels on their way come back in doubt.
+    - **Gates** re-run the risk checks after a wait.
+  - **Checks:** mutation 25/25, after three test gaps were fixed.

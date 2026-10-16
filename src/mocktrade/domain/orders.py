@@ -139,3 +139,8 @@ class OrderUpdate:
     last_fill_price_paise: int = 0
     reason: str = ""  # why it was rejected or cancelled
     ts: datetime = field(default_factory=lambda: datetime.now(UTC))
+    # the order's terms as the broker has them now, when it says (Kite does): after a change
+    # with no clear answer they settle what the order really is (#260); None: not given
+    qty: int | None = None
+    price_paise: int | None = None
+    trigger_paise: int | None = None

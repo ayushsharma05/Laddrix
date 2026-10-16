@@ -164,3 +164,17 @@ Run it before going live and after any change to recovery, orders or positions. 
 3. **If it isn't there,** press **Not placed?** in MockTrade's order book, then **Confirm: not in the broker's book**. The order becomes REJECTED, with your name in the reason and the audit trail.
 
 **A status MockTrade doesn't know:** if Kite reports one, the order is kept (not dropped), and the audit trail shows "the broker reports a status MockTrade doesn't know: …". Tell Claude, so the status can be added (`broker/kite/orders.py`, `STATUS_MAP`).
+
+## A change or a cancel got no answer
+
+**What you see:** the order book says **Pending change** or **Pending cancel**. Messages say the broker didn't answer, and the audit trail shows **Replace unconfirmed** or "no clear answer".
+
+**Why:** the broker didn't answer in time, so MockTrade can't know whether the change or cancel happened. It never guesses:
+- **A change:** risk counts the **larger** quantity of the old and the new until the broker's own terms say. A second change is refused meanwhile.
+- **A cancel:** the order stays "cancel on its way".
+
+**It settles itself:** MockTrade asks the broker for about three minutes.
+- **A change:** the order takes the broker's real terms.
+- **A cancel:** the order becomes CANCELLED, or, if the broker still has it working, goes back to working with the message "the cancel didn't go through". You can then cancel again; pressing cancel again is always allowed in this state.
+
+**If it stays pending** (the audit trail says "the change/cancel is still not settled after asking the broker 7 times"): look at the order in the broker's own app. A reconnect or a restart then brings MockTrade in line from the broker's order list.

@@ -109,6 +109,7 @@ def to_update(order: dict[str, Any]) -> OrderUpdate:
             avg_price_paise=to_paise(order.get("average_price")),
             reason=f"the broker reports a status MockTrade doesn't know: {raw_status or '(none)'}",
             ts=_timestamp(order),
+            **_terms(order),
         )
     reason = ""
     if status in (S.REJECTED, S.CANCELLED):
@@ -123,7 +124,23 @@ def to_update(order: dict[str, Any]) -> OrderUpdate:
         avg_price_paise=to_paise(order.get("average_price")),
         reason=reason,
         ts=_timestamp(order),
+        **_terms(order),
     )
+
+
+def _terms(order: dict[str, Any]) -> dict[str, int | None]:
+    """The order's terms as Kite has them now (they settle a change with no answer, #260).
+    A price or trigger of 0 means none (a market order); a missing field says nothing."""
+    qty = order.get("quantity")
+    price = to_paise(order.get("price")) if order.get("price") is not None else None
+    trigger = (
+        to_paise(order.get("trigger_price")) if order.get("trigger_price") is not None else None
+    )
+    return {
+        "qty": int(qty) if qty not in (None, "") else None,
+        "price_paise": price or None,
+        "trigger_paise": trigger or None,
+    }
 
 
 def _tag(order: dict[str, Any]) -> str:

@@ -155,8 +155,8 @@ async def test_still_unclear_after_every_follow_up_it_asks_for_a_person(world):
     assert still.pending is Pending.UNCONFIRMED and world.broker.lists == 2
     last = world.events[-1]
     assert last.kind is EventKind.UNCONFIRMED
-    assert last.detail == ("still not settled after asking the broker 2 times: check the "
-                           "broker's own order book, then settle it here")  # fmt: skip
+    assert last.detail == ("the order is still not settled after asking the broker 2 times: "
+                           "check the broker's own order book, then settle it here")  # fmt: skip
 
 
 async def test_follow_ups_reject_when_the_evidence_is_there(world):

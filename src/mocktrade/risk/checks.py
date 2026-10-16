@@ -31,6 +31,8 @@ OPTIONS = (InstrumentKind.CALL, InstrumentKind.PUT)
 class RiskGate:
     """The pre-trade checks for one broker account, as an order gate (see orders.gate)."""
 
+    recheck_after_wait = True  # run again if a later gate (the throttle) made the order wait
+
     def __init__(
         self,
         limits: RiskLimits,
