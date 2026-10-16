@@ -151,11 +151,13 @@ class AlertEngine:
         *,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         name: Callable[[InstrumentId], str] = lambda i: i.split(":", 1)[-1],
+        watch: Callable[[set[InstrumentId]], None] = lambda ids: None,
     ) -> None:
         self._latest = latest
         self._known = known
         self._clock = clock
         self._name = name
+        self._watch = watch  # told the instruments alerts need prices for (a feed streams them)
         self._alerts: dict[str, Alert] = {}
         self._index: dict[InstrumentId, set[str]] = {}
         self._listeners: list[Callable[[Fired], None]] = []
@@ -293,17 +295,29 @@ class AlertEngine:
         self._alerts[a.alert_id] = a
         self._index_alert(a)
 
+    def watched(self) -> set[InstrumentId]:
+        """The instruments some alert needs prices of."""
+        return set(self._index)
+
     def _index_alert(self, a: Alert) -> None:
+        new = False
         for i in a.instruments():
+            new |= i not in self._index
             self._index.setdefault(i, set()).add(a.alert_id)
+        if new:
+            self._watch(self.watched())
 
     def _unindex(self, alert_id: str, instruments: tuple[InstrumentId, ...]) -> None:
+        gone = False
         for i in instruments:
             ids = self._index.get(i)
             if ids is not None:
                 ids.discard(alert_id)
                 if not ids:
                     del self._index[i]
+                    gone = True
+        if gone:
+            self._watch(self.watched())
 
     def _measure(self, a: Alert, tick: Tick | None) -> _Eval | str:
         """The condition now, or what the alert is waiting for (in words)."""

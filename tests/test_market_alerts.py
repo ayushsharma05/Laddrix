@@ -242,7 +242,9 @@ def test_changing_switching_on_again_and_deleting(w):
     assert len(w.fired) == 1
     w.engine.update("ayush", a.alert_id, {"instrument_id": REL, "params": {"level_paise": 100},
                                           "enabled": True})  # fmt: skip
+    assert w.engine.watched() == {REL}
     w.engine.delete("ayush", a.alert_id)
+    assert w.engine.watched() == set()
     w.engine.checked = 0
     w.tick(REL, 50)
     w.tick(FUT, 1)
@@ -262,7 +264,9 @@ async def test_alerts_and_the_webhook_are_kept_across_a_restart(w, tmp_path):
     assert hook["secret"] and service.webhook("ayush") == {"url": "https://hooks.example.com/abc",
                                                             "set": True}  # fmt: skip
     await store.flush()
-    data = json.loads((tmp_path / "ayush.json").read_text())
+    (path,) = tmp_path.glob("*.json")
+    data = json.loads(path.read_text())
+    assert data["user"] == "ayush"
     assert data["alerts"][0]["note"] == "breakout" and data["webhook"]["secret"] == hook["secret"]
     again = World()
     second = MarketAlerts(again.engine, AlertStore(tmp_path))
@@ -277,8 +281,12 @@ async def test_alerts_and_the_webhook_are_kept_across_a_restart(w, tmp_path):
     )
     (tmp_path / "broken.json").write_text("{not json")
     assert len(AlertStore(tmp_path).load_all()) == 1  # a broken file is skipped, said in the log
-    with pytest.raises(ValueError):
-        AlertStore(tmp_path).write("../etc")
+    odd = AlertStore(tmp_path)
+    odd.set_webhook("../etc/a b@x", None)  # any user id is a safe file name
+    assert all(p.parent == tmp_path for p in tmp_path.iterdir())
+    named = [p for p in tmp_path.glob("*.json") if p.name != "broken.json"]
+    users = {json.loads(p.read_text())["user"] for p in named}
+    assert users == {"ayush", "../etc/a b@x"}
 
 
 # --- webhooks -----------------------------------------------------------------------------
@@ -542,3 +550,26 @@ async def test_a_fired_alert_reaches_its_users_screens_only(live):
         assert await all_of(ws_r, "market_alert", quiet=0.4) == []
     for c in (a, r):
         await c.aclose()
+
+
+async def test_the_server_keeps_alert_instruments_watched_so_their_prices_come(tmp_path, nifty_fut):
+    from mocktrade.alerts.service import build_market_alerts
+    from mocktrade.marketdata.service import MarketData
+    from mocktrade.platform import Platform
+    from mocktrade.refdata.store import InstrumentStore
+    from mocktrade.risk.kill_switch import KillSwitch
+
+    store = InstrumentStore()
+    store.add(nifty_fut)
+    md = MarketData()
+    platform = Platform(store, md, KillSwitch("firm"))
+    service = build_market_alerts(platform, tmp_path)
+    assert md.watched() == set()
+    made = service.create("ayush", {"kind": "PRICE_ABOVE", "instrument_id": FUT,
+                                    "params": {"level_paise": 2510000}})  # fmt: skip
+    assert md.watched() == {FUT}  # a feed (Kite) now streams it, though no screen shows it
+    md.on_tick(Tick(FUT, 2500000))
+    md.on_tick(Tick(FUT, 2511000))
+    assert service.list("ayush")[0]["fired_count"] == 1
+    service.delete("ayush", made["alert_id"])
+    assert md.watched() == set()

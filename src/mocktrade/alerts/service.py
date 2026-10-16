@@ -143,8 +143,15 @@ def build_market_alerts(
         found = store.get(instrument_id)
         return found.symbol if found else instrument_id
 
+    prices = platform.market_data.subscribe()  # alerts' instruments stay watched (fed by Kite)
+
+    def watch(ids: set[str]) -> None:
+        prices.add(ids - prices.instrument_ids)
+        prices.remove(prices.instrument_ids - ids)
+        prices.drain()  # the engine reads ticks on the tap; nothing waits on this subscription
+
     engine = AlertEngine(platform.market_data.latest, lambda i: store.get(i) is not None,
-                         clock=clock, name=name)  # fmt: skip
+                         clock=clock, name=name, watch=watch)  # fmt: skip
     events = platform.event_log
     audit: Audit | None = None
     if events is not None:
