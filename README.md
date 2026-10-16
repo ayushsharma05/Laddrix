@@ -1,5 +1,7 @@
 # MockTrade
 
+**New here? Start with [docs/GUIDE.md](docs/GUIDE.md):** the whole project in plain words, with a five-day reading plan.
+
 A multi-user, broker-agnostic trading platform for NSE and BSE, designed the way a professional trading-platform team would build it: a price ladder, order blotter, positions and P&L, audit trail and parent/child algo management, with a paper broker that fills against live prices.
 
 The first broker is **Zerodha Kite Connect**. Every broker plugs in behind one adapter interface, so others (or direct exchange access) can be added without changing the core.
