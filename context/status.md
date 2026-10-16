@@ -7,7 +7,7 @@ Later-stage expansion #297 now tracks 25 detailed packages (#298–#322), linked
 
 As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
 
-**Current handoff:** merge the K13.4 PR (#284, keyboard shortcuts) on green CI and check `main` after; then K13.5 (#285, themes; the per-user settings store is ready for it); then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
+**Current handoff:** K13.4 (#284) is merged. Merge the K13.5 PR (#285, themes) on green CI and check `main` after; then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
 
 **Outside review (16 Oct).** While Claude's limit was used up, Ayush had another AI tool review the code and the design. It changed no code. It opened #240–#279 and the docs PR #256; that PR's notes are folded in here, and it was closed. Its findings separate behaviour confirmed in the source from design gaps. Two were reproduced in a throwaway folder:
 - reconciliation overwrote one product's position with another's (#258);
@@ -18,6 +18,8 @@ Each finding must be rechecked against the code before work starts, and fixed de
 Ladder (K5.4) as built: ![K5.4 ladder](images/k5-4-ladder.png)
 
 Order book, positions, audit trail (K5.5) as built: ![K5.5 screens](images/k5-5-screens.png)
+
+Themes (K13.5): ![light](images/k13-5-theme-light.png) ![colour-blind safe](images/k13-5-theme-colour-blind.png)
 
 ## Active track: Kite Connect (NSE/BSE)
 Decided 14 Oct 2026. MockTrade connects to the real Indian market through Zerodha Kite Connect. A paper broker fills orders against live Kite prices for testing without money. Design: `docs/design/kite-architecture.md` (diagrams in `context/images/kite-*.png`).
@@ -156,11 +158,9 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    - #281 K13.1 admin API (users, roles, accounts, per-account limits): merged (PR #286). See `docs/design/admin.md`.
    - #282 K13.2 admin screen and the first-login password page: merged (PR #296). See `docs/design/admin.md` § K13.2.
    - #282 merged (PR #296).
-   - #284 K13.4 keyboard shortcut editor: **done** on branch `k13-4-shortcuts` (PR "Closes #284"; merge on green CI, then check main's CI). See `docs/design/ui.md` § Keyboard shortcuts.
-   - #285 K13.5 themes: **next**. Save the choice with `PUT /api/me/settings/theme` (the store from K13.4).
+   - #284 K13.4 keyboard shortcut editor: merged (PR #325). See `docs/design/ui.md` § Keyboard shortcuts.
+   - #285 K13.5 themes (dark, light, colour-blind safe): **done** on branch `k13-5-themes` (PR "Closes #285"; merge on green CI, then check main's CI). See `docs/design/ui.md` § Themes.
    - #283 K13.3 phone screens: **moved after core v1** (Ayush, 16 Oct; they don't change the core design).
-   - #284 K13.4 keyboard shortcut editor.
-   - #285 K13.5 themes (dark, light, colour-blind safe).
    **Then, in this order (issues Ayush added on 16 Oct from an outside review; no code was changed):**
    1. #240 core v1 completion gate: restart/reconnect drills, backup and restore, recordings with their instrument list, a live-session checklist, docs matching code.
    2. #257 post-core hardening gate: #258–#277 (positions, uncertain orders, exits, MTM, durability, session rollover, freshness, ownership, webhooks, backups, supervision, economics), suggested order in #257; plus the production security gate #279 and the discussion #278 (who pays for data, multi-user Kite).

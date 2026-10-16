@@ -14,17 +14,17 @@
   --text: #dde3ea;
   --text-2: #8d99a8;
   --text-3: #aeb8c5;
-  --bid: #2068c9;
+  --bid: #1e61bb;
   --bid-empty: #1a3a66;
-  --ask: #c8323c;
+  --ask: #b92e38;
   --ask-empty: #5a1e24;
   --price: #c4c9d0;
   --price-text: #14181d;
-  --last: #1e9e5a;
-  --work-buy: #2f7bff;
-  --work-sell: #e0464f;
+  --last: #167141;
+  --work-buy: #0056eb;
+  --work-sell: #c0202a;
   --vap-bar: #34506f;
-  --primary: #0e9f7e;
+  --primary: #0a7059;
   --primary-border: #12b892;
   --good: #4cc38a;
   --bad: #f0646c;
@@ -43,7 +43,213 @@
   --ladder-row: 20px;
 
   color-scheme: dark;
+
+  /* surfaces, ink, lines and tints the screens use (moved here from the stylesheets, K13.5) */
+  --control-border: #3a4452;
+  --control-hover: #2e3846;
+  --selected-fill: #2f4b73;
+  --accent: #3d86f0;
+  --on-strong: #ffffff;
+  --bad-ink: #ffc9cc;
+  --stop-hover: #5c2128;
+  --stop-now-border: #ffb3b8;
+  --focus-border: #4f78b0;
+  --bad-fill: #3d1418;
+  --bad-border: #7a2c33;
+  --warn-fill: #4a3a0a;
+  --warn-ink: #fff1bf;
+  --chrome-ink: #c6ceda;
+  --neutral-dot: #4a5566;
+  --live-ink: #bfebd7;
+  --login-fill: #5a2a14;
+  --login-ink: #ffd9c2;
+  --stopped-ink: #ffd2d5;
+  --firm-stopped-fill: #3d0f13;
+  --warn-strong-ink: #ffe89a;
+  --shadow: rgba(0,0,0,0.5);
+  --backdrop: rgba(8,10,13,0.55);
+  --replay-fill: #3b2a5c;
+  --replay-ink: #efe6ff;
+  --replay-border: #5b4490;
+  --replay-dim: #c8b8e8;
+  --drop-target: rgba(61,134,240,0.18);
+  --icon-hover: rgba(255,255,255,0.08);
+  --shadow-deep: rgba(0,0,0,0.55);
+  --tab-active: #313b48;
+  --tab-inactive: #2b3440;
+  --scrollbar: rgba(255,255,255,0.18);
+  --tab-link-border: rgba(0,0,0,0.35);
+  --grid-head-divider: #313a46;
+  --row-hover: #2a3440;
+  --flash-up: rgba(76,195,138,0.28);
+  --flash-down: rgba(240,100,108,0.28);
+  --panel-fill: #1b2129;
+  --panel-hover: #303a47;
+  --panel-on: #1f5f4a;
+  --lots-border: #4a5566;
+  --differs-fill: rgba(240,100,108,0.14);
+  --sell-soft-ink: #ffb3b8;
+  --timeline-divider: #2a323d;
+  --progress-tint: rgba(111,168,255,0.18);
+  --strike-fill: #232a34;
+  --call-oi-tint: rgba(111,168,255,0.16);
+  --put-oi-tint: rgba(240,100,108,0.16);
+  --itm-fill: rgba(255,214,102,0.07);
+  --atm-ink: #111111;
+  --atm-fill: #ffd666;
+  --atm-border: #ffd66655;
+  --profit-area: rgba(56,193,114,0.12);
+  --payoff-zero: #5c6776;
+  --payoff-forward: #ffd666;
+  --payoff-expiry: #6fa8ff;
+  --payoff-today: #c7a6ff;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --chart-grid-line: #222a34;
+  --stop-now-fill: #c0202a; /* the STOP button while stopping: white text on it */
+  --ladder-ink: #ffffff; /* the ladder's numbers, on its bid / ask / working cells */
+  --buy-strong: #1e61bb; /* strong fills with white text: the ticket's BUY / SELL */
+  --sell-strong: #b92e38;
 }
+/* Light (K13.5): the same tokens for a bright room. Strong fills (last price, STOP, primary)
+   keep white text; the ladder's bid/ask and working cells are lighter, with dark numbers. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --menu: #e4e8ee;
+  --desktop: #d7dde5;
+  --toolbar: #edf0f4;
+  --body: #ffffff;
+  --zebra: #f3f5f8;
+  --chrome: #e6eaf0;
+  --border: #c1c9d4;
+  --border-dark: #a9b3c0;
+  --well: #f6f8fa;
+  --text: #18202b;
+  --text-2: #4f5b6b;
+  --text-3: #333d4b;
+  --bid: #9fc2f2;
+  --bid-empty: #e3edfb;
+  --ask: #f2a9ae;
+  --ask-empty: #fbe5e7;
+  --price: #dfe4ea;
+  --price-text: #18202b;
+  --last: #167141;
+  --work-buy: #7ba9f7;
+  --work-sell: #ee8c92;
+  --vap-bar: #b6c9e2;
+  --primary: #0a7059;
+  --primary-border: #0b8268;
+  --good: #11713f;
+  --bad: #b8222c;
+  --pending: #7d5800;
+  --buy-text: #0b56c2;
+  --sell-text: #b8222c;
+  --stop-bg: #fde4e6;
+  --stop-border: #c0202a;
+  --stopped-band: #f8d0d4;
+  --live-strip: #cdeedd;
+  --paper-strip: #f6e7b0;
+  --select: #a87b00;
+  --control-border: #b9c2ce;
+  --control-hover: #e9edf2;
+  --selected-fill: #d3e3fa;
+  --accent: #1f6fe0;
+  --on-strong: #ffffff;
+  --bad-ink: #8f1a22;
+  --stop-hover: #fbd3d7;
+  --stop-now-border: #8f1a22;
+  --focus-border: #1f6fe0;
+  --bad-fill: #fde4e6;
+  --bad-border: #e2a0a6;
+  --warn-fill: #fbf0cc;
+  --warn-ink: #5e4500;
+  --chrome-ink: #2c3644;
+  --neutral-dot: #9aa5b3;
+  --live-ink: #0d4f2f;
+  --login-fill: #fbe2d2;
+  --login-ink: #6e2c08;
+  --stopped-ink: #6e121a;
+  --firm-stopped-fill: #f6c9cd;
+  --warn-strong-ink: #4d3800;
+  --shadow: rgba(30, 40, 55, 0.18);
+  --backdrop: rgba(30, 40, 55, 0.35);
+  --replay-fill: #e7dcfa;
+  --replay-ink: #2e1a55;
+  --replay-border: #b9a3e6;
+  --replay-dim: #50407a;
+  --drop-target: rgba(31, 111, 224, 0.14);
+  --icon-hover: rgba(0, 0, 0, 0.06);
+  --shadow-deep: rgba(30, 40, 55, 0.25);
+  --tab-active: #ffffff;
+  --tab-inactive: #e2e7ed;
+  --scrollbar: rgba(0, 0, 0, 0.22);
+  --tab-link-border: rgba(0, 0, 0, 0.25);
+  --grid-head-divider: #d3d9e1;
+  --row-hover: #e9f0f9;
+  --flash-up: rgba(17, 113, 63, 0.18);
+  --flash-down: rgba(184, 34, 44, 0.16);
+  --panel-fill: #eef1f5;
+  --panel-hover: #e1e6ec;
+  --panel-on: #cdeedd;
+  --lots-border: #9aa5b3;
+  --differs-fill: rgba(184, 34, 44, 0.1);
+  --sell-soft-ink: #a3202a;
+  --timeline-divider: #e1e6ec;
+  --progress-tint: rgba(11, 86, 194, 0.14);
+  --strike-fill: #eef1f5;
+  --call-oi-tint: rgba(11, 86, 194, 0.14);
+  --put-oi-tint: rgba(184, 34, 44, 0.12);
+  --itm-fill: rgba(168, 123, 0, 0.08);
+  --atm-ink: #18202b;
+  --atm-fill: #f2c94c;
+  --atm-border: #d4a72c;
+  --profit-area: rgba(17, 113, 63, 0.12);
+  --payoff-zero: #9aa5b3;
+  --payoff-forward: #a87b00;
+  --payoff-expiry: #0b56c2;
+  --payoff-today: #7044c4;
+  --series-1: #1f6fe0;
+  --series-2: #c2541f;
+  --series-3: #12805a;
+  --series-4: #9a6b00;
+  --chart-grid-line: #e1e6ec;
+  --stop-now-fill: #c0202a;
+  --ladder-ink: #18202b;
+  --buy-strong: #1e61bb;
+  --sell-strong: #b8222c;
+}
+
+/* Colour-blind safe (K13.5): the dark theme with nothing told apart by red against green.
+   Buy, up, profit: blue; sell, down, loss: orange (an Okabe–Ito pairing). Pending: purple.
+   Signs (+ −), arrows and words still say the same thing, so colour is never the only clue. */
+:root[data-theme="cb"] {
+  --ask: #a8510b;
+  --ask-empty: #4a2c10;
+  --last: #7b4d93; /* purple: apart from both the blue bids and the orange asks */
+  --work-sell: #a8510b;
+  --flash-up: rgba(86, 180, 233, 0.28);
+  --flash-down: rgba(230, 159, 0, 0.28);
+  --good: #56b4e9;
+  --bad: #e69f00;
+  --pending: #d48ab6;
+  --sell-text: #f0a64a;
+  --sell-soft-ink: #f5c27a;
+  --bad-ink: #ffd9a8;
+  --bad-fill: #3a2808;
+  --bad-border: #8a5a10;
+  --differs-fill: rgba(230, 159, 0, 0.14);
+  --put-oi-tint: rgba(230, 159, 0, 0.16);
+  --profit-area: rgba(86, 180, 233, 0.14);
+  --panel-on: #1d4a68;
+  --primary: #0a5f94;
+  --primary-border: #2b8fd0;
+  --live-strip: #12405e;
+  --live-ink: #cfe8f7;
+  --series-3: #56b4e9;
+}
+
 
 * {
   box-sizing: border-box;
@@ -111,7 +317,7 @@ select {
 .btn {
   height: 26px;
   padding: 0 10px;
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   border-radius: 2px;
   background: var(--chrome);
   color: var(--text);
@@ -120,39 +326,39 @@ select {
   cursor: pointer;
 }
 .btn:hover:not(:disabled) {
-  background: #2e3846;
+  background: var(--control-hover);
 }
 .btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
 .btn.on {
-  background: #2f4b73;
-  border-color: #3d86f0;
+  background: var(--selected-fill);
+  border-color: var(--accent);
 }
 .btn.primary {
   background: var(--primary);
   border-color: var(--primary-border);
-  color: #fff;
+  color: var(--on-strong);
   font-weight: 600;
 }
 .btn.stop {
   padding: 0 14px;
   border-color: var(--stop-border);
   background: var(--stop-bg);
-  color: #ffc9cc;
+  color: var(--bad-ink);
   font-weight: 700;
   letter-spacing: 0.06em;
 }
 .btn.stop:hover {
-  background: #5c2128;
+  background: var(--stop-hover);
 }
 .btn.stopped-btn,
 .btn.stop-now {
   padding: 0 14px;
-  border-color: #ffb3b8;
-  background: var(--work-sell);
-  color: #fff;
+  border-color: var(--stop-now-border);
+  background: var(--stop-now-fill);
+  color: var(--on-strong);
   font-weight: 700;
   letter-spacing: 0.06em;
 }
@@ -190,19 +396,19 @@ select {
   height: 26px;
   padding: 0 8px;
   background: var(--well);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   border-radius: 0;
   color: var(--text);
 }
 .input:focus {
-  border-color: #4f78b0;
+  border-color: var(--focus-border);
   outline: none;
 }
 
 select {
   height: 22px;
   background: var(--well);
-  border: 1px solid #3a4452;
+  border: 1px solid var(--control-border);
   color: var(--text);
 }
 
@@ -230,14 +436,14 @@ select {
   border: 1px solid;
 }
 .alert.bad {
-  background: #3d1418;
-  border-color: #7a2c33;
-  color: #ffc9cc;
+  background: var(--bad-fill);
+  border-color: var(--bad-border);
+  color: var(--bad-ink);
 }
 .alert.warn {
-  background: #4a3a0a;
+  background: var(--warn-fill);
   border-color: var(--pending);
-  color: #fff1bf;
+  color: var(--warn-ink);
 }
 
 .hint {

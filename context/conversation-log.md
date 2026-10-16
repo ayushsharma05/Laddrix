@@ -249,3 +249,9 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - an editor widget that refuses browser keys and clashes in words; STOP's fixed Ctrl+Shift+K;
     - the ticket, ladder and chart follow the user's keys, and the ticket's hint shows them;
     - mutation 27/27; the browser check passed.
+  - **K13.5 (#285) themes done:**
+    - every colour became a named token (proved identical first), then light and colour-blind safe blocks were added;
+    - a test checks WCAG AA contrast for every text colour in all three themes; a few dark colours were deepened to pass;
+    - colour-blind safe uses blue for buy, orange for sell and purple for the last price (the first try used blue, which blended with the bids in the browser check);
+    - the choice follows the computer until picked, switches with no reload, is saved per user on the server, and the chart repaints;
+    - mutation 18/18 (it found two gaps: a redundant `try`, removed, and an untested message clear, now tested); the browser check passed.

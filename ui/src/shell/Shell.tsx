@@ -22,6 +22,7 @@ import { Bands, PRICES_OLD_MS } from "./Bands";
 import { EnvStrip } from "./EnvStrip";
 import { ReplayBar } from "./ReplayBar";
 import { StopDialog } from "./StopDialog";
+import { ThemePick } from "./ThemePick";
 
 export const RATE_LIMIT_PER_MIN = 350; // the platform's own per-minute order limit (risk/throttle.py)
 
@@ -57,6 +58,7 @@ export function Shell() {
   // keys that work anywhere (K13.4: the user's choices, else the defaults; STOP always has
   // Ctrl+Shift+K): search, STOP, save the layout, open a ticket / ladder / chart
   useEffect(() => void app.keys.load(), [app]);
+  useEffect(() => void app.theme.load(), [app]);
   const bindings = useKeyBindings();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -160,6 +162,7 @@ function MenuBar() {
         </select>
       </label>
       <span className="grow" />
+      <ThemePick />
       <span className="dim">
         {me.user.name} · {me.user.roles.join(", ")}
       </span>
