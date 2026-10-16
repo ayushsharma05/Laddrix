@@ -162,6 +162,8 @@ price, qty, filled, state.
   blocked, what is kept (positions), and a reason. Enter = STOP NOW. The switch engages first,
   then cancels.
 - While stopped: a red band on every screen, ladders show prices but dim the trading columns.
+  The band shows the server's report of what the STOP did and, when positions are open,
+  **Flatten (N)** (two clicks), which closes them without resuming trading (#262).
 - **Unconfirmed** orders block sending the same order again until the broker's order book answers.
 - **Disconnected** from the server: order clicks are paused; the page reconnects, then loads
   snapshots and merges by `updated_at` (see `stream.md`).

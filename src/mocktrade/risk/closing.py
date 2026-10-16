@@ -59,7 +59,8 @@ async def close_position(
         size = min(left, piece)
         request = OrderRequest("", orders.account_id, user_id, instrument.id, side, size,
                                OrderType.MARKET, product, market_protection=Decimal(-1),
-                               basket_id=basket_id, reduce_only=True)  # fmt: skip
+                               basket_id=basket_id, reduce_only=True,
+                               forced_close=True)  # fmt: skip
         sent.append(await orders.submit(request))
         left -= size
     return sent

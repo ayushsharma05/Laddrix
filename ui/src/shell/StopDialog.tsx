@@ -2,7 +2,8 @@
 //
 //   STOP NOW ─► POST /api/accounts/{a}/stop {reason} ─► the switch engages first (no new
 //   orders), then working orders are cancelled. Positions are kept. The stream's "kill"
-//   message turns the band red on every screen.
+//   message turns the band red on every screen; the band shows the server's report of what
+//   the STOP did, and Flatten (shell/StopBand.tsx, #262).
 
 import { useMemo, useState } from "react";
 import { ApiError } from "../api/rest";
@@ -41,13 +42,15 @@ export function StopDialog({ mode, onClose }: Props) {
     setError("");
     try {
       if (mode === "stop") {
-        const result = await rest.post<{ failed_cancels: { client_order_id: string; reason: string }[] }>(
+        const result = await rest.post<{ failed_cancels: { client_order_id: string; reason: string }[]; reports?: { account_id: string; lines: string[] }[] }>(
           firm ? "/api/firm/stop" : `${base}/stop`,
           { reason: reason.trim() || "manual stop" },
         );
         for (const f of result.failed_cancels) {
           store.addMessage("ERROR", "", `Couldn't cancel ${f.client_order_id}: ${f.reason}. Check it at the broker.`);
         }
+        // exactly what the STOP did, in the server's words (#262)
+        for (const r of result.reports ?? []) store.addMessage("INFO", "", `${r.account_id}: ${r.lines.join("; ")}`);
       } else {
         await rest.post(`${base}/resume`);
       }
@@ -94,7 +97,7 @@ export function StopDialog({ mode, onClose }: Props) {
                 <b>Blocked:</b> every new order and change until someone resumes
               </li>
               <li>
-                <b>Kept:</b> {firm ? "all positions" : `${open} open position${open === 1 ? "" : "s"}`} (close them yourself if needed)
+                <b>Kept:</b> {firm ? "all positions" : `${open} open position${open === 1 ? "" : "s"}`} (STOP doesn't close them; Flatten in the red band does, while trading stays stopped)
               </li>
             </ul>
           ) : (

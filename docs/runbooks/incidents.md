@@ -71,7 +71,20 @@ Kite's. The Recon light is red.
   overriding your own limit.
 - **Resume:** the account owner, risk or an admin uses the STOPPED button. For the firm switch,
   only an admin can resume. Each reset is in the audit trail with who and when.
-- Positions are not closed for you. Close them deliberately (ladder or ticket), or leave them.
+- **The band says exactly what the STOP did** (#262), in the server's words: which orders
+  were asked to cancel, any cancel that was refused (check those at the broker), any order
+  the broker never answered (it is cancelled the moment the broker names it), how many algos
+  stopped, and which positions are still open. The same lines go to Messages.
+- **Positions are not closed for you.** To close them **without resuming**, press
+  **Flatten (N)** in the red band, then **Confirm**. It closes with orders that can only
+  reduce (never reverse), through the exit desk; nothing else gets through the stop. Pressing
+  it twice is safe: the second finds nothing left. Who may: the account's traders, risk, admin.
+- **"size not known, close it at the broker":** MockTrade and the broker disagree on that
+  position (a reconcile alert, or a difference being re-checked). Flatten won't guess a size;
+  close it in the broker's own app, then check [Reconcile mismatch](#reconcile-mismatch).
+- **A Flatten message in red** means something wasn't fully closed: a refused order (its
+  reason is in the message), or part left to orders already closing it (see
+  [A close says "left to orders already closing it"](#a-close-says-left-to-orders-already-closing-it-261)).
 
 ## Trading paused after a restart
 

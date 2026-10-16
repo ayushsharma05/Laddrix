@@ -539,7 +539,11 @@ async def test_stop_and_resume_an_account(world):
     c = await world.logged_in("riya")
     await c.post("/api/accounts/acc-riya/orders", json=ORDER)
     r = await c.post("/api/accounts/acc-riya/stop", json={"reason": "feeling unsure"})
-    assert r.json() == {"stopped": True, "failed_cancels": []}
+    body = r.json()
+    assert (body["stopped"], body["failed_cancels"]) == (True, [])
+    (report,) = body["reports"]  # what it did, in words (#262)
+    assert report["account_id"] == "acc-riya" and report["lines"][:2] == [
+        "stopped by riya: feeling unsure", "1 working order asked to cancel (MT1)"]  # fmt: skip
     assert world.brokers["acc-riya"].cancelled == ["F1"]
     blocked = (await c.post("/api/accounts/acc-riya/orders", json=ORDER)).json()
     assert "feeling unsure" in blocked["reason"]
@@ -560,6 +564,35 @@ async def test_who_may_stop_and_resume(world):
     assert (await ayush.post("/api/firm/resume", json={})).is_success
     assert not world.platform.firm_switch.engaged
     for c in (risk, riya, ayush):
+        await c.aclose()
+
+
+async def test_flatten_while_stopped_who_may_and_a_confirmation(world):
+    riya, risk, ayush = [await world.logged_in(u) for u in ("riya", "risk", "ayush")]
+    world.platform.accounts["acc-riya"].positions.apply_fill(FUT, Product.MIS, Side.BUY, 75,
+                                                             2501000)  # fmt: skip
+    await riya.post("/api/accounts/acc-riya/stop", json={"reason": "break"})
+    status = (await riya.get("/api/accounts/acc-riya/flatten")).json()
+    assert status["stopped"] and status["can_flatten"]
+    assert status["stop_report"]["lines"][-1] == (
+        "positions kept: NIFTY26OCTFUT MIS +75; use Flatten to close them")  # fmt: skip
+    assert (await riya.post("/api/accounts/acc-riya/flatten", json={"confirm": False})
+            ).status_code == 422  # fmt: skip
+    assert (
+        await riya.post("/api/accounts/acc-ayush/flatten", json={"confirm": True})
+    ).status_code == 404  # another trader's account doesn't exist for her
+    done = (await risk.post("/api/accounts/acc-riya/flatten", json={"confirm": True})).json()
+    (row,) = done["positions"]
+    assert row["orders"] and done["by"] == "risk"
+    sent = world.brokers["acc-riya"].placed[-1]
+    assert (sent.side, sent.qty, sent.reduce_only, sent.forced_close) == (Side.SELL, 75, True,
+                                                                          True)  # fmt: skip
+    one = await riya.post(
+        "/api/accounts/acc-riya/flatten",
+        json={"confirm": True, "instrument_id": FUT, "product": "NRML"},
+    )
+    assert one.json()["summary"] == "nothing open to close"
+    for c in (riya, risk, ayush):
         await c.aclose()
 
 

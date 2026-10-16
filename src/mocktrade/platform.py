@@ -28,6 +28,7 @@ from mocktrade.charges.service import ChargesService
 from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import OrderSpec
+from mocktrade.domain.orders import Product
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
 from mocktrade.orders.basket import Baskets
@@ -42,6 +43,7 @@ from mocktrade.recovery import RecoveryGate, recover, recover_until_done, sessio
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.risk.checks import RiskGate
 from mocktrade.risk.closing import ExitDesk, position_of
+from mocktrade.risk.flatten import Flatten
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.risk.limits import RiskLimits
 from mocktrade.risk.loss_watch import DailyLossWatch
@@ -50,6 +52,23 @@ from mocktrade.risk.mtm import MtmWatch
 from mocktrade.risk.squareoff import SquareOff
 from mocktrade.risk.throttle import OrderThrottle
 from mocktrade.store.events import EventLog
+
+
+def _unknown_size(reconciler: PositionReconciler) -> Callable[[str, Product], str | None]:
+    """Why a position's size isn't known (#262), or None: the broker and MockTrade disagree
+    on it (a reconcile alert), or a difference is being re-checked."""
+
+    def unknown(instrument_id: str, product: Product) -> str | None:
+        for m in reconciler.alerts():
+            if m.instrument_id == instrument_id and m.product in (None, product):
+                return m.message
+        last = reconciler.last
+        for i, p in last.suspected if last is not None else ():
+            if i == instrument_id and p in (None, product):
+                return "the broker's position differs and is being re-checked"
+        return None
+
+    return unknown
 
 
 class LostProtection(NamedTuple):
@@ -86,6 +105,7 @@ class AccountRuntime:
     margin_check: bool = False  # ...and, when on, refuses what the funds can't carry
     mtm: MtmWatch | None = None  # the trader's own loss limits (per position, portfolio)
     squareoff: SquareOff | None = None  # intraday positions before the broker's cut-off
+    flatten: Flatten | None = None  # closing positions on purpose, STOP or not (#262)
 
     def apply_limits(self, limits: RiskLimits) -> None:
         """An admin's new limits, from the next order on. Everything that copied a limit at
@@ -94,7 +114,7 @@ class AccountRuntime:
         self.risk.limits = limits
         if self.loss_watch is not None:
             self.loss_watch.limit_paise = limits.max_daily_loss_paise
-        for closer in (self.mtm, self.squareoff):
+        for closer in (self.mtm, self.squareoff, self.flatten):
             if closer is not None:
                 closer.max_lots = limits.max_order_lots
 
@@ -485,6 +505,15 @@ class Platform:
         squareoff = SquareOff(account.id, book, orders, self.instruments.get,
                               max_lots=limits.max_order_lots, audit=note, clock=clock,
                               desk=desk)  # fmt: skip
+        firm = self.firm_switch
+
+        def stopped():
+            return next((sw.state for sw in (switch, firm) if sw.engaged), None)
+
+        flatten = Flatten(account.id, book, orders, desk, self.instruments.get,
+                          max_lots=limits.max_order_lots, unknown=_unknown_size(reconciler),
+                          stopped=stopped, algos=lambda: algos, audit=note,
+                          clock=clock)  # fmt: skip
         runtime = AccountRuntime(
             account,
             broker,
@@ -505,6 +534,7 @@ class Platform:
             margin_check,
             mtm,
             squareoff,
+            flatten,
         )
         self.accounts[account.id] = runtime
         runtime.set_active(account.active)

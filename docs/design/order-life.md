@@ -77,7 +77,17 @@ Working orders at the exchange don't depend on our connection. While the connect
 
 ![STOP](../../context/images/v1-journey-stop.png)
 
-The switch is engaged **before** the cancels go out, so nothing new can slip in meanwhile. Positions are kept: STOP doesn't close them. Closing is a separate, deliberate action (square-off, MTM auto-close, or closing by hand). Only the account's owner, risk or an admin can resume.
+The switch is engaged **before** the cancels go out, so nothing new can slip in meanwhile. Positions are kept: STOP doesn't close them. Closing is a separate, deliberate action: **Flatten** in the red band (it works while trading stays stopped), square-off, MTM auto-close, or closing by hand after resuming. Only the account's owner, risk or an admin can resume.
+
+**Three separate operations (#262):**
+
+| | blocks new orders | cancels working orders | closes positions | allowed while stopped |
+| --- | --- | --- | --- | --- |
+| STOP | yes (and changes) | yes, and stops algos | **no** | — |
+| cancel (one order) | no | that order | no | yes |
+| Flatten | no | the closing orders on each position it closes | yes, reduce-only through the exit desk | yes |
+
+While stopped, the only orders let through are the exit desk's forced closes, and they still pass every other risk check (reduce-only included), so they can't increase or reverse a position. A STOP during an order the broker never answered keeps it Unconfirmed: its cancel goes out the moment the broker names it, and the broker's list can still settle it.
 
 ### Closing a position
 

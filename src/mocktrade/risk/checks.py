@@ -69,7 +69,7 @@ class RiskGate:
         tick = self._price(request.instrument_id)
         others = [o for o in self._working() if o.client_order_id != request.client_order_id]
         reason = (
-            self._kill_problem()
+            self._kill_problem(request)
             or self._off_problem(request, request.qty, others)
             or self._instrument_problem(instrument, request, others)
             or self._product_problem(instrument, request)
@@ -166,7 +166,12 @@ class RiskGate:
             )
         return None
 
-    def _kill_problem(self) -> str | None:
+    def _kill_problem(self, request: OrderRequest | None = None) -> str | None:
+        """A kill switch blocks every new order and change, except a forced close by the exit
+        desk that only reduces (#262): it still passes every other check below, and the
+        reduce-only check can't let it reverse anything. Changes are always blocked."""
+        if request is not None and request.forced_close and request.reduce_only:
+            return None
         for switch in self._switches:
             if switch.engaged:
                 state = switch.state

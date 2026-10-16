@@ -349,3 +349,15 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Screens:** the order book marks closes; the square-off message is the server's own summary.
   - **Decided:** a plain sell stays unlimited (it may be meant to open a short); the desk still cancels it before a forced close.
   - **Checks:** 22 new tests, including a loss limit and a square-off at the same moment (closed once, never short); mutation 26/26 after four test gaps were filled.
+- 16 Oct, #261 merged (PR #339); `main` green. **#262 done** (STOP, cancel and flatten as separate safe operations).
+  - **Defects confirmed first (tests written before the change):**
+    - a STOP or the daily-loss stop blocked every new order, exits too, so reducing risk meant resuming trading first;
+    - a STOP's cancel-all turned an order the broker never answered into "cancel pending", so the evidence could no longer settle it and it stayed counted forever;
+    - the red band claimed "working orders cancelled" even when a cancel failed.
+  - **Decided:**
+    - **STOP** stays as it was (block, cancel, stop algos). It never closes, and now reports exactly what it did.
+    - **Flatten** is a separate, deliberate action allowed while stopped. Only the exit desk's orders get through the stop, and only if reduce-only; they still pass every other risk check.
+    - **A position whose size isn't known** (a reconcile alert or a re-check) is never flattened; the band says to close it at the broker.
+    - **Who may flatten:** the account's traders, risk and admin; it needs a confirmation and is audited (FLATTEN). One runs at a time per account, so repeated clicks close once.
+  - **Screens:** the red band shows the server's report and **Flatten (N)** (two clicks); STOP's report also goes to Messages.
+  - **Checks:** 13 new tests plus server tests; mutation 19/19 after adding a "one at a time" test; real browser check passed.

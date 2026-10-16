@@ -3,6 +3,7 @@
 
 import { useApp, useNow, useStore } from "../app/context";
 import { clock, shortName } from "../lib/format";
+import { StopBand } from "./StopBand";
 
 export const PRICES_OLD_MS = 5000;
 
@@ -17,7 +18,7 @@ export function Bands() {
   const ops = useStore((s) => s.ops);
 
   const bands = [];
-  if (firm.engaged) {
+  if (firm.engaged && !accountId) {
     bands.push(
       <div key="firm" role="alert" className="band firm">
         <b>ALL TRADING STOPPED (firm)</b>
@@ -28,17 +29,8 @@ export function Bands() {
       </div>,
     );
   }
-  if (kill?.engaged) {
-    bands.push(
-      <div key="stop" role="alert" className="band stopped">
-        <b>TRADING STOPPED · {accountId}</b>
-        <span>
-          {kill.reason}
-          {kill.by ? ` · by ${kill.by}` : ""} · working orders cancelled · positions kept · new orders blocked
-        </span>
-      </div>,
-    );
-  }
+  // stopped: what the STOP did, in the server's words, and Flatten (#262)
+  if (accountId && (firm.engaged || kill?.engaged)) bands.push(<StopBand key="stop" firm={firm.engaged} />);
   // operational alerts from the server: errors first (Kite login, prices stopped, disk)
   const opsAlerts = Object.values(ops).sort((a, b) => (a.level === b.level ? a.key.localeCompare(b.key) : a.level === "ERROR" ? -1 : 1));
   for (const a of opsAlerts) {

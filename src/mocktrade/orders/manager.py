@@ -356,6 +356,12 @@ class OrderManager:
         order.cancel_requested = True
         if not order.sent:
             return order.view()  # still at the gate: `submit` will finish it locally
+        if order.pending is Pending.UNCONFIRMED:
+            # its fate is unknown: it stays UNCONFIRMED (so the evidence can still settle it,
+            # #262); the cancel goes out the moment the broker names it
+            self._touch(order)
+            self._emit(EventKind.UPDATED, order, detail="cancel asked: sent if the broker has it")
+            return order.view()
         if order.broker_order_id is None:
             order.pending = Pending.CANCEL  # sent as soon as the broker's id arrives
             self._touch(order)
