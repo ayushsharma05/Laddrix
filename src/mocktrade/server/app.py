@@ -28,6 +28,9 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from mocktrade.alerts.engine import AlertError
+from mocktrade.alerts.engine import spec as alert_spec
+from mocktrade.alerts.service import MarketAlerts
 from mocktrade.algos.engine import AlgoError
 from mocktrade.algos.spec import spec_to_dict as algo_spec_to_dict
 from mocktrade.charges.model import bill_to_dict
@@ -245,6 +248,31 @@ class BacktestIn(_Strict):
     candles: bool = False
 
 
+class AlertIn(_Strict):
+    kind: str = Field(min_length=1, max_length=40)
+    instrument_id: str = Field(min_length=3, max_length=64)
+    params: dict[str, Any] = Field(default_factory=dict)
+    repeat: str = "once"
+    cooldown_s: int = 300
+    note: str = Field(default="", max_length=200)
+    webhook: bool = False
+
+
+class AlertPatch(_Strict):
+    kind: str | None = Field(default=None, min_length=1, max_length=40)
+    instrument_id: str | None = Field(default=None, min_length=3, max_length=64)
+    params: dict[str, Any] | None = None
+    repeat: str | None = None
+    cooldown_s: int | None = None
+    note: str | None = Field(default=None, max_length=200)
+    webhook: bool | None = None
+    enabled: bool | None = None
+
+
+class WebhookIn(_Strict):
+    url: str = Field(min_length=8, max_length=500)
+
+
 class CandlesIn(_Strict):
     instrument_id: str = Field(min_length=3, max_length=64)
     day: date
@@ -282,6 +310,7 @@ def create_app(
     backtests: Backtests | None = None,
     candles: CandleStore | None = None,
     charts: Charts | None = None,
+    market_alerts: MarketAlerts | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -296,6 +325,7 @@ def create_app(
         alerts=alerts,
         chains=chains,
         charts=charts,
+        market_alerts=market_alerts,
     )
     app.state.hub = hub
     METRICS.gauge("stream_connections", lambda: hub.connections)
@@ -629,6 +659,71 @@ def create_app(
         marks = await asyncio.to_thread(service.marks, account_id, chart_instrument(instrument_id),
                                         first, last)  # fmt: skip
         return {"account_id": account_id, "instrument_id": instrument_id, "marks": marks}
+
+    # --- market alerts (K12.3): each user's own ------------------------------------------------
+
+    def alert_service() -> MarketAlerts:
+        if market_alerts is None:
+            raise HTTPException(404, "alerts aren't set up on this server")
+        return market_alerts
+
+    @app.get("/api/alerts/spec")
+    async def alerts_spec(user: Me) -> dict[str, Any]:
+        alert_service()
+        return alert_spec()
+
+    @app.get("/api/alerts")
+    async def alerts_list(user: Me) -> list[dict[str, Any]]:
+        return alert_service().list(user.id)
+
+    @app.post("/api/alerts", status_code=201)
+    async def alerts_create(body: AlertIn, user: Me) -> dict[str, Any]:
+        try:
+            return alert_service().create(user.id, body.model_dump())
+        except AlertError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.get("/api/alerts/webhook")
+    async def alerts_webhook(user: Me) -> dict[str, Any]:
+        return alert_service().webhook(user.id)
+
+    @app.put("/api/alerts/webhook")
+    async def alerts_webhook_set(body: WebhookIn, user: Me) -> dict[str, Any]:
+        try:
+            return alert_service().set_webhook(user.id, body.url)
+        except AlertError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.delete("/api/alerts/webhook", status_code=204)
+    async def alerts_webhook_clear(user: Me) -> Response:
+        alert_service().clear_webhook(user.id)
+        return Response(status_code=204)
+
+    @app.post("/api/alerts/webhook/test")
+    async def alerts_webhook_test(user: Me) -> dict[str, Any]:
+        try:
+            error = await alert_service().test_webhook(user.id)
+        except AlertError as exc:
+            raise HTTPException(422, str(exc)) from None
+        return {"ok": not error, "error": error}
+
+    # (after the webhook routes: /api/alerts/webhook is not an alert id)
+    @app.patch("/api/alerts/{alert_id}")
+    async def alerts_update(alert_id: str, body: AlertPatch, user: Me) -> dict[str, Any]:
+        try:
+            return alert_service().update(user.id, alert_id, body.model_dump(exclude_unset=True))
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from None
+        except AlertError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.delete("/api/alerts/{alert_id}", status_code=204)
+    async def alerts_delete(alert_id: str, user: Me) -> Response:
+        try:
+            alert_service().delete(user.id, alert_id)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from None
+        return Response(status_code=204)
 
     # --- a replay server's controls (K11.2) ------------------------------------------------------
 
