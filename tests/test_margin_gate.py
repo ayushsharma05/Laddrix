@@ -28,7 +28,9 @@ class Quoter:
             await asyncio.sleep(5)
         if self.fail:
             raise self.fail
-        return BasketMargin(self.final, self.final)
+        # initial (the order alone) is more than final (with the positions' hedge): the gate
+        # must use final, what the broker actually blocks
+        return BasketMargin(self.final + 10_000_000, self.final)
 
 
 def gate(quoter, available=30_000_000, net=0, **kw):

@@ -41,3 +41,5 @@ from the repo root (elsewhere it creates a second demo user with a different sec
 | `e2e-charges.cjs` | Real browser on a fresh demo: the published schedule, a futures round trip, the day's charges, Positions gross/charges/net and the ticket estimate | `node context/scripts/e2e-charges.cjs` |
 | `mutate-reports.py` | 20 mutations of the report (carried in, each fill once, marks, strategies, alerts, history, CSV/PDF, store, day bounds); all caught | `python3 context/scripts/mutate-reports.py` (alone) |
 | `e2e-reports.cjs` | Real browser on a fresh demo: a futures round trip, the Reports tab (preview follows fills), CSV and PDF downloaded and read back, History | `node context/scripts/e2e-reports.cjs` |
+| `mutate-margin.py` | 15 mutations of the margin gate, the paper quote and the wiring; all caught | `python3 context/scripts/mutate-margin.py` (alone) |
+| `e2e-margin.cjs` | Real browser on a fresh demo: ticket margin line (1 and 5 lots), 2+2 lots bought, 1 more refused with both numbers, the exits accepted | `node context/scripts/e2e-margin.cjs` |
