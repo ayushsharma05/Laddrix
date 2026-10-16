@@ -18,6 +18,7 @@ import { Store, type State } from "../state/store";
 import { LinkBus } from "../workspace/links";
 import { KeyBindings } from "../keys/bindings";
 import { actionFor, chordOf, type Bindings, type Scope } from "../keys/model";
+import { ThemeSetting, type ThemeChoice, type ThemeEnv, type ThemeName } from "../theme/theme";
 
 export interface App {
   rest: Rest;
@@ -28,10 +29,11 @@ export interface App {
   specs: OrderSpecs;
   links: LinkBus;
   keys: KeyBindings; // the user's keyboard shortcuts (K13.4)
+  theme: ThemeSetting; // dark, light or colour-blind safe (K13.5)
 }
 
 /** Wires the real services for the browser. Tests build their own with fakes. */
-export function createApp(opts: { rest?: Rest; stream?: StreamClient; store?: Store } = {}): App {
+export function createApp(opts: { rest?: Rest; stream?: StreamClient; store?: Store; themeEnv?: ThemeEnv } = {}): App {
   const rest = opts.rest ?? new Rest();
   const scheme = location.protocol === "https:" ? "wss:" : "ws:";
   const stream = opts.stream ?? new StreamClient({ url: `${scheme}//${location.host}/ws` });
@@ -45,6 +47,7 @@ export function createApp(opts: { rest?: Rest; stream?: StreamClient; store?: St
     specs: new OrderSpecs(rest),
     links: new LinkBus(),
     keys: new KeyBindings(rest),
+    theme: new ThemeSetting(rest, opts.themeEnv),
   };
 }
 
@@ -162,4 +165,16 @@ export function useKeyBindings(): Bindings {
 export function useKeyAction(scope: Scope): (e: { key: string; code: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean }) => string | null {
   const bindings = useKeyBindings();
   return (e) => actionFor(chordOf(e), scope, bindings);
+}
+
+/** The theme shown now (re-renders on a switch: canvases redraw with its colours). */
+export function useTheme(): ThemeName {
+  const { theme } = useApp();
+  return useSyncExternalStore(theme.subscribe, theme.getTheme);
+}
+
+/** What the user chose ("system" follows the computer). */
+export function useThemeChoice(): ThemeChoice {
+  const { theme } = useApp();
+  return useSyncExternalStore(theme.subscribe, theme.getChoice);
 }

@@ -351,7 +351,7 @@
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
-  color: var(--on-strong);
+  color: var(--ladder-ink);
   background: var(--body);
   border: 0;
   border-right: 1px solid var(--border-dark);
@@ -414,10 +414,12 @@ button.lc:disabled {
   font-weight: 600;
 }
 .lc.ltq.up {
+  color: var(--on-strong);
   background: var(--last);
 }
 .lc.ltq.down {
-  background: var(--ask);
+  color: var(--on-strong);
+  background: var(--sell-strong);
 }
 .lc.vap {
   text-align: right;
@@ -700,12 +702,12 @@ button.lc:disabled {
 }
 .ticket-sides .side.buy.on {
   color: var(--on-strong);
-  background: var(--bid);
+  background: var(--buy-strong);
   border-color: var(--work-buy);
 }
 .ticket-sides .side.sell.on {
   color: var(--on-strong);
-  background: var(--ask);
+  background: var(--sell-strong);
   border-color: var(--work-sell);
 }
 .ticket-types {
@@ -1221,7 +1223,7 @@ label.algo-field {
 }
 .btn.small.danger-confirm:not(:disabled) {
   color: var(--on-strong);
-  background: var(--bid);
+  background: var(--buy-strong);
   border-color: var(--work-buy);
 }
 

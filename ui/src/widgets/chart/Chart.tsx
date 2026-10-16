@@ -14,7 +14,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Candle, CandlesAnswer, ChartMark, ChartSpec } from "../../api/types";
-import { useApp, useInstrument, useKeyAction, useStore } from "../../app/context";
+import { useApp, useInstrument, useKeyAction, useStore, useTheme } from "../../app/context";
 import { SearchBox } from "../../components/SearchBox";
 import { clock, price, shortName, shortVolume } from "../../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
@@ -43,6 +43,7 @@ export function Chart(props: WidgetProps<ChartParams>) {
 
 function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartParams> & { instrumentId: string }) {
   const keyAction = useKeyAction("chart");
+  const theme = useTheme(); // a switch redraws the canvas with the new colours
   const { rest, stream, links } = useApp();
   const instrument = useInstrument(id);
   const accountId = useStore((s) => s.accountId);
@@ -168,7 +169,7 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
     canvas.height = size.height * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawChart(ctx, { width: size.width, height: size.height, candles, view, marks: byCandle, hover, daily, colours: readColours(boxRef.current), tick: instrument?.tick_paise });
-  }, [candles, view, size, byCandle, hover, daily, instrument]);
+  }, [candles, view, size, byCandle, hover, daily, instrument, theme]);
 
   const pointer = (e: React.MouseEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
