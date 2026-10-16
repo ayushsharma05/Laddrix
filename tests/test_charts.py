@@ -70,6 +70,14 @@ def test_the_hand_worked_minute():
     assert b.forming("NSE:NOPE", MINUTE) is None
 
 
+def test_a_quote_in_a_new_minute_opens_no_candle():
+    b = hand_worked()
+    b.on_tick(tick(t(9, 17, 1), 10010, 1300))  # no new volume, the same price: a quote
+    b.on_tick(tick(t(9, 18, 1), 10020, 1300))  # a new price without volume still draws
+    got = b.candles(FUT, MINUTE, t(9), t(10))
+    assert [c.start for c in got] == [t(9, 15), t(9, 16), t(9, 18)]
+
+
 @pytest.mark.parametrize(
     "at, code, start",
     [
@@ -386,7 +394,7 @@ async def test_the_chart_api(live):
     await client.aclose()
 
 
-async def test_the_forming_candle_streams_at_most_once_a_second(live):
+async def test_the_forming_candle_streams_at_most_once_a_second(live, monkeypatch):
     from test_stream import all_of, next_of
 
     client = await live.session()
@@ -410,6 +418,13 @@ async def test_the_forming_candle_streams_at_most_once_a_second(live):
         await asyncio.sleep(0.1)
         live.md.on_tick(tick(t(9, 21), 2502000, 3000))
         assert await all_of(ws, "candle", quiet=0.5) == []
+        await ws.send(json.dumps({"op": "candles", "instrument_id": FUT, "interval": "2m"}))
+        assert "interval must be one of" in (await next_of(ws, "error"))["message"]
+        monkeypatch.setattr("mocktrade.server.stream.MAX_CHARTS", 2)
+        for code in ("1m", "1m", "5m"):  # the same chart twice replaces it
+            await ws.send(json.dumps({"op": "candles", "instrument_id": FUT, "interval": code}))
+        await ws.send(json.dumps({"op": "candles", "instrument_id": FUT, "interval": "1h"}))
+        assert (await next_of(ws, "error"))["message"] == "at most 2 charts at a time"
         await ws.send(json.dumps({"op": "candles", "instrument_id": FUT, "interval": "2m"}))
         assert "interval must be one of" in (await next_of(ws, "error"))["message"]
         await ws.send(json.dumps({"op": "candles", "instrument_id": "NFO:NOPE", "interval": "1m"}))

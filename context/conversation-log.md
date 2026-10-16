@@ -167,3 +167,9 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
   - Decision: the screen shows each day's replay command (Copy) rather than the server starting replay processes; that belongs with the K13 admin panel. Found and noted a real gap: a live server's recordings can't be replayed yet (the replay tool knows only the demo's instruments).
   - The mutation script caught an editing slip of Claude's: the store interface (Protocol) had been given a method body.
 - K12 issues created: #231–#234.
+- K11.5 merged (#236). K12.1 (#231) candles:
+  - **Design:** only 1-minute candles are built live (cheap per tick); bigger ones are added up on request. Buckets sit on the session grid in India time. Volume comes from the day's total, as VAP does; quotes are ignored.
+  - **History joined to live:** each bucket appears once, and the builder's partial first minute never replaces a whole one from history.
+  - **History sources:** Kite's historical API is in the ₹500 plan (checked on the web). Its range limits and 3/s rate come from the forum only and are flagged to verify. On paper and the demo, history comes from the recordings.
+  - **Fixes:** self-review caught a performance trap: today's recording was re-read on every request. It is now rebuilt at most once a minute. The mutation script found two gaps in the tests (quotes in a new minute; the per-connection chart limit), now covered.
+  - **Check:** on the demo, a minute from the API matched the same minute worked by hand from the recording.

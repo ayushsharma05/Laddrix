@@ -117,25 +117,20 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-**Where we are (16 Oct 2026):** K0–K10 are merged on `main` (K10: PRs #218–#222). K11 is complete once K11.5's PR merges. Safety fixes #206 and #207 are merged. Main CI is green. **Claude merges its own PRs once CI is green** (Ayush, 15 Oct). K10 issues exist: #213 (K10.1), #214 (K10.2), #215 (K10.3), #216 (K10.4), #217 (K10.5).
+**Where we are (16 Oct 2026):** K0–K10 are merged on `main` (K10: PRs #218–#222). K11 is complete; K12 has started. Safety fixes #206 and #207 are merged. Main CI is green. **Claude merges its own PRs once CI is green** (Ayush, 15 Oct). K10 issues exist: #213 (K10.1), #214 (K10.2), #215 (K10.3), #216 (K10.4), #217 (K10.5).
 
 1. **K10.1 (#213) is merged** (PR #218). See `docs/design/portfolio.md`: optional ports `FundsSource`/`HoldingsSource`/`TradesSource`; `PortfolioService` (`AccountRuntime.portfolio`: cached, one read per kind, stale-not-empty with `as_of`/`error`, refresh 0.5 s after fills, holdings live-marked); REST `GET /api/accounts/{a}/funds|holdings|trades[?fresh=true]`; stream type `portfolio`; paper money in `broker/paper_funds.py` (`PaperMargins`, `MOCKTRADE_PAPER_FUNDS`); recovery hands paper CNC over as holdings; UI `ui/src/widgets/portfolio/` (Funds, Holdings, TradesTable in the order book).
 2. **K10.2 (#214) is merged** (PR #219). See `docs/design/charges.md`.
 3. **K10.3 (#215) is merged** (PR #220). See `docs/design/reports.md`.
 4. **K10.4 (#216) is merged** (PR #221). See `docs/design/margin.md`.
 5. **K10.5 (#217) is merged** (PR #222). **K10 is complete.**
-6. **K11 research:** #223–#226 merged (PRs #227–#230). **K11.5 (#235) follow-ups are done** on branch `k11-5-research-followups` (PR "Closes #235"; merge on green CI if still open):
-   - Admin-only, audited delete of a recorded day (never today).
-   - The replay command per day with Copy, offered only where replay works (the demo).
-   - Known gap: replaying a live Kite server's recordings needs that day's instrument list.
+6. **K11 research is complete** (#223–#226, #235; PRs #227–#230, #236). **K12 issues (label `track: kite`):**
+   - #231 K12.1 candles and chart data API: **done** on branch `k12-1-candles` (PR "Closes #231"; merge on green CI if still open). See `docs/design/charts.md`.
+   - #232 K12.2 chart widget: **next**. Canvas candles with a volume pane and the live forming candle (stream op `candles`). Intervals come from `GET /api/charts/spec`. History loads as you pan left (`start`/`end`). Trade marks come from `…/charts/{i}/marks`. Click-to-trade goes through the ticket. Colours are validated.
+   - #233 K12.3 alerts engine and webhooks.
+   - #234 K12.4 alerts manager, time & sales, depth, movers.
 
-   **K12 issues created (label `track: kite`):**
-   - #231 K12.1 candles and chart data API
-   - #232 K12.2 chart widget
-   - #233 K12.3 alerts engine and webhooks
-   - #234 K12.4 alerts manager, time & sales, depth, movers
-
-   **Next: #231.**
+   Known gap from K11.5: replaying a live Kite server's recordings needs that day's instrument list.
 7. Then K12 charts & alerts (charts with trade marks, price/%/volume/OI alerts in app and by webhook, time & sales, depth, movers), K13 admin & phone (admin panel, per-user limits, phone screens, keyboard shortcut editor, themes). See `docs/design/product-vision.md`.
 8. Ayush's own steps (not code): `docs/runbooks/server.md` (AWS Mumbai, static IP, Kite app ₹500/month, AMO check), then a real trading day; before selling to others: the broker's multi-user arrangement, exchange algo empanelment, licensed market data, legal review.
 
