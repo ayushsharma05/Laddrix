@@ -1,3 +1,4 @@
+import { marginText } from "./useChargeEstimate";
 import type { OrderTypeSpec } from "../../api/types";
 import { orderSpec } from "../../test/fixtures";
 import { buildTicketOrder, parsePrice, paysAtMost, pickType, pickValidity, stepPrice, summarise, ticketProblem, type TicketInput } from "./model";
@@ -109,5 +110,18 @@ describe("the ticket follows the server's spec", () => {
     const iceberg: OrderTypeSpec = { ...TYPE("LMT"), code: "ICEBERG", label: "ICE", name: "Iceberg", validities: ["DAY"] };
     const body = buildTicketOrder({ ...t(), type: iceberg }, ID, "T9");
     expect(body).toMatchObject({ order_type: "ICEBERG", price_paise: 2501000, trigger_paise: null, market_protection: null });
+  });
+});
+
+
+describe("margin line", () => {
+  const base = { exit: false, required_paise: 100, available_paise: 500, enough: true, note: "", checked_before_sending: true };
+  const fmt = (p: number) => `₹${p}`;
+  it("says the margin, an exit, or why it is unknown", () => {
+    expect(marginText(base, fmt)).toMatchObject({ text: "Margin ≈ ₹100 of ₹500", tone: "" });
+    expect(marginText({ ...base, exit: true }, fmt)).toMatchObject({ text: "Margin: none (an exit)", tone: "dim" });
+    expect(marginText({ ...base, required_paise: null, enough: null, note: "no margin quote within 1 s" }, fmt)).toMatchObject({ text: "Margin: –", title: "no margin quote within 1 s" });
+    expect(marginText({ ...base, available_paise: null, enough: null }, fmt).text).toBe("Margin ≈ ₹100");
+    expect(marginText({ ...base, enough: false, checked_before_sending: false }, fmt).title).toContain("the broker may reject it");
   });
 });

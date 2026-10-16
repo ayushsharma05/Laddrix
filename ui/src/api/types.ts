@@ -513,3 +513,14 @@ export interface PnlHistory {
   total: { gross_paise: number; charges_paise: number; net_paise: number };
   missing_days: string[]; // trading days without a kept report (not counted as zero)
 }
+
+// --- margin: what an order would block (POST /api/accounts/{a}/margin) ------------------------
+
+export interface MarginCheck {
+  exit: boolean; // only reduces the position: never checked, always allowed
+  required_paise: number | null; // null: the broker couldn't say
+  available_paise: number | null; // null: funds unknown
+  enough: boolean | null; // null: can't be told (the order still goes, with a warning)
+  note: string;
+  checked_before_sending: boolean; // the account refuses orders without enough margin
+}

@@ -10,7 +10,7 @@
 // (tradingBlock) runs before every send, and the server checks everything again.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { chargeLines, useChargeEstimate } from "./useChargeEstimate";
+import { chargeLines, marginText, useChargeEstimate, useMarginCheck } from "./useChargeEstimate";
 import { ApiError } from "../../api/rest";
 import type { Instrument, OrderSpec, OrderView, Side } from "../../api/types";
 import { useApp, useInstrument, useOrderSpec, useStore, useTick } from "../../app/context";
@@ -127,13 +127,16 @@ function TicketBody({
   );
   const summary = summarise(input, ltp, position, workingSameSide);
   const qty = lots * spec.lot_size;
-  const charges = useChargeEstimate(accountId, {
+  const estimateFor = {
     instrumentId: id,
     side,
     qty,
     pricePaise: summary.value !== null && qty ? Math.round(summary.value / qty) : null,
     product,
-  });
+  };
+  const charges = useChargeEstimate(accountId, estimateFor);
+  const margin = useMarginCheck(accountId, estimateFor);
+  const marginLine = margin ? marginText(margin, rupees) : null;
   const what = `${side} ${fmtQty(qty)} ${instrument.symbol}${needsPrice(type) && price !== null ? ` @ ${fmtPrice(price)}` : ` ${type.label}`}${needsTrigger(type) && trigger !== null ? ` trigger ${fmtPrice(trigger)}` : ""}`;
 
   const signature = JSON.stringify([side, priceText, triggerText, lots, type.code, tif, product, accountId]);
@@ -365,6 +368,11 @@ function TicketBody({
         <span title={charges ? chargeLines(charges, fmtPrice) : "Charges if it fills in full (brokerage, taxes, fees)"}>
           Charges ≈ <b>{charges ? rupees(charges.total_paise) : "–"}</b>
         </span>
+        {marginLine && (
+          <span className={marginLine.tone ? `tone-${marginLine.tone}` : ""} title={marginLine.title}>
+            {marginLine.text}
+          </span>
+        )}
         <span>
           Worst position{" "}
           <b className={summary.worstPosition > 0 ? "buy-text" : summary.worstPosition < 0 ? "sell-text" : ""}>
