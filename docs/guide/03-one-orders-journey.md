@@ -37,6 +37,7 @@ From `src/mocktrade/domain/money.py`:
 ```python
 PAISE_PER_RUPEE = 100
 
+
 def to_paise(rupees: str | Decimal) -> int:
     """Turn a rupee amount like "2501.05" into whole paise (250105)."""
 ```
@@ -52,10 +53,11 @@ class Side(Enum):
     BUY = "BUY"
     SELL = "SELL"
 
+
 class OrderStatus(Enum):
-    PENDING = "PENDING"      # sent, broker hasn't confirmed yet
-    OPEN = "OPEN"            # working at the exchange
-    PARTIAL = "PARTIAL"      # partly filled, rest still working
+    PENDING = "PENDING"  # sent, broker hasn't confirmed yet
+    OPEN = "OPEN"  # working at the exchange
+    PARTIAL = "PARTIAL"  # partly filled, rest still working
     FILLED = "FILLED"
     CANCELLED = "CANCELLED"
     REJECTED = "REJECTED"
@@ -73,28 +75,28 @@ shortened, with the meaning of each line:
 
 ```python
 order = _Order(request=request, created_at=now, updated_at=now)
-self._orders[request.client_order_id] = order        # remember it, by its id (MT7)
-self._emit(EventKind.SUBMITTED, order)               # tell everyone: "a new order"
+self._orders[request.client_order_id] = order  # remember it, by its id (MT7)
+self._emit(EventKind.SUBMITTED, order)  # tell everyone: "a new order"
 
-reason = self._rule_problem(request)                  # basic sanity
+reason = self._rule_problem(request)  # basic sanity
 if reason is None:
-    reason = await self._gate.admit_new(request)      # ⑥ the safety inspector
+    reason = await self._gate.admit_new(request)  # ⑥ the safety inspector
 if reason is not None:
-    self._reject_locally(order, reason)               # refused: say why, stop here
+    self._reject_locally(order, reason)  # refused: say why, stop here
     return order.view()
 
 try:
-    broker_order_id = await self._broker.place(request)   # ⑦ to the broker
+    broker_order_id = await self._broker.place(request)  # ⑦ to the broker
 except BrokerError as exc:
-    self._reject_locally(order, exc.reason)           # the broker clearly said no
+    self._reject_locally(order, exc.reason)  # the broker clearly said no
     return order.view()
-except Exception as exc:                              # NO clear answer (timeout…)
+except Exception as exc:  # NO clear answer (timeout…)
     self._mark_unconfirmed(order, f"no answer from broker: {exc!r}")
-    self.follow_unconfirmed()                         # keep asking the broker, by itself
+    self.follow_unconfirmed()  # keep asking the broker, by itself
     return order.view()
 
-self._register_broker_id(order, broker_order_id)     # the broker's own id for it
-self._emit(EventKind.SENT, order)                     # tell everyone: "sent"
+self._register_broker_id(order, broker_order_id)  # the broker's own id for it
+self._emit(EventKind.SENT, order)  # tell everyone: "sent"
 ```
 
 - **`await`** means "wait here for the answer, but let other work go on meanwhile". The server
