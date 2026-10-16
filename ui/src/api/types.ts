@@ -463,3 +463,53 @@ export interface ChargeBill {
   by_position: Record<string, number>; // "instrument_id|product" -> its charges today (positionKey)
   schedule: { name: string; checked_on: string; source: string };
 }
+
+// --- end-of-day reports and P&L history (GET …/reports, …/reports/{day}, …/pnl) ---------------
+
+export interface ReportDays {
+  today: string; // YYYY-MM-DD, India
+  kept: string[]; // days whose report was kept after the close
+}
+
+export interface DayReport {
+  account_id: string;
+  day: string;
+  generated_at: string;
+  final: boolean; // kept after the close (otherwise a preview or a rebuild)
+  priced: boolean;
+  notes: string[];
+  schedule: string;
+  totals: { realised_paise: number; unrealised_paise: number; gross_paise: number; charges_paise: number; net_paise: number; turnover_paise: number; trades: number };
+  charge_lines: { label: string; paise: number }[];
+  positions: {
+    instrument_id: string;
+    product: string;
+    carried_qty: number;
+    reference_paise: number | null;
+    buy_qty: number;
+    buy_value_paise: number;
+    sell_qty: number;
+    sell_value_paise: number;
+    closing_qty: number;
+    mark_paise: number | null;
+    realised_paise: number;
+    unrealised_paise: number;
+    gross_paise: number;
+    charges_paise: number;
+    net_paise: number;
+  }[];
+  strategies: { strategy: string; trades: number; gross_paise: number; charges_paise: number; net_paise: number }[];
+  trades: { ts: string; client_order_id: string; instrument_id: string; side: Side; product: string; qty: number; price_paise: number; value_paise: number; strategy: string }[];
+  rejects: { ts: string; detail: string }[];
+  alerts: { ts: string; kind: string; detail: string }[];
+}
+
+export interface PnlHistory {
+  account_id: string;
+  by: "day" | "instrument" | "strategy";
+  from: string;
+  to: string;
+  rows: { key: string; gross_paise: number; charges_paise: number; net_paise: number; trades: number }[];
+  total: { gross_paise: number; charges_paise: number; net_paise: number };
+  missing_days: string[]; // trading days without a kept report (not counted as zero)
+}

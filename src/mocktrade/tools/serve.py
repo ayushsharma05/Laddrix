@@ -73,6 +73,8 @@ from mocktrade.ops.scheduler import Scheduler, parse_holidays
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
+from mocktrade.reports.service import Reports
+from mocktrade.reports.store import ReportStore
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.server.app import ServerSettings, create_app
 from mocktrade.server.security import SecretBox
@@ -331,6 +333,12 @@ def build(settings: ServeSettings) -> Assembly:
         scheduler.every(60, checks.kite_login, between=("08:30", "15:30"), name="kite login")
     scheduler.every(15, checks.prices, between=("09:16", "15:30"), name="prices")
     scheduler.every(300, checks.disk, between=("00:00", "23:59"), name="disk")
+    reports = Reports(
+        platform,
+        ReportStore(settings.data_dir / "reports"),
+        is_trading_day=scheduler.is_trading_day,
+    )
+    scheduler.daily("16:00", reports.close_of_day, "end-of-day reports")
     jobs.append(scheduler.run)
     ui = settings.ui_dir if (settings.ui_dir / "index.html").exists() else None
     if ui is None:
@@ -343,6 +351,7 @@ def build(settings: ServeSettings) -> Assembly:
         broker_status=kite.status if kite else None,
         alerts=alerts,
         scheduler=scheduler,
+        reports=reports,
         static_dir=ui,
     )
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)

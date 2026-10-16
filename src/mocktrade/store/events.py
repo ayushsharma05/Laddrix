@@ -28,7 +28,7 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -314,6 +314,18 @@ class EventLog:
         sql = f"""SELECT * FROM events WHERE seq < ? AND account_id IN ({marks})
                   ORDER BY seq DESC LIMIT ?"""
         return self._query(sql, (top, *names, limit))
+
+    def between(self, names: list[str], start: datetime, end: datetime) -> list[StoredEvent]:
+        """Events of these log names with start <= ts < end, oldest first (a day's report).
+        Times are stored as ISO text in UTC; a day either side is read, then checked exactly."""
+        if not names:
+            return []
+        marks = ",".join("?" * len(names))
+        low = (start - timedelta(days=1)).astimezone(UTC).isoformat()
+        high = (end + timedelta(days=1)).astimezone(UTC).isoformat()
+        sql = f"""SELECT * FROM events WHERE account_id IN ({marks}) AND ts >= ? AND ts < ?
+                  ORDER BY seq"""
+        return [e for e in self._query(sql, (*names, low, high)) if start <= e.ts < end]
 
     def fills(self, account_id: str) -> list[StoredEvent]:
         """Every fill of one account, oldest first (rebuilding positions after a restart)."""

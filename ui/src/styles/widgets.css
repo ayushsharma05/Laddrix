@@ -1269,3 +1269,40 @@ label.algo-field {
 .funds-lines dd {
   margin: 0;
 }
+
+/* Reports (widgets/reports/Reports.tsx) */
+.reports-body {
+  padding: 4px 8px;
+}
+.reports-body h4 {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  color: var(--text-2);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.report-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  padding: 4px 0;
+}
+.report-totals b {
+  margin-left: 4px;
+}
+.report-pos-row {
+  grid-template-columns: minmax(110px, 1.4fr) 48px 56px 64px 64px 56px 84px minmax(90px, 1fr) 72px minmax(90px, 1fr);
+}
+.report-strategy-row {
+  grid-template-columns: minmax(120px, 1.6fr) 84px minmax(90px, 1fr) 80px minmax(90px, 1fr);
+}
+.report-trade-row {
+  grid-template-columns: 64px minmax(110px, 1.4fr) 42px 64px 90px minmax(90px, 1fr);
+}
+.report-notes {
+  margin: 0;
+  padding-left: 16px;
+}
+.reports .book-bar a.btn {
+  text-decoration: none;
+}
