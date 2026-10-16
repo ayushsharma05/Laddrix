@@ -47,6 +47,10 @@ class TickStore(Protocol):
 
     def read(self, day: date, instruments: Iterable[str] | None = None) -> Iterator[Tick]: ...
 
+    def today(self) -> date: ...
+
+    def delete(self, day: date) -> None: ...
+
 
 # --- one tick as one line ------------------------------------------------------------------------
 
@@ -94,9 +98,16 @@ def decode(line: str) -> tuple[Tick, int]:
 
 
 class FileTickStore:
-    def __init__(self, root: str | Path, *, keep_days: int = 30) -> None:
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        keep_days: int = 30,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ) -> None:
         self.root = Path(root)
         self.keep_days = keep_days
+        self._clock = clock
 
     def append(self, batch: list[tuple[Tick, datetime]]) -> None:
         """Write one batch (a worker thread calls this, never the trading loop)."""
@@ -166,6 +177,20 @@ class FileTickStore:
             shutil.rmtree(self.root / day.isoformat(), ignore_errors=True)
             log.info("tick recordings of %s deleted (keeping %d days)", day, self.keep_days)
         return gone
+
+    def today(self) -> date:
+        """The India day being written now."""
+        return self._clock().astimezone(IST).date()
+
+    def delete(self, day: date) -> None:
+        """Delete one recorded day (a person asked). Today's day is still being written: refused."""
+        if day == self.today():
+            raise ValueError(f"{day} is today: it is still being recorded")
+        folder = self.root / day.isoformat()
+        if not folder.is_dir():
+            raise LookupError(f"nothing recorded on {day}")
+        shutil.rmtree(folder)
+        log.info("tick recordings of %s deleted on request", day)
 
     # --- inside -----------------------------------------------------------------------------
 

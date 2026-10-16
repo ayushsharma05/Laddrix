@@ -170,3 +170,61 @@ def test_the_recording_setting(value, ok):
     else:
         with pytest.raises(ConfigError, match="MOCKTRADE_RECORD_DAYS"):
             ServeSettings.from_env(env(MOCKTRADE_RECORD_DAYS=value))
+
+
+def test_a_day_is_deleted_on_request_but_never_today(tmp_path):
+    now = T0 + timedelta(days=2)
+    store = FileTickStore(tmp_path, clock=lambda: now)
+    for n in range(3):
+        at = T0 + timedelta(days=n)
+        store.append([(full(at=at), at)])
+    store.delete(date(2026, 10, 16))
+    assert store.days() == [date(2026, 10, 17), date(2026, 10, 18)]
+    with pytest.raises(ValueError, match="2026-10-18 is today: it is still being recorded"):
+        store.delete(date(2026, 10, 18))
+    with pytest.raises(LookupError, match="nothing recorded on 2026-10-16"):
+        store.delete(date(2026, 10, 16))
+    late = datetime(2026, 10, 18, 23, 0, tzinfo=UTC)  # already the 19th in India
+    FileTickStore(tmp_path, clock=lambda: late).delete(date(2026, 10, 18))
+    assert store.days() == [date(2026, 10, 17)]
+
+
+async def test_deleting_a_recorded_day_and_the_replay_command(tmp_path, nifty_fut):
+    from test_server import ORIGIN
+    from test_server import World as ServerWorld
+
+    from mocktrade.server.app import ServerSettings, create_app
+
+    w = ServerWorld(tmp_path, nifty_fut)
+    store = FileTickStore(tmp_path / "ticks", clock=lambda: T0 + timedelta(days=1))
+    for at in (T0, T0 + timedelta(days=1)):
+        store.append([(full(at=at), at)])
+    w.app = create_app(w.platform, w.users, ServerSettings(origin=ORIGIN), ticks=store,
+                       replay_command=lambda d: f"replay {d}")  # fmt: skip
+    trader = await w.logged_in("riya")
+    listing = (await trader.get("/api/research/recordings")).json()
+    assert [d["deletable"] for d in listing["days"]] == [False, False]  # not an admin
+    assert [d["replay"] for d in listing["days"]] == ["replay 2026-10-17", "replay 2026-10-16"]
+    r = await trader.delete("/api/research/recordings/2026-10-16")
+    assert r.status_code == 403 and "only an admin" in r.json()["detail"]
+    admin = await w.logged_in("ayush")
+    seen = (await admin.get("/api/research/recordings")).json()["days"]
+    assert [(d["day"], d["deletable"]) for d in seen] == [("2026-10-17", False),
+                                                          ("2026-10-16", True)]  # fmt: skip
+    today = await admin.delete("/api/research/recordings/2026-10-17")
+    assert today.status_code == 409 and "still being recorded" in today.json()["detail"]
+    ok = await admin.delete("/api/research/recordings/2026-10-16")
+    assert ok.status_code == 200 and ok.json() == {"day": "2026-10-16", "deleted": True}
+    assert store.days() == [date(2026, 10, 17)]
+    again = await admin.delete("/api/research/recordings/2026-10-16")
+    assert again.status_code == 404
+    assert (await admin.delete("/api/research/recordings/yesterday")).status_code == 422
+    await w.log.flush()
+    audit = w.log.notes("-", ["RECORDING_DELETED"])
+    assert len(audit) == 1 and audit[0].detail.startswith("ayush deleted the ticks of 2026-10-16")
+    w.app = create_app(w.platform, w.users, ServerSettings(origin=ORIGIN), ticks=store)
+    plain = await w.logged_in("ayush")
+    assert "replay" not in (await plain.get("/api/research/recordings")).json()["days"][0]
+    for c in (trader, admin, plain):
+        await c.aclose()
+    w.log.close()

@@ -148,6 +148,8 @@ async def main(
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
     app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler,
                      reports=reports, alerts=alerts, ticks=ticks, replay=feed,
+                     replay_command=lambda d: f"python -m mocktrade.tools.demo --replay {d} "
+                                              f"--port {port + 1}",
                      backtests=backtests, candles=candle_store)  # fmt: skip
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
     what = "demo" if feed is None else f"REPLAY of {replay_day} at {speed:g}×"

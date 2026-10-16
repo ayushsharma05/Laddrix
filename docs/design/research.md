@@ -173,3 +173,24 @@ Checks:
 - `ui/src/widgets/research/*.test.ts(x)`;
 - `context/scripts/mutate-research.py`;
 - `context/scripts/e2e-research.cjs` (real browser on the demo's recording).
+
+## K11.5 Research follow-ups (#235)
+
+Two parts of #226 that K11.4 left out.
+
+- **Delete a recorded day:** `DELETE /api/research/recordings/{day}`.
+  - Admin only (403 otherwise).
+  - Refused for today's India day, which is still being written (409).
+  - A missing day gives 404.
+  - Audited as `RECORDING_DELETED` with who and how many bytes.
+  - The listing marks each day `deletable` for this user, so the screen never guesses what "today" is.
+  - The Recordings widget asks for a second click ("Confirm: delete <day> (<size>)") before sending.
+- **Replay from the screen:** a replay runs as its own server with its own data folder, so practice can never mix with live. The live server is not switched into replay. The server publishes the command for each day (`replay`) only where its days can be replayed, which today means the demo. The screen shows the command with a Copy button.
+  - A server that starts and stops replay processes itself (another port, its own login) belongs with the K13 admin panel.
+  - **Known gap:** replaying a *live* (Kite) server's recordings needs that day's instrument list; the replay tool uses the demo's instruments. This is still to build before practising on real recorded days.
+
+Checks:
+- `tests/test_ticks_recorder.py`;
+- `ui/src/widgets/research/research.test.tsx`;
+- `context/scripts/mutate-recordings.py` (13/13);
+- `context/scripts/e2e-recordings.cjs`, a real browser on the demo. It deleted an older day (files gone, audit row written), today offered no delete, and the copied replay command was run and started a replay server.

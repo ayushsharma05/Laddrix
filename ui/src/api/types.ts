@@ -560,6 +560,8 @@ export interface RecordedDay {
   bytes: number;
   segments: Record<string, number>; // segment -> bytes on disk
   instruments: number;
+  deletable?: boolean; // this user may delete it now (an admin; not today, still being written)
+  replay?: string; // the command that replays it, where this server's days can be replayed
 }
 
 export interface Recordings {
