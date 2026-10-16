@@ -143,11 +143,18 @@ class FileTickStore:
 
     def read(self, day: date, instruments: Iterable[str] | None = None) -> Iterator[Tick]:
         """Every tick of the day in the order they were recorded (segments merged)."""
+        for _, tick in self.read_timed(day, instruments):
+            yield tick
+
+    def read_timed(
+        self, day: date, instruments: Iterable[str] | None = None
+    ) -> Iterator[tuple[int, Tick]]:
+        """(when it was recorded, epoch µs; the tick), in recorded order: what a replay needs."""
         wanted = set(instruments) if instruments is not None else None
         folder = self.root / day.isoformat()
         streams = [self._lines(f, wanted) for f in sorted(folder.glob(f"*{SUFFIX}"))]
-        for _, _, tick in heapq.merge(*streams):
-            yield tick
+        for recorded, _, tick in heapq.merge(*streams):
+            yield recorded, tick
 
     def rotate(self, today: date | None = None) -> list[date]:
         """Delete the oldest days beyond `keep_days`. Returns what was deleted."""
