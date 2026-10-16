@@ -22,6 +22,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import secrets
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import asdict, dataclass, field
@@ -404,38 +405,84 @@ def _chain(first, rest):
     yield from rest
 
 
+# an instrument id as the store accepts it: EXCHANGE:SYMBOL, no path characters (#269)
+_CANDLE_ID = re.compile(r"^[A-Z]{2,4}:[A-Za-z0-9][A-Za-z0-9 &._-]{0,59}$")
+_DAY_FILE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 class CandleStore:
-    """Imported OHLC candles: `<root>/<instrument id, ':' as '_'>/<YYYY-MM-DD>.json`."""
+    """Imported OHLC candles: `<root>/<instrument id, ':' as '_'>/<YYYY-MM-DD>.json`.
+
+    The instrument id becomes a folder name, so it is checked first: EXCHANGE:SYMBOL with no
+    path characters, and the folder must sit directly under the root (a `..` or an absolute
+    path can never reach outside it). A day is written whole or not at all."""
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root)
 
+    def _folder(self, instrument_id: str) -> Path:
+        if not _CANDLE_ID.match(instrument_id) or ".." in instrument_id:
+            raise BacktestError(f"not an instrument id: {instrument_id!r}")
+        folder = self.root / instrument_id.replace(":", "_")
+        if folder.resolve().parent != self.root.resolve():
+            raise BacktestError(f"not an instrument id: {instrument_id!r}")  # never outside
+        return folder
+
     def put(self, instrument_id: str, day: date, rows: list[dict[str, Any]]) -> int:
+        folder = self._folder(instrument_id)
         problems = []
+        seen: set[datetime] = set()
         for n, r in enumerate(rows, 1):
             try:
-                o, h, low, c = (int(r[k]) for k in ("open", "high", "low", "close"))
+                o, h, low, c = (_whole(r[k]) for k in ("open", "high", "low", "close"))
+                volume = _whole(r.get("volume", 0))
                 at = datetime.fromisoformat(r["time"])
             except (KeyError, ValueError, TypeError):
-                problems.append(f"row {n}: needs time (ISO), open, high, low, close (paise)")
+                problems.append(f"row {n}: needs time (ISO), open, high, low, close (paise) and "
+                                "an optional whole volume")  # fmt: skip
                 continue
             if at.tzinfo is None or at.astimezone(IST).date() != day:
                 problems.append(f"row {n}: the time must carry its zone and fall on {day}")
+            elif at in seen:
+                problems.append(f"row {n}: a second candle at {r['time']}")
+            seen.add(at)
             if not (low <= min(o, c) and max(o, c) <= h and low > 0):
                 problems.append(f"row {n}: low ≤ open, close ≤ high, and prices above 0")
+            if volume < 0:
+                problems.append(f"row {n}: volume can't be negative")
+            extra = set(r) - {"time", "open", "high", "low", "close", "volume"}
+            if extra:
+                problems.append(f"row {n}: unknown field {', '.join(sorted(extra))}")
         if problems:
             raise BacktestError("; ".join(problems[:10]))
-        folder = self.root / instrument_id.replace(":", "_")
         folder.mkdir(parents=True, exist_ok=True)
         rows = sorted(rows, key=lambda r: datetime.fromisoformat(r["time"]))
-        (folder / f"{day.isoformat()}.json").write_text(json.dumps(rows))
+        target = folder / f"{day.isoformat()}.json"
+        part = target.with_suffix(".part")
+        part.write_text(json.dumps(rows))
+        os.replace(part, target)  # whole or nothing: a reader never sees half a day
         return len(rows)
 
     def days(self, instrument_id: str) -> list[str]:
-        """The days with candles for an instrument, newest first."""
-        folder = self.root / instrument_id.replace(":", "_")
-        return sorted((p.stem for p in folder.glob("*.json")), reverse=True)
+        """The days with candles for an instrument, newest first (none for an id the store
+        can't hold: nothing could have been imported for it)."""
+        try:
+            folder = self._folder(instrument_id)
+        except BacktestError:
+            return []
+        return sorted((p.stem for p in folder.glob("*.json") if _DAY_FILE.match(p.stem)),
+                      reverse=True)  # fmt: skip
 
     def rows(self, instrument_id: str, day: date) -> list[dict[str, Any]] | None:
-        path = self.root / instrument_id.replace(":", "_") / f"{day.isoformat()}.json"
+        try:
+            path = self._folder(instrument_id) / f"{day.isoformat()}.json"
+        except BacktestError:
+            return None
         return json.loads(path.read_text()) if path.exists() else None
+
+
+def _whole(value: Any) -> int:
+    """A whole number of paise (or a volume); `True`, 1.5 and "12" are refused."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("not a whole number")
+    return value

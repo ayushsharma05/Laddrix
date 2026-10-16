@@ -1,8 +1,14 @@
 # MockTrade status and next steps
 
-As of 15 Oct 2026 (India time). Code and context are integrated through K9.1 by the recovery for #204. GitHub issues are the source of truth.
+As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
 
-**Current handoff:** next is **#200** (synthetic trailing stop, OCO and bracket), then #201 and #202. See [merge recovery](merge-recovery-2026-10-15.md). The historical table below records each original PR's checks; it is not a list of PRs still needing manual merges.
+**Current handoff:** fix #258 (positions by product in reconciliation), then K13.2 (#282, the admin screen with the first-login password change), K13.4 (#284), K13.5 (#285); then the core v1 gate #240 (with #288 docs and #289 release), the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
+
+**Outside review (16 Oct).** While Claude's limit was used up, Ayush had another AI tool review the code and the design. It changed no code. It opened #240–#279 and the docs PR #256; that PR's notes are folded in here, and it was closed. Its findings separate behaviour confirmed in the source from design gaps. Two were reproduced in a throwaway folder:
+- reconciliation overwrote one product's position with another's (#258);
+- a candle path escaped its folder (#269, fixed).
+
+Each finding must be rechecked against the code before work starts, and fixed defects are not reopened without new evidence.
 
 Ladder (K5.4) as built: ![K5.4 ladder](images/k5-4-ladder.png)
 
@@ -131,10 +137,20 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    - #234 K12.4 alerts manager, time & sales, depth, movers: **done** on branch `k12-4-market-screens` (PR "Closes #234"; merge on green CI if still open). See `docs/design/charts.md` § K12.4. It also fixed a ticket that kept the previous contract's price after a switch, and simulator option prices.
 
    Known gaps: replaying a live Kite server's recordings needs that day's instrument list (also in #240); webhook DNS rebinding (#271); an outside webhook not yet tried (do it once deployed).
-7. **K13 admin & phone** (issues #281–#285, label `track: kite`):
-   - #281 K13.1 admin API (users, roles, accounts, per-account limits): **done** on branch `k13-1-admin-api` (PR "Closes #281"; merge on green CI if still open). See `docs/design/admin.md`.
+7. **Issue clean-up (16 Oct, Ayush's request).** The ~98 issues from the paused COMEX track (#17–#121) were compared with the code and each one closed with a note:
+   - done on the Kite track (completed);
+   - not relevant to it (not planned);
+   - or carried on into a current issue.
+
+   What NG taught that is still missing is now in #287 (operations), #288 (design docs), #289 (release process), #290 (F&O expiry day), #291 (compliance) and #292 (a decision: user-written strategies). The old milestones (Phase 0–8, v0.1–v1.0) can now be closed by Ayush; Claude's tools can't close milestones.
+
+   **Confirmed defects fixed ahead of hardening:**
+   - #269 (candle paths could escape their folder): done on branch `fix-269-candle-paths`;
+   - #258 (positions in different products overwrite each other during reconciliation): next.
+8. **K13 admin & phone** (issues #281–#285, label `track: kite`):
+   - #281 K13.1 admin API (users, roles, accounts, per-account limits): merged (PR #286). See `docs/design/admin.md`.
    - #282 K13.2 admin panel screen: **next**. It includes the first-login password change screen; the API answers 403 "set a new password first" until then. Its form is drawn from `GET /api/admin/limits/spec`, which adds the kinds `money`, `choices` and `instruments` that `ParamInput` doesn't draw yet. Ask twice before a change marked `looser`.
-   - #283 K13.3 phone screens (watch, positions, cancel, close, STOP; no new trades, refused on the server).
+   - #283 K13.3 phone screens: **moved after core v1** (Ayush, 16 Oct; they don't change the core design).
    - #284 K13.4 keyboard shortcut editor.
    - #285 K13.5 themes (dark, light, colour-blind safe).
    **Then, in this order (issues Ayush added on 16 Oct from an outside review; no code was changed):**
@@ -142,7 +158,7 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    2. #257 post-core hardening gate: #258–#277 (positions, uncertain orders, exits, MTM, durability, session rollover, freshness, ownership, webhooks, backups, supervision, economics), suggested order in #257; plus the production security gate #279 and the discussion #278 (who pays for data, multi-user Kite).
    3. #241 post-v1 features: #242–#255 (v1.1 to v1.7).
    Recheck each finding against the code before coding; don't reopen fixed defects without evidence.
-8. Ayush's own steps (not code): `docs/runbooks/server.md` (AWS Mumbai, static IP, Kite app ₹500/month, AMO check), then a real trading day; before selling to others: the broker's multi-user arrangement, exchange algo empanelment, licensed market data, legal review.
+9. Ayush's own steps (not code): `docs/runbooks/server.md` (AWS Mumbai, static IP, Kite app ₹500/month, AMO check), then a real trading day; before selling to others: the broker's multi-user arrangement, exchange algo empanelment, licensed market data, legal review.
 
 **How each piece is built (keep the quality):** brainstorm the traps → code with the "backend provides, frontend displays" rule (specs from the server, no market rules in the UI) → Python tests + UI tests → a mutation script in `context/scripts/mutate-*.py` (restores files in `finally`, a hang counts as caught; **run one at a time, never kill one mid-run**: it can leave a mutant in the source) → real browser or real server check against the demo (`context/scripts/e2e-*.cjs`) → docs in `docs/design/` → context files → PR → green CI → merge.
 
@@ -162,7 +178,7 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
 - SEBI: ≤ 10 orders/s per segment without exchange registration; personal use only; no open APIs.
 
 ## Paused: COMEX/MockCME track
-Old milestones Phase 0–8 and v0.1–v1.0 stay open but their 95 open issues carry the label `paused: cme-track`. The build map (`context/build-map/`) describes that track.
+Old milestones Phase 0–8 and v0.1–v1.0 belong to the paused track. Its issues were closed on 16 Oct with notes (done, not relevant, or carried on into #287–#292 and the hardening issues). The milestones themselves can be closed by Ayush. The build map (`context/build-map/`) describes that track.
 
 ## Tool limits seen in Claude's GitHub access
 - GraphQL blocked: no Projects boards or issue transfers from Claude; Ayush does those.
