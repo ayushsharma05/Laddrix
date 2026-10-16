@@ -305,6 +305,12 @@ export class Store {
         if (note) this.addMessage(note.level, m.algo.instrument_id, note.text);
         return;
       }
+      case "mtm": {
+        // an MTM limit reached: Messages (and the band, through the server's ops alert)
+        const id = m.key === "portfolio" ? "" : m.key.split("|")[0]!;
+        this.addMessage(m.closing ? "ERROR" : "WARN", id, `MTM ${m.text}`);
+        break;
+      }
       case "charges": {
         const { type: _type, account_id, ...bill } = m;
         this.applyCharges(account_id, bill);

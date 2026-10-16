@@ -16,6 +16,7 @@ import type { Position } from "../../api/types";
 import { useNow, useStore } from "../../app/context";
 import { price, qty, shortName } from "../../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
+import { SquareOffButton } from "./SquareOff";
 import { averagePrice, chargesFor, positionRows, positionTotals, reconcileState, signedRupees } from "./model";
 
 const EMPTY: Record<string, Position> = {};
@@ -42,6 +43,7 @@ export function Positions({ publish, open }: WidgetProps) {
           {recon.text}
         </span>
         <span className="book-spacer" />
+        <SquareOffButton />
         <span title="Today's profit and loss on this account (realised + unrealised), before charges">
           Day gross <b className={tone(book?.dayPnl ?? 0)}>{signedRupees(book?.dayPnl ?? 0)}</b>
         </span>

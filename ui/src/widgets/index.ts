@@ -11,5 +11,6 @@ import "./gtt/GttBook";
 import "./portfolio/FundsPanel";
 import "./portfolio/HoldingsPanel";
 import "./reports/Reports";
+import "./mtm/MtmLimits";
 import "./chain/OptionChain";
 import "./strategy/StrategyBuilder";
