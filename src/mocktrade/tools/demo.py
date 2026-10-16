@@ -44,7 +44,14 @@ from mocktrade.refdata.store import InstrumentStore
 from mocktrade.reports.service import Reports
 from mocktrade.reports.store import ReportStore
 from mocktrade.research.backtest import Backtests, CandleStore
-from mocktrade.research.replay import EPOCH, SPEEDS, ReplayClock, ReplayFeed
+from mocktrade.research.replay import (
+    EPOCH,
+    SPEEDS,
+    ReplayClock,
+    ReplayFeed,
+    ReplayInstrumentsError,
+    replay_instruments,
+)
 from mocktrade.research.ticks import IST, FileTickStore, TickRecorder
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.risk.limits_spec import stored_limits
@@ -93,10 +100,21 @@ async def main(
     speed: float = 10,
 ) -> None:
     data = DATA if replay_day is None else REPLAYS / replay_day.isoformat()
-    users = setup_users(data)
     instruments = InstrumentStore()
-    for instrument, _ in INSTRUMENTS:
-        instruments.add(instrument)
+    if replay_day is None:
+        for instrument, _ in INSTRUMENTS:
+            instruments.add(instrument)
+    else:  # the day's own instruments, as they were that day (an old demo day: the demo's)
+        recorded = FileTickStore(ticks_dir)
+        if replay_day not in recorded.days():
+            raise SystemExit(f"nothing recorded on {replay_day} in {ticks_dir}")
+        try:
+            day_instruments = replay_instruments(recorded, replay_day, [i for i, _ in INSTRUMENTS])
+        except ReplayInstrumentsError as exc:
+            raise SystemExit(f"can't replay: {exc}") from None
+        for instrument in day_instruments:
+            instruments.add(instrument)
+    users = setup_users(data)  # after the checks: a refused replay leaves nothing behind
     md = MarketData()
     feed = None
     if replay_day is None:
@@ -105,9 +123,6 @@ async def main(
         clock = lambda: datetime.now(UTC)  # noqa: E731
         market_job = simulator.run()
     else:
-        recorded = FileTickStore(ticks_dir)
-        if replay_day not in recorded.days():
-            raise SystemExit(f"nothing recorded on {replay_day} in {ticks_dir}")
         first_us, _ = next(recorded.read_timed(replay_day))
         clock = ReplayClock(EPOCH + timedelta(microseconds=first_us))
         feed = ReplayFeed(lambda: recorded.read_timed(replay_day), md, clock,
@@ -143,7 +158,7 @@ async def main(
     jobs = [market_job, platform.run(), scheduler.run()]
     ticks = None
     if feed is None:  # a replay doesn't record what it replays
-        ticks = FileTickStore(data / "ticks", keep_days=7)
+        ticks = FileTickStore(data / "ticks", keep_days=7, describe=instruments.get)
         recorder = TickRecorder(ticks)
         md.tap(recorder.on_tick)
         jobs.append(recorder.run())

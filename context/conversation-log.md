@@ -255,3 +255,14 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - colour-blind safe uses blue for buy, orange for sell and purple for the last price (the first try used blue, which blended with the bids in the browser check);
     - the choice follows the computer until picked, switches with no reload, is saved per user on the server, and the chart repaints;
     - mutation 18/18 (it found two gaps: a redundant `try`, removed, and an untested message clear, now tested); the browser check passed.
+- 16 Oct, K13.5 (#326) merged; `main` green. Started the core v1 gate #240:
+  - A helper checked each gate item against the code.
+    - Already done: restart recovery and its tests, duplicate-fill guards, unknown outcomes, the warning bands, a backup of the two databases, and the day's runbooks.
+    - Missing: a real crash drill and an on-screen unprotected warning; a backup of everything and a tested restore; recordings that keep their instruments; a single go-live checklist.
+  - Those four became #327–#330 under #240. Live steps stay with Ayush: no live order without his explicit go-ahead.
+  - **#327 done:**
+    - each recorded day saves `instruments.json` (each instrument described once, before its first ticks);
+    - replay builds from it, so an expired, non-demo contract replays and trades on paper with that day's lot size;
+    - a day that can't be described is refused before anything starts, naming what is missing;
+    - mutation 22/22 (found four test gaps, now covered); the demo check passed;
+    - known limit: backtests still use the live list.
