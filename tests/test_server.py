@@ -138,7 +138,7 @@ ORDER = {
 async def test_health_needs_no_login_and_every_response_has_security_headers(world):
     async with world.client() as c:
         r = await c.get("/api/health")
-    assert r.json() == {"status": "ok"}
+    assert r.json()["status"] == "ok" and r.json()["version"]  # and which version
     assert r.headers["x-frame-options"] == "DENY"
     assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
     assert r.headers["cache-control"] == "no-store"
