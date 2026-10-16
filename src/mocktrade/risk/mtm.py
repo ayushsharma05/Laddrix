@@ -31,7 +31,7 @@ from mocktrade.domain.money import format_rupees
 from mocktrade.domain.orders import Product
 from mocktrade.positions.book import PositionBook, PositionView
 from mocktrade.recovery import IST
-from mocktrade.risk.closing import close_position
+from mocktrade.risk.closing import ExitDesk, position_of
 
 log = logging.getLogger(__name__)
 
@@ -95,10 +95,12 @@ class MtmWatch:
         path: Path | None = None,  # where the rules are kept (None: memory only)
         audit: Callable[[str, str, dict], None] | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        desk: ExitDesk | None = None,  # the account's exit desk (#261)
     ) -> None:
         self.account_id = account_id
         self._book = book
         self._orders = orders
+        self._desk = desk or ExitDesk(orders, position_of(book))
         self._instrument = instruments
         self.max_lots = max_lots  # closing pieces; an admin's edit replaces it
         self._path = path
@@ -214,17 +216,16 @@ class MtmWatch:
             instrument = self._instrument(v.instrument_id)
             if instrument is None or not v.qty:
                 continue
-            try:
-                sent = await close_position(self._orders, instrument, v.product, v.qty,
-                                            user_id="mtm", max_lots=self.max_lots,
-                                            basket_id=basket)  # fmt: skip
+            try:  # the desk reads the position afresh: `v` is from when the limit fired
+                done = await self._desk.close(instrument, v.product, user_id="mtm",
+                                              max_lots=self.max_lots, basket_id=basket,
+                                              why=why)  # fmt: skip
             except Exception:
                 log.exception("MTM close of %s failed", v.instrument_id)
                 continue
             if self._audit is not None:
-                ids = [o.client_order_id for o in sent]
-                what = f"closing {v.qty:+d} {v.instrument_id} {v.product.value}"
-                self._audit("MTM_CLOSE", f"{what}: {', '.join(ids)} ({why})", {"orders": ids})
+                self._audit("MTM_CLOSE", f"{done.words()} ({why})",
+                            {"orders": done.ids, "left_open": done.left_open})  # fmt: skip
 
     def _changed(self, detail: str) -> None:
         if self._audit is not None:

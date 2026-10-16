@@ -340,3 +340,12 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Restart:** changes or cancels on their way come back in doubt.
     - **Gates** re-run the risk checks after a wait.
   - **Checks:** mutation 25/25, after three test gaps were fixed.
+- 16 Oct, #260 merged (PR #338); `main` green. **#261 done** (coordinated exits).
+  - **Defect confirmed:** loss limits, the square-off and stop algos each sized their close from the position they last saw, and nothing stopped two of them closing the same quantity; together they could turn a long into a short. Resting orders (a target, a stop algo's exit) were not cancelled before a forced close.
+  - **The fix:**
+    - **Reduce-only:** every closing order is marked; the risk gate refuses one that would close more than is open, counting other reduce-only orders still working (in doubt too).
+    - **The exit desk** (one per account, risk/closing.py) handles loss limits and square-off: a lock per position, stop the algos on it, cancel resting closing orders and wait up to 3 s, read the position afresh, leave alone what working closes still own, send only the rest, and say what it left.
+    - **Stop algos** cap their exit to what is still open, and finish saying so when nothing is left.
+    - **Screens:** the order book marks closes; the square-off message is the server's own summary.
+  - **Decided:** a plain sell stays unlimited (it may be meant to open a short); the desk still cancels it before a forced close.
+  - **Checks:** 22 new tests, including a loss limit and a square-off at the same moment (closed once, never short); mutation 26/26 after four test gaps were filled.

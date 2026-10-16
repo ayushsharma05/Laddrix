@@ -178,3 +178,18 @@ Run it before going live and after any change to recovery, orders or positions. 
 - **A cancel:** the order becomes CANCELLED, or, if the broker still has it working, goes back to working with the message "the cancel didn't go through". You can then cancel again; pressing cancel again is always allowed in this state.
 
 **If it stays pending** (the audit trail says "the change/cancel is still not settled after asking the broker 7 times"): look at the order in the broker's own app. A reconnect or a restart then brings MockTrade in line from the broker's order list.
+
+## A close says "left to orders already closing it" (#261)
+
+A loss limit or the square-off closed less than the whole position because other closing
+orders were still working: a cancel that didn't take in 3 s, or an order whose fate is
+unknown (Unconfirmed). Nothing is wrong yet; the position isn't closed twice.
+
+1. Open the order book: the other closing orders are there, marked **close**.
+2. If one is **Unconfirmed**, follow [An order says Unconfirmed](#an-order-says-unconfirmed).
+3. If a cancel is still on its way, wait for the broker's answer (or press cancel again).
+4. If the position is still open after they settle, close the rest by hand or press
+   **Square off** again: the desk closes only what is left.
+
+A refused close reading "would close more than is open" means the same thing from the other
+side: something else is already closing that part.

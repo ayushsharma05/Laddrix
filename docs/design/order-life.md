@@ -78,3 +78,7 @@ Working orders at the exchange don't depend on our connection. While the connect
 ![STOP](../../context/images/v1-journey-stop.png)
 
 The switch is engaged **before** the cancels go out, so nothing new can slip in meanwhile. Positions are kept: STOP doesn't close them. Closing is a separate, deliberate action (square-off, MTM auto-close, or closing by hand). Only the account's owner, risk or an admin can resume.
+
+### Closing a position
+
+Every order that closes (a loss limit's, the square-off's, a stop algo's exit, an OCO or bracket target) is **reduce-only**: the risk gate refuses it if it would close more than is open. Forced closes go through the account's exit desk, which stops the algos on that position, cancels resting orders that would also close it, and sends only what is left. So two exits at once can never turn a long into a short. See [mtm.md](mtm.md) § Coordinated exits.

@@ -1,0 +1,12 @@
+login: 200
+buy 150 MIS: 201 PENDING
+MIS position: 150
+resting target: D2610172 PENDING 
+algos: A1 WORKING / A2 WORKING
+square-off: closing +150 NFO:NIFTY26NOVFUT MIS: sent D2610173; stopped algos A1; cancelled D2610172
+after: MIS position 0 | lowest seen 0 | MIS sold 150
+target now: CANCELLED
+MIS algo: STOPPED - forced close: square-off by demo
+NRML algo: WORKING
+closing orders marked reduce-only: [('D2610173', 150)]
+PASS

@@ -23,6 +23,7 @@ export interface OrderRequest {
   algo_id: string | null;
   parent_id: string | null;
   basket_id?: string | null;
+  reduce_only?: boolean; // a close: never more than the open position (#261)
 }
 
 export interface OrderView {

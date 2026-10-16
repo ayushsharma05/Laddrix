@@ -281,6 +281,7 @@ class AlgoContext:
         validity: Validity = Validity.DAY,
         check_remaining: bool = True,
         hedge: bool = False,
+        reduce_only: bool = False,  # an exit: never past what is open (the risk gate, #261)
     ) -> bool:
         """Send a child order. False (and nothing sent) if the algo isn't working, is held,
         or the child would take the main leg past the parent's quantity."""
@@ -309,6 +310,7 @@ class AlgoContext:
             ),
             algo_id=p.exchange_algo_id,
             parent_id=p.algo_id,
+            reduce_only=reduce_only,
         )
         p.in_flight += 1
         if main:
@@ -348,6 +350,30 @@ class AlgoContext:
             self._parent.status = status
             self._engine.changed(self._parent, "UPDATED")
 
+    def position(self) -> int | None:
+        """The account's position in this algo's instrument and product now (+ long, − short),
+        or None when the engine wasn't given positions."""
+        p = self._parent
+        return self._engine.position(p.instrument_id, p.product)
+
+    def closable(self, exit_side: Side) -> int | None:
+        """How much an exit on `exit_side` can still close: the position it reduces, less
+        the other closes on their way (not this algo's own). None: positions unknown."""
+        held = self.position()
+        if held is None:
+            return None
+        p = self._parent
+        reduces = held if exit_side is Side.SELL else -held
+        mine = set(p.children)
+        taken = sum(
+            o.leaves_qty
+            for o in self._engine.manager.working()
+            if o.request.reduce_only and o.client_order_id not in mine
+            and o.request.instrument_id == p.instrument_id and o.request.product is p.product
+            and o.request.side is exit_side
+        )  # fmt: skip
+        return max(0, reduces - taken)
+
     def finish(self, reason: str = "") -> None:
         """The strategy has nothing more to do (its working children are pulled)."""
         self._engine.stop_parent(self._parent, reason or "finished", final=AlgoState.STOPPED)
@@ -369,8 +395,10 @@ class AlgoEngine:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         audit: Callable[[AlgoEvent], None] | None = None,
         id_prefix: str = "A",
+        position: Callable[[str, Any], int] | None = None,  # (instrument, product) -> qty
     ) -> None:
         self.account_id = account_id
+        self._position = position
         self.manager = manager
         self.market_data = market_data
         self.instruments = instruments
@@ -387,6 +415,9 @@ class AlgoEngine:
         manager.subscribe(self._on_order_event)
 
     # --- reading ----------------------------------------------------------------------------
+
+    def position(self, instrument_id: str, product: Any) -> int | None:
+        return None if self._position is None else self._position(instrument_id, product)
 
     def specs(self) -> list[AlgoSpec]:
         return [t.spec for t in self.types.values()]
@@ -496,6 +527,20 @@ class AlgoEngine:
         for p in live:
             self.stop_parent(p, reason, final=AlgoState.STOPPED)
         return len(live)
+
+    def stop_on(self, instrument_id: str, product: Product, reason: str) -> list[str]:
+        """Stop every running algo on this position (instrument and product), before a forced
+        close (#261): its stops would race the close, its entries would reopen it. Returns the
+        ids stopped."""
+        live = [
+            p
+            for p in self._parents.values()
+            if not p.state.is_final and p.state is not AlgoState.STOPPING
+            and p.instrument_id == instrument_id and p.product is product
+        ]  # fmt: skip
+        for p in live:
+            self.stop_parent(p, reason, final=AlgoState.STOPPED)
+        return [p.algo_id for p in live]
 
     async def cancel_orphans(self) -> list[str]:
         """At start: algos don't survive a restart, so their leftover children are cancelled."""

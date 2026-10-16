@@ -64,6 +64,16 @@ describe("square-off assistant", () => {
     await vi.waitFor(() => expect(app.store.getState().messages[0]!.text).toBe(`Square-off ${FUT}: sent MT9`));
   });
 
+  it("says in the server's words what the close did, including what it left to other closes", async () => {
+    const summary = `closing +75 ${FUT} MIS: sent MT9; cancelled MT4; 0 left`;
+    const { app } = setup(<SquareOffButton />, {
+      "POST /api/accounts/acc-a/square-off": { closed: [{ instrument_id: FUT, qty: 75, orders: ["MT9"], refused: [], summary }] },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Square off MIS (1) · 15:25" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm: close 1 MIS" }));
+    await vi.waitFor(() => expect(app.store.getState().messages[0]!.text).toBe(`Square-off: ${summary}`));
+  });
+
   it("shows nothing when no MIS position is open", async () => {
     const { calls } = setup(<SquareOffButton />, { "GET /api/accounts/acc-a/square-off": { ...STATUS, positions: [] } });
     await vi.waitFor(() => expect(calls.some((c) => c.path.endsWith("/square-off"))).toBe(true));

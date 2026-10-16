@@ -32,6 +32,7 @@ def request_to_dict(r: OrderRequest) -> dict[str, Any]:
         "algo_id": r.algo_id,
         "parent_id": r.parent_id,
         "basket_id": r.basket_id,
+        "reduce_only": r.reduce_only,
     }
 
 
@@ -53,6 +54,7 @@ def request_from_dict(d: dict[str, Any]) -> OrderRequest:
         algo_id=d.get("algo_id"),
         parent_id=d.get("parent_id"),
         basket_id=d.get("basket_id"),  # absent in orders stored before baskets
+        reduce_only=bool(d.get("reduce_only", False)),  # absent before #261
     )
 
 
