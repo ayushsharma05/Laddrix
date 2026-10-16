@@ -18,6 +18,8 @@ Settings (environment; secrets never on the command line):
     MOCKTRADE_HOLIDAYS         (none)     exchange holidays, e.g. 2026-10-21,2026-11-10
                                           (no morning reminders or price alerts on them)
     MOCKTRADE_PAPER_FUNDS      1000000    each paper account's starting balance, rupees
+    MOCKTRADE_RECORD_DAYS      30         keep this many days of recorded ticks (research,
+                                          replay, backtests); 0 turns recording off
     MOCKTRADE_CHARGES          (built in) a charge schedule (JSON, charges/schedules.py) to use
                                           instead of the built-in rates, e.g. after a budget
     MOCKTRADE_ALERT_WEBHOOK    (none)     https:// address that gets WARN/ERROR alerts as
@@ -76,6 +78,7 @@ from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.reports.service import Reports
 from mocktrade.reports.store import ReportStore
+from mocktrade.research.ticks import FileTickStore, TickRecorder
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.server.app import ServerSettings, create_app
 from mocktrade.server.security import SecretBox
@@ -103,6 +106,7 @@ class ServeSettings:
     kite_env: tuple[tuple[str, str], ...] = ()  # the KITE_* settings (kite mode)
     paper_funds_paise: int = 10_00_000_00  # each paper account's starting balance
     charges_file: Path | None = None  # a charge schedule (JSON) instead of the built-in one
+    record_days: int = 30  # keep this many days of recorded ticks (0: don't record)
 
     def kite_url(self, name: str, default: str) -> str:
         """KITE_API_URL / KITE_WS_URL: only to point at a Kite simulator (load tests)."""
@@ -171,6 +175,9 @@ class ServeSettings:
             problems.append(
                 f"MOCKTRADE_PAPER_FUNDS must be whole rupees above 0, got {funds_text!r}"
             )
+        record_text = env.get("MOCKTRADE_RECORD_DAYS", "30")
+        if not record_text.isdigit():
+            problems.append(f"MOCKTRADE_RECORD_DAYS must be a whole number, got {record_text!r}")
         charges_text = env.get("MOCKTRADE_CHARGES", "")
         if charges_text:
             try:
@@ -193,6 +200,7 @@ class ServeSettings:
             kite_env=kite_env,
             paper_funds_paise=int(funds_text) * 100,
             charges_file=Path(charges_text) if charges_text else None,
+            record_days=int(record_text) if record_text.isdigit() else 30,
         )
 
 
@@ -342,6 +350,13 @@ def build(settings: ServeSettings) -> Assembly:
         is_trading_day=scheduler.is_trading_day,
     )
     scheduler.daily("16:00", reports.close_of_day, "end-of-day reports")
+    ticks = None
+    if settings.record_days > 0:
+        ticks = FileTickStore(settings.data_dir / "ticks", keep_days=settings.record_days)
+        recorder = TickRecorder(ticks)
+        md.tap(recorder.on_tick)
+        jobs.append(recorder.run)
+        scheduler.daily("16:30", _rotate(ticks), "tick recordings rotation")
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
     jobs.append(scheduler.run)
@@ -357,11 +372,19 @@ def build(settings: ServeSettings) -> Assembly:
         alerts=alerts,
         scheduler=scheduler,
         reports=reports,
+        ticks=ticks,
         static_dir=ui,
     )
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)
     built.alerts, built.notifier = alerts, notifier
     return built
+
+
+def _rotate(store: FileTickStore):
+    async def rotate() -> None:
+        await asyncio.to_thread(store.rotate)
+
+    return rotate
 
 
 def _recovery_alert(alerts: Alerts, account_id: str, state: str, reason: str) -> None:

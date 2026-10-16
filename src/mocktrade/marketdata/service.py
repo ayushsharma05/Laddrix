@@ -87,6 +87,7 @@ class MarketData:
         self.ticks_received = 0
         self._on_demand: list[Callable[[InstrumentId], None]] = []
         self.vap = VolumeAtPrice()  # today's volume at each price (the ladder's VAP column)
+        self._taps: list[Callable[[Tick], None]] = []  # see every tick (e.g. the recorder)
 
     def latest(self, instrument_id: InstrumentId) -> Tick | None:
         return self._latest.get(instrument_id)
@@ -98,6 +99,13 @@ class MarketData:
         self.vap.on_tick(tick)
         for subscription in self._watchers.get(tick.instrument_id, ()):
             subscription._offer(tick)
+        for tap in self._taps:
+            tap(tick)
+
+    def tap(self, listener: Callable[[Tick], None]) -> None:
+        """`listener(tick)` for every tick received, watched or not. It must be quick (an
+        append): it runs on the trading loop. The tick recorder uses it (research/)."""
+        self._taps.append(listener)
 
     def subscribe(self, instrument_ids: Iterable[InstrumentId] = ()) -> Subscription:
         subscription = Subscription(self, ())
