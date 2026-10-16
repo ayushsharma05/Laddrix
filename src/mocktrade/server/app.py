@@ -300,6 +300,10 @@ class StopIn(_Strict):
     reason: str = Field(min_length=1, max_length=200)
 
 
+class SettingIn(_Strict):
+    value: dict[str, Any] | None
+
+
 class LayoutIn(_Strict):
     layout: dict[str, Any]  # the screens' own description of their widgets
 
@@ -1130,6 +1134,28 @@ def create_app(
     async def delete_layout(name: str, user: Me) -> None:
         if not users.delete_layout(user.id, name):
             raise HTTPException(404, "no such layout")
+
+    # --- the user's own screen settings: shortcuts (K13.4), theme (K13.5) -----------------------
+
+    @app.get("/api/me/settings/{name}")
+    async def get_setting(name: str, user: Me) -> dict[str, Any]:
+        """The value as the screens saved it, or null: nothing saved (the defaults)."""
+        try:
+            value = users.get_setting(user.id, name)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from None
+        return {"name": name, "value": json.loads(value) if value is not None else None}
+
+    @app.put("/api/me/settings/{name}")
+    async def put_setting(name: str, body: SettingIn, user: Me) -> dict[str, Any]:
+        """Kept as given (the screens own its shape); null forgets it: back to the defaults."""
+        value = None if body.value is None else json.dumps(body.value, separators=(",", ":"))
+        try:
+            users.set_setting(user.id, name, value)
+        except ValueError as exc:
+            code = 404 if "no setting" in str(exc) else 422
+            raise HTTPException(code, str(exc)) from None
+        return {"name": name, "value": body.value}
 
     # --- orders ------------------------------------------------------------------------------
 

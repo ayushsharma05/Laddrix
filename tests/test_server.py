@@ -711,3 +711,22 @@ async def test_ops_view_is_for_admin_and_risk(world):
     assert (await risk.get("/api/ops")).json() == {"alerts": [], "jobs": []}
     for c in (riya, risk):
         await c.aclose()
+
+
+async def test_each_users_own_settings_follow_them(world):
+    c = await world.logged_in()
+    path = "/api/me/settings/keys"
+    assert (await c.get(path)).json() == {"name": "keys", "value": None}  # nothing saved: defaults
+    saved = await c.put(path, json={"value": {"bindings": {"stop": ["Ctrl+Shift+X"]}}})
+    assert saved.status_code == 200
+    assert (await c.get(path)).json()["value"] == {"bindings": {"stop": ["Ctrl+Shift+X"]}}
+    r = await world.logged_in("riya")
+    assert (await r.get(path)).json()["value"] is None  # another user's are their own
+    assert (await c.get("/api/me/settings/secrets")).status_code == 404  # only known settings
+    big = await c.put(path, json={"value": {"x": "y" * 20_000}})
+    assert big.status_code == 422 and "larger than 16 KB" in big.json()["detail"]
+    assert (await c.put(path, json={"value": None})).status_code == 200  # forget: defaults again
+    assert (await c.get(path)).json()["value"] is None
+    assert (await c.put(path, json={"value": [1, 2]})).status_code == 422  # an object or null
+    await c.aclose()
+    await r.aclose()

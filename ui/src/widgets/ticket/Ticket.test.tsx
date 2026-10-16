@@ -140,6 +140,22 @@ describe("Order ticket", () => {
     expect(posts(calls)[0]!.body).toMatchObject({ side: "SELL", price_paise: 2500990 });
   });
 
+  it("uses the user's own keys (K13.4): send on Ctrl+Enter instead of Enter, Alt+S for the sell side", async () => {
+    const { calls, app } = setup({}, { "PUT /api/me/settings/keys": { name: "keys" } });
+    const price = await ready();
+    await act(() => app.keys.save({ "ticket-send": ["Ctrl+Enter"] }));
+    fireEvent.keyDown(price, { key: "Enter" });
+    expect(posts(calls)).toHaveLength(0); // Enter no longer sends
+    fireEvent.keyDown(price, { key: "s", code: "KeyS", altKey: true });
+    expect(screen.getByRole("button", { name: "SELL" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.keyDown(price, { key: "b", code: "KeyB", altKey: true });
+    expect(screen.getByRole("button", { name: "BUY" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.keyDown(price, { key: "s", code: "KeyS", altKey: true });
+    fireEvent.keyDown(price, { key: "Enter", ctrlKey: true });
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0]!.body).toMatchObject({ side: "SELL" });
+  });
+
   it("stop-loss: price and trigger; a trigger the market already passed is refused before sending", async () => {
     const { calls } = setup({ type: "SL" });
     await ready();

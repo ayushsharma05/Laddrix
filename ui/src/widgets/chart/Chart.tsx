@@ -14,7 +14,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Candle, CandlesAnswer, ChartMark, ChartSpec } from "../../api/types";
-import { useApp, useInstrument, useStore } from "../../app/context";
+import { useApp, useInstrument, useKeyAction, useStore } from "../../app/context";
 import { SearchBox } from "../../components/SearchBox";
 import { clock, price, shortName, shortVolume } from "../../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
@@ -42,6 +42,7 @@ export function Chart(props: WidgetProps<ChartParams>) {
 }
 
 function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartParams> & { instrumentId: string }) {
+  const keyAction = useKeyAction("chart");
   const { rest, stream, links } = useApp();
   const instrument = useInstrument(id);
   const accountId = useStore((s) => s.accountId);
@@ -207,11 +208,12 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
 
   const onKey = (e: React.KeyboardEvent) => {
     const step = Math.max(1, Math.floor(plotW / view.barW / 4));
-    if (e.key === "ArrowLeft") setView((v) => pan(v, step, candles.length, plotW));
-    else if (e.key === "ArrowRight") setView((v) => pan(v, -step, candles.length, plotW));
-    else if (e.key === "+" || e.key === "=") setView((v) => zoom(v, 1.25));
-    else if (e.key === "-") setView((v) => zoom(v, 0.8));
-    else if (e.key === "Home") setView(DEFAULT_VIEW);
+    const action = keyAction(e); // the user's keys for the chart (K13.4)
+    if (action === "chart-back") setView((v) => pan(v, step, candles.length, plotW));
+    else if (action === "chart-forward") setView((v) => pan(v, -step, candles.length, plotW));
+    else if (action === "chart-zoom-in") setView((v) => zoom(v, 1.25));
+    else if (action === "chart-zoom-out") setView((v) => zoom(v, 0.8));
+    else if (action === "chart-reset") setView(DEFAULT_VIEW);
     else return;
     e.preventDefault();
   };

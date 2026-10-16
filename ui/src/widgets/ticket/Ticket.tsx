@@ -13,7 +13,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { chargeLines, marginText, useChargeEstimate, useMarginCheck } from "./useChargeEstimate";
 import { ApiError } from "../../api/rest";
 import type { Instrument, OrderSpec, OrderView, Side } from "../../api/types";
-import { useApp, useInstrument, useOrderSpec, useStore, useTick } from "../../app/context";
+import { useApp, useInstrument, useKeyAction, useOrderSpec, useStore, useTick } from "../../app/context";
 import { SearchBox } from "../../components/SearchBox";
 import { price as fmtPrice, qty as fmtQty, rupees, shortName } from "../../lib/format";
 import { tradingBlock } from "../../state/gate";
@@ -100,6 +100,7 @@ function TicketBody({
   const ltp = tick?.ltp_paise ?? instrument.ltp_paise ?? null;
 
   const [side, setSide] = useState<Side>("BUY");
+  const keyAction = useKeyAction("ticket");
   const [priceText, setPriceText] = useState("");
   const [triggerText, setTriggerText] = useState("");
   // "Confirm" belongs to one exact order: armed only while nothing about it has changed.
@@ -272,16 +273,16 @@ function TicketBody({
     <div
       className={`ticket ${side === "BUY" ? "buy" : "sell"}${blocked ? " blocked" : ""}`}
       onKeyDown={(e) => {
-        if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement)) {
-          e.preventDefault();
-          send();
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          clear();
-        } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !(e.target instanceof HTMLSelectElement)) {
-          e.preventDefault();
-          nudge(e.target instanceof HTMLInputElement && e.target.name === "trigger" ? "trigger" : "price", e.key === "ArrowUp" ? 1 : -1);
-        }
+        // the user's keys for the ticket (K13.4); sending still goes through its confirm rules
+        const action = keyAction(e);
+        const field = e.target instanceof HTMLInputElement && e.target.name === "trigger" ? "trigger" : "price";
+        if (action === "ticket-send" && !(e.target instanceof HTMLButtonElement)) send();
+        else if (action === "ticket-clear") clear();
+        else if (action === "ticket-buy") setSide("BUY");
+        else if (action === "ticket-sell") setSide("SELL");
+        else if ((action === "ticket-up" || action === "ticket-down") && !(e.target instanceof HTMLSelectElement)) nudge(field, action === "ticket-up" ? 1 : -1);
+        else return;
+        e.preventDefault();
       }}
     >
       {tabs}

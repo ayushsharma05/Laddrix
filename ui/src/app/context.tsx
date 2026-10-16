@@ -5,6 +5,7 @@
 //     useStore(s => s.something)   re-renders when that piece of state changes
 //     useTick(id)                  the newest price for one instrument (shared subscription)
 //     useInstrument(id)            tick size, lot size, symbol
+//     useKeyAction(scope)          which shortcut a key press is (K13.4)
 
 import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Rest } from "../api/rest";
@@ -15,6 +16,8 @@ import { OrderSpecs } from "../state/orderSpecs";
 import { Session } from "../state/session";
 import { Store, type State } from "../state/store";
 import { LinkBus } from "../workspace/links";
+import { KeyBindings } from "../keys/bindings";
+import { actionFor, chordOf, type Bindings, type Scope } from "../keys/model";
 
 export interface App {
   rest: Rest;
@@ -24,6 +27,7 @@ export interface App {
   instruments: Instruments;
   specs: OrderSpecs;
   links: LinkBus;
+  keys: KeyBindings; // the user's keyboard shortcuts (K13.4)
 }
 
 /** Wires the real services for the browser. Tests build their own with fakes. */
@@ -40,6 +44,7 @@ export function createApp(opts: { rest?: Rest; stream?: StreamClient; store?: St
     instruments: new Instruments(rest),
     specs: new OrderSpecs(rest),
     links: new LinkBus(),
+    keys: new KeyBindings(rest),
   };
 }
 
@@ -145,4 +150,16 @@ export function useNow(ms = 1000): number {
     return () => clearInterval(timer);
   }, [ms]);
   return now;
+}
+
+/** The user's shortcut choices (re-renders when they change). */
+export function useKeyBindings(): Bindings {
+  const { keys } = useApp();
+  return useSyncExternalStore(keys.subscribe, keys.get);
+}
+
+/** For a widget's onKeyDown: which action this key press starts in its scope (or null). */
+export function useKeyAction(scope: Scope): (e: { key: string; code: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean }) => string | null {
+  const bindings = useKeyBindings();
+  return (e) => actionFor(chordOf(e), scope, bindings);
 }

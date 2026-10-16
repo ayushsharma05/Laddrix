@@ -8,7 +8,8 @@
 //   page tabs    Main | + ……………………………… working count · layout saved
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useApp, useNow, useStore } from "../app/context";
+import { useApp, useKeyBindings, useNow, useStore } from "../app/context";
+import { actionFor, chordOf } from "../keys/model";
 import { Menu } from "../components/Menu";
 import { SearchBox } from "../components/SearchBox";
 import { clock, rupees } from "../lib/format";
@@ -53,24 +54,30 @@ export function Shell() {
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);
   }, [app]);
 
-  // keys that work anywhere: "/" search, Ctrl+Shift+K STOP, Ctrl+S save the layout
+  // keys that work anywhere (K13.4: the user's choices, else the defaults; STOP always has
+  // Ctrl+Shift+K): search, STOP, save the layout, open a ticket / ladder / chart
+  useEffect(() => void app.keys.load(), [app]);
+  const bindings = useKeyBindings();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
-      if (e.key === "/" && !typing) {
-        e.preventDefault();
-        search.current?.focus();
-      } else if (e.ctrlKey && e.shiftKey && (e.key === "K" || e.key === "k")) {
-        e.preventDefault();
-        setDialog("stop");
-      } else if (e.ctrlKey && !e.shiftKey && (e.key === "s" || e.key === "S")) {
-        e.preventDefault();
-        void controller.saveNow();
-      }
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+      const chord = chordOf(e);
+      if (!chord || e.defaultPrevented) return; // a widget already took it
+      const plain = !/^(Ctrl|Alt)\+/.test(chord) && !/^F\d+$/.test(chord);
+      if (typing && plain) return; // typing "/" in a box is just a slash
+      const action = actionFor(chord, "global", bindings);
+      if (!action) return;
+      e.preventDefault();
+      if (action === "search") search.current?.focus();
+      else if (action === "stop") setDialog("stop");
+      else if (action === "save-layout") void controller.saveNow();
+      else if (action === "open-ticket") controller.addWidget("ticket");
+      else if (action === "open-ladder") controller.addWidget("ladder");
+      else if (action === "open-chart") controller.addWidget("chart");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [controller]);
+  }, [controller, bindings]);
 
   return (
     <div className="terminal">
