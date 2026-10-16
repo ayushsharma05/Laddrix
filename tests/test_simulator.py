@@ -81,6 +81,7 @@ def test_options_start_their_day_at_their_model_price():
     for t in sim.step():
         i = next((o for o in options if o.id == t.instrument_id), None)
         if i is not None:
+            assert t.open_paise is not None and abs(t.open_paise - t.ltp_paise) <= 5 * i.tick_paise
             assert abs(t.ltp_paise - t.close_paise) <= 45 * i.tick_paise, (
                 i.id,
                 t.ltp_paise,

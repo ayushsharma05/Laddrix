@@ -132,6 +132,15 @@ describe("Movers", () => {
     expect(publish).toHaveBeenCalledWith(FUT);
   });
 
+  it("never shows an answer for another tab (a slow one landing after a switch)", async () => {
+    const { calls } = mount((p) => <Movers {...p} />, { "GET /api/market/movers": ANSWER("gainers") }, { by: "losers" });
+    const grid = await screen.findByRole("grid", { name: "Movers" });
+    await vi.waitFor(() => expect(calls.some((c) => c.path.includes("by=losers"))).toBe(true));
+    await act(async () => {});
+    expect(within(grid).queryAllByRole("row")).toHaveLength(0);
+    expect(screen.queryByText("of 72 with prices")).toBeNull();
+  });
+
   it("the OI tab shows the change and says what it is measured from", async () => {
     mount((p) => <Movers {...p} />, { "GET /api/market/movers": ANSWER("oi") }, { by: "oi" });
     const grid = await screen.findByRole("grid", { name: "Movers" });

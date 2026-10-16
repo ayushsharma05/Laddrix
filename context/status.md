@@ -117,7 +117,7 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
 ## Next
-**Where we are (16 Oct 2026):** K0–K10 are merged on `main` (K10: PRs #218–#222). K11 is complete; K12 has started. Safety fixes #206 and #207 are merged. Main CI is green. **Claude merges its own PRs once CI is green** (Ayush, 15 Oct). K10 issues exist: #213 (K10.1), #214 (K10.2), #215 (K10.3), #216 (K10.4), #217 (K10.5).
+**Where we are (16 Oct 2026):** K0–K10 are merged on `main` (K10: PRs #218–#222). K11 and K12 are complete (K12.4 in its PR). Safety fixes #206 and #207 are merged. Main CI is green. **Claude merges its own PRs once CI is green** (Ayush, 15 Oct). K10 issues exist: #213 (K10.1), #214 (K10.2), #215 (K10.3), #216 (K10.4), #217 (K10.5).
 
 1. **K10.1 (#213) is merged** (PR #218). See `docs/design/portfolio.md`: optional ports `FundsSource`/`HoldingsSource`/`TradesSource`; `PortfolioService` (`AccountRuntime.portfolio`: cached, one read per kind, stale-not-empty with `as_of`/`error`, refresh 0.5 s after fills, holdings live-marked); REST `GET /api/accounts/{a}/funds|holdings|trades[?fresh=true]`; stream type `portfolio`; paper money in `broker/paper_funds.py` (`PaperMargins`, `MOCKTRADE_PAPER_FUNDS`); recovery hands paper CNC over as holdings; UI `ui/src/widgets/portfolio/` (Funds, Holdings, TradesTable in the order book).
 2. **K10.2 (#214) is merged** (PR #219). See `docs/design/charges.md`.
@@ -127,12 +127,16 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
 6. **K11 research is complete** (#223–#226, #235; PRs #227–#230, #236). **K12 issues (label `track: kite`):**
    - #231 K12.1 candles and chart data API: merged (PR #237).
    - #232 K12.2 chart widget: merged (PR #238).
-   - #233 K12.3 alerts engine and webhooks: **done** on branch `k12-3-alerts` (PR "Closes #233"; merge on green CI if still open). See `docs/design/charts.md` § K12.3.
-   - #234 K12.4: **next**. Alerts manager (form from `GET /api/alerts/spec`, reuse `ParamInput`; list with status, fired count and webhook result; webhook settings with the secret shown once and a Test button; live via `market_alert` / `market_alert_state`), time & sales, depth window, movers.
-   - #234 K12.4 alerts manager, time & sales, depth, movers.
+   - #233 K12.3 alerts engine and webhooks: merged (PR #239).
+   - #234 K12.4 alerts manager, time & sales, depth, movers: **done** on branch `k12-4-market-screens` (PR "Closes #234"; merge on green CI if still open). See `docs/design/charts.md` § K12.4. It also fixed a ticket that kept the previous contract's price after a switch, and simulator option prices.
 
-   Known gap from K11.5: replaying a live Kite server's recordings needs that day's instrument list.
-7. Then K12 charts & alerts (charts with trade marks, price/%/volume/OI alerts in app and by webhook, time & sales, depth, movers), K13 admin & phone (admin panel, per-user limits, phone screens, keyboard shortcut editor, themes). See `docs/design/product-vision.md`.
+   Known gaps: replaying a live Kite server's recordings needs that day's instrument list (also in #240); webhook DNS rebinding (#271); an outside webhook not yet tried (do it once deployed).
+7. **Next: K13 admin & phone** (admin panel for users/roles/accounts/per-user limits, phone screens for watch/positions/cancel/close/STOP, keyboard shortcut editor, dark/light and colour-blind-safe themes). Create its issues first (milestone K13, label `track: kite`). See `docs/design/product-vision.md`.
+   **Then, in this order (issues Ayush added on 16 Oct from an outside review; no code was changed):**
+   1. #240 core v1 completion gate: restart/reconnect drills, backup and restore, recordings with their instrument list, a live-session checklist, docs matching code.
+   2. #257 post-core hardening gate: #258–#277 (positions, uncertain orders, exits, MTM, durability, session rollover, freshness, ownership, webhooks, backups, supervision, economics), suggested order in #257; plus the production security gate #279 and the discussion #278 (who pays for data, multi-user Kite).
+   3. #241 post-v1 features: #242–#255 (v1.1 to v1.7).
+   Recheck each finding against the code before coding; don't reopen fixed defects without evidence.
 8. Ayush's own steps (not code): `docs/runbooks/server.md` (AWS Mumbai, static IP, Kite app ₹500/month, AMO check), then a real trading day; before selling to others: the broker's multi-user arrangement, exchange algo empanelment, licensed market data, legal review.
 
 **How each piece is built (keep the quality):** brainstorm the traps → code with the "backend provides, frontend displays" rule (specs from the server, no market rules in the UI) → Python tests + UI tests → a mutation script in `context/scripts/mutate-*.py` (restores files in `finally`, a hang counts as caught; **run one at a time, never kill one mid-run**: it can leave a mutant in the source) → real browser or real server check against the demo (`context/scripts/e2e-*.cjs`) → docs in `docs/design/` → context files → PR → green CI → merge.

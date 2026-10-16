@@ -85,3 +85,14 @@ def test_a_feed_hears_when_an_instrument_gets_its_first_watcher():
     a.close()
     md.subscribe(["NSE:A"])  # still watched by the second: not new
     assert asked == ["NSE:A", "NSE:B"]
+
+
+def test_is_watched_follows_the_subscribers():
+    md = MarketData()
+    assert md.is_watched("NSE:A") is False
+    a, b = md.subscribe(["NSE:A"]), md.subscribe(["NSE:A"])
+    assert md.is_watched("NSE:A") and not md.is_watched("NSE:B")
+    a.close()
+    assert md.is_watched("NSE:A")  # one still watches
+    b.close()
+    assert md.is_watched("NSE:A") is False

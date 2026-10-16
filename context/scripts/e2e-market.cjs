@@ -1,7 +1,8 @@
 // Real browser check of K12.4 on the demo: Depth, Time & Sales and Movers from Widgets on the
 // pink link (NIFTY future), their numbers against the server's own answers, then the Alerts
 // widget: a webhook refused for http, an alert made from the New form just above the live price
-// that fires (its row and Messages), switched on again, and deleted after the second click.
+// that fires (its row and Messages), switched on again, and deleted after the second click. Also:
+// a Movers click switches the linked ticket, which must start at the new contract's price.
 // Run with the demo up and ui/dist rebuilt.
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 const { execSync } = require('child_process');
@@ -62,6 +63,18 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await page.waitForTimeout(600);
   console.log('volume:', (await movers.getByRole('row').allTextContents()).slice(0, 2).map(flat).join(' | '));
   await page.screenshot({ path: '/tmp/claude-0/e2e-market.png' });
+
+  // a Movers click switches the pink group: the ticket must start at the new contract's price
+  const rows = await movers.getByRole('row').all();
+  let picked = null;
+  for (const r of rows) { const id = await r.getAttribute('title'); if (id && id !== 'NFO:NIFTY26OCTFUT') { picked = id; await r.click(); break; } }
+  await page.waitForTimeout(800);
+  const ticket = page.locator('.ticket').first();
+  if (picked && (await ticket.count())) {
+    const shown = Number((await ticket.getByRole('textbox', { name: 'Price', exact: true }).inputValue()).replace(/,/g, ''));
+    const real = (await api('GET', `/api/instruments/${encodeURIComponent(picked)}`)).ltp_paise / 100;
+    console.log('ticket after switch to', picked, ':', shown, 'vs ltp', real, Math.abs(shown - real) / real < 0.01 ? 'OK' : 'WRONG');
+  } else console.log('ticket check skipped (no ticket in the layout or no other mover)');
 
   // Alerts
   await open('Alerts');

@@ -44,6 +44,14 @@ def test_the_hand_worked_tape():
     assert tape.recent("NSE:NOPE") == []
 
 
+def test_exactly_at_the_previous_touch_counts_as_that_side():
+    tape = TimeAndSales()
+    tape.on_tick(book(2500000, 1000, 2499990, 2500010))
+    tape.on_tick(book(2499990, 1050, 2499980, 2500000))  # at the old bid exactly: SELL
+    tape.on_tick(book(2500000, 1100, 2499980, 2500000))  # at the old ask exactly: BUY
+    assert [p.side for p in tape.recent(FUT)] == ["SELL", "BUY"]
+
+
 def test_a_new_day_unwatched_contracts_and_the_size_kept():
     watched = {FUT}
     tape = TimeAndSales(keep=3, wanted=lambda i: i in watched)
@@ -127,6 +135,17 @@ def test_filters_limits_and_a_new_day_for_oi(market):
     tick("NIFTY26OCTFUT", 2500000, 2500000, 200, oi=1_900_000, exchange="NFO")
     assert [r["oi_change_pct"] for r in movers.top("oi")["rows"]] == [-5.0]  # a fall counts too
     assert movers.top("oi", limit=5)["of"] == 6
+    now[0] += timedelta(days=1)  # a day with no OI tick yet: yesterday's change isn't today's
+    assert movers.top("oi")["rows"] == []
+
+
+def test_exchange_alone_filters_and_oi_ranks_the_biggest_move_either_way(market):
+    movers, tick, _ = market
+    assert [r["symbol"] for r in movers.top("volume", exchange="NFO")["rows"]] == ["NIFTY26OCTFUT"]
+    tick("RELIANCE", 102_00, 100_00, 5_000, oi=100_000)
+    tick("RELIANCE", 102_00, 100_00, 5_100, oi=92_000)  # OI −8%: a bigger move than the +5%
+    assert [(r["symbol"], r["oi_change_pct"]) for r in movers.top("oi")["rows"]] == [
+        ("RELIANCE", -8.0), ("NIFTY26OCTFUT", 5.0)]  # fmt: skip
 
 
 async def test_the_api(tmp_path, nifty_fut):

@@ -21,6 +21,8 @@ describe("market screens model", () => {
     expect(d.spread).toEqual({ paise: 20, ticks: 2 });
     const shown = depth(tick(FUT, 1, { bids: [[100, 30, 1]], asks: [[110, 10, 1]] }), 10)!;
     expect(shown.imbalance).toBe(0.75); // no book totals sent: the levels shown
+    const bigAsk = depth(tick(FUT, 1, { bids: [[100, 30, 1]], asks: [[110, 60, 1]] }), 10)!;
+    expect([bigAsk.bids[0]!.share, bigAsk.asks[0]!.share]).toEqual([0.5, 1]); // bars share one scale: the largest on either side
     const empty = depth(tick(FUT, 1), 10)!;
     expect([empty.imbalance, empty.spread, empty.bidTotal]).toEqual([null, null, 0]);
     expect(depth(null, 10)).toBeNull();
