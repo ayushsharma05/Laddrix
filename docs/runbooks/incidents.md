@@ -99,3 +99,51 @@ Paper accounts: the paper broker keeps its orders in memory, so working paper or
 closed at a restart ("the paper broker restarted: paper orders don't survive a restart");
 positions and today's P&L come back from the audit trail.
 
+
+## Position UNPROTECTED
+
+**What you see:** a red **ACTION NEEDED** band on every screen:
+
+    UNPROTECTED acc-paper: 75 NFO:NIFTY26OCTFUT (long) is open with no stop: its stop
+    (TRAILING_STOP SELL 75 NFO:NIFTY26OCTFUT (A1, demo)) was running when the server stopped
+    and is not running now. Start a stop for it, or close it.
+
+**Why:** a trailing stop, OCO or bracket is held by MockTrade, not by the exchange. It stops
+protecting when:
+- the server restarts (these algos don't survive one);
+- someone pauses or stops it;
+- it fails;
+- it ends while the position is still open.
+
+The server's protection guard (`src/mocktrade/ops/protection.py`, V1.2 #328) then keeps one band per position.
+- **When it decides:** after the account's recovery has finished, so a half-rebuilt book is never taken for flat.
+- **What it flags:** only positions that *had* protection and lost it. A position you chose never to protect is left alone.
+
+**Do:** either protect it again or close it. The band clears by itself within about 5 seconds when any of these happens:
+- the position is **flat**;
+- a stop algo is **working** on it again (a new one, or the paused one resumed);
+- a working **stop order** (SL or SL-M) is on the closing side (sell for a long, buy for a short);
+- an active **GTT** is on it.
+
+## Crash-and-restart drill (V1.2, #328)
+
+Run it before going live and after any change to recovery, orders or positions. It uses the demo only; nothing reaches a broker.
+
+    python3 context/scripts/drill-restart.py         # API checks: 17 PASS/FAIL lines
+    node context/scripts/e2e-restart-bands.cjs       # the bands in a real browser (ui/dist built)
+
+**What it proves:**
+- **After a SIGKILL mid-session:**
+  - the position comes back at its size;
+  - every fill is counted once (bought 150, not 300);
+  - a resting paper order is closed and the reason says why;
+  - the lost trailing stop shows the UNPROTECTED band;
+  - new orders and cancels work.
+- **After protecting it again:** the band clears.
+- **After a second crash:** the position and the fill count are the same again, and the second lost stop is named once.
+- **After closing it:** the band goes.
+- **In the browser:** the band appears after the restart; freezing the server for 9 s shows "PRICES 9 s OLD", which goes once it resumes. Screenshots: `context/images/v1-2-*.png`.
+
+**What it doesn't cover:**
+- **A live broker:** Kite's own order book after a crash is the go-live checklist's (#330) to check, live.
+- **The recovery gate's wait:** new orders are held while recovery runs, and cancels still go through. On paper recovery is instant, so the drill can't see this wait; `tests/test_recovery.py` covers it.

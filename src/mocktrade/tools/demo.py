@@ -37,6 +37,7 @@ from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.ops.alerts import Alerts
 from mocktrade.ops.guards import DayGuards
+from mocktrade.ops.protection import ProtectionGuard
 from mocktrade.ops.scheduler import Scheduler
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
@@ -180,6 +181,9 @@ async def main(
     jobs.append(market_alerts.store.run())
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
+    protection = ProtectionGuard(platform, alerts)  # lost stops on open positions (V1.2)
+    protection.after_restart()
+    scheduler.every(5, protection.run_check, between=("00:00", "23:59"), name="protection guard")
     app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler,
                      reports=reports, alerts=alerts, ticks=ticks, replay=feed,
                      replay_command=lambda d: f"python -m mocktrade.tools.demo --replay {d} "

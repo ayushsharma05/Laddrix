@@ -266,6 +266,19 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - a day that can't be described is refused before anything starts, naming what is missing;
     - mutation 22/22 (found four test gaps, now covered); the demo check passed;
     - known limit: backtests still use the live list.
+- 16 Oct, #327 merged (PR #331). **#328 done:**
+  - **A protection guard on the server.** A position that *had* a stop held by MockTrade and lost it (restart, pause, stop, failure, or the stop ending while the position is still open) gets one red UNPROTECTED band. It clears when the position is flat or covered again (a working stop algo, a closing-side SL/SL-M order, or an active GTT).
+  - **What changed from before.** The old restart alert existed only in `serve.py`, never cleared, and never appeared in the demo; the guard replaces it in both. It waits for recovery before deciding. Never-protected positions are deliberately left alone, so the band stays meaningful.
+  - **The crash drill (SIGKILL, restart twice) passed 17/17:**
+    - the position came back at its size, and bought stayed 150, not 300;
+    - the resting paper order was closed with a reason;
+    - the band appeared and cleared;
+    - orders and cancels worked.
+  - **The browser check:** the band showed after the restart, and a 9 s freeze showed "PRICES 9 s OLD", which cleared on resume.
+  - **What testing found and fixed:**
+    - resuming a stop didn't clear its band (a real bug);
+    - an early drill counted the broker's tradebook, which is the wrong measure; it now counts our own fills;
+    - mutation 27/27, after adding a test for a short position.
 - 16 Oct, **#329 done:**
   - **What a backup holds now.** Everything a restored server needs: the two databases plus rules, reports, alerts, candles and backtests. Recordings come only with `--with-ticks`.
   - **What it never holds:** broker tokens, keys, `.env` or temporary files. `manifest.json` gives each file's size and SHA-256.

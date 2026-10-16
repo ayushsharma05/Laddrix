@@ -77,6 +77,7 @@ from mocktrade.ops.alerts import Alerts
 from mocktrade.ops.checks import Checks
 from mocktrade.ops.guards import DayGuards
 from mocktrade.ops.notify import WebhookNotifier
+from mocktrade.ops.protection import ProtectionGuard
 from mocktrade.ops.scheduler import Scheduler, parse_holidays
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
@@ -342,15 +343,6 @@ def build(settings: ServeSettings) -> Assembly:
             gate.subscribe(
                 lambda state, reason, a=account_id: _recovery_alert(alerts, a, state, reason)
             )
-        # stops held by MockTrade don't survive a restart: say so loudly, once
-        if lost := platform.lost_protection(account_id):
-            alerts.raise_(
-                f"protection_lost:{account_id}",
-                "ERROR",
-                f"{account_id}: {len(lost)} stop/target orders held by MockTrade were running "
-                f"when the server stopped and are NOT running now: {'; '.join(lost)}. "
-                "Check those positions.",
-            )
     checks = Checks(
         alerts,
         md,
@@ -401,6 +393,11 @@ def build(settings: ServeSettings) -> Assembly:
     jobs.append(market_alerts.store.run)
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
+    # stops held by MockTrade that a restart (or a pause, stop or failure) left off an open
+    # position: one band per position until it is flat or protected again (V1.2)
+    protection = ProtectionGuard(platform, alerts)
+    protection.after_restart(running)
+    scheduler.every(5, protection.run_check, between=("00:00", "23:59"), name="protection guard")
     jobs.append(scheduler.run)
     ui = settings.ui_dir if (settings.ui_dir / "index.html").exists() else None
     if ui is None:
