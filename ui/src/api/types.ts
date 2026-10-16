@@ -119,7 +119,8 @@ export interface PositionsSnapshot {
     checked_at: string | null;
     ok: boolean | null;
     error: string;
-    alerts: { instrument_id: string; ours: number; broker: number; since: string; message: string }[];
+    // product: the one that differs; null: the net across products differs (the broker didn't say)
+    alerts: { instrument_id: string; product: string | null; ours: number; broker: number; since: string; message: string }[];
   };
 }
 
@@ -155,6 +156,7 @@ export type ServerMessage =
       account_id: string;
       state: "raised" | "cleared";
       instrument_id: string;
+      product: string | null;
       ours: number;
       broker: number;
       message: string;

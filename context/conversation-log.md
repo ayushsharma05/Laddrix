@@ -208,3 +208,11 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
   - **Checks:**
     - The mutation run found 5 real gaps in the tests, all now covered; 2 of its mutants were equivalent and are left out.
     - On the demo, every step worked, and so did a restart.
+- 16 Oct, #258 fixed. Positions are now compared and closed per instrument *and* product, in all of these places:
+  - the periodic broker check and the restart rebuild (`differences()` in `positions/reconcile.py`);
+  - the paper broker, which now lists one row per product;
+  - the "only closing trades" rule, which uses that product's position and its own working orders;
+  - the alerts, on the server and the screen.
+
+  The audit's case (NRML +75, MIS −75) no longer raises a false difference. The mutation run found 5 gaps in the tests, all now covered (19/19).
+- 16 Oct, Ayush asked about about 22 "in progress" issues on the GitHub Project linked to the repo. Claude's GitHub tools can't read Project boards. Ayush was asked to send the list (or a CSV export) so it can be checked against the clean-up.

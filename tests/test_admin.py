@@ -197,6 +197,8 @@ async def test_a_turned_off_account_takes_only_closing_trades(world):
     assert refused == ("the account is turned off by an admin: only closing trades are allowed")
     assert await running.risk.admit_new(request(Side.SELL, 150)) is None  # closes it all
     assert "turned off" in await running.risk.admit_new(request(Side.SELL, 225))  # flips short
+    mis = replace(request(Side.SELL, 75), product=Product.MIS)
+    assert "turned off" in await running.risk.admit_new(mis)  # opens a MIS short: not closing
     working = await running.orders.submit(request(Side.SELL, 75, cid="S1"))  # reduces
     view = running.orders.get("S1") or working
     grown = await running.risk.admit_modify(view, replace(view.request, qty=225))
@@ -531,3 +533,16 @@ async def test_the_stream_refuses_a_user_who_must_change_their_password(world):
             with tc.websocket_connect("/ws", headers={"origin": "https://trade.example.in"}) as ws:
                 ws.receive_json()
     assert closed.value.code == 4401
+
+
+async def test_the_running_account_compares_with_the_broker_by_product(world):
+    running = world.platform.account("acc-ayush")
+    running.positions.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)
+    running.positions.apply_fill(FUT, Product.MIS, Side.SELL, 75, 2501000)
+    from mocktrade.broker.base import BrokerPosition
+
+    world.brokers["acc-ayush"].broker_positions = [
+        BrokerPosition(FUT, 75, 0, product=Product.NRML),
+        BrokerPosition(FUT, -75, 0, product=Product.MIS),
+    ]
+    assert (await running.reconciler.check()).ok  # #258: not a false difference

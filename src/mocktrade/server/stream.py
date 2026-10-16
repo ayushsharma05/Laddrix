@@ -529,6 +529,7 @@ class StreamHub:
             "account_id": account_id,
             "state": what,
             "instrument_id": mismatch.instrument_id,
+            "product": mismatch.product.value if mismatch.product else None,  # None: the net
             "ours": mismatch.ours,
             "broker": mismatch.broker,
             "message": mismatch.message,

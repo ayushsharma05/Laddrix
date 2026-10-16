@@ -15,6 +15,7 @@ import { useMemo } from "react";
 import type { Position } from "../../api/types";
 import { useNow, useStore } from "../../app/context";
 import { price, qty, shortName } from "../../lib/format";
+import { alertFor } from "../../state/store";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
 import { SquareOffButton } from "./SquareOff";
 import { averagePrice, chargesFor, positionRows, positionTotals, reconcileState, signedRupees } from "./model";
@@ -70,7 +71,7 @@ export function Positions({ publish, open }: WidgetProps) {
         <div className="grid-body" role="grid" aria-label="Positions">
           {!rows.length && <div className="empty-note">No positions today.</div>}
           {rows.map((p) => {
-            const alert = alerts[p.instrument_id];
+            const alert = alertFor(alerts, p);
             return (
               <div
                 key={`${p.instrument_id}|${p.product}`}

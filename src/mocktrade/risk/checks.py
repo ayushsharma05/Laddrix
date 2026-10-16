@@ -19,7 +19,7 @@ from decimal import Decimal
 from mocktrade.broker.rules import protected_limit
 from mocktrade.domain.instruments import Instrument, InstrumentKind
 from mocktrade.domain.money import format_rupees
-from mocktrade.domain.orders import OrderRequest, OrderType, Side
+from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
 from mocktrade.domain.ticks import Tick
 from mocktrade.orders.model import OrderView
 from mocktrade.risk.kill_switch import KillSwitch
@@ -43,6 +43,7 @@ class RiskGate:
         switches: Sequence[KillSwitch],  # e.g. the firm's and this account's
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),  # same clock as the orders
         positions: Callable[[], dict[str, int]] = dict,  # every net position (covered shorts)
+        product_position: Callable[[str, Product], int] | None = None,  # one product's qty
     ) -> None:
         self.limits = limits  # replaced whole by an admin's edit; read fresh on every order
         self.off_reason: str | None = None  # set: the account takes only closing trades
@@ -54,6 +55,8 @@ class RiskGate:
         self._switches = tuple(switches)
         self._clock = clock
         self._positions = positions
+        # what an order can close is its own product's position (#258); net when not given
+        self._product_position = product_position or (lambda i, _p: position(i))
 
     # --- the gate -------------------------------------------------------------------------
 
@@ -284,9 +287,15 @@ class RiskGate:
         return f"{self.off_reason}: only closing trades are allowed"
 
     def _closes(self, request: OrderRequest, leaves: int, others) -> bool:
-        """Does this order only reduce the position (with what already works on that side)?"""
-        now = self._position(request.instrument_id)
-        working = self._working_qty(request.instrument_id, request.side, others)
+        """Does this order only reduce its product's position (with what already works on that
+        side in that product)? A MIS sell doesn't close an NRML long: at the broker it opens a
+        MIS short (#258)."""
+        now = self._product_position(request.instrument_id, request.product)
+        working = sum(
+            o.leaves_qty for o in others
+            if o.request.instrument_id == request.instrument_id and o.request.side is request.side
+            and o.request.product is request.product
+        )  # fmt: skip
         after = now + request.side.sign * (working + leaves)
         return now != 0 and request.side.sign == -_sign(now) and _sign(after) != -_sign(now)
 

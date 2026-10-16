@@ -32,6 +32,7 @@ export interface KillState {
 
 export interface PositionAlert {
   instrumentId: string;
+  product: string | null; // null: the net across products differs
   ours: number;
   broker: number;
   message: string;
@@ -42,7 +43,7 @@ export interface AccountBook {
   positions: Record<string, Position>; // by instrument_id + product
   dayPnl: number;
   reconcile: PositionsSnapshot["reconcile"] | null;
-  alerts: Record<string, PositionAlert>; // by instrument_id
+  alerts: Record<string, PositionAlert>; // by alertKey (instrument and product)
   kill: KillState;
   algos: Record<string, AlgoView>; // by algo_id
   gtts: Record<string, GttView>; // by gtt_id
@@ -81,6 +82,16 @@ export function emptyBook(): AccountBook {
 
 export function positionKey(p: { instrument_id: string; product: string }): string {
   return `${p.instrument_id}|${p.product}`;
+}
+
+/** A position alert's key: the same as its position's, or `<instrument>|` for the net. */
+export function alertKey(a: { instrument_id: string; product: string | null }): string {
+  return `${a.instrument_id}|${a.product ?? ""}`;
+}
+
+/** The alert that concerns a position row: its own product's, else its instrument's net. */
+export function alertFor(alerts: Record<string, PositionAlert>, p: { instrument_id: string; product: string }): PositionAlert | undefined {
+  return alerts[positionKey(p)] ?? alerts[`${p.instrument_id}|`];
 }
 
 /** True when `a` is at least as new as `b` (ISO times; missing counts as oldest). */
@@ -180,8 +191,9 @@ export class Store {
     }
     const alerts: Record<string, PositionAlert> = {};
     for (const a of snap.reconcile.alerts) {
-      alerts[a.instrument_id] = {
+      alerts[alertKey(a)] = {
         instrumentId: a.instrument_id,
+        product: a.product,
         ours: a.ours,
         broker: a.broker,
         message: a.message,
@@ -286,16 +298,17 @@ export class Store {
       case "position_alert": {
         const alerts = { ...this.book(m.account_id).alerts };
         if (m.state === "raised") {
-          alerts[m.instrument_id] = {
+          alerts[alertKey(m)] = {
             instrumentId: m.instrument_id,
+            product: m.product,
             ours: m.ours,
             broker: m.broker,
             message: m.message,
           };
           this.addMessage("WARN", m.instrument_id, m.message);
         } else {
-          delete alerts[m.instrument_id];
-          this.addMessage("OK", m.instrument_id, `${shortName(m.instrument_id)}: positions match the broker again`);
+          delete alerts[alertKey(m)];
+          this.addMessage("OK", m.instrument_id, `${shortName(m.instrument_id)}${m.product ? ` ${m.product}` : ""}: positions match the broker again`);
         }
         return this.setBook(m.account_id, { alerts });
       }

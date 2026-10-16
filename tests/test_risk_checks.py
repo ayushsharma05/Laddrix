@@ -53,6 +53,7 @@ class World:
             REL: Tick(REL, 140000),  # ₹1,400.00
         }
         self.positions: dict[str, int] = {}
+        self.by_product: dict | None = None  # (instrument, product) -> qty, when a test sets it
         self.working: list[OrderView] = []
         self.pnl = 0
         self.firm = KillSwitch("firm")
@@ -69,7 +70,9 @@ class World:
             day_pnl_paise=lambda: self.pnl,
             switches=(self.firm, self.account),
             clock=lambda: self.now,
-        )
+            product_position=(lambda i, p: self.by_product.get((i, p), 0))
+            if self.by_product is not None else None,
+        )  # fmt: skip
 
 
 @pytest.fixture
@@ -337,6 +340,24 @@ async def test_past_the_daily_loss_only_closing_trades_are_allowed(world):
     assert "daily loss" in await check(gate, req(side=Side.SELL, qty=225))  # would flip short
     world.positions[FUT] = 0
     assert "daily loss" in await check(gate, req(side=Side.SELL))  # opening from flat
+
+
+async def test_only_the_same_products_position_can_be_closed(world):
+    """#258: long 2 lots NRML. Past the loss limit a MIS sell doesn't close it (at the broker it
+    opens a MIS short); an NRML sell does. Working NRML sells count against what's left."""
+    world.by_product = {(FUT, Product.NRML): 150}
+    world.positions[FUT] = 150
+    gate = world.gate(max_order_value_paise=10**12)
+    world.pnl = -20_000_00
+    assert "daily loss" in await check(gate, req(side=Side.SELL, qty=75, product=Product.MIS))
+    assert await check(gate, req(side=Side.SELL, qty=75, product=Product.NRML)) is None
+    world.working = [working(req(side=Side.SELL, qty=75, product=Product.NRML), "W1"),
+                     working(req(side=Side.SELL, qty=75, product=Product.MIS), "W2")]  # fmt: skip
+    assert await check(gate, req(side=Side.SELL, qty=75, product=Product.NRML)) is None
+    assert "daily loss" in await check(gate, req(side=Side.SELL, qty=150, product=Product.NRML))
+    gate.off_reason = "the account is turned off by an admin"  # the same rule when turned off
+    world.pnl = 0
+    assert "turned off" in await check(gate, req(side=Side.SELL, qty=75, product=Product.MIS))
 
 
 # --- open orders and double clicks ---
