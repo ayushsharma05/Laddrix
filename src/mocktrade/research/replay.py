@@ -132,6 +132,7 @@ class ReplayFeed:
             self.clock.now = at
             self._md.on_tick(tick)
             self.fed += 1
+        self._seek_to = None  # a jump past the end ends with the day
         self.state = "finished"
         self._tell()
 

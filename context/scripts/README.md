@@ -47,3 +47,5 @@ from the repo root (elsewhere it creates a second demo user with a different sec
 | `e2e-mtm.cjs` | Real browser on a fresh demo: Square off MIS with its confirmation; an MTM ₹1 limit with auto-close set on the MTM Limits tab closes the position; the message | `node context/scripts/e2e-mtm.cjs` |
 | `mutate-recorder.py` | 14 mutations of the tick recorder and store (fields, India day, append, merge order, crash cut, rotation, retry, the tap); all caught | `python3 context/scripts/mutate-recorder.py` (alone) |
 | `check-recording.py` | Reads a real recording (the demo's) back: ticks, bytes per tick, busiest instruments, read speed | `python3 context/scripts/check-recording.py [data/demo/ticks]` |
+| `mutate-replay.py` | 11 mutations of the replay feed (pace, cap, loop turns, pause, clock, seek, speeds) and the paper broker's every-tick mode; all caught | `python3 context/scripts/mutate-replay.py` (alone) |
+| `e2e-replay.cjs` | Real browser on a replay server (`demo --replay <day> --port 8001`, after the demo recorded that day): bar and band, the replayed time moving, an order filled, pause, speed, jump | `node context/scripts/e2e-replay.cjs <day>` |

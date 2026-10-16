@@ -80,6 +80,12 @@ async def test_pause_resume_speed_and_jumping_ahead(tmp_path):
         await run
     assert feed.state == "finished" and clock() == at(601)
     assert states[:3] == ["playing", "paused", "paused"] and states[-1] == "finished"
+    past = ReplayFeed(lambda: store.read_timed(T0.date()), MarketData(), ReplayClock(T0),
+                      day=T0.date(), speed=1)  # fmt: skip
+    past.seek(at(3600))  # beyond the last tick
+    async with asyncio.timeout(1):
+        await past.run()
+    assert past.status()["seeking_to"] is None and past.state == "finished"
 
 
 # --- the same fills as when it was live --------------------------------------------------------

@@ -39,3 +39,48 @@ every 1 s, in a worker thread ─► FileTickStore.append(batch)
 - `tests/test_ticks_recorder.py`;
 - `context/scripts/mutate-recorder.py` (14/14);
 - a real recording of the demo: `context/scripts/check-recording.py`.
+
+## K11.2 Replay a recorded day into paper trading (#224)
+
+```
+python -m mocktrade.tools.demo --replay 2026-10-16 [--ticks data/demo/ticks] [--speed 10] --port 8001
+python -m mocktrade.tools.demo --replay 2026-10-16 --code        # its login code
+
+FileTickStore.read_timed(day) ─► ReplayFeed ─► ReplayClock.now = the tick's recorded time
+                                            ─► MarketData.on_tick ─► paper broker, algos, screens
+                                            ─► waits gap / speed (at most 5 s), or 3 loop turns at max
+```
+
+- **Its own server and data folder** (`data/replay/<day>/`): a user, paper account, audit trail,
+  reports and MTM rules of its own. Practice never mixes with live or live-paper results, and the
+  replay doesn't record what it replays.
+- **Everything runs on the replayed time:** the paper broker, orders, risk, algos (TWAP/VWAP
+  schedules), MTM, the square-off window, the scheduler (16:00 report), alerts and reports all
+  get the `ReplayClock`.
+- **The same fills as live, at any speed:**
+  - In a replay the paper broker sees every tick (`PaperBroker(every_tick=True)` uses
+    `MarketData.tap`). A subscription keeps only the newest tick per instrument, so at full
+    speed it would skip ticks and the fills would depend on the speed.
+  - At full speed the feed gives the event loop 3 turns between ticks. An order placed on one
+    tick is accepted before the next, as it always is live, where ticks are milliseconds apart.
+  - Tested: a scripted day gives identical fills live and replayed, every time.
+- **Controls** (`GET/POST /api/replay`; every action audited as REPLAY_CONTROL):
+  - pause, which stops before the next tick, not after it;
+  - resume;
+  - speed: 1×, 10×, 60× or max;
+  - jump ahead: the ticks in between are fed at once, so prices, VAP and resting orders stay
+    consistent. To go back, start the replay again. A jump past the end finishes the day.
+- **Screens:**
+  - a purple **replay bar** (day, replayed time, state, speed buttons, Pause/Resume, +15 min);
+  - a **REPLAY** band ("practice on a recorded day; nothing reaches the market");
+  - every widget unchanged.
+- **Limits:**
+  - The replay knows the demo's instruments. A Kite recording replays once the instrument list is
+    loaded the same way (a later step).
+  - A recording's own pauses (between sessions, or a dropped feed) are shortened to 5 s.
+
+Checks:
+- `tests/test_replay.py`: pace and clock, pause/resume/speed/jump, the same fills as live, the API, the demo flag;
+- `ui/src/shell/ReplayBar.test.tsx`;
+- `context/scripts/mutate-replay.py` (11/11);
+- real browser `context/scripts/e2e-replay.cjs <day>`, against a replay of a demo recording.
