@@ -138,7 +138,7 @@ docker compose -f deploy/compose.yaml run --rm --no-deps \
 docker compose -f deploy/compose.yaml start app
 ```
 
-- `--replace` first moves the current data aside to `/data.before-restore-<time>`; nothing is deleted. Without it, a folder with data in it is refused.
+- `--replace` first moves the current data into `/data/.before-restore-<time>/`, inside the volume (a volume's root can't be moved); nothing is deleted, and `backups/` stays where it is. Without it, a folder with data in it is refused.
 - The restore runs as the app's own user, so the files keep the right owner.
 - At the end the command lists what to put back by hand: the same `MOCKTRADE_SECRET_KEY` (without it, users must set up their authenticator again), `.env`, and a fresh Kite login.
 

@@ -78,6 +78,7 @@ from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.stream import StreamHub
 from mocktrade.server.users import SESSION_MAX, LoginFailed, UserStore
 from mocktrade.store.events import StoredEvent
+from mocktrade.version import BUILD, VERSION
 
 log = logging.getLogger(__name__)
 
@@ -409,7 +410,7 @@ def create_app(
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "ok", "version": VERSION, "build": BUILD}  # the screens show it
 
     @app.get("/api/metrics", response_model=None)
     async def metrics(user: Me, format: str = "json") -> dict[str, Any] | Response:

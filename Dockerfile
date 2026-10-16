@@ -23,8 +23,11 @@ RUN pip install . \
     && mkdir /data && chown mocktrade /data
 COPY --from=screens /ui/dist ./ui/dist
 
+# the commit this image is built from (deploy/deploy.sh passes it), shown by /api/health
+ARG MOCKTRADE_BUILD=unknown
 # no secrets here: they come from the environment at run time (deploy/.env)
-ENV MOCKTRADE_HOST=0.0.0.0 \
+ENV MOCKTRADE_BUILD=$MOCKTRADE_BUILD \
+    MOCKTRADE_HOST=0.0.0.0 \
     MOCKTRADE_PORT=8000 \
     MOCKTRADE_DATA=/data \
     MOCKTRADE_USERS_DB=/data/users.db \
