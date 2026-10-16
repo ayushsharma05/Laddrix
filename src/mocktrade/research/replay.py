@@ -26,6 +26,8 @@ from mocktrade.marketdata.service import MarketData
 log = logging.getLogger(__name__)
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 SPEEDS = (0, 1, 10, 60)  # 0: as fast as possible
+TURNS = 3  # event-loop turns between ticks at full speed: an order placed on one tick is
+# accepted (a task) before the next, as it always is live, where ticks are milliseconds apart
 MAX_WAIT_S = 5.0  # a long quiet gap (e.g. lunch) never stalls the replay longer than this
 
 
@@ -112,7 +114,7 @@ class ReplayFeed:
         for recorded_us, tick in self._ticks():
             await self._running.wait()
             at = EPOCH + timedelta(microseconds=recorded_us)
-            seeking = self._seek_to is not None and at < self._seek_to
+            seeking = self._seek_to is not None and at <= self._seek_to
             if self._seek_to is not None and not seeking:
                 self._seek_to = None
                 self._tell()
@@ -121,10 +123,12 @@ class ReplayFeed:
                 if self.speed > 0 and gap > 0:
                     await self._sleep(min(gap / self.speed, MAX_WAIT_S))
                 else:
-                    await self._sleep(0)  # let fills and screens run between ticks
+                    for _ in range(TURNS):  # let acceptances and fills run between ticks
+                        await self._sleep(0)
             elif seeking and self.fed % 500 == 0:
                 await self._sleep(0)  # stay responsive while jumping
             previous = recorded_us
+            await self._running.wait()  # paused while waiting: stop before this tick, not after
             self.clock.now = at
             self._md.on_tick(tick)
             self.fed += 1

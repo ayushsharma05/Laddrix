@@ -111,7 +111,8 @@ async def main(
     platform = Platform(instruments, md, KillSwitch("firm"), log)
     brokers = []
     for account in users.accounts():
-        broker = PaperBroker(md, instruments, name="paper", clock=clock)
+        broker = PaperBroker(md, instruments, name="paper", clock=clock,
+                             every_tick=feed is not None)  # fmt: skip
         broker.start()
         brokers.append(broker)
         day = clock().astimezone(IST).strftime("%y%m%d")
