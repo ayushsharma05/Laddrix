@@ -1733,8 +1733,9 @@ label.algo-field {
 }
 .admin-limit-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 6px 14px;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 6px 24px;
+  align-items: start;
 }
 .admin-limit-grid fieldset {
   margin: 0;
@@ -1744,7 +1745,7 @@ label.algo-field {
 }
 .admin-limit-grid fieldset.admin-group {
   display: block;
-  padding: 4px 6px;
+  padding: 2px 8px 6px;
   border: 1px solid var(--border);
 }
 .admin-group legend {
@@ -1752,16 +1753,27 @@ label.algo-field {
   color: var(--text-2);
 }
 .admin-field {
-  display: flex;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 170px auto;
+  gap: 8px;
   align-items: center;
-  justify-content: space-between;
   min-height: 26px;
+}
+.admin-field.flag {
+  display: flex;
+  gap: 8px;
 }
 .admin-field.wide {
   grid-column: 1 / -1;
-  justify-content: flex-start;
+  display: flex;
   flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.admin-field.wide > span:first-child {
+  width: 170px;
+}
+.admin-group .admin-field {
+  grid-template-columns: 154px auto;
 }
 .admin-preview {
   margin: 6px 0;
@@ -1771,4 +1783,27 @@ label.algo-field {
 .admin-preview ul {
   margin: 0;
   padding-left: 18px;
+}
+/* Admin works at any size (a corner of a page or a whole screen): its own width decides */
+.admin {
+  container-type: inline-size;
+  overflow: auto;
+}
+@container (max-width: 820px) {
+  .admin-user-row,
+  .admin-account-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 2px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    height: auto;
+  }
+  .admin .grid-head.admin-user-row,
+  .admin .grid-head.admin-account-row {
+    display: none; /* each row says it all: no column heads to line up with */
+  }
+  .admin-row-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
 }

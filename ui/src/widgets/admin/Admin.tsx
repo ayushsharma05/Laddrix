@@ -634,7 +634,7 @@ function LimitField({ param: p, value, onChange, disabled, short }: { param: Alg
   const label = short && p.label.includes(":") ? p.label.split(":").slice(1).join(":").trim() : p.label;
   if (p.kind === "flag") {
     return (
-      <label className="admin-field" title={p.help}>
+      <label className="admin-field flag" title={p.help}>
         <input type="checkbox" aria-label={p.label} checked={value === true} disabled={disabled} onChange={(e) => onChange(e.target.checked)} /> {label}
       </label>
     );
@@ -693,4 +693,5 @@ registerWidget<AdminParams>({
   defaults: () => ({ link: "none", tab: "users" }),
   link: "none",
   roles: ["admin", "risk"],
+  size: { width: 900, height: 520 }, // three tabs of forms: room to read them (or pop it out)
 });

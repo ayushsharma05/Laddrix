@@ -38,7 +38,7 @@ export function SetPassword() {
             MockTrade · Set your password
           </span>
         </div>
-        <form className="login-form" onSubmit={submit}>
+        <form className="login-form" aria-label="Set your password" onSubmit={submit}>
           <p className="hint">
             {user?.name ?? user?.id}, you signed in with a one-time password from an admin. Choose your own to go on; your other sign-ins end.
           </p>

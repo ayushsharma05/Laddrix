@@ -176,6 +176,7 @@ where the thumb rests.
   subscription.
 - Prices update a ladder at most every 250 ms (the server conflates); order events are applied
   one by one.
+- **The workspace is the user's** (Ayush, 16 Oct): any widget opens, closes and sizes anywhere on a page; pages are the screens, and widgets pop out onto other monitors. Together they make one workspace, saved per user. So **every widget must work at any size**: a widget adapts to its own width (CSS container queries), never to the window's, and scrolls rather than cutting anything off.
 - Widgets get everything as props, so any widget **pops out** into its own window unchanged
   (⧉ on its tab; ⇲ or closing the window docks it back). The window loads `/popout.html` and
   is drawn by the main page, so it shares the one WebSocket, store and link groups: no second

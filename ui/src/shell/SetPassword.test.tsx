@@ -56,6 +56,7 @@ describe("Set your password (after an admin's reset)", () => {
     fill("k7Q2mXv9pLr4tWa8", "my own long password", "my own long passwort");
     expect(screen.getByRole("status").textContent).toBe("The two new passwords differ.");
     expect((screen.getByRole("button", { name: "Set password" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.submit(screen.getByRole("form", { name: "Set your password" })); // Enter in a field
     expect(calls.filter((c) => c.method === "POST")).toHaveLength(0);
   });
 
