@@ -287,6 +287,7 @@ def build(settings: ServeSettings) -> Assembly:
         platform.add_account(
             account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN,
             recover_on_start=True,  # no new orders until rebuilt and checked (recovery.py)
+            margin_check=True,  # refuse what the funds can't carry (risk/margin.py; fails open)
         )  # fmt: skip
         running.append(account.id)
     if kite is not None:

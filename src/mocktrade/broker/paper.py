@@ -31,8 +31,8 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
-from mocktrade.broker.base import BrokerError, BrokerPosition
-from mocktrade.broker.paper_funds import Exposure, PaperMargins, paper_funds
+from mocktrade.broker.base import BasketMargin, BrokerError, BrokerPosition
+from mocktrade.broker.paper_funds import Exposure, PaperMargins, paper_funds, used_margin
 from mocktrade.broker.rules import (
     MAX_MODIFICATIONS_PER_ORDER,
     order_spec,
@@ -366,6 +366,41 @@ class PaperBroker:
                 rates=self.margins,
             )
         ]
+
+    async def basket_margin(self, requests: list[OrderRequest]) -> BasketMargin:
+        """What these orders would block if they all filled, with today's positions (an
+        estimate from PaperMargins, like the paper funds). `initial`: each order on its own
+        from flat; `final`: the extra over what the positions use now (an exit adds 0)."""
+        now: dict[tuple[InstrumentId, Product], list[int]] = {}  # -> [qty now, qty after, price]
+        initial = 0
+        for p in self._book.positions():
+            now[(p.instrument_id, p.product)] = [p.qty, p.qty, self._price_of(p.instrument_id)]
+        for r in requests:
+            instrument = self._instruments.get(r.instrument_id)
+            if instrument is None:
+                raise BrokerError(f"unknown instrument {r.instrument_id}")
+            price = r.price_paise or r.trigger_paise or self._price_of(r.instrument_id)
+            if not price:
+                raise BrokerError(f"no price yet for {r.instrument_id}")
+            row = now.setdefault((r.instrument_id, r.product), [0, 0, price])
+            row[1] += r.side.sign * r.qty
+            row[2] = row[2] or price
+            alone = Exposure(instrument, r.product, r.side.sign * r.qty, price)
+            initial += round(sum(used_margin(self.margins, [alone])[0].values()))
+
+        def used(after: bool) -> int:
+            exposures = []
+            for (instrument_id, product), (qty, later, price) in now.items():
+                instrument = self._instruments.get(instrument_id)
+                if instrument is not None:
+                    exposures.append(Exposure(instrument, product, later if after else qty, price))
+            return round(sum(used_margin(self.margins, exposures)[0].values()))
+
+        return BasketMargin(initial_paise=initial, final_paise=max(0, used(True) - used(False)))
+
+    def _price_of(self, instrument_id: InstrumentId) -> int:
+        tick = self._market_data.latest(instrument_id)
+        return tick.ltp_paise if tick is not None and tick.ltp_paise > 0 else 0
 
     # --- GTT, as Kite holds them -------------------------------------------------------
     # A trigger touched by the last price places a LIMIT order *from the broker* (a client id
