@@ -195,3 +195,16 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
   - **Found in the browser check:** the OI list showed zeros (now ranked by the biggest move either way, zeros left out), and simulator options showed absurd % changes (their day now starts at the model price).
   - **Safety bug found and fixed (from before K12.2):** a linked ticket that switched contract started at the old contract's price for one render. The hooks now return values only for the contract asked. A test proved the bug and then the fix.
   - Ayush said that while Claude's limits were used up, he had an outside AI tool review the whole code. It changed no code but opened issues #240–#279. **Decided order:** finish K12.4, then K13 (core scope), then the core v1 gate #240, the hardening gate #257 (#258–#277, with #279 security and #278 discussion), and only then the post-v1 features #241 (#242–#255). Each finding is rechecked against the code before work starts.
+- 16 Oct, K12.4 merged (#280). K13 issues created: #281–#285. K13.1 (#281) admin API:
+  - **Design:**
+    - The risk limits are published as a spec (the algo-spec format plus the kinds `money`, `choices` and `instruments`), and the server checks edits against it.
+    - An edit applies from the next order everywhere a limit had been copied at the start: the checks, the daily-loss stop, and the MTM and square-off closing pieces. It is saved for a restart.
+    - Each change says whether it loosens a limit, and what a tighter one means for open positions and orders. An edit never cancels anything itself.
+  - **Rules:**
+    - A turned-off account takes only closing trades, from any source (the risk gate), and its traders can still cancel, close and stop.
+    - There is always an active admin, and nobody turns themselves off.
+    - A reset or new password must be changed before anything else; until then the API and the stream refuse the user.
+    - An admin's new paper account runs at once: the platform starts its loops while running.
+  - **Checks:**
+    - The mutation run found 5 real gaps in the tests, all now covered; 2 of its mutants were equivalent and are left out.
+    - On the demo, every step worked, and so did a restart.

@@ -3,7 +3,8 @@
 Every /api route except login and health needs a session cookie. Rules that hold
 for every request:
 - Who you are comes from the session, never from the request body.
-- Account routes check can_view / can_trade for that account.
+- Account routes check can_view / can_manage for that account (a turned-off account takes
+  only closing trades: the risk checks say so).
 - Changing requests (POST, PATCH, PUT, DELETE) must come from our own page: the
   Origin header must match, the cookie is SameSite=Strict, and bodies are JSON.
 - Responses carry security headers (no framing, strict content policy, HSTS).
@@ -38,7 +39,7 @@ from mocktrade.charges.schedules import schedule_to_dict
 from mocktrade.charges.service import ChargesError
 from mocktrade.charts.candles import IST
 from mocktrade.charts.service import ChartError, Charts
-from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_view
+from mocktrade.domain.accounts import BrokerAccount, Role, User, can_manage, can_view
 from mocktrade.domain.gtt import gtt_spec_to_dict, gtt_to_dict
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import spec_to_dict
@@ -72,6 +73,7 @@ from mocktrade.research.ticks import FileTickStore
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.risk.mtm import PortfolioRule, PositionRule
 from mocktrade.server import security
+from mocktrade.server.admin import AccountStarter, admin_router
 from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.stream import StreamHub
 from mocktrade.server.users import SESSION_MAX, LoginFailed, UserStore
@@ -126,6 +128,15 @@ class BrokerLogin(Protocol):
 
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+# what a user whose password an admin reset may still reach: who am I, change it, log out
+PASSWORD_FIRST = frozenset({"/api/me", "/api/me/password", "/api/session"})
+
+
+class PasswordIn(_Strict):
+    old: str = Field(min_length=1, max_length=256)
+    new: str = Field(min_length=1, max_length=256)
 
 
 class LoginIn(_Strict):
@@ -313,6 +324,7 @@ def create_app(
     candles: CandleStore | None = None,
     charts: Charts | None = None,
     market_alerts: MarketAlerts | None = None,
+    starter: AccountStarter | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -368,6 +380,8 @@ def create_app(
         user = users.session_user(request.cookies.get(settings.cookie_name))
         if user is None:
             raise HTTPException(401, "please log in")
+        if user.must_change_password and request.url.path not in PASSWORD_FIRST:
+            raise HTTPException(403, "set a new password first (an admin reset it)")
         return user
 
     Me = Annotated[User, Depends(current_user)]
@@ -377,7 +391,9 @@ def create_app(
         running = platform.account(account_id)
         if account is None or running is None or not can_view(user, account):
             raise HTTPException(404, "no such account")  # don't reveal other people's accounts
-        if trade and not can_trade(user, account):
+        # a turned-off account still lets its traders cancel and close: the risk checks pass
+        # only closing trades on it (AccountRuntime.set_active)
+        if trade and not can_manage(user, account):
             raise HTTPException(403, "you can view this account but not trade it")
         return running
 
@@ -1020,6 +1036,19 @@ def create_app(
     async def me(user: Me) -> dict[str, Any]:
         return _me(user, users, platform, broker_status)
 
+    @app.post("/api/me/password", status_code=204)
+    async def change_password(body: PasswordIn, user: Me, request: Request) -> None:
+        """The user's own change (also the first step after an admin's reset). Their other
+        sessions end; this one stays."""
+        try:
+            await asyncio.to_thread(users.change_own_password, user.id, body.old, body.new,
+                                    request.cookies.get(settings.cookie_name, ""))  # fmt: skip
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+        audit("PASSWORD_CHANGED", f"{user.id} changed their password", {"user_id": user.id})
+
+    app.include_router(admin_router(platform, users, current_user, audit, starter))
+
     # --- instruments and layouts -------------------------------------------------------------
 
     @app.get("/api/instruments")
@@ -1258,7 +1287,8 @@ def create_app(
     @app.post("/api/accounts/{account_id}/stop")
     async def stop_account(account_id: str, body: StopIn, user: Me) -> dict[str, Any]:
         running = runtime(account_id, user)
-        if not (can_trade(user, running.account) or _risk_or_admin(user)):
+        account = users.get_account(account_id)  # now (an admin may have changed traders)
+        if not ((account and can_manage(user, account)) or _risk_or_admin(user)):
             raise HTTPException(403, "you can't stop trading on this account")
         failures = await stop_trading(running.switch, [running.orders], body.reason, by=user.id)
         return {"stopped": True, "failed_cancels": _failures(failures)}
@@ -1412,7 +1442,8 @@ def _me(
                 "id": account.id,
                 "broker": account.broker,
                 "broker_client_id": account.broker_client_id,
-                "can_trade": can_trade(user, account),
+                "can_trade": can_manage(user, account),  # a turned-off account: closing only
+                "active": account.active,
                 "running": running is not None,
                 "stopped": bool(state and state.engaged),
                 "stop_reason": state.reason if state and state.engaged else "",
@@ -1421,7 +1452,12 @@ def _me(
             }
         )
     return {
-        "user": {"id": user.id, "name": user.name, "roles": sorted(r.value for r in user.roles)},
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "roles": sorted(r.value for r in user.roles),
+            "must_change_password": user.must_change_password,
+        },
         "accounts": accounts,
         "firm_stopped": platform.firm_switch.engaged,
     }

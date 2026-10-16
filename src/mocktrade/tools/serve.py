@@ -86,6 +86,8 @@ from mocktrade.reports.store import ReportStore
 from mocktrade.research.backtest import Backtests, CandleStore
 from mocktrade.research.ticks import FileTickStore, TickRecorder
 from mocktrade.risk.kill_switch import KillSwitch
+from mocktrade.risk.limits_spec import stored_limits
+from mocktrade.server.admin import CallbackStarter
 from mocktrade.server.app import ServerSettings, create_app
 from mocktrade.server.security import SecretBox
 from mocktrade.server.users import UserStore
@@ -286,26 +288,39 @@ def build(settings: ServeSettings) -> Assembly:
     not_running: dict[str, str] = {}
     day = f"S{time.strftime('%y%m%d')}"
     ids = ClientIds(day, events.last_counter(day))  # one sequence for the day, all accounts
-    for account in accounts:
+
+    def start(account: BrokerAccount, limits: dict | None) -> str | None:
+        """Run one account (at start, or an admin's new one); None, or why it can't run."""
         if account.broker == "paper":
             broker = PaperBroker(
                 md, instruments, name="paper", starting_paise=settings.paper_funds_paise
             )
             broker.start()
             brokers.append(broker)
-        elif account.broker == "kite" and kite is not None:
+        elif account.broker == "kite" and kite is not None and account.id in kite_ready:
             broker = kite.add_account(account)  # refuses orders until its daily login
+        elif account.broker == "kite" and kite is not None:
+            return "a Kite account starts after a restart (its app key in the settings first)"
         else:
-            not_running[account.id] = f"{account.broker} accounts need MOCKTRADE_PRICES=kite"
-            log.warning("account %s not started: %s", account.id, not_running[account.id])
-            continue
+            return f"{account.broker} accounts need MOCKTRADE_PRICES=kite"
         platform.add_account(
             account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN,
             recover_on_start=True,  # no new orders until rebuilt and checked (recovery.py)
             margin_check=True,  # refuse what the funds can't carry (risk/margin.py; fails open)
             rules_dir=settings.data_dir / "rules",  # the trader's MTM limits survive a restart
+            limits=stored_limits(limits),  # an admin's limits (K13.1), else the defaults
         )  # fmt: skip
         running.append(account.id)
+        return None
+
+    kite_ready = {a.id for a in accounts if a.broker == "kite"}  # their apps were checked above
+    for account in accounts:
+        why = start(account, users.account_limits(account.id))
+        if why:
+            not_running[account.id] = why
+            log.warning("account %s not started: %s", account.id, why)
+    starter = CallbackStarter(("paper", "kite") if kite is not None else ("paper",), start,
+                              not_running)  # fmt: skip
     if kite is not None:
         platform_ref.append(platform)
     jobs.append(platform.run)
@@ -402,6 +417,7 @@ def build(settings: ServeSettings) -> Assembly:
         candles=candle_store,
         charts=charts,
         market_alerts=market_alerts,
+        starter=starter,
         static_dir=ui,
     )
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)

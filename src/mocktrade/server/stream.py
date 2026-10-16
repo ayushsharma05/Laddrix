@@ -173,7 +173,7 @@ class StreamHub:
             return
         token = websocket.cookies.get(self._cookie, "")
         user = self._users.session_user(token)
-        if user is None:
+        if user is None or user.must_change_password:  # a reset password: change it first
             await websocket.close(code=CLOSE_NOT_LOGGED_IN)
             return
         await websocket.accept()

@@ -47,7 +47,9 @@ from mocktrade.research.backtest import Backtests, CandleStore
 from mocktrade.research.replay import EPOCH, SPEEDS, ReplayClock, ReplayFeed
 from mocktrade.research.ticks import IST, FileTickStore, TickRecorder
 from mocktrade.risk.kill_switch import KillSwitch
+from mocktrade.risk.limits_spec import stored_limits
 from mocktrade.server import security
+from mocktrade.server.admin import CallbackStarter
 from mocktrade.server.app import ServerSettings, create_app
 from mocktrade.server.security import SecretBox
 from mocktrade.server.users import UserStore
@@ -115,17 +117,24 @@ async def main(
     log.start()
     platform = Platform(instruments, md, KillSwitch("firm"), log)
     brokers = []
-    for account in users.accounts():
+    day = clock().astimezone(IST).strftime("%y%m%d")
+    ids = ClientIds(f"D{day}", log.last_counter(f"D{day}"))  # one sequence, all accounts
+
+    def start(account: BrokerAccount, limits: dict | None) -> str | None:
+        """Run one paper account (at start, or an admin's new one)."""
         broker = PaperBroker(md, instruments, name="paper", clock=clock,
                              every_tick=feed is not None)  # fmt: skip
         broker.start()
         brokers.append(broker)
-        day = clock().astimezone(IST).strftime("%y%m%d")
-        ids = ClientIds(f"D{day}", log.last_counter(f"D{day}"))
         platform.add_account(
             account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN,
             recover_on_start=True, margin_check=True, rules_dir=data / "rules", clock=clock,
+            limits=stored_limits(limits),
         )  # fmt: skip
+        return None
+
+    for account in users.accounts():
+        start(account, users.account_limits(account.id))
     settings = ServerSettings(origin=origin, cookie_secure=False)
     reports = Reports(platform, ReportStore(data / "reports"), clock=clock)
     scheduler = Scheduler(clock=clock)
@@ -161,7 +170,8 @@ async def main(
                      replay_command=lambda d: f"python -m mocktrade.tools.demo --replay {d} "
                                               f"--port {port + 1}",
                      backtests=backtests, candles=candle_store, charts=charts,
-                     market_alerts=market_alerts)  # fmt: skip
+                     market_alerts=market_alerts,
+                     starter=CallbackStarter(("paper",), start))  # fmt: skip
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
     what = "demo" if feed is None else f"REPLAY of {replay_day} at {speed:g}×"
     code = "python -m mocktrade.tools.demo --code" + (f" --replay {replay_day}" if feed else "")

@@ -38,7 +38,7 @@ class DailyLossWatch:
         if limit_paise <= 0:
             raise ValueError("the daily loss limit must be positive")
         self._pnl = day_pnl_paise
-        self._limit = limit_paise
+        self.limit_paise = limit_paise  # an admin's edit replaces it
         self._switch = switch
         self._managers = tuple(managers)
         self._today = today
@@ -50,14 +50,14 @@ class DailyLossWatch:
         if it fired now. Cheap: call it on every position change (it accepts and
         ignores a listener argument)."""
         pnl = self._pnl()
-        if pnl > -self._limit or self._fired_on == self._today():
+        if pnl > -self.limit_paise or self._fired_on == self._today():
             return False
         self._fired_on = self._today()
         if self._switch.engaged:
             return False  # someone already stopped trading
         reason = (
             f"daily loss limit reached: {format_rupees(-pnl)} lost "
-            f"(limit {format_rupees(self._limit)})"
+            f"(limit {format_rupees(self.limit_paise)})"
         )
         log.warning("%s: stopping trading", reason)
         task = asyncio.get_running_loop().create_task(

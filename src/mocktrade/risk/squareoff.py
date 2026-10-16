@@ -43,7 +43,7 @@ class SquareOff:
         self._book = book
         self._orders = orders
         self._instrument = instruments
-        self._max_lots = max_lots
+        self.max_lots = max_lots  # closing pieces; an admin's edit replaces it
         self.cutoffs = dict(cutoffs or CUTOFFS)
         self.warn_from = warn_from
         self._audit = audit
@@ -98,7 +98,7 @@ class SquareOff:
             if instrument is None:
                 continue
             sent = await close_position(self._orders, instrument, p.product, p.qty,
-                                        user_id=user_id, max_lots=self._max_lots,
+                                        user_id=user_id, max_lots=self.max_lots,
                                         basket_id=basket)  # fmt: skip
             ids = [o.client_order_id for o in sent]
             refused = [o.reason for o in sent if o.status.value == "REJECTED"]
