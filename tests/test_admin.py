@@ -357,6 +357,11 @@ async def test_reading_is_for_admin_and_risk_changing_for_admin(world):
     for uid, read, write in (("ayush", 200, 201), ("risk", 200, 403), ("riya", 403, 403)):
         c = await world.logged_in(uid)
         assert (await c.get("/api/admin/users")).status_code == read
+        roles = await c.get("/api/admin/roles")
+        assert roles.status_code == read
+        if read == 200:
+            assert [r["name"] for r in roles.json()] == ["admin", "trader", "risk"]
+            assert all(r["help"] for r in roles.json())
         assert (await c.get("/api/admin/accounts")).status_code == read
         assert (await c.get("/api/admin/limits/spec")).status_code == read
         new = await c.post("/api/admin/users", json={"id": f"n-{uid}", "name": "N",

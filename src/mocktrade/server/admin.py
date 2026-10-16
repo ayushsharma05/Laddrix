@@ -1,6 +1,7 @@
 """The admin API (K13.1): users, roles, broker accounts and each account's risk limits, without
 code or a terminal. Admins change; risk users may read; everyone else gets 403.
 
+    GET   /api/admin/roles                          the roles there are, with what each allows
     GET   /api/admin/users                          everyone, with roles, on/off, locked
     POST  /api/admin/users                          new user: a one-time password and the
                                                     authenticator link, each shown once
@@ -29,7 +30,7 @@ from typing import Annotated, Any, Literal, Protocol
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from mocktrade.domain.accounts import BrokerAccount, Role, User
+from mocktrade.domain.accounts import ROLE_HELP, BrokerAccount, Role, User
 from mocktrade.platform import AccountRuntime, Platform
 from mocktrade.risk.limits_spec import (
     changes,
@@ -130,6 +131,11 @@ def admin_router(
         return found
 
     # --- users -------------------------------------------------------------------------------
+
+    @router.get("/roles")
+    async def list_roles(user: Me) -> list[dict[str, str]]:
+        can_read(user)
+        return [{"name": r.value, "help": ROLE_HELP[r]} for r in Role]
 
     @router.get("/users")
     async def list_users(user: Me) -> list[dict[str, Any]]:

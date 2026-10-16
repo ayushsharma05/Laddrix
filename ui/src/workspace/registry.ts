@@ -40,6 +40,8 @@ export interface WidgetDef<P extends BaseParams = BaseParams> {
   /** Tab text, e.g. "NIFTY26OCTFUT" for a ladder. */
   tabTitle?: (params: P) => string | undefined;
   size?: { width?: number; height?: number };
+  /** Offered in Widgets ▾ only to users with one of these roles (the server checks too). */
+  roles?: string[];
 }
 
 const widgets = new Map<string, WidgetDef<BaseParams>>();
@@ -54,4 +56,9 @@ export function widget(kind: string): WidgetDef<BaseParams> | undefined {
 
 export function allWidgets(): WidgetDef<BaseParams>[] {
   return [...widgets.values()];
+}
+
+/** The widgets a user with these roles may open (Widgets ▾). */
+export function widgetsFor(roles: string[]): WidgetDef<BaseParams>[] {
+  return allWidgets().filter((w) => !w.roles || w.roles.some((r) => roles.includes(r)));
 }

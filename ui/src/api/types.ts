@@ -102,10 +102,13 @@ export interface AccountSummary {
   stop_reason: string;
   /** The broker's own daily login: "live", "login_needed", or null when it has none. */
   broker_session?: "live" | "login_needed" | null;
+  /** false: an admin turned the account off (only closing trades, cancels always work). */
+  active?: boolean;
 }
 
 export interface Me {
-  user: { id: string; name: string; roles: string[] };
+  /** must_change_password: an admin set a one-time password; nothing else until it's changed. */
+  user: { id: string; name: string; roles: string[]; must_change_password?: boolean };
   accounts: AccountSummary[];
   firm_stopped: boolean;
 }
@@ -750,4 +753,75 @@ export interface MoversAnswer {
   note: string;
   exchanges: string[];
   kinds: string[];
+}
+
+// --- admin (K13.1/K13.2: /api/admin/…) ------------------------------------------------------------
+
+export type RoleName = "admin" | "trader" | "risk";
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  roles: RoleName[];
+  active: boolean;
+  must_change_password: boolean;
+  locked_until: string | null; // failed logins: locked until then
+  failures: number;
+  sessions: number; // logged in on this many browsers now
+}
+
+/** A new user, or a reset: shown once, never again (the server keeps only hashes). */
+export interface UserCreated {
+  user: AdminUser;
+  temporary_password: string;
+  totp_uri: string;
+  note: string;
+}
+
+export interface AdminAccount {
+  id: string;
+  broker: string;
+  broker_client_id: string;
+  owner: string;
+  traders: string[];
+  active: boolean;
+  running: boolean;
+  not_running: string; // why not, when it isn't
+}
+
+export interface AdminAccounts {
+  accounts: AdminAccount[];
+  brokers: string[]; // what this server can add
+}
+
+/** The limits spec: the algo-spec format, with the kinds money, choices and instruments. */
+export interface LimitsSpec {
+  code: string;
+  name: string;
+  help: string;
+  family: string;
+  params: AlgoParamSpec[];
+}
+
+export type LimitValue = number | boolean | string[] | null;
+
+export interface LimitsAnswer {
+  account_id: string;
+  limits: Record<string, LimitValue>;
+  running: boolean;
+}
+
+export interface LimitChange {
+  name: string;
+  label: string;
+  old: LimitValue;
+  new: LimitValue;
+  text: string; // "Most lots per order: 10 → 5"
+  looser: boolean;
+}
+
+export interface LimitsSaved extends LimitsAnswer {
+  changes: LimitChange[];
+  warnings: string[];
+  applied: boolean;
 }
