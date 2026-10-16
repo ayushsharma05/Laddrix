@@ -116,6 +116,9 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
 
 **UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
 
+## Post-v1 backlog — 16 Oct 2026
+Ayush requested detailed future issues for every feature in the agreed post-v1 proposal. Codex created core acceptance gate #240, roadmap tracker #241 and feature issues #242–#255. **Do not start post-v1 implementation before #240 is accepted.** Continue active K12/K13 first; core shortcuts, themes, admin and basic phone screens stay in v1. Proposed v1.1–v1.7 groups are sequencing suggestions, not release dates or GitHub milestones. #241 lists all issues, priorities and dependencies. Read it after core completion; recheck live repository state before picking work. This session changed planning only, not application code.
+
 ## Next
 **Where we are (16 Oct 2026):** K0–K10 are merged on `main` (K10: PRs #218–#222). K11 is complete; K12 has started. Safety fixes #206 and #207 are merged. Main CI is green. **Claude merges its own PRs once CI is green** (Ayush, 15 Oct). K10 issues exist: #213 (K10.1), #214 (K10.2), #215 (K10.3), #216 (K10.4), #217 (K10.5).
 

@@ -190,3 +190,7 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
     - Self-review found that user ids aren't restricted, so file names are now hashed.
     - The mutation script's one survivor led to a real gap: alert instruments weren't watched, so Kite would never have streamed a contract no screen showed. The engine now keeps them subscribed.
   - **Check:** an alert fired live on the demo. An outside webhook couldn't be tried from the sandbox; test it once deployed.
+
+## 16 Oct 2026 — Codex: detailed post-v1 issue backlog
+
+Ayush asked to record every suggested later feature with what it does and why, for pickup only after core design/v1 completion. Created #240 (core acceptance evidence), #241 (parent roadmap and dependencies), and #242–#255 (14 detailed feature planning issues). Coverage: watchlists/search; presets/shortcuts/workspaces; notifications; charts/indicators/drawings; compound alerts/OI; advanced exits; conditional/scheduled orders/baskets; visual strategies; multi-leg definitions/accounting/execution; journal/execution analysis; robust research/optimisation; spreadsheet/API integrations; brokers/accounts/mobile. Each issue includes acceptance criteria and implementation constraints. Core K13 work is preserved, not deferred. Use existing merged functionality and split planning issues into bounded implementation children before coding. No application code or live trading was changed.
