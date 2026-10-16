@@ -291,6 +291,8 @@ class RiskGate:
         key = _duplicate_key(request)
         now = self._clock()
         for order in others:
+            if request.basket_id and order.request.basket_id == request.basket_id:
+                continue  # one basket's legs (e.g. a close split in pieces) are meant
             if not order.request.from_algo and _duplicate_key(order.request) == key:
                 ago = (now - order.created_at).total_seconds()
                 if 0 <= ago < self.limits.duplicate_window_s:

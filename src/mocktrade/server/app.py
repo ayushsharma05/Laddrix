@@ -53,6 +53,7 @@ from mocktrade.portfolio.service import PortfolioError, snapshot_to_dict
 from mocktrade.reports.export import report_csv, report_pdf
 from mocktrade.reports.service import ReportError, Reports
 from mocktrade.risk.kill_switch import stop_trading
+from mocktrade.risk.mtm import PortfolioRule, PositionRule
 from mocktrade.server import security
 from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.stream import StreamHub
@@ -196,6 +197,24 @@ class ChargesIn(_Strict):
     qty: int = Field(gt=0, le=10_000_000)
     price_paise: int = Field(gt=0, le=10**12)
     product: Product
+
+
+class PositionRuleIn(_Strict):
+    instrument_id: str = Field(min_length=3, max_length=64)
+    product: Product
+    max_loss_paise: int | None = Field(default=None, gt=0, le=10**13)
+    max_loss_pct: float | None = Field(default=None, gt=0, le=100)
+    auto_close: bool = False
+
+
+class PortfolioRuleIn(_Strict):
+    max_loss_paise: int | None = Field(default=None, gt=0, le=10**13)
+    target_paise: int | None = Field(default=None, gt=0, le=10**13)
+    auto_close: bool = False
+
+
+class ConfirmIn(_Strict):
+    confirm: bool
 
 
 class StopIn(_Strict):
@@ -399,6 +418,70 @@ def create_app(
         except ChargesError as exc:
             raise HTTPException(422, str(exc)) from None
         return bill_to_dict(bill, service.model.schedule)
+
+    # --- MTM limits and the square-off assistant --------------------------------------------------
+
+    def mtm_watch(running: AccountRuntime):
+        if running.mtm is None:
+            raise HTTPException(404, "no MTM watch for this account")
+        return running.mtm
+
+    @app.get("/api/accounts/{account_id}/mtm")
+    async def mtm_rules(account_id: str, user: Me) -> dict[str, Any]:
+        return mtm_watch(runtime(account_id, user)).to_dict()
+
+    @app.put("/api/accounts/{account_id}/mtm/positions")
+    async def mtm_position(account_id: str, body: PositionRuleIn, user: Me) -> dict[str, Any]:
+        watch = mtm_watch(runtime(account_id, user, trade=True))
+        rule = PositionRule(body.instrument_id, body.product.value, body.max_loss_paise,
+                            body.max_loss_pct, body.auto_close)  # fmt: skip
+        try:
+            watch.set_position_rule(rule, user.id)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+        watch.check()
+        return watch.to_dict()
+
+    @app.delete("/api/accounts/{account_id}/mtm/positions")
+    async def mtm_position_off(account_id: str, instrument_id: str, product: Product,
+                               user: Me) -> dict[str, Any]:  # fmt: skip
+        watch = mtm_watch(runtime(account_id, user, trade=True))
+        watch.remove_position_rule(f"{instrument_id}|{product.value}", user.id)
+        return watch.to_dict()
+
+    @app.put("/api/accounts/{account_id}/mtm/portfolio")
+    async def mtm_portfolio(account_id: str, body: PortfolioRuleIn, user: Me) -> dict[str, Any]:
+        watch = mtm_watch(runtime(account_id, user, trade=True))
+        try:
+            watch.set_portfolio_rule(
+                PortfolioRule(body.max_loss_paise, body.target_paise, body.auto_close), user.id
+            )
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+        watch.check()
+        return watch.to_dict()
+
+    @app.delete("/api/accounts/{account_id}/mtm/portfolio")
+    async def mtm_portfolio_off(account_id: str, user: Me) -> dict[str, Any]:
+        watch = mtm_watch(runtime(account_id, user, trade=True))
+        watch.set_portfolio_rule(None, user.id)
+        return watch.to_dict()
+
+    @app.get("/api/accounts/{account_id}/square-off")
+    async def square_off_status(account_id: str, user: Me) -> dict[str, Any]:
+        running = runtime(account_id, user)
+        if running.squareoff is None:
+            raise HTTPException(404, "no square-off assistant for this account")
+        return running.squareoff.status()
+
+    @app.post("/api/accounts/{account_id}/square-off")
+    async def square_off(account_id: str, body: ConfirmIn, user: Me) -> dict[str, Any]:
+        running = runtime(account_id, user, trade=True)
+        if running.squareoff is None:
+            raise HTTPException(404, "no square-off assistant for this account")
+        if not body.confirm:
+            raise HTTPException(422, "square-off needs the trader's confirmation")
+        return {"closed": await running.squareoff.close_all(user.id)}
 
     # --- margin: what an order would block, against what's available -------------------------
 

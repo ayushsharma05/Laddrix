@@ -47,6 +47,8 @@ def day_bounds(day: date) -> tuple[datetime, datetime]:
 
 
 def strategy_of(request: OrderRequest) -> str:
+    if request.basket_id and request.basket_id.startswith(("SQ", "MTM")):
+        return "square-off" if request.basket_id.startswith("SQ") else "MTM stop"
     if request.basket_id:
         return f"basket {request.basket_id}"
     if request.parent_id:
