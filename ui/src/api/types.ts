@@ -547,9 +547,22 @@ export interface MtmPositionRule {
   fired_today: boolean;
 }
 
+export interface MtmBreach {
+  id: string;
+  key: string; // the rule's key, or "portfolio"
+  kind: "position" | "portfolio";
+  text: string;
+  state: "ALERTED" | "REQUESTED" | "WORKING" | "BLOCKED" | "UNKNOWN" | "COMPLETED";
+  detail: string; // the server's words: what is left, or why
+  attempts: number;
+  at: string;
+}
+
 export interface MtmRules {
   positions: MtmPositionRule[];
   portfolio: { max_loss_paise: number | null; target_paise: number | null; auto_close: boolean; fired_today: boolean } | null;
+  breaches?: MtmBreach[]; // what each limit reached did (#263)
+  problem?: string; // saved limits that couldn't be read: NOT watched
 }
 
 export interface SquareOffStatus {

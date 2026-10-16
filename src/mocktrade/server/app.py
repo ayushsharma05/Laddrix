@@ -297,6 +297,11 @@ class ConfirmIn(_Strict):
     confirm: bool
 
 
+class MtmRetryIn(_Strict):
+    key: str = Field(min_length=1, max_length=100)  # the rule's key, or "portfolio"
+    confirm: bool
+
+
 class FlattenIn(_Strict):
     confirm: bool
     instrument_id: str | None = None  # one instrument only (else every open position)
@@ -820,6 +825,18 @@ def create_app(
                                user: Me) -> dict[str, Any]:  # fmt: skip
         watch = mtm_watch(runtime(account_id, user, trade=True))
         watch.remove_position_rule(f"{instrument_id}|{product.value}", user.id)
+        return watch.to_dict()
+
+    @app.post("/api/accounts/{account_id}/mtm/retry")
+    async def mtm_retry(account_id: str, body: MtmRetryIn, user: Me) -> dict[str, Any]:
+        """Close a blocked MTM close again (#263): only one that nothing is still working on."""
+        watch = mtm_watch(runtime(account_id, user, trade=True))
+        if not body.confirm:
+            raise HTTPException(422, "a retry needs a confirmation")
+        try:
+            await watch.retry(body.key, user.id)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
         return watch.to_dict()
 
     @app.put("/api/accounts/{account_id}/mtm/portfolio")

@@ -5,9 +5,14 @@
 //   Portfolio   stop ₹[20,000]  target ₹[    ]  [x] auto-close   [Set] [Remove]   day −₹3,015.00
 //   Position         P&L         limit ₹   or %   auto   rule
 //   NIFTY26OCTFUT    −₹1,507.50  [1,500]  [   ]   [ ]    ₹1,500.00 · alert only · reached today
+//   Reached today    NIFTY26OCTFUT MIS  BLOCKED  +150 still open: refused (…)  [Retry]
+//
+// Each limit reached is a breach the server keeps through restarts (#263); its state and words
+// come from the server. Retry (two clicks) only for a BLOCKED close: never on top of one that
+// may still be happening. Saved limits that couldn't be read show in red: they aren't watched.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { MtmPositionRule, MtmRules, Position } from "../../api/types";
+import type { MtmBreach, MtmPositionRule, MtmRules, Position } from "../../api/types";
 import { useApp, useStore } from "../../app/context";
 import { price, rupees, shortName } from "../../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
@@ -45,7 +50,7 @@ export function MtmLimits(_props: WidgetProps) {
     return () => {
       live = false;
     };
-  }, [rest, base]);
+  }, [rest, base, book?.positions, book?.orders]); // a close's state follows them
 
   const call = useCallback(
     (method: "put" | "delete", path: string, body?: unknown) => {
@@ -63,6 +68,16 @@ export function MtmLimits(_props: WidgetProps) {
 
   if (!accountId || !base) return <div className="empty-note">No account selected.</div>;
   const byKey = new Map((rules?.positions ?? []).map((r) => [r.key, r]));
+  const retry = (key: string) => {
+    setError(null);
+    rest
+      .post<MtmRules>(`${base}/retry`, { key, confirm: true })
+      .then((r) => {
+        setRules(r);
+        store.addMessage("INFO", "", `MTM ${key}: closing again`);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+  };
   return (
     <div className="book mtm">
       {error && (
@@ -70,6 +85,12 @@ export function MtmLimits(_props: WidgetProps) {
           {error}
         </div>
       )}
+      {rules?.problem && (
+        <div className="empty-note tone-bad" role="alert">
+          {rules.problem}
+        </div>
+      )}
+      <Breaches breaches={rules?.breaches ?? []} onRetry={retry} />
       <PortfolioForm rules={rules} dayPnl={book?.dayPnl ?? 0} onSet={(body) => call("put", `${base}/portfolio`, body)} onRemove={() => call("delete", `${base}/portfolio`)} />
       <div className="grid-head book-row mtm-row" role="row">
         <span>Position</span>
@@ -92,6 +113,41 @@ export function MtmLimits(_props: WidgetProps) {
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+const STATE_TONE: Record<MtmBreach["state"], string> = { ALERTED: "dim", REQUESTED: "", WORKING: "", BLOCKED: "tone-bad", UNKNOWN: "tone-bad", COMPLETED: "good" };
+
+function Breaches({ breaches, onRetry }: { breaches: MtmBreach[]; onRetry: (key: string) => void }) {
+  const [armed, setArmed] = useState<string | null>(null);
+  if (!breaches.length) return null;
+  return (
+    <div className="mtm-breaches" role="grid" aria-label="Limits reached">
+      {breaches.map((b) => {
+        const name = b.key === "portfolio" ? "Portfolio" : `${shortName(b.key.split("|")[0]!)} ${b.key.split("|")[1] ?? ""}`;
+        return (
+          <div key={b.id} role="row" className="row book-row" title={b.text}>
+            <span>{name}</span>
+            <span className={STATE_TONE[b.state]}>{b.state.toLowerCase()}</span>
+            <span className="grow">{b.detail || b.text}</span>
+            {b.state === "BLOCKED" && (
+              <button
+                type="button"
+                className="btn small danger"
+                onClick={() => {
+                  if (armed === b.key) {
+                    setArmed(null);
+                    onRetry(b.key);
+                  } else setArmed(b.key);
+                }}
+              >
+                {armed === b.key ? "Confirm: close again" : "Retry"}
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

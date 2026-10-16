@@ -16,6 +16,35 @@ from 15:00 IST ─► DayGuards every minute: band "N intraday positions open; t
                   the exit desk for every open MIS position, audit SQUARE_OFF (who asked)
 ```
 
+## What happens after a limit is reached (#263)
+
+Each firing is a **breach** kept on disk (`<data>/rules/mtm-<account>-state.json`, with which
+rules fired today), so a failure or a restart can't hide it or repeat it:
+
+| state | meaning | what a person does |
+| --- | --- | --- |
+| ALERTED | alert only (auto-close off) | decide |
+| REQUESTED | the exit desk is closing | wait |
+| WORKING | closing orders working, position not yet closed | wait |
+| **BLOCKED** | nothing working and the position still open: refused, failed, or cut short by a restart | **Retry** (two clicks) after reading why |
+| **UNKNOWN** | an order the broker hasn't answered, or the broker disagrees on the size | check the broker; it is never retried while unknown |
+| COMPLETED | the position is closed and the broker agrees | nothing |
+
+- **The state is worked out, not remembered:** from the close's orders (found by its basket
+  ids) and the positions, after every position change and every order event of the close.
+  After a restart it is judged only once orders and positions are restored.
+- **A restart sends nothing by itself.** A close cut short shows BLOCKED ("nothing was
+  sent"), and a rule that fired today doesn't fire again.
+- **BLOCKED and UNKNOWN** raise a red band (`mtm-close:<account>:<key>`) until settled.
+- **Saved data that can't be read is never silently dropped:**
+  - **Rules file:** an unreadable one is moved aside (`….unreadable-<time>.json`); the
+    screens and the band (`mtm-data:<account>`) say no loss limits are watched until they
+    are set again.
+  - **A single invalid rule** is named; the others are still watched.
+  - **State file:** an unreadable one holds auto-close for the day, since it can't be known
+    whether a close already happened.
+- **Saves are whole:** write, flush to disk, then rename.
+
 ## Coordinated exits (#261)
 
 Several things can close one position: a loss limit, the square-off, a stop algo, a target
@@ -83,6 +112,7 @@ lock this position (instrument + product): a second forced close waits, then see
 | `PUT / DELETE …/mtm/portfolio` `{max_loss_paise?, target_paise?, auto_close}` | the portfolio stop |
 | `GET …/square-off` | cut-offs, the window, open MIS positions with the minutes left |
 | `POST …/square-off` `{confirm: true}` | close every open MIS position |
+| `POST …/mtm/retry` `{key, confirm: true}` | close a BLOCKED breach again (409 for any other state) |
 
 ## Screens
 

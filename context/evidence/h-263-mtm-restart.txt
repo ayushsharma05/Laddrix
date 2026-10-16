@@ -1,0 +1,12 @@
+1. rule set: 200
+1. breaches: [('NIFTY26NOVFUT|MIS', 'COMPLETED', 'closed: nothing left open')]
+1. fired today: [True] | MTM close orders: 1
+1. problem: (none)
+2. breaches: [('NIFTY26NOVFUT|MIS', 'COMPLETED', 'closed: nothing left open')]
+2. fired today: [True] | MTM close orders: 1
+2. problem: (none)
+3. breaches: [('NIFTY26NOVFUT|MIS', 'COMPLETED', 'closed: nothing left open')]
+3. fired today: [] | MTM close orders: 1
+3. problem: rules: the saved MTM limits can't be read (Expecting ':' delimiter: line 2 column 1 (char 52)); NO loss limits are watched for acc-paper until they are set again (the file is kept as mtm-acc-paper.unreadable-20261016T205804.json)
+3. ops band: ["acc-paper MTM rules: the saved MTM limits can't be read (Expecting ':' delimiter: line 2 column 1 (char 52)); "]
+3. kept aside: mtm-acc-paper.unreadable-20261016T205804.json

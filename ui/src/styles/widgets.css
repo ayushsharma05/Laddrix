@@ -1324,6 +1324,13 @@ label.algo-field {
 .mtm-row input:not([type="checkbox"]) {
   width: 100%;
 }
+.mtm-breaches .book-row {
+  grid-template-columns: minmax(130px, 1.4fr) 84px minmax(160px, 4fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--control-border);
+}
 
 /* Research: recordings and backtests (widgets/research/) */
 .research {

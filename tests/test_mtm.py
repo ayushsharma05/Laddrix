@@ -137,8 +137,10 @@ async def test_rules_survive_a_restart_and_a_broken_file_loads_none(day, tmp_pat
     again = MtmWatch("acc", p.rt.positions, p.rt.orders, p.store.get, max_lots=10, path=path)
     assert again.to_dict() == watch.to_dict()
     path.write_text("{not json")
-    assert MtmWatch("acc", p.rt.positions, p.rt.orders, p.store.get, max_lots=10,
-                    path=path).to_dict() == {"positions": [], "portfolio": None}  # fmt: skip
+    broken = MtmWatch("acc", p.rt.positions, p.rt.orders, p.store.get, max_lots=10, path=path)
+    shown = broken.to_dict()
+    assert (shown["positions"], shown["portfolio"]) == ([], None)
+    assert "NO loss limits are watched for acc" in shown["problem"]  # visible, not silent (#263)
     json.loads(json.dumps(again.to_dict()))  # what the API sends is plain JSON
 
 

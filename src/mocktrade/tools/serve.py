@@ -393,6 +393,7 @@ def build(settings: ServeSettings) -> Assembly:
     jobs.append(market_alerts.store.run)
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
+    scheduler.every(60, guards.check_mtm_job, between=("00:00", "23:59"), name="mtm closes")
     # stops held by MockTrade that a restart (or a pause, stop or failure) left off an open
     # position: one band per position until it is flat or protected again (V1.2)
     protection = ProtectionGuard(platform, alerts)

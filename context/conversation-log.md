@@ -361,3 +361,17 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Who may flatten:** the account's traders, risk and admin; it needs a confirmation and is audited (FLATTEN). One runs at a time per account, so repeated clicks close once.
   - **Screens:** the red band shows the server's report and **Flatten (N)** (two clicks); STOP's report also goes to Messages.
   - **Checks:** 13 new tests plus server tests; mutation 19/19 after adding a "one at a time" test; real browser check passed.
+- 16 Oct, **#263 done** (MTM breaches through failures and restarts).
+  - **Defects confirmed (tests written first):**
+    - which rules fired was in memory only, so a restart could fire a rule again and close twice;
+    - a rule counted as fired before its close finished, so a refused or failed close stayed silent the rest of the day;
+    - a broken rules file loaded nothing and only said so in the log.
+  - **The fix:**
+    - **A saved breach per firing:** each firing is saved, with states ALERTED / REQUESTED / WORKING / BLOCKED / UNKNOWN / COMPLETED.
+    - **State worked out from orders and positions:** from the close's orders (by basket ids) and the positions, only once a restart's restore is done.
+    - **COMPLETED needs the broker's agreement** on the size.
+    - **BLOCKED shows Retry** (two clicks); it is never retried by itself, and never while UNKNOWN.
+    - **Red bands for closes and data:** BLOCKED / UNKNOWN closes, and unreadable rules or state, raise red bands at any hour.
+    - **Bad files:** a broken file is kept aside and named. A bad rule is named while the good ones are still watched. A lost state file holds auto-close for the day.
+    - **Saves:** write, flush, rename.
+  - **Checks:** 18 new tests, mutation 19/19 (after five test gaps were filled), and a demo restart check (`context/evidence/h-263-mtm-restart.txt`). The demo check found that the alert band only ran in market hours, so MTM problems now run on their own all-day job and once at start.
