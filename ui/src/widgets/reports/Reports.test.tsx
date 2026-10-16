@@ -115,6 +115,23 @@ describe("Reports", () => {
     expect(screen.getByRole("link", { name: "PDF" }).hasAttribute("download")).toBe(true);
   });
 
+  it("today's preview follows the day: a fill reads it again, a kept day doesn't change", async () => {
+    const { calls, app } = setup();
+    await screen.findByText("Preview: kept at 16:00 IST with closing prices");
+    const reads = () => calls.filter((c) => c.path === "/api/accounts/acc-a/reports/2026-10-15").length;
+    const before = reads();
+    const bill = { total_paise: 1, turnover_paise: 99, lines: [], by_position: {}, schedule: { name: "", checked_on: "", source: "" } };
+    act(() => app.store.applyCharges("acc-a", bill));
+    await vi.waitFor(() => expect(reads()).toBe(before + 1));
+    fireEvent.change(screen.getByRole("combobox", { name: "Report day" }), { target: { value: "2026-10-13" } });
+    await screen.findByText("Kept after the close");
+    const kept = () => calls.filter((c) => c.path === "/api/accounts/acc-a/reports/2026-10-13").length;
+    const once = kept();
+    act(() => app.store.applyCharges("acc-a", { ...bill, turnover_paise: 199 }));
+    await act(async () => {});
+    expect(kept()).toBe(once);
+  });
+
   it("shows P&L history from kept reports, and says which days are missing", async () => {
     const { calls } = setup({ mode: "history", by: "instrument" });
     await screen.findByLabelText("Period totals");

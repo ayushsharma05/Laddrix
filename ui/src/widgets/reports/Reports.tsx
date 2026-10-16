@@ -33,6 +33,9 @@ export function Reports({ params, setParams, publish }: WidgetProps<ReportsParam
   const [error, setError] = useState<string | null>(null);
   const [loads, setLoads] = useState(0); // Refresh asks again
   const base = accountId ? `/api/accounts/${encodeURIComponent(accountId)}` : null;
+  // today's preview follows the day: every fill changes the day's charges, so read it again
+  const turnover = useStore((s) => (s.accountId ? (s.books[s.accountId]?.charges?.turnover_paise ?? 0) : 0));
+  const follow = days !== null && day === days.today ? turnover : 0;
 
   useEffect(() => {
     if (!base) return;
@@ -61,7 +64,7 @@ export function Reports({ params, setParams, publish }: WidgetProps<ReportsParam
     return () => {
       live = false;
     };
-  }, [rest, base, day, mode, loads]);
+  }, [rest, base, day, mode, loads, follow]);
 
   const by = params.by ?? "day";
   useEffect(() => {

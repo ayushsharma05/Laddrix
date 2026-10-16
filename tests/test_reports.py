@@ -70,7 +70,9 @@ async def log(tmp_path, nifty_fut):
     events = EventLog(tmp_path / "events.db")
     events.start()
     fill(events, "M1", Side.BUY, 75, 25000, at(MON, 10))
+    fill(events, "M1", Side.BUY, 75, 25000, at(MON, 10, 1))  # the same fill read twice
     fill(events, "M2", Side.BUY, 75, 25020, at(MON, 11), basket="B1")
+    events.record_note("KILL_SWITCH_ENGAGED", "acc", "late on Monday", ts=at(MON, 23, 59))
     fill(events, "T1", Side.SELL, 150, 25100, at(TUE, 10),
          fills=[(75, 2510000), (75, 2510000)])  # fmt: skip  # two fills, one order
     rejected(events, "T2", at(TUE, 10, 5), "position limit: at most 20 lots")
@@ -95,7 +97,8 @@ def day(log, nifty_fut, d, ltp=None, close=None, final=True):
 async def test_monday_open_position_at_the_close_and_by_strategy(log, nifty_fut):
     r = day(log, nifty_fut, MON, ltp=2505000, close=2499000)
     (p,) = r.positions
-    assert (p.carried_qty, p.buy_qty, p.sell_qty, p.closing_qty) == (0, 150, 0, 150)
+    assert (p.carried_qty, p.buy_qty, p.sell_qty, p.closing_qty) == (0, 150, 0, 150)  # M1 once
+    assert len(r.trades) == 2 and [n.detail for n in r.alerts] == ["late on Monday"]
     assert (p.realised_paise, p.unrealised_paise) == (0, 150 * 4000)  # ₹6,000
     assert r.priced and r.final and r.notes == ()
     strategies = {s.strategy: (s.trades, s.gross_paise) for s in r.strategies}
@@ -146,6 +149,7 @@ async def test_history_by_day_instrument_and_strategy_from_kept_reports(log, nif
     store.save(report_to_dict(day(log, nifty_fut, MON, ltp=2505000, close=2499000)))
     store.save(report_to_dict(day(log, nifty_fut, TUE, ltp=2510000, close=2505000)))
     assert store.days("acc") == [MON, TUE]
+    assert [r["day"] for r in store.between("acc", TUE, WED)] == ["2026-10-13"]
     kept = store.between("acc", MON, WED)
     by_day = pnl_history(kept, "day", MON, WED)
     assert [(r["key"], r["gross_paise"]) for r in by_day["rows"]] == [
