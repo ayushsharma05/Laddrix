@@ -3,8 +3,13 @@
 Login = username + password + 6-digit authenticator code, checked together. A
 failure never says which part was wrong. Five failures lock the user for 15 minutes.
 Sessions last at most 12 hours and end after 2 idle hours; logout ends them at once.
+
+Admin changes (K13.1) keep at least one active admin: the last one can't lose the role or be
+turned off, checked under the store's lock so two admins can't remove each other at once.
+A password reset gives a one-time password the user must change before anything else.
 """
 
+import json
 import sqlite3
 import threading
 from collections.abc import Callable, Iterator
@@ -43,6 +48,12 @@ CREATE TABLE IF NOT EXISTS accounts (
     traders TEXT NOT NULL DEFAULT '',   -- comma separated user ids
     active INTEGER NOT NULL DEFAULT 1
 );
+CREATE TABLE IF NOT EXISTS account_limits (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id),
+    limits TEXT NOT NULL,               -- the limits spec's flat names, as JSON
+    updated_at TEXT NOT NULL,
+    updated_by TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -59,8 +70,15 @@ CREATE TABLE IF NOT EXISTS layouts (
 );
 """
 
+# columns added after the first release: (table, column, definition)
+_ADDED = (("users", "must_change", "INTEGER NOT NULL DEFAULT 0"),)
+
 MAX_LAYOUT_BYTES = 256 * 1024
 MAX_LAYOUTS_PER_USER = 50
+
+
+class LastAdmin(ValueError):
+    """The change would leave no active admin."""
 
 
 class LoginFailed(Exception):
@@ -87,10 +105,17 @@ class UserStore:
         self._lock = threading.Lock()  # one writer at a time (requests run in threads)
         with self._db() as db:
             db.executescript(_SCHEMA)
+            for table, column, definition in _ADDED:  # an older file: add what it lacks
+                have = {r["name"] for r in db.execute(f"PRAGMA table_info({table})")}
+                if column not in have:
+                    db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     # --- users -------------------------------------------------------------------------------
 
-    def create_user(self, user_id: str, name: str, password: str, roles: set[Role]) -> NewUser:
+    def create_user(
+        self, user_id: str, name: str, password: str, roles: set[Role], *, must_change: bool = False
+    ) -> NewUser:
+        """`must_change`: the password is a one-time one (an admin's); changed at first login."""
         if not user_id.isascii() or not user_id.replace("-", "").isalnum():
             raise ValueError("user id must be letters, digits or dashes")
         secret = security.new_totp_secret()
@@ -98,13 +123,20 @@ class UserStore:
         try:
             with self._db() as db:
                 db.execute(
-                    "INSERT INTO users (id, name, password_hash, totp_secret, roles) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (user_id, name, password_hash, self._box.seal(secret), _roles(roles)),
+                    "INSERT INTO users (id, name, password_hash, totp_secret, roles, must_change) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        user_id,
+                        name,
+                        password_hash,
+                        self._box.seal(secret),
+                        _roles(roles),
+                        int(must_change),
+                    ),
                 )
         except sqlite3.IntegrityError:
             raise ValueError(f"user {user_id} already exists") from None
-        user = User(user_id, name, frozenset(roles))
+        user = User(user_id, name, frozenset(roles), must_change_password=must_change)
         return NewUser(user, security.totp_uri(secret, user_id))
 
     def get_user(self, user_id: str) -> User | None:
@@ -123,6 +155,109 @@ class UserStore:
             db.execute("UPDATE users SET active = ? WHERE id = ?", (int(active), user_id))
             if not active:
                 db.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+    def users(self) -> list[dict]:
+        """Everyone, for the admin screen: who, roles, on/off, and whether login is locked."""
+        now = self._clock()
+        with self._db() as db:
+            rows = db.execute("SELECT * FROM users ORDER BY id").fetchall()
+            sessions = dict(db.execute(
+                "SELECT user_id, COUNT(*) FROM sessions GROUP BY user_id").fetchall())  # fmt: skip
+        out = []
+        for r in rows:
+            locked = r["locked_until"] and datetime.fromisoformat(r["locked_until"]) > now
+            out.append({"user": _user(r), "locked_until": r["locked_until"] if locked else None,
+                        "failures": r["failures"],
+                        "sessions": sessions.get(r["id"], 0)})  # fmt: skip
+        return out
+
+    def update_user(
+        self,
+        user_id: str,
+        *,
+        name: str | None = None,
+        roles: set[Role] | None = None,
+        active: bool | None = None,
+    ) -> tuple[User, User]:
+        """Change a user; (before, after). Turning off ends their sessions. Refuses (LastAdmin)
+        to leave no active admin."""
+        if name is not None and not 1 <= len(name.strip()) <= 80:
+            raise ValueError("name: 1-80 characters")
+        with self._lock, self._db() as db:
+            row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            if row is None:
+                raise KeyError(user_id)
+            before = _user(row)
+            after = User(
+                before.id,
+                name.strip() if name is not None else before.name,
+                frozenset(roles) if roles is not None else before.roles,
+                active if active is not None else before.active,
+                before.must_change_password,
+            )
+            if before.has_role(Role.ADMIN) and not after.has_role(Role.ADMIN):
+                others = [_user(r) for r in db.execute("SELECT * FROM users WHERE id != ?",
+                                                       (user_id,))]  # fmt: skip
+                if not any(u.has_role(Role.ADMIN) for u in others):
+                    raise LastAdmin(f"{user_id} is the last active admin: make another admin "
+                                    "first")  # fmt: skip
+            db.execute(
+                "UPDATE users SET name = ?, roles = ?, active = ? WHERE id = ?",
+                (after.name, _roles(set(after.roles)), int(after.active), user_id),
+            )
+            if not after.active:
+                db.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        return before, after
+
+    def unlock(self, user_id: str) -> bool:
+        """Clear failed logins; True if the user was locked or had failures."""
+        with self._db() as db:
+            cursor = db.execute(
+                "UPDATE users SET failures = 0, locked_until = NULL WHERE id = ? "
+                "AND (failures > 0 OR locked_until IS NOT NULL)", (user_id,))  # fmt: skip
+        return cursor.rowcount > 0
+
+    def reset_password(self, user_id: str) -> str:
+        """A one-time password (shown once to the admin); the user must change it after the
+        next login, and is logged out everywhere now."""
+        temporary = security.new_temporary_password()
+        password_hash = security.hash_password(temporary)
+        with self._db() as db:
+            cursor = db.execute(
+                "UPDATE users SET password_hash = ?, must_change = 1, failures = 0, "
+                "locked_until = NULL WHERE id = ?", (password_hash, user_id))  # fmt: skip
+            if cursor.rowcount == 0:
+                raise KeyError(user_id)
+            db.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        return temporary
+
+    def reset_authenticator(self, user_id: str) -> str:
+        """A new authenticator secret (a lost phone); returns its link, shown once. The old
+        codes stop working and the user is logged out everywhere."""
+        secret = security.new_totp_secret()
+        with self._db() as db:
+            cursor = db.execute(
+                "UPDATE users SET totp_secret = ?, last_totp_step = 0 WHERE id = ?",
+                (self._box.seal(secret), user_id))  # fmt: skip
+            if cursor.rowcount == 0:
+                raise KeyError(user_id)
+            db.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        return security.totp_uri(secret, user_id)
+
+    def change_own_password(self, user_id: str, old: str, new: str, keep_token: str) -> None:
+        """The user's own change: the old password first, the new one strong and different.
+        Ends their other sessions (keeps `keep_token`, the one asking)."""
+        security.check_password_strength(new)
+        if new == old:
+            raise ValueError("the new password must differ from the old one")
+        with self._lock, self._db() as db:
+            row = db.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,)).fetchone()
+            if row is None or not security.verify_password(row["password_hash"], old):
+                raise ValueError("the current password is wrong")
+            db.execute("UPDATE users SET password_hash = ?, must_change = 0 WHERE id = ?",
+                       (security.hash_password(new), user_id))  # fmt: skip
+            db.execute("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?",
+                       (user_id, security.token_digest(keep_token)))  # fmt: skip
 
     def verify_login(self, user_id: str, password: str, code: str) -> User:
         """Check all three together. Raises LoginFailed with one generic message."""
@@ -180,6 +315,50 @@ class UserStore:
                 )
         except sqlite3.IntegrityError:
             raise ValueError(f"account {account.id} already exists") from None
+
+    def update_account(
+        self, account_id: str, *, traders: set[str] | None = None, active: bool | None = None
+    ) -> tuple[BrokerAccount, BrokerAccount]:
+        """Who else may trade it, and on/off; (before, after). Traders must be users."""
+        with self._lock, self._db() as db:
+            row = db.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
+            if row is None:
+                raise KeyError(account_id)
+            before = _account(row)
+            if traders is not None:
+                known = {r["id"] for r in db.execute("SELECT id FROM users")}
+                unknown = sorted(set(traders) - known)
+                if unknown:
+                    raise ValueError(f"no such user: {', '.join(unknown)}")
+                traders = set(traders) - {before.owner_user_id}  # the owner trades it anyway
+            after = BrokerAccount(
+                before.id, before.broker, before.broker_client_id, before.owner_user_id,
+                frozenset(traders) if traders is not None else before.traders,
+                active if active is not None else before.active,
+            )  # fmt: skip
+            db.execute(
+                "UPDATE accounts SET traders = ?, active = ? WHERE id = ?",
+                (",".join(sorted(after.traders)), int(after.active), account_id),
+            )
+        return before, after
+
+    def account_limits(self, account_id: str) -> dict | None:
+        """The saved limits (the spec's flat names), or None: the defaults."""
+        with self._db() as db:
+            row = db.execute(
+                "SELECT limits FROM account_limits WHERE account_id = ?", (account_id,)
+            ).fetchone()
+        return json.loads(row["limits"]) if row else None
+
+    def set_account_limits(self, account_id: str, limits: dict, by: str) -> None:
+        with self._db() as db:
+            db.execute(
+                "INSERT INTO account_limits (account_id, limits, updated_at, updated_by) "
+                "VALUES (?, ?, ?, ?) ON CONFLICT (account_id) DO UPDATE SET "
+                "limits = excluded.limits, updated_at = excluded.updated_at, "
+                "updated_by = excluded.updated_by",
+                (account_id, json.dumps(limits, sort_keys=True), self._clock().isoformat(), by),
+            )
 
     def get_account(self, account_id: str) -> BrokerAccount | None:
         with self._db() as db:
@@ -302,7 +481,7 @@ def _roles(roles: set[Role]) -> str:
 
 def _user(row: sqlite3.Row) -> User:
     roles = frozenset(Role(r) for r in row["roles"].split(",") if r)
-    return User(row["id"], row["name"], roles, bool(row["active"]))
+    return User(row["id"], row["name"], roles, bool(row["active"]), bool(row["must_change"]))
 
 
 def _account(row: sqlite3.Row) -> BrokerAccount:

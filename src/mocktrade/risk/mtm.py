@@ -100,7 +100,7 @@ class MtmWatch:
         self._book = book
         self._orders = orders
         self._instrument = instruments
-        self._max_lots = max_lots
+        self.max_lots = max_lots  # closing pieces; an admin's edit replaces it
         self._path = path
         self._audit = audit
         self._clock = clock
@@ -216,7 +216,7 @@ class MtmWatch:
                 continue
             try:
                 sent = await close_position(self._orders, instrument, v.product, v.qty,
-                                            user_id="mtm", max_lots=self._max_lots,
+                                            user_id="mtm", max_lots=self.max_lots,
                                             basket_id=basket)  # fmt: skip
             except Exception:
                 log.exception("MTM close of %s failed", v.instrument_id)

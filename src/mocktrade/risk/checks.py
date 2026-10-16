@@ -44,7 +44,8 @@ class RiskGate:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),  # same clock as the orders
         positions: Callable[[], dict[str, int]] = dict,  # every net position (covered shorts)
     ) -> None:
-        self.limits = limits
+        self.limits = limits  # replaced whole by an admin's edit; read fresh on every order
+        self.off_reason: str | None = None  # set: the account takes only closing trades
         self._instrument = instruments
         self._price = prices
         self._position = position
@@ -64,6 +65,7 @@ class RiskGate:
         others = [o for o in self._working() if o.client_order_id != request.client_order_id]
         reason = (
             self._kill_problem()
+            or self._off_problem(request, request.qty, others)
             or self._instrument_problem(instrument, request, others)
             or self._product_problem(instrument, request)
             or self._size_problem(instrument, request.qty)
@@ -123,6 +125,7 @@ class RiskGate:
             )
             or (self._position_problem(instrument, new, leaves, others) if grows else None)
             or (self._loss_problem(new, leaves, others) if grows else None)
+            or (self._off_problem(new, leaves, others) if grows else None)
         )
 
     async def admit_cancel(self, order: OrderView) -> str | None:
@@ -267,16 +270,25 @@ class RiskGate:
         pnl = self._pnl()
         if pnl > -self.limits.max_daily_loss_paise:
             return None
-        now = self._position(request.instrument_id)
-        working = self._working_qty(request.instrument_id, request.side, others)
-        after = now + request.side.sign * (working + leaves)
-        closes = now != 0 and request.side.sign == -_sign(now) and _sign(after) != -_sign(now)
-        if closes:
+        if self._closes(request, leaves, others):
             return None
         return (
             f"daily loss limit reached ({format_rupees(-pnl)} lost, limit "
             f"{format_rupees(self.limits.max_daily_loss_paise)}): only closing trades are allowed"
         )
+
+    def _off_problem(self, request: OrderRequest, leaves: int, others) -> str | None:
+        """A turned-off account: only trades that close positions (an admin's switch)."""
+        if self.off_reason is None or self._closes(request, leaves, others):
+            return None
+        return f"{self.off_reason}: only closing trades are allowed"
+
+    def _closes(self, request: OrderRequest, leaves: int, others) -> bool:
+        """Does this order only reduce the position (with what already works on that side)?"""
+        now = self._position(request.instrument_id)
+        working = self._working_qty(request.instrument_id, request.side, others)
+        after = now + request.side.sign * (working + leaves)
+        return now != 0 and request.side.sign == -_sign(now) and _sign(after) != -_sign(now)
 
     def _open_orders_problem(self, others) -> str | None:
         if len(others) >= self.limits.max_open_orders:

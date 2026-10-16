@@ -66,6 +66,13 @@ def needs_rehash(stored_hash: str) -> bool:
     return _hasher.check_needs_rehash(stored_hash)
 
 
+def new_temporary_password() -> str:
+    """A one-time password for an admin's reset: 16 characters, easy to read out (no 0/O,
+    1/l/I), well above the minimum length."""
+    alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(16))
+
+
 def new_totp_secret() -> str:
     return pyotp.random_base32()
 

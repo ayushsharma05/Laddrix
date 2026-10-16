@@ -12,6 +12,7 @@ rate limit), then the throttle (which counts what it lets through).
 """
 
 import asyncio
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -52,6 +53,9 @@ from mocktrade.store.events import EventLog
 ALGO_ENDS = ("DONE", "STOPPED", "FAILED", "LOST")  # audit kinds ALGO_<end>: no longer running
 
 
+log = logging.getLogger(__name__)
+
+
 @dataclass
 class AccountRuntime:
     account: BrokerAccount
@@ -74,6 +78,21 @@ class AccountRuntime:
     mtm: MtmWatch | None = None  # the trader's own loss limits (per position, portfolio)
     squareoff: SquareOff | None = None  # intraday positions before the broker's cut-off
 
+    def apply_limits(self, limits: RiskLimits) -> None:
+        """An admin's new limits, from the next order on. Everything that copied a limit at
+        the start reads the new one: the checks, the daily-loss stop and the closing pieces
+        (MTM, square-off). Working orders are left as they are."""
+        self.risk.limits = limits
+        if self.loss_watch is not None:
+            self.loss_watch.limit_paise = limits.max_daily_loss_paise
+        for closer in (self.mtm, self.squareoff):
+            if closer is not None:
+                closer.max_lots = limits.max_order_lots
+
+    def set_active(self, active: bool) -> None:
+        """Turned off by an admin: only closing trades from then on (cancels always work)."""
+        self.risk.off_reason = None if active else "the account is turned off by an admin"
+
 
 @dataclass
 class Platform:
@@ -83,6 +102,8 @@ class Platform:
     event_log: EventLog | None = None
     accounts: dict[str, AccountRuntime] = field(default_factory=dict)
     charges_model: ChargesModel = field(default_factory=lambda: ScheduleCharges(KITE_STANDARD))
+    _late: set[asyncio.Task] | None = field(default=None, init=False, repr=False)
+    _reconcile: bool = field(default=True, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.event_log is not None:
@@ -98,20 +119,48 @@ class Platform:
 
     async def run(self, *, reconcile: bool = True) -> None:
         """Run every background loop until cancelled: each account's broker updates and
-        position checks, and marking positions to the latest prices."""
+        position checks, and marking positions to the latest prices. An account added while
+        this runs (an admin's new account) starts its own loops at once, ended with these."""
+        self._reconcile = reconcile
         loops = [self._mark_loop()]
         for runtime in self.accounts.values():
-            loops.append(runtime.orders.run())
-            loops.append(self._run_algos(runtime))
-            if runtime.recovery is not None:
-                loops.append(self._recover(runtime))
-            if runtime.gtt is not None:
-                loops.append(self._after_recovery(runtime, runtime.gtt.run))
-            if runtime.portfolio is not None:
-                loops.append(self._after_recovery(runtime, runtime.portfolio.run))
-            if reconcile:
-                loops.append(self._after_recovery(runtime, runtime.reconciler.run))
-        await asyncio.gather(*loops)
+            loops.extend(self._account_loops(runtime))
+        self._late = set()
+        try:
+            await asyncio.gather(*loops)
+        finally:
+            late, self._late = self._late, None
+            for task in late:
+                task.cancel()
+            if late:
+                await asyncio.gather(*late, return_exceptions=True)
+
+    def _account_loops(self, runtime: AccountRuntime) -> list:
+        loops = [runtime.orders.run(), self._run_algos(runtime)]
+        if runtime.recovery is not None:
+            loops.append(self._recover(runtime))
+        if runtime.gtt is not None:
+            loops.append(self._after_recovery(runtime, runtime.gtt.run))
+        if runtime.portfolio is not None:
+            loops.append(self._after_recovery(runtime, runtime.portfolio.run))
+        if self._reconcile:
+            loops.append(self._after_recovery(runtime, runtime.reconciler.run))
+        return loops
+
+    def _start_late(self, runtime: AccountRuntime) -> None:
+        """An account added after run() started: its loops as tasks run() ends with its own."""
+        if self._late is None:
+            return  # not running yet: run() starts it with the others
+        for loop in self._account_loops(runtime):
+            task = asyncio.ensure_future(loop)
+            self._late.add(task)
+            task.add_done_callback(self._late_done)
+
+    def _late_done(self, task: asyncio.Task) -> None:
+        if self._late is not None:
+            self._late.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            log.error("a loop of a late-added account failed", exc_info=task.exception())
 
     async def _recover(self, runtime: AccountRuntime, retry_s: float = 10.0) -> None:
         """Rebuild the account from the audit trail and the broker (recovery.py)."""
@@ -439,6 +488,8 @@ class Platform:
             squareoff,
         )
         self.accounts[account.id] = runtime
+        runtime.set_active(account.active)
+        self._start_late(runtime)
         return runtime
 
 

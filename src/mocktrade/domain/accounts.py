@@ -25,6 +25,7 @@ class User:
     name: str
     roles: frozenset[Role] = field(default_factory=frozenset)
     active: bool = True
+    must_change_password: bool = False  # after an admin's reset: nothing else until changed
 
     def has_role(self, role: Role) -> bool:
         return self.active and role in self.roles
@@ -49,10 +50,19 @@ def can_trade(user: User, account: BrokerAccount) -> bool:
     return user.id == account.owner_user_id or user.id in account.traders
 
 
+def can_manage(user: User, account: BrokerAccount) -> bool:
+    """True if this user may work the account's orders even while it is turned off:
+    cancel, close, stop. (On a turned-off account the risk checks pass only closing trades.)"""
+    if not user.has_role(Role.TRADER):
+        return False
+    return user.id == account.owner_user_id or user.id in account.traders
+
+
 def can_view(user: User, account: BrokerAccount) -> bool:
-    """True if this user may see this account's orders and positions."""
+    """True if this user may see this account's orders and positions (also when the
+    account is turned off: its positions may still need closing)."""
     if not user.active:
         return False
     if user.has_role(Role.ADMIN) or user.has_role(Role.RISK):
         return True
-    return can_trade(user, account)
+    return can_manage(user, account)

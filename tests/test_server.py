@@ -178,7 +178,8 @@ async def test_login_sets_a_locked_down_cookie(world):
         for part in ("HttpOnly", "Secure", "SameSite=strict", "Path=/"):
             assert part.lower() in cookie.lower()
         me = (await c.get("/api/me")).json()
-    assert me["user"] == {"id": "ayush", "name": "Ayush", "roles": ["admin", "trader"]}
+    assert me["user"] == {"id": "ayush", "name": "Ayush", "roles": ["admin", "trader"],
+                          "must_change_password": False}  # fmt: skip
     assert [a["id"] for a in me["accounts"]] == ["acc-ayush", "acc-riya"]  # admin sees all
     # the broker's daily login, so the screen can offer it
     assert [a["broker_session"] for a in me["accounts"]] == ["login_needed", None]

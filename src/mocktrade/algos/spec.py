@@ -23,6 +23,9 @@ class ParamKind(Enum):
     CHOICE = "choice"
     FLAG = "flag"
     INSTRUMENT = "instrument"  # another instrument (e.g. a spread's second leg)
+    MONEY = "money"  # paise, shown in rupees (e.g. a limit per order)
+    CHOICES = "choices"  # several of `choices` (min/max: how many)
+    INSTRUMENTS = "instruments"  # a list of instruments (min/max: how many)
 
 
 @dataclass(frozen=True)
@@ -68,10 +71,13 @@ def check_params(spec: AlgoSpec, raw: dict[str, Any]) -> tuple[dict[str, Any], l
         except (TypeError, ValueError) as exc:
             problems.append(f"{p.label}: {exc}")
             continue
-        if p.min is not None and value < p.min:
-            problems.append(f"{p.label} must be at least {p.min}")
-        if p.max is not None and value > p.max:
-            problems.append(f"{p.label} must be at most {p.max}")
+        size = len(value) if isinstance(value, list) else value  # lists: how many
+        if p.min is not None and size < p.min:
+            what = f"at least {p.min} chosen" if isinstance(value, list) else f"at least {p.min}"
+            problems.append(f"{p.label} must be {what}")
+        if p.max is not None and size > p.max:
+            what = f"at most {p.max} chosen" if isinstance(value, list) else f"at most {p.max}"
+            problems.append(f"{p.label} must be {what}")
         clean[p.name] = value
     return clean, problems
 
@@ -87,6 +93,14 @@ def _coerce(p: ParamSpec, value: Any) -> Any:
         if p.kind is ParamKind.CHOICE and value not in p.choices:
             raise ValueError(f"must be one of {', '.join(p.choices)}")
         return value
+    if p.kind in (ParamKind.CHOICES, ParamKind.INSTRUMENTS):
+        if not isinstance(value, list | tuple) or not all(isinstance(v, str) and v for v in value):
+            raise ValueError("must be a list")
+        if p.kind is ParamKind.CHOICES:
+            bad = [v for v in value if v not in p.choices]
+            if bad:
+                raise ValueError(f"{', '.join(bad)}: not one of {', '.join(p.choices)}")
+        return sorted(set(value))  # each once, in a stable order
     if p.kind in (ParamKind.SECONDS, ParamKind.MINUTES, ParamKind.PERCENT):
         if isinstance(value, bool) or not isinstance(value, int | float):
             raise ValueError("must be a number")
