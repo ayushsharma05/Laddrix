@@ -14,6 +14,7 @@ browser ──https──► caddy (ports 80/443, certificates) ──► app (p
 | `Caddyfile` | HTTPS for `MOCKTRADE_DOMAIN`. Stream messages pass through unbuffered. |
 | `.env.example` | The settings to copy into `deploy/.env`. Never commit `deploy/.env`. |
 | `smoke.sh` | Checks a built image: it starts locked down, answers, and stops with exit code 0. CI runs it. |
+| `deploy.sh`, `rollback.sh`, `window.sh` | Deploy a tagged release outside market hours, with a backup first and an automatic rollback if it isn't healthy; go back by hand. See `docs/runbooks/release.md`. |
 
 The server entry point is `python -m mocktrade.tools.serve`. Its settings are listed at the
 top of `src/mocktrade/tools/serve.py`. Run `serve --check` to validate them without starting.

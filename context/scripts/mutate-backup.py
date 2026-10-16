@@ -1,6 +1,6 @@
 """#329 mutation check: break one rule of backup and restore (what goes in, what never does, the
 manifest, half backups, checking a backup, never overwriting or deleting, stale WAL files, what
-the restore says); the tests must notice. Restores each file in `finally`. Run alone."""
+the restore says, moving aside in place); the tests must notice. Restores each file in `finally`. Run alone."""
 import subprocess
 
 B = "src/mocktrade/tools/backup.py"
@@ -26,9 +26,11 @@ MUTANTS = [
  (R, '            if result != "ok":', '            if False:'),
  (R, '                result = str(exc)  # too damaged to even check', '                raise'),
  (R, '        if not replace:\n            raise RestoreError(', '        if False:\n            raise RestoreError('),
- (R, '        data_dir.rename(moved)', '        shutil.rmtree(data_dir)'),
- (R, '        data_dir.rename(moved)', '        shutil.copytree(data_dir, moved)'),
- (R, '    listed = check_backup(source)\n    moved = None', '    listed = json.loads((source / MANIFEST).read_text())\n    moved = None'),
+ (R, '            path.rename(moved / path.name)', '            shutil.rmtree(path) if path.is_dir() else path.unlink()'),
+ (R, '            path.rename(moved / path.name)', '            shutil.copy2(path, moved / path.name) if path.is_file() else None'),
+ (R, 'LEFT_IN_PLACE = ("backups",)', 'LEFT_IN_PLACE = ()'),
+ (R, '                   if p.name not in LEFT_IN_PLACE and not p.name.startswith(ASIDE)]', '                   if p.name not in LEFT_IN_PLACE]'),
+ (R, '    listed = check_backup(source)\n    present = []', '    listed = json.loads((source / MANIFEST).read_text())\n    present = []'),
  (R, '    except (RestoreError, OSError) as exc:', '    except OSError as exc:'),
  (R, '    for item in FROM_ELSEWHERE:\n        print(f"  - {item}")', '    pass'),
 ]
