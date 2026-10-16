@@ -180,7 +180,8 @@ async def recover(
 
     # 3. today's orders, then the broker's word on them
     report.orders = orders.restore(log_.latest_views(account_id, since=since))
-    orders.reconcile(broker_orders)
+    orders.reconcile(broker_orders)  # one list proves nothing about an unanswered order (#259):
+    orders.follow_unconfirmed()  # the manager asks the broker again, by itself
 
     # 4. working orders the broker doesn't know
     listed = {u.broker_order_id for u in broker_orders} | {u.client_order_id for u in broker_orders}

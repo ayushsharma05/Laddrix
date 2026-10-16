@@ -18,7 +18,12 @@ An order's status **only moves forward**. The allowed moves are `ALLOWED` in `or
 
 Next to the status, `pending` says what we're waiting on:
 - **NONE**: nothing.
-- **UNCONFIRMED**: the place call got no clear answer (a timeout or a dropped connection). The order is never assumed rejected; the broker's order list settles it.
+- **UNCONFIRMED**: the place call got no clear answer (a timeout or a dropped connection). The order is never assumed rejected, and its risk stays counted. The broker's order list settles it (#259):
+  - the manager asks the broker again by itself, at 2, 5, 10, 20, 30, 60 and 60 seconds, and after a restart too;
+  - one list without the order proves nothing (a slow broker lists it late);
+  - it becomes REJECTED only when **3 lists over at least 60 seconds** all miss it, and the reason says so ("not in its order list at 3 checks from … to …, 75 s after it was sent");
+  - still unclear after every follow-up: it stays UNCONFIRMED and asks for a person. They check the broker's own order book, then press **Not placed?** in the order book, confirm, and the order is settled with their name;
+  - placing is never retried blindly.
 - **CANCEL**: a cancel is on its way, or is waiting for the broker's id to arrive.
 
 An update that would move an order backwards, or that repeats one already applied, is **IGNORED** and still recorded in the audit trail. An order we never placed (one made in Kite's own app) appears as **EXTERNAL**.

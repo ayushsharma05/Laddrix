@@ -309,3 +309,26 @@ def test_recovery_needs_the_audit_trail(nifty_fut):
     platform = Platform(store, MarketData(), KillSwitch("firm"))
     with pytest.raises(ValueError, match="needs the event log"):
         platform.add_account(ACCOUNT, FakeBroker(), ids=ClientIds("MT"), recover_on_start=True)
+
+
+async def test_an_unanswered_order_survives_a_restart_and_is_followed_up(tmp_path, nifty_fut):
+    # #259: a place with no answer is written as UNCONFIRMED; after a restart one broker list
+    # without it proves nothing, so it stays unconfirmed (its risk held) and is asked about
+    class NoAnswer(FakeBroker):
+        async def place(self, request):
+            raise TimeoutError("read timed out")
+
+    first = Server(tmp_path, nifty_fut, NoAnswer(), recover=False)
+    first.runtime.orders._follow_up_s = ()
+    view = await first.runtime.orders.submit(request())
+    assert view.pending.value == "UNCONFIRMED"
+    await first.log.flush()
+    await first.stop()
+
+    again = Server(tmp_path, nifty_fut, FakeBroker())
+    await again.ready()
+    back = again.runtime.orders.get(view.client_order_id)
+    assert (back.status, back.pending.value) == (OrderStatus.PENDING, "UNCONFIRMED")
+    assert len(again.runtime.orders._followers) == 1  # being asked about, by itself
+    await again.runtime.orders.aclose()
+    await again.stop()

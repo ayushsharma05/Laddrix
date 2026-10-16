@@ -62,6 +62,20 @@ export function OrderBook({ params, setParams, publish, open }: WidgetProps<Orde
     [rest, store, accountId],
   );
 
+  // an unanswered order a person checked at the broker: not there, so never placed (#259)
+  const [settling, setSettling] = useState<string | null>(null);
+  const settle = useCallback(
+    (o: OrderView) => {
+      if (!accountId) return;
+      setSettling(null);
+      rest
+        .post<OrderView>(`/api/accounts/${encodeURIComponent(accountId)}/orders/${o.request.client_order_id}/settle`, { confirm: true })
+        .then((view) => store.applyOrders(accountId, [view]))
+        .catch((e: unknown) => store.addMessage("ERROR", o.request.instrument_id, `Not settled: ${e instanceof Error ? e.message : String(e)}`));
+    },
+    [rest, store, accountId],
+  );
+
   const working = useMemo(() => ordersFor(orders, "working").filter(cancellable), [orders]);
 
   return (
@@ -144,6 +158,21 @@ export function OrderBook({ params, setParams, publish, open }: WidgetProps<Orde
                   <span className={`tone-${statusTone(o)}`} title={o.reason || status}>
                     {status}
                     {o.status === "REJECTED" && o.reason ? `: ${o.reason}` : ""}
+                    {o.pending === "UNCONFIRMED" && !o.broker_order_id && (
+                      <button
+                        type="button"
+                        className="btn small settle-btn"
+                        title="The broker never answered. Check the broker's own order book: if the order isn't there, mark it as never placed."
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (settling === id) settle(o);
+                          else setSettling(id);
+                        }}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                      >
+                        {settling === id ? "Confirm: not in the broker's book" : "Not placed?"}
+                      </button>
+                    )}
                   </span>
                   {cancellable(o) ? (
                     <button

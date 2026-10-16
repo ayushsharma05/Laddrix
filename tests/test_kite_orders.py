@@ -190,8 +190,10 @@ def test_every_mapped_status_is_one_we_know():
     assert set(STATUS_MAP.values()) <= set(S)
 
 
-def test_an_unknown_future_status_is_skipped_not_fatal(caplog):
-    assert to_update({**KITE_ORDER, "status": "SOMETHING NEW"}) is None
+def test_an_unknown_future_status_is_kept_not_fatal(caplog):
+    update = to_update({**KITE_ORDER, "status": "SOMETHING NEW"})
+    assert update.status is S.PENDING  # kept as proof the order exists (#259)
+    assert "doesn't know: SOMETHING NEW" in update.reason
     assert "unknown Kite order status" in caplog.text
 
 

@@ -1207,6 +1207,19 @@ def create_app(
         except OrderError as exc:
             raise HTTPException(409, exc.reason) from None
 
+    @app.post("/api/accounts/{account_id}/orders/{client_order_id}/settle")
+    async def settle(account_id: str, client_order_id: str, body: ConfirmIn,
+                     user: Me) -> dict[str, Any]:  # fmt: skip
+        """An unanswered order a person checked at the broker: not there, so never placed
+        (#259). Only after confirming; recorded with who did it."""
+        running = runtime(account_id, user, trade=True)
+        if not body.confirm:
+            raise HTTPException(422, "check the broker's own order book first, then confirm")
+        try:
+            return view_to_dict(running.orders.settle_unconfirmed(client_order_id, by=user.id))
+        except OrderError as exc:
+            raise HTTPException(409, exc.reason) from None
+
     @app.get("/api/accounts/{account_id}/orders/{client_order_id}/history")
     async def history(account_id: str, client_order_id: str, user: Me) -> list[dict[str, Any]]:
         running = runtime(account_id, user)

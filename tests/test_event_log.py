@@ -239,8 +239,9 @@ async def test_an_order_caught_mid_send_comes_back_unconfirmed(store, log):
     om = manager(store, FakeBroker(), log)
     om.restore([view])
     assert om.get("MT2610147").pending is Pending.UNCONFIRMED
-    om.reconcile([])  # the broker never got it
-    assert om.get("MT2610147").status is S.REJECTED
+    om.reconcile([])  # one list without it proves nothing: still followed up (#259)
+    assert om.get("MT2610147").status is S.PENDING
+    assert om.get("MT2610147").pending is Pending.UNCONFIRMED
 
 
 async def test_restore_skips_other_accounts(store, log):

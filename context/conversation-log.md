@@ -313,3 +313,16 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     2. a rollback checks out code without its own script, so it now runs from a copy;
     3. the old image's restore can't work in place on a volume, so restore now moves data aside inside `/data`, and `--restore-data` uses the newer image.
   - **After the fixes:** 15/15. Mutation for backup and restore 26/26. The market-hours rule was first written in Python inside the image; it moved to `window.sh`, because the running image may predate it.
+- 16 Oct, #289 merged (PR #336); `main` green. Posted a status table on #240.
+  - **Ayush said** he is lost in how much has been built. He wants Claude to finish everything first; then he will start understanding it. He trusts Claude for now.
+  - **Decided:** carry on with the hardening gate #257 and everything after it, then write him a simple guide. The steps that only he can do (live trading with his own login, his acceptance, the v1.0.0 tag) wait for that guide, explained slowly.
+- 16 Oct (after the limit reset), **#259 done** (unanswered orders).
+  - **Two real defects confirmed in the code:**
+    - one broker list without an unanswered order rejected it at once, so a slow broker could lead to a duplicate;
+    - an unknown Kite status was dropped from the list, which made the order look missing.
+  - **The fix:**
+    - **Rejecting needs evidence:** 3 lists over at least 60 s, with the times in the reason.
+    - **Follow-ups:** the manager asks the broker again by itself, after a restart too.
+    - **Unknown statuses** are kept as PENDING with the raw status, and are visible in the audit trail.
+    - **A person can settle it:** after checking the broker's book, two clicks on **Not placed?** in the order book, recorded with their name.
+  - **Checks:** mutation 14/14, after removing two redundant conditions it exposed and adding a restart test.

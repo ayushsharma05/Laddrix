@@ -147,3 +147,20 @@ Run it before going live and after any change to recovery, orders or positions. 
 **What it doesn't cover:**
 - **A live broker:** Kite's own order book after a crash is the go-live checklist's (#330) to check, live.
 - **The recovery gate's wait:** new orders are held while recovery runs, and cancels still go through. On paper recovery is instant, so the drill can't see this wait; `tests/test_recovery.py` covers it.
+
+## An order says Unconfirmed
+
+**What you see:** an order in the order book with the status **Unconfirmed**, and in Messages "no answer from broker".
+
+**Why:** the broker didn't answer when the order was sent (a timeout or a dropped connection), so MockTrade doesn't know whether it exists. It is **never retried**, and its risk stays counted, so you can't accidentally double it.
+
+**It usually settles itself:** MockTrade asks the broker again for about three minutes.
+- If the broker lists the order, it continues as normal.
+- If 3 of the broker's lists over at least 60 seconds don't show it, it is marked **REJECTED: the broker never received this order**, with the times it checked.
+
+**If it stays Unconfirmed** (the audit trail says "still not settled after asking the broker 7 times"):
+1. Open the broker's own order book (the Kite app or console). Look for the order by its tag, which is our order id (for example `D2610161`).
+2. **If it's there,** do nothing here: the next order update or reconnect settles it. A restart also does.
+3. **If it isn't there,** press **Not placed?** in MockTrade's order book, then **Confirm: not in the broker's book**. The order becomes REJECTED, with your name in the reason and the audit trail.
+
+**A status MockTrade doesn't know:** if Kite reports one, the order is kept (not dropped), and the audit trail shows "the broker reports a status MockTrade doesn't know: …". Tell Claude, so the status can be added (`broker/kite/orders.py`, `STATUS_MAP`).
