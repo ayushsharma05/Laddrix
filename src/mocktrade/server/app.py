@@ -52,6 +52,7 @@ from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.portfolio.service import PortfolioError, snapshot_to_dict
 from mocktrade.reports.export import report_csv, report_pdf
 from mocktrade.reports.service import ReportError, Reports
+from mocktrade.research.ticks import FileTickStore
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.risk.mtm import PortfolioRule, PositionRule
 from mocktrade.server import security
@@ -238,6 +239,7 @@ def create_app(
     alerts: Alerts | None = None,
     scheduler: Scheduler | None = None,
     reports: Reports | None = None,
+    ticks: FileTickStore | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -418,6 +420,34 @@ def create_app(
         except ChargesError as exc:
             raise HTTPException(422, str(exc)) from None
         return bill_to_dict(bill, service.model.schedule)
+
+    # --- research: recorded ticks (K11) ---------------------------------------------------------
+
+    def recordings():
+        if ticks is None:
+            raise HTTPException(404, "ticks aren't being recorded on this server")
+        return ticks
+
+    @app.get("/api/research/recordings")
+    async def recorded_days(user: Me) -> dict[str, Any]:
+        store = recordings()
+        days = []
+        for day in reversed(store.days()):
+            s = await asyncio.to_thread(store.summary, day)
+            days.append({k: s[k] for k in ("day", "ticks", "bytes", "segments")}
+                        | {"instruments": len(s["instruments"])})  # fmt: skip
+        return {"keep_days": store.keep_days, "days": days}
+
+    @app.get("/api/research/recordings/{day}")
+    async def recorded_day(day: str, user: Me) -> dict[str, Any]:
+        store = recordings()
+        try:
+            when = date.fromisoformat(day)
+        except ValueError:
+            raise HTTPException(422, f"not a date: {day!r} (YYYY-MM-DD)") from None
+        if when not in store.days():
+            raise HTTPException(404, f"nothing recorded on {day}")
+        return await asyncio.to_thread(store.summary, when)
 
     # --- MTM limits and the square-off assistant --------------------------------------------------
 

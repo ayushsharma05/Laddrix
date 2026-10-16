@@ -45,3 +45,5 @@ from the repo root (elsewhere it creates a second demo user with a different sec
 | `e2e-margin.cjs` | Real browser on a fresh demo: ticket margin line (1 and 5 lots), 2+2 lots bought, 1 more refused with both numbers, the exits accepted | `node context/scripts/e2e-margin.cjs` |
 | `mutate-mtm.py` | 18 mutations of the MTM watch, the square-off assistant, closing and the band; all caught | `python3 context/scripts/mutate-mtm.py` (alone) |
 | `e2e-mtm.cjs` | Real browser on a fresh demo: Square off MIS with its confirmation; an MTM ₹1 limit with auto-close set on the MTM Limits tab closes the position; the message | `node context/scripts/e2e-mtm.cjs` |
+| `mutate-recorder.py` | 14 mutations of the tick recorder and store (fields, India day, append, merge order, crash cut, rotation, retry, the tap); all caught | `python3 context/scripts/mutate-recorder.py` (alone) |
+| `check-recording.py` | Reads a real recording (the demo's) back: ticks, bytes per tick, busiest instruments, read speed | `python3 context/scripts/check-recording.py [data/demo/ticks]` |
