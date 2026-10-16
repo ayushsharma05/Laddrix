@@ -286,7 +286,8 @@ async def test_recorded_ticks_make_the_history_on_paper(tmp_path):
             (Tick(FUT, 103, volume=1150), t(9, 16, 5, y)),  # no time on the tick: when recorded
             (tick(t(9, 15, 5), 200, 50), t(9, 15, 5))]  # fmt: skip
     store.append(rows)
-    hist = RecordedHistory(store, clock=lambda: t(12, 0))
+    mono = [0.0]
+    hist = RecordedHistory(store, clock=lambda: t(12, 0), monotonic=lambda: mono[0])
     got = await hist.fetch(FUT, MINUTE, t(9, 0, 0, y), t(10, 0))
     assert [(c.start, c.open, c.close, c.volume) for c in got] == [
         (t(9, 15, 0, y), 100, 105, 100),
@@ -294,8 +295,13 @@ async def test_recorded_ticks_make_the_history_on_paper(tmp_path):
         (t(9, 15), 200, 200, 0),
     ]
     store.append([(tick(t(9, 15, 30), 210, 80), t(9, 15, 30))])  # today grows; yesterday is kept
+    assert hist.builds == 2
+    soon = await hist.fetch(FUT, BY_CODE["1d"], t(0, 0), t(0, 0, 0, DAY + timedelta(days=1)))
+    assert [(c.close, c.volume) for c in soon] == [(200, 0)] and hist.builds == 2  # a minute old
+    mono[0] = 61.0
     again = await hist.fetch(FUT, BY_CODE["1d"], t(0, 0, 0, y), t(0, 0, 0, DAY + timedelta(days=1)))
     assert [(c.start.date(), c.close, c.volume) for c in again] == [(y, 103, 150), (DAY, 210, 30)]
+    assert hist.builds == 3  # today again; yesterday from memory
 
 
 # --- marks ------------------------------------------------------------------------------------

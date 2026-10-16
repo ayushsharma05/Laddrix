@@ -119,12 +119,22 @@ class KiteHistory:
 
 
 class RecordedHistory:
+    TODAY_FOR_S = 60.0  # today's recording grows: built again at most once a minute (the live
+    # builder has the newest minutes anyway; this only fills what came before a restart)
+
     def __init__(
-        self, ticks: FileTickStore, *, clock: Callable[[], datetime] = lambda: datetime.now(UTC)
+        self,
+        ticks: FileTickStore,
+        *,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        monotonic: Callable[[], float] = monotonic_time.monotonic,
     ) -> None:
         self._ticks = ticks
         self._clock = clock
+        self._monotonic = monotonic
         self._cache: dict[tuple[InstrumentId, date], list[Candle]] = {}
+        self._today: dict[InstrumentId, tuple[date, float, list[Candle]]] = {}
+        self.builds = 0
 
     async def fetch(
         self, instrument_id: InstrumentId, interval: Interval, start: datetime, end: datetime
@@ -134,19 +144,27 @@ class RecordedHistory:
         minutes: list[Candle] = []
         for day in self._ticks.days():
             if first <= day <= last:
-                key = (instrument_id, day)
-                day_minutes = self._cache.get(key)
-                if day_minutes is None:
-                    day_minutes = await asyncio.to_thread(self._build, instrument_id, day)
-                    if day < today:
-                        self._cache[key] = day_minutes
-                minutes.extend(day_minutes)
+                minutes.extend(await self._day(instrument_id, day, today))
         exchange = exchange_of(instrument_id)
         window = bucket_start(start, interval, exchange)
         built = aggregate((m for m in minutes if window <= m.start < end), interval, exchange)
         return [c for c in built if start <= c.start < end]
 
+    async def _day(self, instrument_id: InstrumentId, day: date, today: date) -> list[Candle]:
+        if day < today:  # a finished day never changes
+            key = (instrument_id, day)
+            if key not in self._cache:
+                self._cache[key] = await asyncio.to_thread(self._build, instrument_id, day)
+            return self._cache[key]
+        kept = self._today.get(instrument_id)
+        if kept is not None and kept[0] == day and self._monotonic() - kept[1] < self.TODAY_FOR_S:
+            return kept[2]
+        minutes = await asyncio.to_thread(self._build, instrument_id, day)
+        self._today[instrument_id] = (day, self._monotonic(), minutes)
+        return minutes
+
     def _build(self, instrument_id: InstrumentId, day: date) -> list[Candle]:
+        self.builds += 1
         builder = CandleBuilder(keep_minutes=24 * 60)
         for recorded_us, tick in self._ticks.read_timed(day, [instrument_id]):
             if tick.exchange_time is None and tick.received_at is None:
