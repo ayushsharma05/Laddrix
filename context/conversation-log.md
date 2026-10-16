@@ -375,3 +375,10 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Bad files:** a broken file is kept aside and named. A bad rule is named while the good ones are still watched. A lost state file holds auto-close for the day.
     - **Saves:** write, flush, rename.
   - **Checks:** 18 new tests, mutation 19/19 (after five test gaps were filled), and a demo restart check (`context/evidence/h-263-mtm-restart.txt`). The demo check found that the alert band only ran in market hours, so MTM problems now run on their own all-day job and once at start.
+- 16 Oct (late), #263 merged (PR #341). **Ayush asked to pause until Wednesday 21 Oct.** His weekly usage was at 62% and he wants it to last; he will spend five days understanding the code.
+  - **His ask:** fix only what really matters now, without lowering quality (postpone rather than rush), and write documentation explaining everything simply.
+  - **Decided:**
+    - **Nothing more is merged before Wednesday.** No live trading happens before then, so the remaining P0s can safely wait: #264 lost stops, #265 durable order intents, #267 price freshness, #270 resource ownership.
+    - **#264 is parked** half done on branch `h-264-protection`. It has a WIP commit and no PR: the server side only. Still needed: tests, the Restore button, the mutation check, docs.
+    - **Wrote `docs/GUIDE.md`:** the whole project in plain words, a five-day reading plan, one order traced through the code, each safety system, what's left, and his own steps. README links to it.
+  - **On Wednesday:** start with his questions, then finish #264, then #265, #267, #270.
