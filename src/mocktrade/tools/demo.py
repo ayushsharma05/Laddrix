@@ -181,10 +181,14 @@ async def main(
     jobs.append(market_alerts.store.run())
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
-    scheduler.every(60, guards.check_mtm_job, between=("00:00", "23:59"), name="mtm closes")
+    scheduler.every(
+        60, guards.check_mtm_job, between=("00:00", "23:59"), name="mtm closes", any_day=True
+    )
     protection = ProtectionGuard(platform, alerts)  # lost stops on open positions (V1.2)
     protection.after_restart()
-    scheduler.every(5, protection.run_check, between=("00:00", "23:59"), name="protection guard")
+    scheduler.every(
+        5, protection.run_check, between=("00:00", "23:59"), name="protection guard", any_day=True
+    )
     app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler,
                      reports=reports, alerts=alerts, ticks=ticks, replay=feed,
                      protection=protection,

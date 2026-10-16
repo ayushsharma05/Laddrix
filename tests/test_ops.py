@@ -80,6 +80,18 @@ async def test_an_interval_job_runs_only_in_its_window_and_a_failing_job_hurts_n
     assert [name for name, _ in s.ran].count("failing") == 4
 
 
+async def test_a_safety_warning_job_runs_on_weekends_too_others_do_not():
+    sat = WED + timedelta(days=3)
+    clock = Clock(ist(sat, 10, 0))
+    warnings, trading = [], []
+    s = Scheduler(clock=clock)
+    s.every(5, lambda: warnings.append(1), between=("00:00", "23:59"), any_day=True)
+    s.every(5, lambda: trading.append(1), between=("00:00", "23:59"))
+    s.daily("10:00", lambda: trading.append("daily"))
+    await walk(s, clock, ist(sat, 10, 0, 20))
+    assert len(warnings) == 4 and trading == []  # a lost stop is shown on a Saturday too
+
+
 def test_holidays_parse_and_reject_nonsense():
     assert parse_holidays("2026-10-21, 2026-11-10,") == {date(2026, 10, 21), date(2026, 11, 10)}
     with pytest.raises(ValueError):

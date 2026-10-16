@@ -393,3 +393,5 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
       - a bracket comes back as an OCO at its levels;
       - it is refused while rebuilding, while an old order is working or unanswered, while another stop is there, if the position flipped, or if the size is in doubt.
   - **Checks:** 6 tests plus API and UI tests; mutation 12/12. Not yet a real-browser run: do one on Wednesday before relying on it.
+  - **Browser check passed** (`context/scripts/e2e-restore-stop.cjs`, screenshot `context/images/h-264-restore-band.png`). The flag survived two demo restarts; Restore needed two clicks and named what it starts; the stop ran again and the band cleared by itself.
+  - **The check found a real defect:** the scheduler ran **no** jobs on weekends and holidays, so the lost-stop band and the MTM close warnings never showed then (positions stay open over a weekend). `Scheduler.every(..., any_day=True)` now runs those two all week; trading jobs stay trading-days only.

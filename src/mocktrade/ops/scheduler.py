@@ -44,6 +44,7 @@ class _Every:
     start: time
     end: time
     next_at: datetime | None = None
+    any_day: bool = False  # also on weekends and holidays (a safety warning: positions stay open)
 
 
 @dataclass
@@ -61,10 +62,16 @@ class Scheduler:
         self._daily.append(_Daily(parse_hhmm(at), job, name or _name(job)))
 
     def every(
-        self, seconds: float, job: Job, *, between: tuple[str, str], name: str | None = None
+        self,
+        seconds: float,
+        job: Job,
+        *,
+        between: tuple[str, str],
+        name: str | None = None,
+        any_day: bool = False,
     ) -> None:
         start, end = (parse_hhmm(t) for t in between)
-        self._every.append(_Every(seconds, job, name or _name(job), start, end))
+        self._every.append(_Every(seconds, job, name or _name(job), start, end, any_day=any_day))
 
     def is_trading_day(self, day: date) -> bool:
         return day.weekday() < 5 and day not in self.holidays
@@ -77,9 +84,8 @@ class Scheduler:
     async def run_due(self) -> None:
         """Run every job that is due now (called once a second by `run`)."""
         now = self.clock().astimezone(IST)
-        if not self.is_trading_day(now.date()):
-            return
-        for d in self._daily:
+        trading = self.is_trading_day(now.date())
+        for d in self._daily if trading else ():
             due = datetime.combine(now.date(), d.at, tzinfo=IST)
             if d.last_day == now.date() or now < due:
                 continue
@@ -89,7 +95,7 @@ class Scheduler:
                 continue
             await self._call(d.name, d.job, now)
         for e in self._every:
-            if not (e.start <= now.time() < e.end):
+            if not (trading or e.any_day) or not (e.start <= now.time() < e.end):
                 e.next_at = None
                 continue
             if e.next_at is None or now >= e.next_at:
