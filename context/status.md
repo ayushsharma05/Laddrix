@@ -131,7 +131,12 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    - #234 K12.4 alerts manager, time & sales, depth, movers: **done** on branch `k12-4-market-screens` (PR "Closes #234"; merge on green CI if still open). See `docs/design/charts.md` § K12.4. It also fixed a ticket that kept the previous contract's price after a switch, and simulator option prices.
 
    Known gaps: replaying a live Kite server's recordings needs that day's instrument list (also in #240); webhook DNS rebinding (#271); an outside webhook not yet tried (do it once deployed).
-7. **Next: K13 admin & phone** (admin panel for users/roles/accounts/per-user limits, phone screens for watch/positions/cancel/close/STOP, keyboard shortcut editor, dark/light and colour-blind-safe themes). Create its issues first (milestone K13, label `track: kite`). See `docs/design/product-vision.md`.
+7. **K13 admin & phone** (issues #281–#285, label `track: kite`):
+   - #281 K13.1 admin API (users, roles, accounts, per-account limits): **done** on branch `k13-1-admin-api` (PR "Closes #281"; merge on green CI if still open). See `docs/design/admin.md`.
+   - #282 K13.2 admin panel screen: **next**. It includes the first-login password change screen; the API answers 403 "set a new password first" until then. Its form is drawn from `GET /api/admin/limits/spec`, which adds the kinds `money`, `choices` and `instruments` that `ParamInput` doesn't draw yet. Ask twice before a change marked `looser`.
+   - #283 K13.3 phone screens (watch, positions, cancel, close, STOP; no new trades, refused on the server).
+   - #284 K13.4 keyboard shortcut editor.
+   - #285 K13.5 themes (dark, light, colour-blind safe).
    **Then, in this order (issues Ayush added on 16 Oct from an outside review; no code was changed):**
    1. #240 core v1 completion gate: restart/reconnect drills, backup and restore, recordings with their instrument list, a live-session checklist, docs matching code.
    2. #257 post-core hardening gate: #258–#277 (positions, uncertain orders, exits, MTM, durability, session rollover, freshness, ownership, webhooks, backups, supervision, economics), suggested order in #257; plus the production security gate #279 and the discussion #278 (who pays for data, multi-user Kite).

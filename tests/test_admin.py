@@ -23,6 +23,7 @@ import pytest
 from test_server import FUT, ORDER, PASSWORD, World
 
 from mocktrade.algos.builtin import BUILTIN
+from mocktrade.algos.spec import check_params
 from mocktrade.broker.fake import FakeBroker
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_manage, can_trade
 from mocktrade.domain.instruments import Exchange, InstrumentKind
@@ -93,6 +94,14 @@ def test_round_trip_and_every_kind_of_refusal():
         assert limits is None and any(words in p for p in problems), (bad, problems)
 
 
+def test_lists_come_back_each_once_in_order():
+    clean, problems = check_params(LIMITS_SPEC, {"blocked_instruments": ["NSE:B", "NSE:A",
+                                                                         "NSE:A"]})  # fmt: skip
+    assert problems == [] and clean["blocked_instruments"] == ["NSE:A", "NSE:B"]
+    many = [f"NSE:S{n}" for n in range(200)] + ["NSE:S0"]  # 200 different, one twice
+    assert check_params(LIMITS_SPEC, {"blocked_instruments": many})[1] == []
+
+
 def test_saved_limits_from_another_version_never_stop_an_account():
     assert stored_limits(None) == RiskLimits()
     got = stored_limits({"max_order_lots": 4, "gone_limit": 1, "max_open_orders": 0})
@@ -128,7 +137,10 @@ def test_what_a_tighter_limit_means_for_what_is_open():
     tight = replace(RiskLimits(), max_position_lots=2, max_open_orders=1,
                     max_daily_loss_paise=5_000_00,
                     blocked_instruments=frozenset({"NSE:YESBANK"}))  # fmt: skip
-    said = warnings(tight, positions={FUT: (-225, 75), "NSE:YESBANK": (10, 1), "NSE:A": (0, 1)},
+    held = {FUT: (-225, 75), "NSE:YESBANK": (10, 1), "NSE:A": (0, 1)}
+    flat = replace(tight, blocked_instruments=frozenset({"NSE:YESBANK", "NSE:A"}))
+    assert warnings(flat, positions={"NSE:A": (0, 1)}, working_orders=0, day_pnl_paise=0) == []
+    said = warnings(tight, positions=held,
                     working_orders=3, day_pnl_paise=-6_000_00)  # fmt: skip
     assert said == [
         f"{FUT}: 3 lots held, above the new 2-lot limit: only orders that reduce it will pass",
@@ -141,6 +153,8 @@ def test_what_a_tighter_limit_means_for_what_is_open():
     ]
     exactly = warnings(tight, positions={FUT: (150, 75)}, working_orders=1, day_pnl_paise=-1)
     assert exactly == []  # at the limit is within it
+    at_loss = warnings(tight, positions={}, working_orders=0, day_pnl_paise=-5_000_00)
+    assert len(at_loss) == 1 and "already beyond" in at_loss[0]  # a loss AT the limit stops
 
 
 # --- the account at work ----------------------------------------------------------------------
@@ -176,14 +190,25 @@ def request(side, qty, account="acc-ayush", cid="A1"):
 
 async def test_a_turned_off_account_takes_only_closing_trades(world):
     running = world.platform.account("acc-ayush")
+    running.apply_limits(replace(RiskLimits(), max_order_value_paise=10**12))  # sizes only
     running.positions.apply_fill(FUT, Product.NRML, Side.BUY, 150, 2501000)  # long 2 lots
     running.set_active(False)
     refused = await running.risk.admit_new(request(Side.BUY, 75))
     assert refused == ("the account is turned off by an admin: only closing trades are allowed")
     assert await running.risk.admit_new(request(Side.SELL, 150)) is None  # closes it all
     assert "turned off" in await running.risk.admit_new(request(Side.SELL, 225))  # flips short
+    working = await running.orders.submit(request(Side.SELL, 75, cid="S1"))  # reduces
+    view = running.orders.get("S1") or working
+    grown = await running.risk.admit_modify(view, replace(view.request, qty=225))
+    assert grown and "turned off" in grown  # growing it past the position: refused
+    assert await running.risk.admit_modify(view, replace(view.request, qty=150)) is None
     running.set_active(True)
     assert await running.risk.admit_new(request(Side.BUY, 75)) is None
+    stored_off = world.platform.add_account(
+        BrokerAccount("acc-off", "paper", "P3", "ayush", active=False), FakeBroker(),
+        ids=ClientIds("OF"), clock=world.clock,
+    )  # fmt: skip
+    assert "turned off" in await stored_off.risk.admit_new(request(Side.BUY, 75, "acc-off"))
 
 
 async def test_new_limits_reach_everything_that_copied_one(world):
