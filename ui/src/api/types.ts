@@ -551,3 +551,77 @@ export interface SquareOffStatus {
   window_open: boolean;
   positions: { instrument_id: string; qty: number; cutoff: string | null; minutes_left: number | null; pnl_paise: number }[];
 }
+
+// --- research (K11): recordings and backtests ---------------------------------------------------
+
+export interface RecordedDay {
+  day: string;
+  ticks: number;
+  bytes: number;
+  segments: Record<string, number>; // segment -> bytes on disk
+  instruments: number;
+}
+
+export interface Recordings {
+  keep_days: number;
+  days: RecordedDay[]; // newest first
+}
+
+export interface RecordedDayDetail extends Omit<RecordedDay, "instruments"> {
+  instruments: Record<string, number>; // instrument -> ticks
+}
+
+/** What the backtest form offers, from the server (GET /api/research/backtests/form). */
+export interface BacktestForm {
+  algos: AlgoSpec[];
+  days: string[]; // recorded days, newest first
+  products: string[];
+  candles: boolean; // candle-based runs are possible on this server
+  candle_days?: string[]; // for the instrument asked about
+  defaults: { product: string; start: string; capital_paise: number };
+  max_days: number;
+}
+
+export interface BacktestSpecView {
+  days: string[];
+  algo: string;
+  instrument_id: string;
+  side: Side;
+  qty: number;
+  params: Record<string, unknown>;
+  product: string;
+  start: string;
+  capital_paise: number;
+  name: string;
+}
+
+export interface BacktestSummary {
+  days_run: number;
+  days_skipped: string[];
+  gross_paise: number;
+  charges_paise: number;
+  net_paise: number;
+  max_drawdown_paise: number;
+  winning_days: number;
+  win_rate: number | null;
+  trades: number;
+  equity_curve: [string, number][]; // (day, cumulative net)
+}
+
+/** A day of a run: the K10.3 report plus its intraday curve, or why it was skipped. */
+export type BacktestDay = (DayReport & { equity_curve: [string, number][]; algo_started: boolean }) | { day: string; skipped: string };
+
+export type BacktestState = "queued" | "running" | "done" | "failed";
+
+export interface BacktestRun {
+  run_id: string;
+  spec: BacktestSpecView;
+  candle_based: boolean;
+  state: BacktestState;
+  progress: number; // days done
+  days: number;
+  error: string;
+  created_at: string;
+  summary?: BacktestSummary;
+  daily?: BacktestDay[]; // only when one run is asked for
+}

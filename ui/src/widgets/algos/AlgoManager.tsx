@@ -432,7 +432,7 @@ export function StartForm({ accountId, specs, defaultInstrument, defaultSide = "
 const UNITS: Record<string, string> = { seconds: "s", minutes: "min", percent: "%", ticks: "ticks" };
 
 /** One parameter's input, chosen by its kind. An unknown kind gets a plain text box. */
-function ParamInput({ param: p, value, onChange }: { param: AlgoParamSpec; value: string | boolean | undefined; onChange: (v: string | boolean) => void }) {
+export function ParamInput({ param: p, value, onChange }: { param: AlgoParamSpec; value: string | boolean | undefined; onChange: (v: string | boolean) => void }) {
   const label = (
     <span>
       {p.label}
