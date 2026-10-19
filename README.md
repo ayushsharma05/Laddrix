@@ -1,31 +1,136 @@
+<div align="center">
+
 # MockTrade
 
-**New here? Start with [the guide](docs/guide/README.md):** the whole project from zero, in plain words, with pictures and flowcharts (one-page summary: [docs/GUIDE.md](docs/GUIDE.md)).
+**A professional trading terminal and order-management platform for Indian markets (NSE, BSE, F&O)**
+Live market data, a price ladder, algos, options, risk controls, and a paper broker that fills
+against live prices. Built on Zerodha Kite Connect, behind a broker-agnostic core.
 
-A multi-user, broker-agnostic trading platform for NSE and BSE, designed the way a professional trading-platform team would build it: a price ladder, order blotter, positions and P&L, audit trail and parent/child algo management, with a paper broker that fills against live prices.
+[![CI](https://github.com/ayushsharma05/MockTrade/actions/workflows/ci.yml/badge.svg)](https://github.com/ayushsharma05/MockTrade/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)
+![Tests](https://img.shields.io/badge/tests-1%2C650%2B-brightgreen)
+![Docker](https://img.shields.io/badge/deploy-Docker%20%2B%20Caddy-2496ED?logo=docker&logoColor=white)
 
-The first broker is **Zerodha Kite Connect**. Every broker plugs in behind one adapter interface, so others (or direct exchange access) can be added without changing the core.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
+  <img alt="The MockTrade terminal: watchlist, two price ladders, order ticket, order book, positions and a live audit trail" src="docs/images/hero-light.png">
+</picture>
 
-- **Architecture:** [docs/design/kite-architecture.md](docs/design/kite-architecture.md) and the one-chart in [context/one-chart/](context/one-chart/)
-- **Plan:** GitHub issues with the `track: kite` label, milestones K0 to K7
+<sub>The terminal running on the demo: a watchlist, two live depth ladders, an order ticket with margin and charges,
+the order book, positions with P&L, and the audit trail, all streaming in real time.</sub>
 
-## Run the tests
+</div>
+
+---
+
+## What it is
+
+MockTrade is a full trading stack for a single desk:
+- **A Python server** that holds the order manager, the risk engine, positions and P&L, an algo
+  engine, and an append-only audit log.
+- **A React terminal** of dockable widgets that stream from it.
+
+It trades through **Zerodha Kite Connect** (REST for orders, WebSocket for ticks) or a
+**paper broker** that simulates fills, queue position and latency against live prices. Every
+external dependency (broker, market data, charges, storage) sits behind a small interface, so
+each can be replaced without touching the core.
+
+Its design rule is **"the backend provides, the frontend displays"**. The server publishes what
+is allowed for each instrument: order types, lot and tick sizes, cut-off times, and why an order
+was refused. The UI hard-codes no market rules.
+
+## Highlights
+
+| | |
+| --- | --- |
+| **Trading terminal** | Dockable widgets (dockview) with linked colour groups and pop-out windows (Electron): a depth ladder with volume at price, an order ticket, a watchlist, charts, time and sales, market movers, and light, dark and colour-blind-safe themes. |
+| **Order management** | A full order lifecycle with modify and cancel, partial fills, baskets, GTT triggers, and reconciliation against the broker's own book. |
+| **Risk engine** | Pre-trade checks (size, value, position, price bands, lot and tick, daily loss, open orders, double-click), margin, an 8-orders-per-second sliding-window throttle, firm- and account-level kill switches, and reduce-only exits. |
+| **Algos** | A parent/child algo engine: slicer, iceberg, TWAP/VWAP, POV, a two-leg spreader, and protection algos (trailing stop, OCO, bracket). |
+| **Options** | An option chain with Greeks, a multi-leg strategy builder with payoff charts, and basket orders. |
+| **Research** | Tick recording, replay of a recorded day as if live, and backtests that run the same engine, paper broker and risk checks. |
+| **Operations** | Crash recovery from the audit log, backups with checksums and verified restore, deploys gated to market hours with automatic rollback, plus operational alert bands and webhooks. |
+
+## Screens
+
+| Order book, positions, audit trail | Option chain with Greeks |
+| --- | --- |
+| ![Blotter](context/images/k5-5-screens.png) | ![Option chain](context/images/14-chain.png) |
+| **Strategy builder (payoff)** | **Algo manager** |
+| ![Strategy](context/images/15-strategy.png) | ![Algos](context/images/11-algos.png) |
+| **Order ticket** | **Kill switch: a report of exactly what STOP did, then Flatten** |
+| ![Ticket](context/images/k5-ticket.png) | ![STOP band](context/images/h-262-stop-band.png) |
+
+## Architecture
+
+![Architecture overview](context/images/kite-overview.png)
 
 ```
-python -m venv .venv
-.venv\Scripts\activate        # Windows (Mac/Linux: source .venv/bin/activate)
+ Kite WebSocket ─► decoder ─► MarketData ─┬─► paper broker (fills)  ─┐
+                                          ├─► algos, MTM limits       │
+                                          └─► stream ─► React UI      │
+ React UI ─REST─► API ─► OrderManager ─► gates: risk → margin → throttle ─► broker (Kite | paper)
+                              │                                             │
+                              ◄──────────── order updates / fills ──────────┘
+                              └─► positions & P&L · charges · audit log (SQLite) · stream
+```
+
+- **The order manager** owns every order's lifecycle. It never re-sends an order whose fate is
+  unknown: an unanswered order stays UNCONFIRMED until the broker's own order list settles it.
+- **The risk gates** turn every refusal into a plain-English reason that the screens show
+  verbatim.
+- **Crash safety:** state is rebuilt from the audit log and the broker on start, and trading
+  stays shut until positions reconcile.
+- **Safe exits:** every forced close goes through one "exit desk". It stops the algos on that
+  position, cancels resting closing orders, and sends only reduce-only orders, so overlapping
+  exits can never reverse a position.
+
+More: [architecture](docs/design/kite-architecture.md) · [domain model](docs/design/domain-model.md) ·
+[order life](docs/design/order-life.md) · [all design docs](docs/design/README.md)
+
+## Engineering
+
+| | |
+| --- | --- |
+| **Size** | ~23k lines of Python and ~14k lines of TypeScript, plus ~24k lines of tests |
+| **Tests** | 1,250+ pytest and 400 vitest tests, run in CI on every pull request |
+| **Mutation testing** | 44 scripts that inject deliberate bugs into safety rules and check that a test catches each one |
+| **Real-browser checks** | Playwright runs against the live demo, with the results kept as evidence |
+| **Drills** | Crash-and-restart, backup-and-restore and deploy-and-rollback, each rehearsed for real |
+| **Process** | Every change goes issue → branch → pull request (`Closes #N`) → green CI → merge |
+
+## Quick start (demo: no broker account needed)
+
+```bash
 pip install -r requirements-dev.txt
-ruff check .
-pytest
+cd ui && npm install && npm run build && cd ..
+python -m mocktrade.tools.demo --ui ui/dist      # http://localhost:8000
+python -m mocktrade.tools.demo --code            # the login code (user demo / demo-password-123)
 ```
 
-## Code layout
+**Tests:** `pytest` and `cd ui && npx vitest run`.
 
-```
-src/mocktrade/
-  domain/   shared types: money in paise, instruments, users and accounts, orders
-  broker/   the broker interface and its adapters (fake, paper, kite)
-tests/      one test file per module
-```
+## Documentation
 
-More packages (market data, order manager, risk, positions, algos, server) arrive milestone by milestone.
+- **[The guide](docs/guide/README.md):** the whole system from first principles, with diagrams, in nine chapters.
+- **[Reading order](docs/guide/reading-order.md):** every source file, in the order to read it.
+- **[Design docs](docs/design/README.md)** · **[Runbooks](docs/runbooks/README.md)** (morning routine, incidents, release, go-live) · **[Changelog](CHANGELOG.md)**
+
+## How it was built
+
+MockTrade is my project. I defined the product, the requirements and the safety rules (Kite's
+limits and SEBI's rules for algorithmic trading), set the priorities, and reviewed and accepted
+each milestone. The implementation was written with AI pair-programming (Claude Code),
+working issue by issue under that direction. The design notes, decision log and every pull
+request are in the repo.
+
+## Status
+
+- **Version:** `1.0.0-rc.1`. Paper trading is complete.
+- **Hardening:** a production-hardening pass is in progress (issue #257).
+- **Live trading:** it goes live only after a manual go-live checklist
+  ([docs/runbooks/go-live.md](docs/runbooks/go-live.md)).
+
+<sub>Not affiliated with Zerodha. Market rules (lot sizes, cut-off times, SEBI requirements) change, so re-check them before trading real money.</sub>
