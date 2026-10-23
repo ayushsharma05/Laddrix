@@ -352,3 +352,16 @@ async def test_a_restored_server_never_sends_an_order_twice(tmp_path, nifty_fut)
         assert later.client_order_id != sent.client_order_id  # ids go on from the backup
     finally:
         await log.aclose()
+
+
+def test_a_running_servers_lock_isnt_state(tmp_path):
+    """The data folder's owner lock (#273) is the running server's, not state: no INCOMPLETE."""
+    from mocktrade.ops.fence import DataFence
+
+    a_server(tmp_path / "data")
+    fence = DataFence(tmp_path / "data")
+    fence.acquire()
+    try:
+        assert main(["--data", str(tmp_path / "data"), "--to", str(tmp_path / "b")]) == 0
+    finally:
+        fence.release()

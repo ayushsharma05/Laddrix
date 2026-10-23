@@ -363,3 +363,21 @@ tests/           one test file per module
 - SEBI/NSE retail algo framework: https://zerodha.com/z-connect/general/a-comprehensive-overview-of-nses-circular-on-the-new-retail-algo-trading-framework and https://inthemoneybyzerodha.substack.com/p/sebi-algo-trading-changes-april-2026
 - SDK byte order (big-endian) and divisors: `kiteconnect` 5.2.2, `ticker.py`
 - Lightsail pricing: https://aws.amazon.com/lightsail/pricing
+
+## Watched loops and one owner (#273)
+
+- **Every background loop is watched** (`ops/supervisor.py`). A crash is said and the loop
+  restarted, with a pause that grows. After 5 failures in 5 minutes it is quarantined.
+- **A critical loop that is down pauses its account's new orders** (`PauseGate`). Cancels
+  still go. The critical loops are an account's broker updates, recovery, GTTs, reconciling
+  and algos, plus marking positions to prices.
+- **Liveness and readiness are separate.** `GET /api/health` says the process answers.
+  `GET /api/ready` says it can trade: critical loops running, the supervisor's watchdog
+  ticking, and every account recovered.
+- **One server per data folder** (`ops/fence.py`): an exclusive OS lock, held for the
+  process's life. A second server refuses to start. A dead one frees it at once; a hung one
+  keeps it, so nothing takes over from a server that could wake up and send.
+- **Shutdown** stops the loops, flushes the audit trail, closes the brokers and only then lets
+  go of the lock.
+- This fences **one machine**, which is how MockTrade is deployed: one server, behind the
+  static IP the broker accepts orders from.
