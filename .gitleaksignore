@@ -1,0 +1,5 @@
+# Findings checked by hand and accepted (#365). One per line: the fingerprint gitleaks prints.
+# Each one is a made-up value in a test, never a real credential.
+# Admin.test.tsx: fake one-time passwords returned by the scripted test server
+defd0a6dfba82a08b081fb7635e469d0703c624f:ui/src/widgets/admin/Admin.test.tsx:generic-api-key:44
+defd0a6dfba82a08b081fb7635e469d0703c624f:ui/src/widgets/admin/Admin.test.tsx:generic-api-key:56

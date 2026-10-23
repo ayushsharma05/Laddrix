@@ -16,9 +16,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md requirements.lock ./
 COPY src ./src
-RUN pip install . \
+# exactly the reviewed versions, each checked against its hash (#365); then our own code
+RUN pip install --require-hashes -r requirements.lock \
+    && pip install --no-deps . \
     && useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin mocktrade \
     && mkdir /data && chown mocktrade /data
 COPY --from=screens /ui/dist ./ui/dist

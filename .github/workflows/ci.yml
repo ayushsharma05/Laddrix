@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"] # a release: its SBOMs are kept with the run (docs/runbooks/release.md)
   pull_request:
 
 jobs:
@@ -13,6 +14,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - run: pip install --require-hashes -r requirements.lock # what the image ships (#365)
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: ruff format --check .
@@ -68,3 +70,40 @@ jobs:
           docker compose -f deploy/compose.yaml config --quiet
       - name: image starts locked down, answers, and stops cleanly
         run: deploy/smoke.sh mocktrade:ci
+
+  supply-chain:
+    # #365: known vulnerabilities in what we ship, secrets in the history, and the SBOMs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the whole history: a secret removed later is still leaked
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - run: pip install pip-audit==2.10.1 cyclonedx-bom==7.5.0
+      - name: Python dependencies have no known vulnerability
+        run: pip-audit -r requirements.lock --no-deps --disable-pip --strict
+      - name: no secret anywhere in the history
+        env:
+          GITLEAKS: "8.21.2"
+          GITLEAKS_SHA256: 5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba
+        run: |
+          curl -sSfL -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS}/gitleaks_${GITLEAKS}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum --check
+          tar xzf gitleaks.tgz gitleaks
+          ./gitleaks git --redact --no-banner .
+      - name: SBOMs (CycloneDX) of the server, the screens and the desktop app
+        run: |
+          mkdir sbom
+          cyclonedx-py requirements requirements.lock --output-format JSON -o sbom/mocktrade-server.cdx.json
+          (cd ui && npm ci --no-audit --no-fund && npm sbom --sbom-format cyclonedx --omit dev) > sbom/mocktrade-screens.cdx.json
+          # all of it: Electron (a dev dependency to npm) is inside the installer
+          (cd ui/desktop && npm ci --no-audit --no-fund && npm sbom --sbom-format cyclonedx) > sbom/mocktrade-desktop.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.ref_name }}
+          path: sbom/

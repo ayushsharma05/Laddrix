@@ -1,0 +1,19 @@
+# Weekly update proposals for everything we depend on (#365, docs/runbooks/patching.md).
+# Security fixes arrive as soon as they are published, whatever the schedule.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule: { interval: weekly }
+  - package-ecosystem: npm
+    directory: "/ui"
+    schedule: { interval: weekly }
+  - package-ecosystem: npm
+    directory: "/ui/desktop"
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: "/"
+    schedule: { interval: weekly }

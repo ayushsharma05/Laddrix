@@ -73,7 +73,7 @@ the control.
 | 7 | Secrets leaked via the screens, git or HTTP paths | screens and desktop sources scanned; `.env`, keys, tokens and databases never tracked; probes of 24 private paths (incl. path tricks) never serve a planted secret | `test_security_surface.py` (**new**), #269 |
 | 8 | SSRF via webhooks | https only, private addresses refused | #271, `test_alerts*.py` |
 | 9 | Key or credential compromised | `users revoke-sessions` (open screens close within 2 s), `users rotate-key` (refused while the server runs; all or nothing), backups hold no session, the playbook in `incidents.md` ("A credential is stolen") | `test_key_rotation.py`; the drill on the demo, 15/15 (`context/evidence/h-364-credential-drill.txt`) |
-| 10 | Dependency or update compromised | `npm audit` in CI | Python audit, SBOM, pins, signing: **#365** |
+| 10 | Dependency or update compromised | `npm audit` and `pip-audit` (on the lock) in CI; Python pinned by hash (`requirements.lock`, the image installs `--require-hashes`), npm by `package-lock.json`; Dependabot; gitleaks over the whole history; CycloneDX SBOMs at each release; patch times in `patching.md`; the desktop app has no update path until it is signed (#365) | `test_supply_chain.py`; the **supply-chain** CI job |
 | 11 | Logs leak secrets; retention | secrets kept out of backups | redaction tests, retention policy: **#367** |
 | 12 | Storage, audit or feed outage | orders refused unless on disk first (#265); stale prices refuse risk-adding orders (#267); critical loops watched, new orders pause, cancels go (#273); STOP + Flatten work through it (#262) | those PRs' tests |
 
@@ -94,7 +94,7 @@ This is not certification: it only shows where each requirement area stands.
 | V10 Malicious code | no user code runs on the server (algos are built-in, declarative settings) |
 | V12 Files | path traversal fixed (#269); request and upload size limits: #274 |
 | V13 API | CSRF by Origin + SameSite; no docs pages exposed |
-| V14 Configuration | `.env` outside git; settings checked at start; supply chain: #365 |
+| V14 Configuration | `.env` outside git; settings checked at start; dependencies pinned by hash, audited and listed (SBOM) at each release (#365) |
 
 ## 6. Before a public real-money launch
 
