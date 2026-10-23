@@ -444,3 +444,15 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Positions:** carried at the last price with today's totals at zero, keeping their original average (`carried_avg_paise`, also seeded by recovery); flat rows and delivery buys drop out.
     - **Charges** are worked out again, and an audit note (SESSION_ROLLED) is written.
   - **Checks:** 8 tests, including a two-day run and the daily loss limit on day 2; mutation 10/10.
+- 23 Oct, **#290 done** (F&O expiry day).
+  - **Defects confirmed:** nothing knew that a contract ends. An expired future or option stayed in search, took orders (the exchange refuses them), and its position was carried into the next day at its last price instead of being settled, so paper and live would disagree and reconciling would stop trading. The demo's contracts were fixed to 27 Oct 2026, so the demo (and 13 test files on the real clock) would have broken after that date.
+  - **The fix:**
+    - **`refdata/expiry.py`:** one place for the facts: expires at 15:30 India time on its date; cash (index) or delivery (stock F&O); "expires today"; a broker's cut-off as a setting (`ExpiryRules`, off by default); one sentence for the screens; the final settlement price (a future's last price; an option's in-the-money amount, never below 0).
+    - **Risk gate:** an expired contract takes no order at all, not even a close; after a cut-off only closing trades (and only orders that add risk are judged).
+    - **Settlement:** the 08:45 new-day roll first settles positions in contracts that ended (our book and the paper broker), so the result belongs to expiry day; noted as EXPIRY_SETTLED, which recovery re-applies; a restart after the server was off over expiry settles them itself.
+    - **Search, chain, watch list** drop expired contracts; charts and recordings still find them by id.
+    - **Screens** show the server's sentence: a warning line on the ticket, the ladder and the chain; an "EXP" tag before the name in Positions and the watch list (the first try put the tag after the name, and narrow columns cut it off: caught in the browser check).
+    - **The demo's contracts roll with the calendar** (near and next monthly expiry, the last Tuesday); `MOCKTRADE_SIM_NEAR_EXPIRY` sets an expiry day to try.
+    - **Tests not about expiry** see expiry as on 16 Oct 2026 (`tests/conftest.py`), so they don't break when the test contracts' date passes.
+  - **Decided:** paper settles stock F&O in cash and says so (delivery of shares is not simulated yet); broker cut-offs are settings, not guesses, because they differ by broker and change. Rules checked 23 Oct 2026 with sources in `docs/design/expiry.md`.
+  - **Checks:** 15 new tests plus an API test, 2 ticket and 3 watch-list tests; mutation 18/18; a real demo whose near contracts expired at 15:30 on 23 Oct, checked before and after (`context/evidence/h-290-*.txt`, `context/images/h-290-expires-today.png`).

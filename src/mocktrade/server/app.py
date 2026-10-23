@@ -59,6 +59,7 @@ from mocktrade.orders.gtt import GttError, gtt_request_from
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.portfolio.service import PortfolioError, snapshot_to_dict
+from mocktrade.refdata.expiry import Expiries, expiry_to_dict
 from mocktrade.reports.export import report_csv, report_pdf
 from mocktrade.reports.service import ReportError, Reports
 from mocktrade.research.backtest import (
@@ -1154,7 +1155,9 @@ def create_app(
     @app.get("/api/instruments")
     async def search_instruments(user: Me, q: str = "", limit: int = 20) -> list[dict[str, Any]]:
         limit = max(1, min(limit, 50))
-        return [_instrument(i) for i in platform.instruments.search(q, limit)]
+        live = platform.expiries
+        found = platform.instruments.search(q, limit, keep=lambda i: not live.expired(i))
+        return [_instrument(i, live) for i in found]  # expired contracts don't come up (#290)
 
     @app.get("/api/instruments/{instrument_id}")
     async def get_instrument(instrument_id: str, user: Me) -> dict[str, Any]:
@@ -1162,7 +1165,8 @@ def create_app(
         if instrument is None:
             raise HTTPException(404, "no such instrument")
         tick = platform.market_data.latest(instrument_id)
-        return {**_instrument(instrument), "ltp_paise": tick.ltp_paise if tick else None}
+        found = _instrument(instrument, platform.expiries)
+        return {**found, "ltp_paise": tick.ltp_paise if tick else None}
 
     @app.get("/api/instruments/{instrument_id}/vap")
     async def get_vap(instrument_id: str, user: Me) -> dict[str, Any]:
@@ -1200,7 +1204,8 @@ def create_app(
         instrument = platform.instruments.get(instrument_id)
         if instrument is None:
             raise HTTPException(404, "no such instrument")
-        return spec_to_dict(spec_of(running.broker)(instrument))
+        expiry = expiry_to_dict(platform.expiries.info(instrument))  # warnings, cut-off (#290)
+        return {**spec_to_dict(spec_of(running.broker)(instrument)), "expiry": expiry}
 
     @app.get("/api/layouts")
     async def list_layouts(user: Me) -> list[dict[str, str]]:
@@ -1533,7 +1538,8 @@ def _headers(response: Response) -> Response:
     return response
 
 
-def _instrument(i: Instrument) -> dict[str, Any]:
+def _instrument(i: Instrument, expiries: Expiries | None = None) -> dict[str, Any]:
+    """An instrument as JSON; with `expiries`, its expiry facts now as well (#290)."""
     return {
         "id": i.id,
         "exchange": i.exchange.value,
@@ -1545,6 +1551,7 @@ def _instrument(i: Instrument) -> dict[str, Any]:
         "strike_paise": i.strike_paise,
         "underlying": i.underlying,
         "tradable": i.tradable,
+        "expiry_info": expiry_to_dict(expiries.info(i)) if expiries else None,
     }
 
 

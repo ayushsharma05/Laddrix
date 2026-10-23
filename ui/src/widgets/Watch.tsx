@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useInstrument, useTick } from "../app/context";
+import { ExpiryBadge } from "../components/ExpiryBadge";
 import { SearchBox } from "../components/SearchBox";
 import { change, changePct, price, shortName, shortVolume } from "../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../workspace/registry";
@@ -24,6 +25,12 @@ export function Watch({ params, setParams, publish, open }: WidgetProps<WatchPar
     publish(id);
   };
   const remove = (id: string) => setParams({ items: items.filter((i) => i !== id) });
+  // expired contracts leave the list (#290); several can end at once, so all go together
+  const ended = useRef(new Set<string>());
+  const expire = (id: string) => {
+    ended.current.add(id);
+    setParams({ items: items.filter((i) => !ended.current.has(i)) });
+  };
 
   return (
     <div className="watch" tabIndex={0} onKeyDown={(e) => {
@@ -53,6 +60,7 @@ export function Watch({ params, setParams, publish, open }: WidgetProps<WatchPar
             onSelect={() => select(id)}
             onOpen={() => open("ladder", { instrumentId: id, link: "none" })}
             onRemove={() => remove(id)}
+            onExpired={() => expire(id)}
           />
         ))}
       </div>
@@ -74,9 +82,10 @@ interface RowProps {
   onSelect: () => void;
   onOpen: () => void;
   onRemove: () => void;
+  onExpired?: () => void; // the server says the contract has ended (#290)
 }
 
-export function WatchRow({ id, selected, onSelect, onOpen, onRemove }: RowProps) {
+export function WatchRow({ id, selected, onSelect, onOpen, onRemove, onExpired }: RowProps) {
   const tick = useTick(id);
   const instrument = useInstrument(id);
   const flash = useFlash(tick?.ltp_paise);
@@ -84,6 +93,10 @@ export function WatchRow({ id, selected, onSelect, onOpen, onRemove }: RowProps)
   const up = tick && close != null ? tick.ltp_paise >= close : null;
   const bid = tick?.bids[0];
   const ask = tick?.asks[0];
+  const expired = instrument?.expiry_info?.expired === true;
+  useEffect(() => {
+    if (expired) onExpired?.(); // once, when the server says it has ended
+  }, [expired]); // eslint-disable-line react-hooks/exhaustive-deps -- once per change
   return (
     <div
       className={`watch-row row${selected ? " selected" : ""}`}
@@ -93,7 +106,10 @@ export function WatchRow({ id, selected, onSelect, onOpen, onRemove }: RowProps)
       onDoubleClick={onOpen}
       title={instrument ? `${instrument.exchange}:${instrument.symbol} · lot ${instrument.lot_size} · tick ${price(instrument.tick_paise)}` : id}
     >
-      <span className="name">{instrument?.symbol ?? shortName(id)}</span>
+      <span className="name">
+        <ExpiryBadge info={instrument?.expiry_info} compact />
+        {instrument?.symbol ?? shortName(id)}
+      </span>
       <span className={`num ltp ${flash}`}>{tick ? price(tick.ltp_paise) : "–"}</span>
       <span className={`num ${up === null ? "" : up ? "good" : "bad"}`}>{tick ? change(tick.ltp_paise, close) : ""}</span>
       <span className={`num ${up === null ? "" : up ? "good" : "bad"}`}>{tick ? changePct(tick.ltp_paise, close) : ""}</span>

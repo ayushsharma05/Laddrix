@@ -27,6 +27,7 @@ from mocktrade.charges.schedules import KITE_STANDARD
 from mocktrade.charges.service import ChargesService
 from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.domain.instruments import Instrument
+from mocktrade.domain.money import format_rupees
 from mocktrade.domain.order_spec import OrderSpec
 from mocktrade.domain.orders import Product
 from mocktrade.domain.ticks import Tick
@@ -40,6 +41,7 @@ from mocktrade.portfolio.service import PortfolioService
 from mocktrade.positions.book import PositionBook
 from mocktrade.positions.reconcile import PositionReconciler
 from mocktrade.recovery import IST, RecoveryGate, recover, recover_until_done, session_start
+from mocktrade.refdata.expiry import Expiries, ExpiryRules
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.risk.checks import RiskGate
 from mocktrade.risk.closing import ExitDesk, position_of
@@ -136,10 +138,13 @@ class Platform:
     # every order on disk before the broker sees it (#265); off only for backtests, which
     # replay a day faster than real time and never send a real order
     durable_orders: bool = True
+    expiry_rules: ExpiryRules = field(default_factory=ExpiryRules)  # broker cut-offs (#290)
+    expiries: Expiries = field(init=False, repr=False)
     _late: set[asyncio.Task] | None = field(default=None, init=False, repr=False)
     _reconcile: bool = field(default=True, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        self.expiries = Expiries(self.instruments, rules=self.expiry_rules)
         if self.event_log is not None:
             self.firm_switch.on_change(self.event_log.record_kill)
 
@@ -205,6 +210,16 @@ class Platform:
             tick = self.market_data.latest(instrument_id)
             return tick.close_paise if tick is not None else None
 
+        def expired(instrument_id: str) -> bool:  # before today (#290)
+            instrument = self.instruments.get(instrument_id)
+            today = runtime.positions._clock().astimezone(IST).date()
+            return instrument is not None and self.expiries.expired_by(today)(instrument)
+
+        def settlement(instrument_id: str) -> int | None:
+            instrument = self.instruments.get(instrument_id)
+            found = instrument and self.expiries.settlement_price(instrument, self.last_price)
+            return found if found is not None else close(instrument_id)
+
         def attempt():
             return recover(
                 account_id,
@@ -212,9 +227,11 @@ class Platform:
                 runtime.positions,
                 runtime.broker,
                 log,
-                since=session_start(datetime.now(UTC)),
+                since=session_start(runtime.positions._clock()),  # the account's clock
                 close=close,
                 latest=self.market_data.latest,
+                expired=expired,
+                settlement=settlement,
             )
 
         await recover_until_done(
@@ -250,17 +267,52 @@ class Platform:
             if runtime.session_day is not None and runtime.session_day >= today:
                 continue
             expired = runtime.orders.expire_day(session_start(at))
+            settled = self._settle_expired(account_id, runtime, today)
             carried = runtime.positions.roll()
             if runtime.charges is not None:
                 runtime.charges.refresh()
             runtime.session_day = today
             words = (f"new trading day {today.isoformat()}: {len(carried)} position(s) "
-                     f"carried at the last price, {len(expired)} day order(s) expired")  # fmt: skip
+                     f"carried at the last price, {len(expired)} day order(s) expired, "
+                     f"{len(settled)} expired contract(s) settled")  # fmt: skip
             done[account_id] = words
             log.info("%s: %s", account_id, words)
             if self.event_log is not None:
                 extra = {"day": today.isoformat(), "expired": expired}
                 self.event_log.record_note("SESSION_ROLLED", account_id, words, extra)
+        return done
+
+    def last_price(self, instrument_id: str) -> int | None:
+        tick = self.market_data.latest(instrument_id)
+        return tick.ltp_paise if tick is not None and tick.ltp_paise > 0 else None
+
+    def _settle_expired(self, account_id: str, runtime: AccountRuntime, today: date) -> list[str]:
+        """Positions in contracts that expired before `today` close at their final settlement
+        price (#290), in the platform's book and (paper) at the broker, before the day rolls:
+        the result belongs to the expiry day. A live broker settles them itself; reconciling
+        then finds both sides flat. Each is noted in the audit trail, which recovery reads."""
+        ended = self.expiries.expired_by(today)
+        done = []
+        for p in runtime.positions.positions():
+            instrument = self.instruments.get(p.instrument_id)
+            if not p.qty or instrument is None or not ended(instrument):
+                continue
+            price = self.expiries.settlement_price(instrument, self.last_price)
+            if price is None:
+                price = p.ltp_paise or round(p.avg_price_paise)
+            qty = runtime.positions.settle(p.instrument_id, p.product, price)
+            settle_at_broker = getattr(runtime.broker, "settle_expired", None)
+            if callable(settle_at_broker):
+                settle_at_broker(p.instrument_id, p.product, price)
+            how = "cash" if not self.expiries.physical(instrument) else "physical"
+            words = (f"{p.instrument_id} {p.product.value} {qty:+d} expired: settled at "
+                     f"{format_rupees(price)} ({how} settlement)")  # fmt: skip
+            done.append(words)
+            log.info("%s: %s", account_id, words)
+            if self.event_log is not None:
+                extra = {"instrument_id": p.instrument_id, "product": p.product.value,
+                         "qty": qty, "price_paise": price, "settlement": how}  # fmt: skip
+                self.event_log.record_note("EXPIRY_SETTLED", account_id, words, extra)
         return done
 
     def lost_protection(self, account_id: str) -> list[LostProtection]:
@@ -423,6 +475,7 @@ class Platform:
             positions=book.net_by_instrument,
             product_position=book.qty,
             price_age=self.market_data.age_s,  # per instrument: freshness (#267)
+            expiry=self.expiries.info,  # expired contracts, expiry-day cut-offs (#290)
         )
         throttle = throttle or OrderThrottle()
         recovery = RecoveryGate() if recover_on_start else None

@@ -13,7 +13,8 @@
 
 import { useMemo } from "react";
 import type { Position } from "../../api/types";
-import { useNow, useStore } from "../../app/context";
+import { useInstrument, useNow, useStore } from "../../app/context";
+import { ExpiryBadge } from "../../components/ExpiryBadge";
 import { price, qty, shortName } from "../../lib/format";
 import { alertFor } from "../../state/store";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
@@ -82,6 +83,7 @@ export function Positions({ publish, open }: WidgetProps) {
                 onDoubleClick={() => open("ladder", { instrumentId: p.instrument_id, link: "none" })}
               >
                 <span>
+                  <PositionExpiry id={p.instrument_id} />
                   {shortName(p.instrument_id)}
                   {alert ? <b className="bad"> · broker {qty(alert.broker)}</b> : null}
                 </span>
@@ -129,3 +131,9 @@ registerWidget<BaseParams>({
   defaults: () => ({ link: "pink" }),
   link: "drives",
 });
+
+/** "EXP TODAY" next to a position whose contract ends today (#290). */
+function PositionExpiry({ id }: { id: string }) {
+  const instrument = useInstrument(id);
+  return <ExpiryBadge info={instrument?.expiry_info} compact />;
+}

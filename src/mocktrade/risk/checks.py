@@ -22,6 +22,7 @@ from mocktrade.domain.money import format_rupees
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
 from mocktrade.domain.ticks import Tick
 from mocktrade.orders.model import OrderView
+from mocktrade.refdata.expiry import ExpiryInfo
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.risk.limits import PRODUCTS_FOR_KIND, RiskLimits
 
@@ -51,7 +52,9 @@ class RiskGate:
         product_position: Callable[[str, Product], int] | None = None,  # one product's qty
         price_age: Callable[[str], float | None] = lambda _i: None,  # s since its last tick
         max_price_age_s: float = MAX_PRICE_AGE_S,
+        expiry: Callable[[Instrument, datetime], ExpiryInfo | None] = lambda _i, _n: None,
     ) -> None:
+        self._expiry = expiry  # a contract's expiry facts at a moment (#290)
         self._price_age = price_age
         self.max_price_age_s = max_price_age_s
         self.limits = limits  # replaced whole by an admin's edit; read fresh on every order
@@ -78,6 +81,7 @@ class RiskGate:
         reason = (
             self._kill_problem(request)
             or self._off_problem(request, request.qty, others)
+            or self._expiry_problem(instrument, request, request.qty, others)
             or self._instrument_problem(instrument, request, others)
             or self._product_problem(instrument, request)
             or self._size_problem(instrument, request.qty)
@@ -129,6 +133,7 @@ class RiskGate:
         grows = new.qty > order.request.qty
         return (
             self._kill_problem()
+            or self._expiry_problem(instrument, new, leaves, others, grows=grows)
             or self._size_problem(instrument, new.qty)
             or self._price_problem(instrument, new, tick)
             or self._value_problem(instrument, new, new.qty, tick)
@@ -323,6 +328,24 @@ class RiskGate:
             f"daily loss limit reached ({format_rupees(-pnl)} lost, limit "
             f"{format_rupees(self.limits.max_daily_loss_paise)}): only closing trades are allowed"
         )
+
+    def _expiry_problem(self, instrument: Instrument, request: OrderRequest, leaves: int,
+                        others, *, grows: bool = True) -> str | None:  # fmt: skip
+        """A contract that has expired can't be traded at all, not even to close: the
+        exchange has settled it (#290). After the broker's cut-off on its expiry day, only
+        closing trades go."""
+        info = self._expiry(instrument, self._clock())
+        if info is None:
+            return None
+        if info.expired:
+            return f"{info.note}; its position settles at the final settlement price"
+        if not info.opening_closed or not grows:
+            return None
+        if request.reduce_only or self._closes(request, leaves, others):
+            return None
+        cutoff = info.opening_cutoff.strftime("%H:%M") if info.opening_cutoff else ""
+        return (f"{instrument.symbol} expires today: from {cutoff} only closing trades are "
+                f"allowed ({info.settlement} settlement)")  # fmt: skip
 
     def _stale_problem(self, instrument: Instrument, request: OrderRequest, leaves: int,
                        others) -> str | None:  # fmt: skip

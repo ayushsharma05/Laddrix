@@ -186,6 +186,23 @@ class PositionBook:
         )
         self._ltp.setdefault(instrument_id, reference_paise)
 
+    def settle(self, instrument_id: InstrumentId, product: Product, price: int) -> int:
+        """Close a position at its final settlement price (a contract's expiry, #290). The
+        price may be zero (an option that ends worthless), which no fill can be. The
+        difference is realised as the trade that closes it would be. Returns the quantity
+        settled (+ long, - short; 0: nothing open)."""
+        position = self._positions.get((instrument_id, product))
+        if position is None or not position.qty:
+            return 0
+        if price < 0:
+            raise ValueError(f"a settlement price can't be negative, got {price}")
+        qty = position.qty
+        position.apply(Side.SELL if qty > 0 else Side.BUY, abs(qty), price)
+        position.updated_at = self._clock()
+        self._ltp[instrument_id] = price
+        self._notify(instrument_id, product)
+        return qty
+
     def roll(self) -> list[Key]:
         """Start a new trading day without a restart (#266): each open position carries over
         at the last price seen, with today's realised P&L and buy/sell totals at zero.

@@ -16,6 +16,7 @@ import { ApiError } from "../../api/rest";
 import type { Instrument, OrderSpec, OrderView, Side } from "../../api/types";
 import { useApp, useInstrument, useKeyAction, useKeyBindings, useOrderSpec, useStore, useTick } from "../../app/context";
 import { keyText } from "../../keys/model";
+import { ExpiryNote } from "../../components/ExpiryBadge";
 import { SearchBox } from "../../components/SearchBox";
 import { price as fmtPrice, qty as fmtQty, rupees, shortName } from "../../lib/format";
 import { tradingBlock } from "../../state/gate";
@@ -290,6 +291,7 @@ function TicketBody({
       }}
     >
       {tabs}
+      <ExpiryNote info={spec.expiry} />
       <div className="ticket-head">
         <b>{instrument.symbol}</b>
         <span className="dim">{instrument.exchange} · lot {spec.lot_size} · tick {fmtPrice(tickSize)}</span>

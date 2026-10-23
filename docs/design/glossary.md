@@ -11,6 +11,8 @@ Every term a trader or a developer meets in MockTrade, in plain words. Code name
 | **Instrument** | Anything with a price: a share, a future, an option, an index. Our id is `EXCHANGE:SYMBOL`, for example `NFO:NIFTY26OCTFUT` (`domain/instruments.py`). |
 | **Index** | A number like NIFTY 50 that has prices but can't be traded. |
 | **Future (FUT)** | A contract to buy or sell an underlying at a set price on an expiry day. |
+| **Expiry** | The day a future or option ends: 15:30 India time on its expiry date. After that it can't be traded, and every position in it is settled ([expiry.md](expiry.md)). |
+| **Settlement (cash, physical)** | How an expired contract's positions end. Index F&O: in cash, at the final settlement price. Stock F&O: by delivery of the shares ("physical"). |
 | **Option (CE, PE)** | The right, but not the duty, to buy (call, CE) or sell (put, PE) the underlying at the **strike** price, until expiry. |
 | **Underlying** | What a future or option is on, for example NIFTY. |
 | **Expiry** | The last day a future or option exists. |
