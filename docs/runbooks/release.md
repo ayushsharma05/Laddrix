@@ -13,6 +13,18 @@
 3. **Run the release scenarios:** those in [the test plan](../test/README.md#scenarios-that-must-pass-before-a-release).
 4. **Merge,** then check that CI is green on `main`.
 5. **Tag `main`:** `git tag -a vX.Y.Z -m "MockTrade X.Y.Z"` and `git push origin vX.Y.Z`. For **v1.0.0**, only after Ayush has run the live steps of the [go-live checklist](go-live.md) and recorded his acceptance on #240.
+6. **Keep the SBOMs** (#365): the tag's CI run makes `sbom-vX.Y.Z`, the CycloneDX lists of every package in the server, the screens and the desktop app. Download it from the run's page and keep it with the release notes. When a new advisory comes out, it answers "were we shipping that?" for any past release.
+
+## The desktop app (#365)
+
+The desktop app isn't distributed today: it is built from source, and it has no auto-update
+(`tests/test_supply_chain.py` fails if one is added). **Before giving the installer to anyone:**
+- **Sign it:** a code-signing certificate in the firm's name. electron-builder signs the Windows
+  installer when `CSC_LINK`/`CSC_KEY_PASSWORD` are set on the build machine, never in git.
+- **Updates only if signed:** if auto-update is ever added, it must check each download's
+  signature against the firm's certificate before installing (electron-updater does this for
+  signed Windows builds), and be served over HTTPS only.
+- **Publish its SHA-256** with the release notes, so anyone can check their download.
 
 ## Deploying (on the server)
 

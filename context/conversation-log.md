@@ -523,3 +523,17 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Gap confirmed:** an admin's session alone (the cookie) could loosen limits, add traders, reset other people's logins and resume the firm.
   - **The fix:** these need an authenticator code given in the last 5 minutes (a login counts). The server answers 428 "step-up: ..."; the screens ask "Confirm it's you", send the code and repeat the change once. Asked for: loosening a limit, changing traders, turning an account or user on, adding users or accounts, changing roles, resetting a password or authenticator, resuming the firm. Never asked for: STOP, Flatten, cancels, tightening, turning off, dry runs. Five wrong codes lock the user and end every session. Menu bar **Sessions**: your own logins (browser, address, times) with End.
   - **Checks:** 6 server tests, 6 UI tests (all 419 pass), mutation 17/17. Browser check on the demo 7/7 (`context/scripts/e2e-step-up.cjs`; `context/images/h-363-step-up.png`, `h-363-sessions.png`); it caught a repeated phrase in the dialog, fixed.
+- 23 Oct, #363 merged (PR #376). **#365 done** (supply chain).
+  - **Gaps confirmed:**
+    - Python dependencies were installed from open ranges (`>=`), so each build could get different code, and nothing checked them for known flaws.
+    - There was no SBOM and no secret scan.
+    - Nothing stopped an unsigned update path being added to the desktop app.
+  - **The fix:**
+    - `requirements.lock` holds exact versions with hashes (uv, universal). The image installs only from it (`--require-hashes`, then our code with `--no-deps`), and CI tests against the lock.
+    - A new **supply-chain** CI job runs `pip-audit` on the lock and `gitleaks` over the whole history (a checked download). It also produces CycloneDX SBOMs for the server, the screens and the desktop app (which includes Electron); a release tag's run keeps them.
+    - Dependabot covers pip, both npm folders, the actions and the base image.
+    - `docs/runbooks/patching.md` sets the patch times: critical 48 h, high 7 days while live.
+    - The release runbook says the desktop installer must be signed before anyone else gets it, with updates only if signature-checked.
+  - **Found by the first scans:** no known vulnerability in the 30 locked Python packages. gitleaks found 2 hits in 223 commits, both made-up passwords in `Admin.test.tsx`, accepted in `.gitleaksignore` (only test files are allowed there).
+  - **CI caught:** the first image build failed: `.dockerignore` lets only listed files into the build, and the lock wasn't listed. Fixed, with a test. The SBOM upload also failed on a PR (its ref name has a '/'): now named by the tag on a release, else the commit.
+  - **Checks:** 4 tests; mutation 15/15 (one first survivor was the mutant's fault: a package has 2 hashes, it broke one).

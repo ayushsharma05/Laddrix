@@ -3,6 +3,7 @@
 !Dockerfile
 !pyproject.toml
 !README.md
+!requirements.lock
 !src/
 !ui/
 ui/node_modules/
