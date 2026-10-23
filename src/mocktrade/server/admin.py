@@ -125,9 +125,13 @@ def admin_router(
         if not user.has_role(Role.ADMIN):
             raise HTTPException(403, "only an admin can change this")
 
-    def entry_for(user_id: str) -> dict:
-        found = next((e for e in users.users() if e["user"].id == user_id), None)
-        if found is None:
+    def mine(user: User) -> list[dict]:
+        """The users of the asker's own workspace: an admin never sees another firm's (#368)."""
+        return [e for e in users.users() if e["user"].workspace == user.workspace]
+
+    def entry_for(user_id: str, user: User) -> dict:
+        found = next((e for e in mine(user) if e["user"].id == user_id), None)
+        if found is None:  # another firm's user is answered like no user at all
             raise HTTPException(404, f"no user {user_id}")
         return found
 
@@ -141,7 +145,7 @@ def admin_router(
     @router.get("/users")
     async def list_users(user: Me) -> list[dict[str, Any]]:
         can_read(user)
-        return [_user_dict(e) for e in users.users()]
+        return [_user_dict(e) for e in mine(user)]
 
     @router.post("/users", status_code=201)
     async def create_user(body: NewUserIn, user: Me, request: Request) -> dict[str, Any]:
@@ -150,12 +154,14 @@ def admin_router(
         temporary = security.new_temporary_password()
         roles = {Role(r) for r in body.roles}
         try:
-            created = users.create_user(body.id, body.name, temporary, roles, must_change=True)
+            created = users.create_user(
+                body.id, body.name, temporary, roles, must_change=True, workspace=user.workspace
+            )  # the admin's own firm
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from None
         audit("ADMIN_USER_CREATED", f"{user.id} added user {body.id} ({', '.join(body.roles)})",
               {"by": user.id, "user_id": body.id, "roles": sorted(body.roles)}, "-")  # fmt: skip
-        return {"user": _user_dict(entry_for(body.id)), "temporary_password": temporary,
+        return {"user": _user_dict(entry_for(body.id, user)), "temporary_password": temporary,
                 "totp_uri": created.totp_uri,
                 "note": "shown once: give both to the user; they set their own password at "
                         "the first login"}  # fmt: skip
@@ -168,6 +174,7 @@ def admin_router(
             raise HTTPException(409, "you can't turn yourself off: ask another admin")
         if body.roles is not None or body.active is True:  # what someone may do: privileged
             step_up(request, "change roles or turn a user on")
+        entry_for(user_id, user)  # another firm's user: 404, nothing changed
         try:
             before, after = users.update_user(
                 user_id, name=body.name, active=body.active,
@@ -187,21 +194,22 @@ def admin_router(
             said = ", ".join(f"{k} {was[k]} → {now[k]}" for k in was if was[k] != now[k])
             extra = {"by": user.id, "user_id": user_id, "before": was, "after": now}
             audit("ADMIN_USER_CHANGED", f"{user.id} changed {user_id}: {said}", extra, "-")
-        return _user_dict(entry_for(user_id))
+        return _user_dict(entry_for(user_id, user))
 
     @router.post("/users/{user_id}/unlock")
     async def unlock_user(user_id: str, user: Me) -> dict[str, Any]:
         can_change(user)
-        entry_for(user_id)
+        entry_for(user_id, user)
         if users.unlock(user_id):
             audit("ADMIN_USER_UNLOCKED", f"{user.id} unlocked {user_id}",
                   {"by": user.id, "user_id": user_id}, "-")  # fmt: skip
-        return _user_dict(entry_for(user_id))
+        return _user_dict(entry_for(user_id, user))
 
     @router.post("/users/{user_id}/reset-password")
     async def reset_password(user_id: str, user: Me, request: Request) -> dict[str, Any]:
         can_change(user)
         step_up(request, "reset a password")
+        entry_for(user_id, user)
         try:
             temporary = users.reset_password(user_id)
         except KeyError:
@@ -216,6 +224,7 @@ def admin_router(
     async def reset_authenticator(user_id: str, user: Me, request: Request) -> dict[str, Any]:
         can_change(user)
         step_up(request, "reset an authenticator")
+        entry_for(user_id, user)
         try:
             uri = users.reset_authenticator(user_id)
         except KeyError:
@@ -238,16 +247,17 @@ def admin_router(
         known = starter.not_running.get(account_id) if starter else None
         return known or "starts after a restart"
 
-    def account_or_404(account_id: str) -> BrokerAccount:
+    def account_or_404(account_id: str, user: User) -> BrokerAccount:
         account = users.get_account(account_id)
-        if account is None:
+        if account is None or account.workspace != user.workspace:  # another firm's: none
             raise HTTPException(404, f"no account {account_id}")
         return account
 
     @router.get("/accounts")
     async def list_accounts(user: Me) -> dict[str, Any]:
         can_read(user)
-        return {"accounts": [account_dict(a) for a in users.accounts()],
+        return {"accounts": [account_dict(a) for a in users.accounts()
+                             if a.workspace == user.workspace],
                 "brokers": list(starter.brokers) if starter else []}  # fmt: skip
 
     @router.post("/accounts", status_code=201)
@@ -257,7 +267,7 @@ def admin_router(
         if starter is None or body.broker not in starter.brokers:
             can = ", ".join(starter.brokers) if starter else "none"
             raise HTTPException(422, f"this server can add {can} accounts, not {body.broker}")
-        unknown = sorted({body.owner, *body.traders} - {e["user"].id for e in users.users()})
+        unknown = sorted({body.owner, *body.traders} - {e["user"].id for e in mine(user)})
         if unknown:
             raise HTTPException(422, f"no such user: {', '.join(unknown)}")
         account = BrokerAccount(body.id, body.broker, body.broker_client_id, body.owner,
@@ -283,6 +293,7 @@ def admin_router(
         can_change(user)
         if body.traders is not None or body.active is True:  # turning off never asks
             step_up(request, "change who trades an account or turn it on")
+        account_or_404(account_id, user)
         try:
             before, after = users.update_account(
                 account_id, active=body.active,
@@ -311,8 +322,8 @@ def admin_router(
         can_read(user)
         return limits_spec_dict()
 
-    def in_force(account_id: str) -> tuple[Any, AccountRuntime | None]:
-        account_or_404(account_id)
+    def in_force(account_id: str, user: User) -> tuple[Any, AccountRuntime | None]:
+        account_or_404(account_id, user)
         running = platform.account(account_id)
         if running is not None:
             return running.risk.limits, running
@@ -321,7 +332,7 @@ def admin_router(
     @router.get("/accounts/{account_id}/limits")
     async def get_limits(account_id: str, user: Me) -> dict[str, Any]:
         can_read(user)
-        limits, running = in_force(account_id)
+        limits, running = in_force(account_id, user)
         return {"account_id": account_id, "limits": limits_to_dict(limits),
                 "running": running is not None}  # fmt: skip
 
@@ -329,7 +340,7 @@ def admin_router(
     async def put_limits(account_id: str, body: LimitsIn, user: Me, request: Request,
                          dry_run: bool = False) -> dict[str, Any]:  # fmt: skip
         can_change(user)
-        old, running = in_force(account_id)
+        old, running = in_force(account_id, user)
         new, problems = limits_from_dict(body.limits)
         if new is not None:
             gone = sorted(i for i in new.blocked_instruments if platform.instruments.get(i) is None)

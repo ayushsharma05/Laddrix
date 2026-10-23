@@ -103,6 +103,9 @@ A new firm is created with
 
 ## 8. Steps
 
+**Progress:** 368a (#394) is done (the PR that closes it). Its route sweep tries all 115 routes
+from another firm: `tests/test_workspaces.py`.
+
 | Step | What | Done when |
 | --- | --- | --- |
 | **368a** (#394) | Workspaces in the data, the rule in every access check, STOP per workspace, the operator only on the terminal | the two-workspace route sweep and stream tests pass |

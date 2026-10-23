@@ -51,6 +51,7 @@ def test_secrets_are_encrypted_in_the_database(store):
 
 def test_accounts_need_an_existing_owner_and_unique_ids(store):
     store.create_user("ayush", "Ayush", PASSWORD, {Role.TRADER})
+    store.create_user("riya", "Riya", PASSWORD, {Role.TRADER})
     account = BrokerAccount("acc-1", "kite", "AB1234", "ayush", frozenset({"riya"}))
     store.add_account(account)
     assert store.get_account("acc-1") == account and store.accounts() == [account]
@@ -58,6 +59,8 @@ def test_accounts_need_an_existing_owner_and_unique_ids(store):
         store.add_account(account)
     with pytest.raises(ValueError, match="no user"):
         store.add_account(BrokerAccount("acc-2", "kite", "X", "ghost"))
+    with pytest.raises(ValueError, match="no such user: nobody"):  # traders must exist (#368)
+        store.add_account(BrokerAccount("acc-3", "kite", "Y", "ayush", frozenset({"nobody"})))
 
 
 def test_a_disabled_user_cannot_log_in(store):

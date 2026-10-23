@@ -430,6 +430,28 @@ def create_app(
 
     Me = Annotated[User, Depends(current_user)]
 
+    # --- workspaces (#368, docs/design/tenancy.md) ---------------------------------------------
+
+    def in_workspace(user: User, account_id: str) -> bool:
+        """The account exists and is in the user's own workspace."""
+        account = users.get_account(account_id)
+        return account is not None and account.workspace == user.workspace
+
+    def admin_of(user: User, owner: str) -> bool:
+        """An admin sees the backtests of their own workspace's users (#270, #368)."""
+        if not user.has_role(Role.ADMIN):
+            return False
+        found = users.get_user(owner) if owner else None
+        return found is not None and found.workspace == user.workspace
+
+    def platform_wide(user: User, what: str) -> None:
+        """Changes that touch every firm on the server (resetting metrics, a replay's clock,
+        the shared recordings and candles) are an admin's only while the server holds one
+        firm. With several, only the operator makes them, from the server's terminal."""
+        if len(users.workspaces()) > 1:
+            raise HTTPException(403, f"with several firms on this server, only its operator "
+                                f"can {what}, from the server's terminal")  # fmt: skip
+
     def runtime(account_id: str, user: User, *, trade: bool = False) -> AccountRuntime:
         account = users.get_account(account_id)
         running = platform.account(account_id)
@@ -612,6 +634,7 @@ def create_app(
         store = recordings()
         if not user.has_role(Role.ADMIN):
             raise HTTPException(403, "only an admin can delete recordings")
+        platform_wide(user, "delete recordings")
         try:
             when = date.fromisoformat(day)
         except ValueError:
@@ -651,7 +674,7 @@ def create_app(
         """A backtest the user may see (#270): their own, or any for an admin. Someone else's
         is 'no backtest', exactly as one that doesn't exist: nothing leaks."""
         run = backtest_runs().get(run_id)
-        if run is None or not run.may_see(user.id, user.has_role(Role.ADMIN)):
+        if run is None or not run.may_see(user.id, admin_of(user, run.owner)):
             raise HTTPException(404, f"no backtest {run_id}")
         return run
 
@@ -659,7 +682,7 @@ def create_app(
     async def backtest_list(user: Me) -> list[dict[str, Any]]:
         admin = user.has_role(Role.ADMIN)
         return [r.to_dict(full=False) for r in backtest_runs().runs()
-                if r.may_see(user.id, admin)]  # fmt: skip
+                if r.may_see(user.id, admin and admin_of(user, r.owner))]  # fmt: skip
 
     @app.get("/api/research/backtests/form")
     async def backtest_form_spec(user: Me, instrument_id: str = "") -> dict[str, Any]:
@@ -699,6 +722,7 @@ def create_app(
         if not user.has_role(Role.ADMIN):  # a shared dataset: every backtest reads it (#270)
             raise HTTPException(403, "only an admin can import candles (everyone's backtests "
                                 "use them)")  # fmt: skip
+        platform_wide(user, "import candles")
         if platform.instruments.get(body.instrument_id) is None:
             raise HTTPException(422, f"unknown instrument {body.instrument_id}")
         try:
@@ -833,6 +857,7 @@ def create_app(
     async def replay_control(body: ReplayIn, user: Me) -> dict[str, Any]:
         if replay is None:
             raise HTTPException(404, "this server isn't replaying a recorded day")
+        platform_wide(user, "control the replay")
         try:
             if body.action == "pause":
                 replay.pause()
@@ -1114,8 +1139,15 @@ def create_app(
         """What operations look like now: active alerts and the scheduled jobs that ran."""
         if not _risk_or_admin(user):
             raise HTTPException(403, "operations are for admin and risk users")
+        mine = {a.id for a in users.accounts() if a.workspace == user.workspace}
         return {
-            "alerts": [alert_to_dict(a) for a in alerts.active()] if alerts else [],
+            "alerts": [
+                alert_to_dict(a)
+                for a in alerts.active()
+                if a.account_id is None or a.account_id in mine
+            ]
+            if alerts
+            else [],
             "jobs": [
                 {"job": name, "at": at.isoformat()}
                 for name, at in (scheduler.ran if scheduler else [])
@@ -1127,6 +1159,7 @@ def create_app(
         """Start measuring afresh (e.g. after a load test's warm-up). Admin only."""
         if not user.has_role(Role.ADMIN):
             raise HTTPException(403, "only an admin can reset metrics")
+        platform_wide(user, "reset the metrics")
         METRICS.reset()
         audit("METRICS_RESET", user.id, {})
         return {"status": "reset"}
@@ -1408,7 +1441,7 @@ def create_app(
         if platform.event_log is None:
             return []
         limit = max(1, min(limit, 1000))
-        names = [account_id, f"account {account_id}", "firm"]
+        names = [account_id, f"account {account_id}", platform.firm_switch_of(user.workspace).name]
         events = await asyncio.to_thread(
             platform.event_log.page,
             names,
@@ -1510,11 +1543,15 @@ def create_app(
         """Patterns worth a look (risk/surveillance.py): self-trades, large orders, cancel
         ratios, bursts. Kept in the audit trail; acknowledged with a note."""
         _risk_only(user)
-        return [surveillance_to_dict(a) for a in platform.surveillance.alerts(open_only=open_only)]
+        return [surveillance_to_dict(a) for a in platform.surveillance.alerts(open_only=open_only)
+                if in_workspace(user, a.account_id)]  # fmt: skip
 
     @app.post("/api/surveillance/{alert_id}/ack")
     async def acknowledge_alert(alert_id: str, body: AckIn, user: Me) -> dict[str, Any]:
         _risk_only(user)
+        found = next((a for a in platform.surveillance.alerts() if a.alert_id == alert_id), None)
+        if found is None or not in_workspace(user, found.account_id):
+            raise HTTPException(404, f"no surveillance alert {alert_id}")  # another firm's: none
         try:
             done = platform.surveillance.acknowledge(alert_id, user.id, body.note)
             return surveillance_to_dict(done)
@@ -1619,10 +1656,12 @@ def create_app(
     async def stop_firm(body: StopIn, user: Me) -> dict[str, Any]:
         if not _risk_or_admin(user):
             raise HTTPException(403, "only risk or an admin can stop the whole firm")
-        runs = list(platform.accounts.values())
+        # the firm is the asker's workspace: its accounts and its switch, nobody else's (#368)
+        runs = [r for r in platform.accounts.values() if r.account.workspace == user.workspace]
         before = _stop_snapshot(runs)
         managers = [r.orders for r in runs]
-        failures = await stop_trading(platform.firm_switch, managers, body.reason, by=user.id)
+        firm = platform.firm_switch_of(user.workspace)
+        failures = await stop_trading(firm, managers, body.reason, by=user.id)
         reports = _stop_reports(runs, before, failures, user.id, body.reason)
         return {"stopped": True, "failed_cancels": _failures(failures), "reports": reports}
 
@@ -1631,7 +1670,7 @@ def create_app(
         if not user.has_role(Role.ADMIN):
             raise HTTPException(403, "only an admin can resume the whole firm")
         require_step_up(request, "resume the whole firm")
-        platform.firm_switch.reset(by=user.id)
+        platform.firm_switch_of(user.workspace).reset(by=user.id)
         return {"stopped": False}
 
     # --- the broker's own daily login ------------------------------------------------------------
@@ -1778,7 +1817,7 @@ def _me(
             "must_change_password": user.must_change_password,
         },
         "accounts": accounts,
-        "firm_stopped": platform.firm_switch.engaged,
+        "firm_stopped": platform.firm_switch_of(user.workspace).engaged,
     }
 
 

@@ -563,3 +563,17 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **STOP:** one kill switch per workspace.
   - **Prices:** each Kite account is its own price source, and today's "first account carries prices for everyone" goes. Screens see only the sources of accounts the person may see. The setting `MOCKTRADE_PRICES_VISIBLE` (`owner` by default) waits on Zerodha's answer for supervisors.
   - **Split into steps:** #394 (368a), #395 (368b), #396 (368c), #397 (368d).
+- 23 Oct, design merged (PR #398). **#394 (368a) done:** workspaces in the data and in every check.
+  - **The data:** users and accounts carry a workspace, and today's data is `main`. An account belongs to its owner's firm, and its traders must be from that firm. Ids are unique across firms.
+  - **The rule:** the same-workspace test sits inside `can_view`/`can_manage`/`can_trade`, so every account route, the stream and `/api/me` inherit it.
+  - **STOP:** one switch per workspace (`Platform.firm_switch_of`). Each account's gates, algos, GTT sweeps and Flatten use their own firm's switch.
+  - **Admin screens:** list and change only their own firm, and make new users in it.
+  - **Other screens:** surveillance, ops bands, the audit trail's firm events and backtests are scoped.
+  - **Server-wide controls** (metrics reset, replay clock, recordings and candles) are the operator's once a server holds two firms.
+  - **The operator** makes a firm with `users add-workspace`.
+  - **Tests:** a two-firm route sweep (115 routes, read from the app), the stream, STOP isolation, the admin screens, the operator's CLI.
+  - **Found before shipping:** the screens show the firm STOP band only for the scope "firm", so acme's traders would never have seen their own STOP. Each firm now hears its own as "firm".
+  - **Mutation 22/22.** It caught three real test gaps:
+    - this FastAPI wraps included routers, so the sweep had silently missed all 13 admin routes;
+    - an empty body was refused before the workspace check;
+    - "main" is the default, so creating users only as main's admin proved nothing.

@@ -157,6 +157,14 @@ An older `users.db` gets the new column (`must_change`) and table when the serve
 
 ## Who sees what (#270)
 
+**First, the firm (#368):** everything below is inside the asker's own workspace. An admin or
+risk user of one firm never sees, lists, changes or stops another firm's users, accounts,
+orders, alerts or backtests, and an id from another firm is answered like one that doesn't
+exist (404). "Stop the whole firm" stops their own workspace only. The server-wide controls
+(resetting metrics, a replay's clock, the shared recordings and candles) are the operator's,
+from the terminal, once a server holds more than one firm. The metrics screen shows the
+server's own speed figures: they name no firm, account or user.
+
 | Resource | Whose | Who sees it |
 | --- | --- | --- |
 | An account's orders, positions, algos, GTTs, charges, MTM, its **alert bands** (Kite login, UNPROTECTED, MTM, square-off, failed restart) | the account | its owner and traders; risk and admin. Re-checked while connected: access taken away stops the stream at once. |
