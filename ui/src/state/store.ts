@@ -64,6 +64,23 @@ export interface State {
   messages: Message[]; // newest first
   stream: Status;
   sentTimes: number[]; // when we sent orders in the last minute (rate meter)
+  /** Is each account's state loaded since the last (re)connect? (#268) */
+  sync: Sync;
+}
+
+/**
+ * Loading the server's state after each (re)connect (#268). An open stream isn't enough to
+ * trade: an account's orders and positions must have arrived since that connect.
+ *   epoch     one per (re)connect: answers from an older one are dropped
+ *   accounts  loading | ready | failed, per account
+ *   missing   per account, the optional parts that couldn't be loaded (algos, GTTs): shown as
+ *             unavailable, never as an empty list
+ */
+export interface Sync {
+  epoch: number;
+  accounts: Record<string, "loading" | "ready" | "failed">;
+  reason: string; // why the last load failed ("" if it didn't)
+  missing: Record<string, string[]>;
 }
 
 export interface OpsAlert {
@@ -117,6 +134,7 @@ export class Store {
       messages: [],
       stream: "stopped",
       sentTimes: [],
+      sync: { epoch: 0, accounts: {}, reason: "", missing: {} },
     };
   }
 
@@ -170,6 +188,29 @@ export class Store {
 
   setStream(status: Status): void {
     if (status !== this.state.stream) this.set({ stream: status });
+  }
+
+  // --- loading after a (re)connect (#268) ------------------------------------------------------
+
+  /** A new load begins: every account waits for its orders and positions again. */
+  startSync(epoch: number, accountIds: string[]): void {
+    const accounts = Object.fromEntries(accountIds.map((id) => [id, "loading" as const]));
+    this.set({ sync: { epoch, accounts, reason: "", missing: {} } });
+  }
+
+  /** One account's orders and positions are in (for this load); `missing`: optional parts that weren't. */
+  accountSynced(epoch: number, accountId: string, missing: string[] = []): void {
+    const sync = this.state.sync;
+    if (epoch !== sync.epoch) return; // an older load: a newer one decides
+    this.set({ sync: { ...sync, accounts: { ...sync.accounts, [accountId]: "ready" }, missing: { ...sync.missing, [accountId]: missing } } });
+  }
+
+  /** The load failed: accounts not yet in stay closed to new orders until a retry works. */
+  syncFailed(epoch: number, reason: string): void {
+    const sync = this.state.sync;
+    if (epoch !== sync.epoch) return;
+    const accounts = Object.fromEntries(Object.entries(sync.accounts).map(([id, s]) => [id, s === "ready" ? s : ("failed" as const)]));
+    this.set({ sync: { ...sync, accounts, reason } });
   }
 
   // --- snapshots ------------------------------------------------------------------------------

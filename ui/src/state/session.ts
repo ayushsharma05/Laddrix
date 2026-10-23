@@ -13,10 +13,13 @@ import type { AlgoView, ChargeBill, GttView, Me, OrderView, PortfolioKind, Portf
 import type { Store } from "./store";
 
 const KINDS: PortfolioKind[] = ["funds", "holdings", "trades"];
+export const RETRY_MS = 3000; // a failed load is tried again (while connected)
 
 export class Session {
   private unsubscribers: (() => void)[] = [];
   private loading: Promise<void> | null = null;
+  private epoch = 0; // one per load: answers from an older load are dropped (#268)
+  private retry: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly rest: Rest,
@@ -28,7 +31,11 @@ export class Session {
         store.setStream(status);
         if (status === "logged-out") store.setMe(null);
       }),
-      stream.on("hello", () => void this.reload()),
+      stream.on("hello", () => {
+        this.epoch += 1; // a new connect: whatever an older load was doing is out of date
+        this.loading = null;
+        void this.reload();
+      }),
       stream.on("order", (m) => store.applyMessage(m)),
       stream.on("positions", (m) => store.applyMessage(m)),
       stream.on("kill", (m) => store.applyMessage(m)),
@@ -93,25 +100,41 @@ export class Session {
   }
 
   private async load(): Promise<void> {
+    const epoch = this.epoch;
+    const current = () => epoch === this.epoch; // false once a newer connect started a new load
+    if (this.retry) clearTimeout(this.retry);
+    this.retry = null;
     try {
       const me = await this.rest.get<Me>("/api/me");
+      if (!current()) return;
       this.store.setMe(me);
+      this.store.startSync(epoch, me.accounts.map((a) => a.id));
       await Promise.all(
         me.accounts.map(async (account) => {
           const base = `/api/accounts/${encodeURIComponent(account.id)}`;
+          const missing: string[] = [];
+          const optional = <T,>(path: string, what: string) =>
+            this.rest.get<T>(path).catch((err: unknown) => {
+              if (err instanceof ApiError && err.status === 404) return null; // not offered here
+              if (err instanceof ApiError && err.loggedOut) throw err;
+              missing.push(what); // unavailable, not empty: said, never shown as "none"
+              return null;
+            });
           const [orders, positions, algos, gtts] = await Promise.all([
             this.rest.get<OrderView[]>(`${base}/orders`),
             this.rest.get<PositionsSnapshot>(`${base}/positions`),
-            this.rest.get<AlgoView[]>(`${base}/algos`).catch(() => [] as AlgoView[]), // a nicety
-            this.rest.get<GttView[]>(`${base}/gtt`).catch(() => [] as GttView[]), // not every broker
+            optional<AlgoView[]>(`${base}/algos`, "algos"),
+            optional<GttView[]>(`${base}/gtt`, "GTTs"),
           ]);
+          if (!current()) return;
           this.store.applyOrders(account.id, orders);
           this.store.applyPositions(account.id, positions);
-          this.store.applyAlgos(account.id, algos);
-          this.store.applyGtts(account.id, gtts);
+          if (algos) this.store.applyAlgos(account.id, algos);
+          if (gtts) this.store.applyGtts(account.id, gtts);
+          this.store.accountSynced(epoch, account.id, missing);
           await Promise.all(KINDS.map((kind) => this.loadPortfolio(account.id, kind)));
           const charges = await this.rest.get<ChargeBill>(`${base}/charges`).catch(() => null); // a nicety
-          if (charges) this.store.applyCharges(account.id, charges);
+          if (charges && current()) this.store.applyCharges(account.id, charges);
         }),
       );
     } catch (err) {
@@ -120,8 +143,14 @@ export class Session {
         this.store.setMe(null);
         return;
       }
+      if (!current()) return;
       const text = err instanceof Error ? err.message : String(err);
-      this.store.addMessage("ERROR", "", `Couldn't load orders and positions: ${text}`);
+      this.store.syncFailed(epoch, text);
+      this.store.addMessage("ERROR", "", `Couldn't load orders and positions: ${text} (trying again; cancels still go)`);
+      this.retry = setTimeout(() => {
+        this.retry = null;
+        if (current() && this.stream.status === "open") void this.reload();
+      }, RETRY_MS);
     }
   }
 
@@ -142,6 +171,7 @@ export class Session {
   }
 
   dispose(): void {
+    if (this.retry) clearTimeout(this.retry);
     for (const off of this.unsubscribers) off();
     this.unsubscribers = [];
   }
