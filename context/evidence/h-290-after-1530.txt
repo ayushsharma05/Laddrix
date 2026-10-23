@@ -1,0 +1,5 @@
+instrument expiry_info: {'expires_at': '2026-10-23T15:30:00+05:30', 'settlement': 'cash', 'expires_today': False, 'expired': True, 'opening_cutoff': None, 'opening_closed': False, 'note': "NIFTY26OCTFUT expired at 15:30 on 23 Oct 2026: it can't be traded any more"}
+order spec expiry note: NIFTY26OCTFUT expired at 15:30 on 23 Oct 2026: it can't be traded any more
+search NIFTY26: ['NIFTY26NOVFUT', 'NIFTY26NOV24000CE', 'NIFTY26NOV24000PE', 'NIFTY26NOV24200CE', 'NIFTY26NOV24200PE', 'NIFTY26NOV24400CE', 'NIFTY26NOV24400PE', 'NIFTY26NOV24600CE', 'NIFTY26NOV24600PE', 'NIFTY26NOV24800CE', 'NIFTY26NOV24800PE', 'NIFTY26NOV25000CE', 'NIFTY26NOV25000PE', 'NIFTY26NOV25200CE', 'NIFTY26NOV25200PE', 'NIFTY26NOV25400CE', 'NIFTY26NOV25400PE', 'NIFTY26NOV25600CE', 'NIFTY26NOV25600PE', 'NIFTY26NOV25800CE']
+chain expiries: ['2026-11-24']
+a market buy: REJECTED NIFTY26OCTFUT expired at 15:30 on 23 Oct 2026: it can't be traded any more; its position settles at the final settlement price
