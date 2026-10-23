@@ -94,6 +94,7 @@ class _Order:
     cancel_unclear: bool = False  # the last cancel got no clear answer: it may have worked
     change_sent_at: datetime | None = None  # a change with no clear answer was sent then
     terms_at: datetime | None = None  # when our terms were last confirmed (a change, the broker)
+    asked: OrderRequest | None = None  # the order as first asked for (a retry must match it)
 
     def view(self) -> OrderView:
         return OrderView(
@@ -184,10 +185,17 @@ class OrderManager:
             request = replace(request, client_order_id=self._ids.next())
         existing = self._orders.get(request.client_order_id)
         if existing is not None:
+            first = existing.asked or existing.request
+            if _intent(first) != _intent(request):  # the id, reused for a different order (#279)
+                raise OrderError(
+                    f"order id {request.client_order_id} is already used for another order "
+                    f"({first.side.value} {first.qty} {first.instrument_id}): nothing was sent; "
+                    "use a new id"
+                )
             return existing.view()  # a retry of an order we already have: never place twice
 
         now = self._clock()
-        order = _Order(request=request, created_at=now, updated_at=now)
+        order = _Order(request=request, created_at=now, updated_at=now, asked=request)
         self._orders[request.client_order_id] = order
         self._emit(EventKind.SUBMITTED, order)
 
@@ -867,6 +875,12 @@ class OrderManager:
                 listener(event)
             except Exception:  # a broken screen must never stop order handling
                 log.exception("order event listener failed")
+
+
+def _intent(r: OrderRequest) -> tuple:
+    """What an order is, for telling a retry (the same) from a reused id (a different one)."""
+    return (r.account_id, r.user_id, r.instrument_id, r.side, r.qty, r.order_type, r.product,
+            r.validity, r.price_paise, r.trigger_paise, r.market_protection)  # fmt: skip
 
 
 def _filled_value(order: _Order, update: OrderUpdate) -> int:
