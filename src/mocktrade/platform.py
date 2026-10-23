@@ -15,7 +15,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -39,7 +39,7 @@ from mocktrade.orders.model import ClientIds
 from mocktrade.portfolio.service import PortfolioService
 from mocktrade.positions.book import PositionBook
 from mocktrade.positions.reconcile import PositionReconciler
-from mocktrade.recovery import RecoveryGate, recover, recover_until_done, session_start
+from mocktrade.recovery import IST, RecoveryGate, recover, recover_until_done, session_start
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.risk.checks import RiskGate
 from mocktrade.risk.closing import ExitDesk, position_of
@@ -107,6 +107,7 @@ class AccountRuntime:
     mtm: MtmWatch | None = None  # the trader's own loss limits (per position, portfolio)
     squareoff: SquareOff | None = None  # intraday positions before the broker's cut-off
     flatten: Flatten | None = None  # closing positions on purpose, STOP or not (#262)
+    session_day: date | None = None  # the trading day its positions and limits are for (#266)
 
     def apply_limits(self, limits: RiskLimits) -> None:
         """An admin's new limits, from the next order on. Everything that copied a limit at
@@ -234,6 +235,33 @@ class Platform:
         """Why this position's size isn't known (the broker disagrees), or None."""
         runtime = self.accounts.get(account_id)
         return None if runtime is None else unknown_size(runtime.reconciler)(instrument_id, product)
+
+    def roll_day(self, now: datetime | None = None) -> dict[str, str]:
+        """A new trading day without a restart (#266), for every account not yet on it:
+        yesterday's day orders end as expired, overnight positions carry over at the last
+        price with today's P&L at zero (so the daily loss limit and MTM limits start fresh),
+        and the charges are worked out again. Once per account per day: running it twice, or
+        after a restart (which builds today from scratch), changes nothing. Returns what it
+        did per account, in words."""
+        done = {}
+        for account_id, runtime in self.accounts.items():
+            at = now or runtime.positions._clock()
+            today = at.astimezone(IST).date()
+            if runtime.session_day is not None and runtime.session_day >= today:
+                continue
+            expired = runtime.orders.expire_day(session_start(at))
+            carried = runtime.positions.roll()
+            if runtime.charges is not None:
+                runtime.charges.refresh()
+            runtime.session_day = today
+            words = (f"new trading day {today.isoformat()}: {len(carried)} position(s) "
+                     f"carried at the last price, {len(expired)} day order(s) expired")  # fmt: skip
+            done[account_id] = words
+            log.info("%s: %s", account_id, words)
+            if self.event_log is not None:
+                extra = {"day": today.isoformat(), "expired": expired}
+                self.event_log.record_note("SESSION_ROLLED", account_id, words, extra)
+        return done
 
     def lost_protection(self, account_id: str) -> list[LostProtection]:
         """At start: protection algos (stops held by MockTrade) that were running when the
@@ -557,6 +585,7 @@ class Platform:
             flatten,
         )
         self.accounts[account.id] = runtime
+        runtime.session_day = clock().astimezone(IST).date()  # a start rebuilds today (recovery)
         runtime.set_active(account.active)
         self._start_late(runtime)
         return runtime

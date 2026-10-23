@@ -139,7 +139,11 @@ async def recover(
         for p in broker_positions:
             if p.overnight_qty and p.product is not None:
                 book.seed(
-                    p.instrument_id, p.product, p.overnight_qty, p.close_paise or p.avg_price_paise
+                    p.instrument_id,
+                    p.product,
+                    p.overnight_qty,
+                    p.close_paise or p.avg_price_paise,
+                    carried_avg=p.avg_price_paise,
                 )
                 report.carried += 1
     else:  # the paper broker: from the audit trail's earlier days
@@ -158,7 +162,7 @@ async def recover(
                 report.holdings += 1
                 continue
             price = close(p.instrument_id) or round(p.avg_price_paise)
-            book.seed(p.instrument_id, p.product, p.qty, price)
+            book.seed(p.instrument_id, p.product, p.qty, price, carried_avg=p.avg_price_paise)
             carried[(p.instrument_id, p.product)] = (p.qty, price)
             earlier_pnl += (price - p.avg_price_paise) * p.qty  # settled at the close
             report.carried += 1

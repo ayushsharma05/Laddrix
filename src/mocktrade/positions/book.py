@@ -18,7 +18,12 @@ Fills are applied once: each order's cumulative filled quantity is remembered, s
 replays (after a restart or a reconcile) never count twice.
 
 Positions carried from yesterday are seeded at the previous close, so today's P&L
-(what the daily loss limit uses) starts at zero, like a broker's mark-to-market.
+(what the daily loss limit uses) starts at zero, like a broker's mark-to-market. The
+original buy price is kept too (`carried_avg_paise`), so the screens can show both.
+
+A new trading day without a restart (#266): `roll()` starts it. Overnight positions are
+re-seeded at the last price of the session that ended, with today's totals at zero; flat
+positions are dropped; a delivery buy (CNC, long) leaves positions, as it is now a holding.
 P&L here is gross: brokerage, STT, exchange charges, GST and stamp duty are not
 included yet.
 """
@@ -55,6 +60,7 @@ class PositionView:
     buy_value_paise: int
     sell_value_paise: int
     updated_at: datetime | None
+    carried_avg_paise: Fraction | None = None  # carried overnight: what it was bought at
 
     @property
     def pnl_paise(self) -> int:
@@ -71,6 +77,7 @@ class _Position:
     buy_value: int = 0
     sell_value: int = 0
     updated_at: datetime | None = None
+    carried_avg: Fraction | None = None  # carried overnight: its average before the roll
 
     @property
     def avg(self) -> Fraction:
@@ -159,7 +166,12 @@ class PositionBook:
         self._notify(instrument_id, product)
 
     def seed(
-        self, instrument_id: InstrumentId, product: Product, qty: int, reference_paise: int
+        self,
+        instrument_id: InstrumentId,
+        product: Product,
+        qty: int,
+        reference_paise: int,
+        carried_avg: Fraction | float | None = None,
     ) -> None:
         """Start the day with a position carried from yesterday, at the previous close.
 
@@ -167,9 +179,35 @@ class PositionBook:
         if (instrument_id, product) in self._positions:
             raise ValueError(f"{instrument_id} {product.value} already has a position today")
         self._positions[(instrument_id, product)] = _Position(
-            qty=qty, cost=Fraction(qty * reference_paise), updated_at=self._clock()
+            qty=qty,
+            cost=Fraction(qty * reference_paise),
+            updated_at=self._clock(),
+            carried_avg=Fraction(carried_avg) if carried_avg is not None else None,
         )
         self._ltp.setdefault(instrument_id, reference_paise)
+
+    def roll(self) -> list[Key]:
+        """Start a new trading day without a restart (#266): each open position carries over
+        at the last price seen, with today's realised P&L and buy/sell totals at zero.
+        Flat positions go; a delivery buy (CNC long) goes too (it is a holding now).
+        Returns the positions carried."""
+        now = self._clock()
+        carried: dict[Key, _Position] = {}
+        for (instrument_id, product), p in self._positions.items():
+            if not p.qty or (product is Product.CNC and p.qty > 0):
+                continue
+            reference = self._ltp.get(instrument_id) or round(p.avg)
+            carried[(instrument_id, product)] = _Position(
+                qty=p.qty, cost=Fraction(p.qty * reference), updated_at=now,
+                carried_avg=p.carried_avg if p.carried_avg is not None else p.avg,
+            )  # fmt: skip
+        gone = [key for key in self._positions if key not in carried]
+        self._positions = carried
+        for instrument_id, product in carried:
+            self._notify(instrument_id, product)
+        for key in gone:  # listeners hear it is flat with nothing today (never a None)
+            self._tell(self._view(key, _Position(updated_at=now)))
+        return list(carried)
 
     def mark(self, tick: Tick) -> None:
         """A new last price: unrealised P&L moves. Market data listener."""
@@ -261,12 +299,17 @@ class PositionBook:
             buy_value_paise=position.buy_value,
             sell_value_paise=position.sell_value,
             updated_at=position.updated_at,
+            carried_avg_paise=position.carried_avg,
         )
 
     def _notify(self, instrument_id: InstrumentId, product: Product) -> None:
         if not self._listeners:
             return
         view = self.get(instrument_id, product)
+        if view is not None:
+            self._tell(view)
+
+    def _tell(self, view: PositionView) -> None:
         for listener in list(self._listeners):
             try:
                 listener(view)

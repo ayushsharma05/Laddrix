@@ -770,6 +770,25 @@ class OrderManager:
         self._touch(order)
         self._emit(EventKind.REJECTED, order, detail=reason)
 
+    def expire_day(self, before: datetime) -> list[str]:
+        """A new trading day (#266): day orders (DAY, IOC) from before `before` can't fill
+        any more, so the ones still open here end as expired; they stop counting against
+        today's limits. An order whose fate was never known ends the same way: the broker's
+        own book for the day that ended no longer matters. Returns their ids."""
+        ended = []
+        for order in self._orders.values():
+            if order.status.is_final or order.created_at >= before:
+                continue
+            if order.request.validity.value not in ("DAY", "IOC"):
+                continue
+            order.status = OrderStatus.CANCELLED
+            order.pending = Pending.NONE
+            order.reason = "expired: a day order ends with its trading day"
+            self._touch(order)
+            self._emit(EventKind.CANCELLED_LOCALLY, order, detail=order.reason)
+            ended.append(order.request.client_order_id)
+        return ended
+
     def _finish_locally(self, order: _Order) -> None:
         order.status = OrderStatus.CANCELLED
         order.reason = "cancelled before it was sent"

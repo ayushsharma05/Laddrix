@@ -433,3 +433,14 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Candles are a shared dataset:** importing them is admin-only.
     - **The policy is written down:** the "Who sees what" table in `docs/design/admin.md`.
   - **Checks:** two-user tests (stream, backtests, candles) plus tests that each alert producer tags its account; mutation 15/15.
+- 23 Oct, #270 merged (PR #348): all P0s of the hardening gate are done.
+  - **Ayush asked:** which open issues still affect trading. The answer: 9 (#266, #290, #276, #291, #275, #268, #273, #272, #279), plus 4 smaller operational ones and 2 decisions; all "Later:" and "Post-v1" issues are features.
+  - **His plan:** do the 9 one by one; he is watching his usage (45% of the 4-hour window used at the start).
+- 23 Oct, **#266 done** (a new trading day without a restart).
+  - **Defects confirmed:** a server running overnight kept yesterday's realised P&L in today's (the daily loss limit and MTM judged today by yesterday), and yesterday's unfilled day orders still counted as working.
+  - **The fix:**
+    - **A daily 08:45 job** (trading days only) calls `Platform.roll_day()`, once per account per day; an account started today is already on today.
+    - **Day orders:** yesterday's are expired.
+    - **Positions:** carried at the last price with today's totals at zero, keeping their original average (`carried_avg_paise`, also seeded by recovery); flat rows and delivery buys drop out.
+    - **Charges** are worked out again, and an audit note (SESSION_ROLLED) is written.
+  - **Checks:** 8 tests, including a two-day run and the daily loss limit on day 2; mutation 10/10.

@@ -155,6 +155,7 @@ async def main(
     settings = ServerSettings(origin=origin, cookie_secure=False)
     reports = Reports(platform, ReportStore(data / "reports"), clock=clock)
     scheduler = Scheduler(clock=clock)
+    scheduler.daily("08:45", platform.roll_day, "new trading day")  # #266: no restart needed
     scheduler.daily("16:00", reports.close_of_day, "end-of-day reports")
     alerts = Alerts(clock=clock)
     jobs = [market_job, platform.run(), scheduler.run()]
