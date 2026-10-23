@@ -195,7 +195,8 @@ class StreamHub:
             }
         )
         for alert in self._alerts.active() if self._alerts else ():
-            connection.put(alert_to_dict(alert))  # what's wrong right now, at once
+            if _may_see(connection, alert):
+                connection.put(alert_to_dict(alert))  # what's wrong right now, at once
         tasks = [
             asyncio.create_task(self._send(websocket, connection)),
             asyncio.create_task(self._receive(websocket, connection)),
@@ -434,9 +435,12 @@ class StreamHub:
                 connection.put(message)
 
     def _on_ops(self, alert: Alert) -> None:
+        """Firm-wide alerts go to everyone signed in; an account's only to those who may see
+        that account now (#270: permissions are re-read while connected)."""
         message = alert_to_dict(alert)
         for connection in list(self._connections):
-            connection.put(message)  # operations concern everyone signed in
+            if _may_see(connection, alert):
+                connection.put(message)
 
     def _on_order(self, event: OrderEvent) -> None:
         if event.kind in NOT_SENT:
@@ -582,3 +586,7 @@ def _tick(tick: Tick) -> dict[str, Any]:
         "bids": tick.bids,
         "asks": tick.asks,
     }
+
+
+def _may_see(connection, alert: Alert) -> bool:
+    return alert.account_id is None or alert.account_id in connection.accounts

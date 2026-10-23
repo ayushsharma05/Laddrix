@@ -422,3 +422,14 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - 9 tests; mutation 12/12;
     - a demo check (`e2e-exits.sh`) still passes;
     - a mistake caught on the way: the mutation script named a test file that didn't exist, which made every mutant look "caught". The scripts now run the tests unmutated first and stop if they fail.
+- 23 Oct, **#270 done** (whose is what).
+  - **Defects confirmed:**
+    - every operational alert went to every signed-in user, including other accounts' Kite login, UNPROTECTED and MTM bands with client ids;
+    - backtests had no owner: anyone could list and read anyone's;
+    - any user could import candles into the shared dataset.
+  - **The fix:**
+    - **Alerts carry `account_id`:** the stream sends an account's alerts only to people who may see that account, both on connect and live, and its "cleared" goes to the same people. Permissions are re-read while connected, so revoked access stops at once. Firm-wide alerts still reach everyone.
+    - **Backtests have an owner:** admins see all. Someone else's is "no backtest …", the same as a missing one. Old runs without an owner are admin-only.
+    - **Candles are a shared dataset:** importing them is admin-only.
+    - **The policy is written down:** the "Who sees what" table in `docs/design/admin.md`.
+  - **Checks:** two-user tests (stream, backtests, candles) plus tests that each alert producer tags its account; mutation 15/15.

@@ -606,16 +606,26 @@ def create_app(
                             body.qty, body.params, body.product.value, body.start,
                             body.capital_paise, body.name)  # fmt: skip
         try:
-            run = runs.start(spec, candles=body.candles)
+            run = runs.start(spec, candles=body.candles, owner=user.id)
         except BacktestError as exc:
             raise HTTPException(422, str(exc)) from None
         audit("BACKTEST", f"{user.id} started {run.run_id}: {body.algo} {body.side.value} "
               f"{body.qty} {body.instrument_id} over {len(body.days)} days", {})  # fmt: skip
         return run.to_dict(full=False)
 
+    def own_run(run_id: str, user: User):
+        """A backtest the user may see (#270): their own, or any for an admin. Someone else's
+        is 'no backtest', exactly as one that doesn't exist: nothing leaks."""
+        run = backtest_runs().get(run_id)
+        if run is None or not run.may_see(user.id, user.has_role(Role.ADMIN)):
+            raise HTTPException(404, f"no backtest {run_id}")
+        return run
+
     @app.get("/api/research/backtests")
     async def backtest_list(user: Me) -> list[dict[str, Any]]:
-        return [r.to_dict(full=False) for r in backtest_runs().runs()]
+        admin = user.has_role(Role.ADMIN)
+        return [r.to_dict(full=False) for r in backtest_runs().runs()
+                if r.may_see(user.id, admin)]  # fmt: skip
 
     @app.get("/api/research/backtests/form")
     async def backtest_form_spec(user: Me, instrument_id: str = "") -> dict[str, Any]:
@@ -630,6 +640,7 @@ def create_app(
     async def backtest_day(run_id: str, day: str, user: Me, format: str = "json") -> Any:
         if format not in ("json", "csv", "pdf"):
             raise HTTPException(422, "format must be json, csv or pdf")
+        own_run(run_id, user)
         try:
             data = backtest_runs().day(run_id, day)
         except LookupError as exc:
@@ -645,15 +656,15 @@ def create_app(
 
     @app.get("/api/research/backtests/{run_id}")
     async def backtest_get(run_id: str, user: Me) -> dict[str, Any]:
-        run = backtest_runs().get(run_id)
-        if run is None:
-            raise HTTPException(404, f"no backtest {run_id}")
-        return run.to_dict()
+        return own_run(run_id, user).to_dict()
 
     @app.post("/api/research/candles", status_code=201)
     async def candles_import(body: CandlesIn, user: Me) -> dict[str, Any]:
         if candles is None:
             raise HTTPException(404, "candles can't be imported on this server")
+        if not user.has_role(Role.ADMIN):  # a shared dataset: every backtest reads it (#270)
+            raise HTTPException(403, "only an admin can import candles (everyone's backtests "
+                                "use them)")  # fmt: skip
         if platform.instruments.get(body.instrument_id) is None:
             raise HTTPException(422, f"unknown instrument {body.instrument_id}")
         try:

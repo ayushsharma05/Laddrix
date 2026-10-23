@@ -250,11 +250,17 @@ class Run:
     error: str = ""
     created_at: str = ""
     result: dict[str, Any] | None = None
+    owner: str = ""  # who started it (#270); "" (kept from before #270): admins only
+
+    def may_see(self, user_id: str, admin: bool) -> bool:
+        """A run is its owner's; an admin sees every run."""
+        return admin or self.owner == user_id  # "" is nobody's: user ids are never empty
 
     def to_dict(self, full: bool = True) -> dict[str, Any]:
         out = {"run_id": self.run_id, "spec": asdict(self.spec), "candle_based": self.candles,
                "state": self.state, "progress": self.progress, "days": len(self.spec.days),
-               "error": self.error, "created_at": self.created_at}  # fmt: skip
+               "error": self.error, "created_at": self.created_at,
+               "owner": self.owner}  # fmt: skip
         if self.result is not None:
             out["summary"] = self.result["summary"]
             if full:
@@ -286,7 +292,7 @@ class Backtests:
         self._tasks: set[asyncio.Task] = set()
         self._load()
 
-    def start(self, spec: BacktestSpec, *, candles: bool = False) -> Run:
+    def start(self, spec: BacktestSpec, *, candles: bool = False, owner: str = "") -> Run:
         problems = spec.problems()
         if self._instruments.get(spec.instrument_id) is None:
             problems.append(f"unknown instrument {spec.instrument_id}")
@@ -297,7 +303,7 @@ class Backtests:
         if problems:
             raise BacktestError("; ".join(problems))
         run = Run(f"BT{self._clock().strftime('%y%m%d%H%M%S')}{secrets.token_hex(2).upper()}",
-                  spec, candles, created_at=self._clock().isoformat())  # fmt: skip
+                  spec, candles, created_at=self._clock().isoformat(), owner=owner)  # fmt: skip
         self._runs[run.run_id] = run
         self._save(run)
         task = asyncio.ensure_future(self._run(run))
@@ -378,7 +384,7 @@ class Backtests:
                 d = json.loads(path.read_text())
                 spec = BacktestSpec(**{**d["spec"], "days": tuple(d["spec"]["days"])})
                 run = Run(d["run_id"], spec, d["candle_based"], d["state"], d["progress"],
-                          d["error"], d["created_at"])  # fmt: skip
+                          d["error"], d["created_at"], owner=d.get("owner", ""))  # fmt: skip
                 if d.get("summary") is not None:
                     run.result = {"summary": d["summary"], "daily": d.get("daily", [])}
                 if run.state in ("queued", "running"):  # the server stopped mid-run

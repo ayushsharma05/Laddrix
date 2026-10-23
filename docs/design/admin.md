@@ -154,3 +154,15 @@ An older `users.db` gets the new column (`must_change`) and table when the serve
   - the user signs in elsewhere and sees only Set your password; a short password gets the server's words; their own opens the terminal, without the Admin widget;
   - the admin tightens the per-order limit to 1 lot (check, then save), and a 2-lot order is refused; the loosening back takes two clicks;
   - no page errors.
+
+## Who sees what (#270)
+
+| Resource | Whose | Who sees it |
+| --- | --- | --- |
+| An account's orders, positions, algos, GTTs, charges, MTM, its **alert bands** (Kite login, UNPROTECTED, MTM, square-off, failed restart) | the account | its owner and traders; risk and admin. Re-checked while connected: access taken away stops the stream at once. |
+| Firm-wide alert bands (prices, disk, audit log, price overload) | the firm | everyone signed in (they affect every account) |
+| Price alerts and their webhook | the user | that user only |
+| Backtests | whoever started one | that user; admins see all. Someone else's answers **"no backtest …"**, exactly like one that doesn't exist. Runs kept from before #270 have no owner: admins only. |
+| Recorded ticks (market data, no account data) | shared | everyone signed in can read; admins delete |
+| Imported candles (one dataset every backtest reads) | shared | admins import; everyone's backtests read |
+| `/api/ops` (every alert, every job) | the firm | risk and admin |

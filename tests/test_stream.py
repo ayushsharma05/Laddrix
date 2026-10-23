@@ -559,3 +559,33 @@ async def test_strategy_endpoints(live):
     )
     assert too_wide.status_code == 422
     await client.aclose()
+
+
+# --- whose alerts (#270) ---
+
+
+async def test_an_accounts_alerts_reach_only_those_who_may_see_that_account(live):
+    live.hub._recheck_s = 0.05  # permissions re-read quickly
+    live.alerts.raise_("broker_login:acc-ayush", "WARN", "Log in to Kite for acc-ayush (ayush)",
+                       account_id="acc-ayush")  # fmt: skip
+    riya = await live.session("riya")
+    async with live.stream(riya) as ws:
+        live.alerts.raise_("prices", "ERROR", "No prices for over a minute")  # the firm's
+        first = await next_of(ws, "ops")
+        assert first["key"] == "prices"  # not ayush's login band, active before she connected
+        live.alerts.raise_("unprotected:acc-ayush:X", "ERROR", "UNPROTECTED acc-ayush: …",
+                           account_id="acc-ayush")  # fmt: skip
+        live.alerts.raise_("disk", "WARN", "Data disk low")
+        assert (await next_of(ws, "ops"))["key"] == "disk"  # ayush's band never came
+        live.users.update_account("acc-ayush", traders={"riya"})  # access given…
+        await asyncio.sleep(0.2)
+        live.alerts.raise_("mtm:acc-ayush:portfolio", "ERROR", "acc-ayush MTM …",
+                           account_id="acc-ayush")  # fmt: skip
+        assert (await next_of(ws, "ops"))["key"] == "mtm:acc-ayush:portfolio"
+        live.users.update_account("acc-ayush", traders=set())  # …and taken away again
+        await asyncio.sleep(0.2)
+        live.alerts.raise_("squareoff:acc-ayush", "WARN", "acc-ayush: square off?",
+                           account_id="acc-ayush")  # fmt: skip
+        live.alerts.raise_("prices", "WARN", "prices slow")
+        assert (await next_of(ws, "ops"))["key"] == "prices"  # revoked: nothing of ayush's
+    await riya.aclose()
