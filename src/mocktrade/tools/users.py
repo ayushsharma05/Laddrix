@@ -2,6 +2,7 @@
 
     python -m mocktrade.tools.users new-key                  # once: the secret key for .env
     python -m mocktrade.tools.users add-user ayush "Ayush" --roles admin,trader
+    python -m mocktrade.tools.users add-workspace acme "Acme Capital" --admin ravi   # a firm (#368)
     python -m mocktrade.tools.users add-account acc-ayush kite AB1234 --owner ayush
     python -m mocktrade.tools.users password ayush
     python -m mocktrade.tools.users disable ayush
@@ -77,6 +78,11 @@ def main(argv: list[str], env: dict[str, str], password=ask_password) -> int:
     add.add_argument("user_id")
     add.add_argument("name")
     add.add_argument("--roles", default="trader", help="comma separated: admin,trader,risk")
+    add.add_argument("--workspace", default="main", help="the firm (#368); default: main")
+    ws = sub.add_parser("add-workspace", help="a new firm, with its first admin (#368)")
+    ws.add_argument("workspace_id")
+    ws.add_argument("name")
+    ws.add_argument("--admin", required=True, help="its first admin's user id (created now)")
     acc = sub.add_parser("add-account")
     acc.add_argument("account_id")
     acc.add_argument("broker", choices=["kite", "paper"])
@@ -106,9 +112,19 @@ def main(argv: list[str], env: dict[str, str], password=ask_password) -> int:
     store = store_from_env(env)
     if args.command == "add-user":
         roles = {Role(r.strip()) for r in args.roles.split(",") if r.strip()}
-        created = store.create_user(args.user_id, args.name, password(), roles)
+        created = store.create_user(args.user_id, args.name, password(), roles,
+                                    workspace=args.workspace)  # fmt: skip
         print(f"Created {created.user.id} with roles {sorted(r.value for r in roles)}.")
         print("Add this to an authenticator app now (it won't be shown again):")
+        print(created.totp_uri)
+    elif args.command == "add-workspace":
+        # only from here: no screen can create a firm or reach another (docs/design/tenancy.md)
+        store.create_workspace(args.workspace_id, args.name)
+        created = store.create_user(args.admin, args.admin, password(), {Role.ADMIN},
+                                    workspace=args.workspace_id)  # fmt: skip
+        print(f"Created workspace {args.workspace_id} ({args.name}) with its admin {args.admin}.")
+        print("Their admin adds the firm's users and accounts from the Admin screen.")
+        print("Add this to the admin's authenticator app now (it won't be shown again):")
         print(created.totp_uri)
     elif args.command == "add-account":
         traders = frozenset(t for t in args.traders.split(",") if t)

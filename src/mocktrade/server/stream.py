@@ -39,7 +39,7 @@ from mocktrade.algos.engine import AlgoEvent
 from mocktrade.charges.model import ChargeBill, bill_to_dict
 from mocktrade.charges.service import ChargesService
 from mocktrade.charts.service import ChartError, Charts
-from mocktrade.domain.accounts import User, can_view
+from mocktrade.domain.accounts import MAIN, User, can_view
 from mocktrade.domain.gtt import GttView, gtt_to_dict
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import Subscription
@@ -128,7 +128,7 @@ class StreamHub:
         self._live: tuple[float, set[str]] | None = None  # (read at, session digests)
         self._connections: set[_Connection] = set()
         self._attached: set[str] = set()
-        platform.firm_switch.on_change(self._on_kill)
+        platform.on_firm_change(self._on_kill)  # every workspace's firm STOP (#368)
         for runtime in platform.accounts.values():
             self.attach(runtime)
         self._alerts = alerts
@@ -540,9 +540,14 @@ class StreamHub:
             "by": state.by,
             "at": state.at.isoformat() if state.at else None,
         }
+        firm = None  # a firm STOP: whose ("firm" is "main"'s, "firm <id>" another's, #368)
+        if name == "firm" or name.startswith("firm "):
+            firm = name.removeprefix("firm").strip() or MAIN
+            message["scope"] = "firm"  # to its own people it is simply their firm's STOP
         for connection in list(self._connections):
             account_id = name.removeprefix("account ")
-            if name == "firm" or account_id in connection.accounts:
+            if (connection.user.workspace == firm if firm is not None
+                    else account_id in connection.accounts):  # fmt: skip
                 connection.put(message)
 
     def _on_alert(self, account_id: str, what: str, mismatch: Mismatch) -> None:

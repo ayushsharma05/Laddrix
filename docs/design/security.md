@@ -11,9 +11,12 @@ Reviewed 23 Oct 2026, against current `main`.
 
 **Today: one firm, one self-hosted server.** One Docker host (Lightsail Mumbai) behind Caddy
 (HTTPS), with one static IP that the broker accepts orders from. The firm's own users only:
-admin, risk, traders. **Not multi-tenant:** admin and risk users see every account, by
-design (`admin.md`, "Who sees what"). Offering MockTrade to other firms changes this whole
-page. That decision is #278, and the work is #368.
+admin, risk, traders. **Several firms (#368, in progress):** each firm is a workspace
+([tenancy.md](tenancy.md)). Everything checks the asker's workspace first, and another firm's
+things answer 404. STOP is per workspace. The operator has no web role: terminal only. Done
+in #394: the data, every check, STOP and the admin screens. Still to do before any outside
+firm: each trader's own prices (#395), files and jobs (#396), the browser drill (#397), and
+Zerodha's answer (#278).
 
 | Who can read what, outside the app | |
 | --- | --- |

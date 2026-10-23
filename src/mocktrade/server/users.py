@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from mocktrade.domain.accounts import BrokerAccount, Role, User
+from mocktrade.domain.accounts import MAIN, BrokerAccount, Role, User
 from mocktrade.server import security
 from mocktrade.server.security import SecretBox
 
@@ -70,6 +70,11 @@ CREATE TABLE IF NOT EXISTS sessions (
     last_seen TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sessions_by_user ON sessions (user_id);
+CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY,                -- e.g. "main", "acme"
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS layouts (
     user_id TEXT NOT NULL REFERENCES users(id),
     name TEXT NOT NULL,
@@ -82,6 +87,9 @@ CREATE TABLE IF NOT EXISTS layouts (
 # columns added after the first release: (table, column, definition)
 _ADDED = (
     ("users", "must_change", "INTEGER NOT NULL DEFAULT 0"),
+    # the firm each belongs to (#368): everything from before is the one firm, "main"
+    ("users", "workspace", "TEXT NOT NULL DEFAULT 'main'"),
+    ("accounts", "workspace", "TEXT NOT NULL DEFAULT 'main'"),
     ("sessions", "stepped_up_at", "TEXT"),  # the last fresh authenticator code (#363)
     ("sessions", "device", "TEXT NOT NULL DEFAULT ''"),  # the browser, as it says (#363)
     ("sessions", "ip", "TEXT NOT NULL DEFAULT ''"),
@@ -129,22 +137,46 @@ class UserStore:
                 have = {r["name"] for r in db.execute(f"PRAGMA table_info({table})")}
                 if column not in have:
                     db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            db.execute("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES (?, ?, ?)",
+                       (MAIN, "Main", self._clock().isoformat()))  # fmt: skip
+
+    # --- workspaces: one per firm (#368); created only from the server's terminal ----------------
+
+    def create_workspace(self, workspace_id: str, name: str) -> None:
+        if not workspace_id.isascii() or not workspace_id.replace("-", "").isalnum():
+            raise ValueError("workspace id must be letters, digits or dashes")
+        try:
+            with self._db() as db:
+                db.execute("INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?)",
+                           (workspace_id, name, self._clock().isoformat()))  # fmt: skip
+        except sqlite3.IntegrityError:
+            raise ValueError(f"workspace {workspace_id} already exists") from None
+
+    def workspaces(self) -> list[tuple[str, str]]:
+        with self._db() as db:
+            return [
+                (r["id"], r["name"]) for r in db.execute("SELECT * FROM workspaces ORDER BY id")
+            ]
 
     # --- users -------------------------------------------------------------------------------
 
     def create_user(
-        self, user_id: str, name: str, password: str, roles: set[Role], *, must_change: bool = False
-    ) -> NewUser:
-        """`must_change`: the password is a one-time one (an admin's); changed at first login."""
+        self, user_id: str, name: str, password: str, roles: set[Role], *,
+        must_change: bool = False, workspace: str = MAIN,
+    ) -> NewUser:  # fmt: skip
+        """`must_change`: the password is a one-time one (an admin's); changed at first login.
+        `workspace`: the firm, for life (#368). User ids are unique across all workspaces."""
         if not user_id.isascii() or not user_id.replace("-", "").isalnum():
             raise ValueError("user id must be letters, digits or dashes")
+        if workspace not in {w for w, _ in self.workspaces()}:
+            raise ValueError(f"no workspace {workspace}")
         secret = security.new_totp_secret()
         password_hash = security.hash_password(password)
         try:
             with self._db() as db:
                 db.execute(
-                    "INSERT INTO users (id, name, password_hash, totp_secret, roles, must_change) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO users (id, name, password_hash, totp_secret, roles, must_change, "
+                    "workspace) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (
                         user_id,
                         name,
@@ -152,11 +184,13 @@ class UserStore:
                         self._box.seal(secret),
                         _roles(roles),
                         int(must_change),
+                        workspace,
                     ),
                 )
         except sqlite3.IntegrityError:
             raise ValueError(f"user {user_id} already exists") from None
-        user = User(user_id, name, frozenset(roles), must_change_password=must_change)
+        user = User(user_id, name, frozenset(roles), must_change_password=must_change,
+                    workspace=workspace)  # fmt: skip
         return NewUser(user, security.totp_uri(secret, user_id))
 
     def get_user(self, user_id: str) -> User | None:
@@ -320,13 +354,16 @@ class UserStore:
         # the id names files (MTM rules, broker tokens, reports): letters, digits, dashes only
         if not account.id.isascii() or not account.id.replace("-", "").isalnum():
             raise ValueError("account id must be letters, digits or dashes")
-        if self.get_user(account.owner_user_id) is None:
+        owner = self.get_user(account.owner_user_id)
+        if owner is None:
             raise ValueError(f"no user {account.owner_user_id}")
+        # the account is its owner's firm's; its traders must be of that firm too (#368)
+        self._same_firm(account.traders, owner.workspace)
         try:
             with self._db() as db:
                 db.execute(
                     "INSERT INTO accounts (id, broker, broker_client_id, owner_user_id, traders, "
-                    "active) VALUES (?, ?, ?, ?, ?, ?)",
+                    "active, workspace) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (
                         account.id,
                         account.broker,
@@ -334,6 +371,7 @@ class UserStore:
                         account.owner_user_id,
                         ",".join(sorted(account.traders)),
                         int(account.active),
+                        owner.workspace,
                     ),
                 )
         except sqlite3.IntegrityError:
@@ -349,7 +387,9 @@ class UserStore:
                 raise KeyError(account_id)
             before = _account(row)
             if traders is not None:
-                known = {r["id"] for r in db.execute("SELECT id FROM users")}
+                # only users of the account's own firm (#368): another firm's id is unknown here
+                known = {r["id"] for r in db.execute("SELECT id FROM users WHERE workspace = ?",
+                                                     (before.workspace,))}  # fmt: skip
                 unknown = sorted(set(traders) - known)
                 if unknown:
                     raise ValueError(f"no such user: {', '.join(unknown)}")
@@ -357,13 +397,21 @@ class UserStore:
             after = BrokerAccount(
                 before.id, before.broker, before.broker_client_id, before.owner_user_id,
                 frozenset(traders) if traders is not None else before.traders,
-                active if active is not None else before.active,
+                active if active is not None else before.active, before.workspace,
             )  # fmt: skip
             db.execute(
                 "UPDATE accounts SET traders = ?, active = ? WHERE id = ?",
                 (",".join(sorted(after.traders)), int(after.active), account_id),
             )
         return before, after
+
+    def _same_firm(self, user_ids, workspace: str) -> None:
+        with self._db() as db:
+            known = {r["id"] for r in db.execute("SELECT id FROM users WHERE workspace = ?",
+                                                 (workspace,))}  # fmt: skip
+        unknown = sorted(set(user_ids) - known)
+        if unknown:
+            raise ValueError(f"no such user: {', '.join(unknown)}")
 
     def account_limits(self, account_id: str) -> dict | None:
         """The saved limits (the spec's flat names), or None: the defaults."""
@@ -741,7 +789,8 @@ def _roles(roles: set[Role]) -> str:
 
 def _user(row: sqlite3.Row) -> User:
     roles = frozenset(Role(r) for r in row["roles"].split(",") if r)
-    return User(row["id"], row["name"], roles, bool(row["active"]), bool(row["must_change"]))
+    return User(row["id"], row["name"], roles, bool(row["active"]), bool(row["must_change"]),
+                row["workspace"])  # fmt: skip
 
 
 def _account(row: sqlite3.Row) -> BrokerAccount:
@@ -753,4 +802,5 @@ def _account(row: sqlite3.Row) -> BrokerAccount:
         row["owner_user_id"],
         traders,
         bool(row["active"]),
+        row["workspace"],
     )

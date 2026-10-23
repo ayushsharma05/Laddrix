@@ -25,7 +25,7 @@ from mocktrade.broker.rules import order_spec
 from mocktrade.charges.model import ChargesModel, ScheduleCharges
 from mocktrade.charges.schedules import KITE_STANDARD
 from mocktrade.charges.service import ChargesService
-from mocktrade.domain.accounts import BrokerAccount
+from mocktrade.domain.accounts import MAIN, BrokerAccount
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.money import format_rupees
 from mocktrade.domain.order_spec import OrderSpec
@@ -138,7 +138,7 @@ class AccountRuntime:
 class Platform:
     instruments: InstrumentStore
     market_data: MarketData
-    firm_switch: KillSwitch
+    firm_switch: KillSwitch  # the "main" workspace's: on a one-firm server, the firm's
     event_log: EventLog | None = None
     accounts: dict[str, AccountRuntime] = field(default_factory=dict)
     charges_model: ChargesModel = field(default_factory=lambda: ScheduleCharges(KITE_STANDARD))
@@ -151,6 +151,9 @@ class Platform:
     supervisor: Supervisor = field(init=False, repr=False)  # critical loops, watched (#273)
     # may this user still trade this account? read at each order (#366); the server sets it
     access: Access = field(default=no_check, repr=False)
+    # every other workspace's own "firm" switch (#368): one firm's STOP never touches another
+    _firms: dict[str, KillSwitch] = field(default_factory=dict, init=False, repr=False)
+    _firm_listeners: list = field(default_factory=list, init=False, repr=False)
     _late: set[asyncio.Task] | None = field(default=None, init=False, repr=False)
     _reconcile: bool = field(default=True, init=False, repr=False)
 
@@ -166,6 +169,29 @@ class Platform:
 
     def account(self, account_id: str) -> AccountRuntime | None:
         return self.accounts.get(account_id)
+
+    def firm_switch_of(self, workspace: str) -> KillSwitch:
+        """The kill switch of one workspace's whole firm (#368). "main" is `firm_switch`
+        (named "firm", as before); another is "firm <id>", made on first use, audited and told
+        to every listener of `on_firm_change`."""
+        if workspace == MAIN:
+            return self.firm_switch
+        found = self._firms.get(workspace)
+        if found is None:
+            found = KillSwitch(f"firm {workspace}")
+            if self.event_log is not None:
+                found.on_change(self.event_log.record_kill)
+            for listener in self._firm_listeners:
+                found.on_change(listener)
+            self._firms[workspace] = found
+        return found
+
+    def on_firm_change(self, listener) -> None:
+        """`listener(name, state)` for every workspace's firm switch, now and later."""
+        self._firm_listeners.append(listener)
+        self.firm_switch.on_change(listener)
+        for switch in self._firms.values():
+            switch.on_change(listener)
 
     def mark(self, tick: Tick) -> None:
         """Send a tick to every account's positions (market data listener)."""
@@ -446,12 +472,14 @@ class Platform:
         clock: Callable[[], datetime],
         book: PositionBook | None = None,
         throttle: OrderThrottle | None = None,
+        firm: KillSwitch | None = None,
     ) -> AlgoEngine:
         """The account's algos: blocked while a kill switch is on, stopped when one engages,
         every state change audited."""
+        firm = firm or self.firm_switch  # the account's workspace's (#368)
 
         def blocked() -> str | None:
-            for s in (self.firm_switch, switch):
+            for s in (firm, switch):
                 if s.engaged:
                     return f"trading is stopped: {s.state.reason}"
             return None
@@ -501,7 +529,7 @@ class Platform:
                 engine.stop_all(f"trading stopped: {state.reason}")
 
         switch.on_change(on_switch)
-        self.firm_switch.on_change(on_switch)
+        firm.on_change(on_switch)
         return engine
 
     def add_account(
@@ -530,6 +558,7 @@ class Platform:
             raise ValueError(f"account {account.id} is already running")
         limits = limits or RiskLimits()
         switch = KillSwitch(f"account {account.id}", clock=clock)
+        firm = self.firm_switch_of(account.workspace)  # its own firm's STOP, no other (#368)
         book = PositionBook(account.id, clock=clock)
         holder: dict[str, Any] = {}  # the gates need what they guard (orders, portfolio)
         risk = RiskGate(
@@ -539,7 +568,7 @@ class Platform:
             position=book.net_qty,
             working=lambda: holder["orders"].working(),
             day_pnl_paise=book.day_pnl_paise,
-            switches=(self.firm_switch, switch),
+            switches=(firm, switch),
             clock=clock,
             positions=book.net_by_instrument,
             product_position=book.qty,
@@ -614,7 +643,8 @@ class Platform:
                     },
                 )
             )
-        algos = self._algo_engine(account.id, orders, switch, algo_types, clock, book, throttle)
+        algos = self._algo_engine(account.id, orders, switch, algo_types, clock, book, throttle,
+                                  firm=firm)  # fmt: skip
         basket_audit = None
         if self.event_log is not None:
             log = self.event_log
@@ -643,7 +673,7 @@ class Platform:
             gtt = GttService(
                 account.id, broker, orders, risk, self.instruments.get, self.market_data.latest,
                 audit=gtt_audit, clock=clock,
-                stopped=lambda: next((s.state.reason or s.name for s in (self.firm_switch, switch)
+                stopped=lambda: next((s.state.reason or s.name for s in (firm, switch)
                                       if s.engaged), None),
                 position=book.qty,
                 access=lambda user_id, a=account.id: self.access(user_id, a),
@@ -663,7 +693,7 @@ class Platform:
                 task.add_done_callback(sweeps.discard)
 
             switch.on_change(sweep_now)
-            self.firm_switch.on_change(sweep_now)
+            firm.on_change(sweep_now)
 
         def client_id_of(broker_order_id: str) -> str | None:
             view = orders.by_broker_id(broker_order_id)
@@ -708,7 +738,6 @@ class Platform:
         squareoff = SquareOff(account.id, book, orders, self.instruments.get,
                               max_lots=limits.max_order_lots, audit=note, clock=clock,
                               desk=desk)  # fmt: skip
-        firm = self.firm_switch
 
         def stopped():
             return next((sw.state for sw in (switch, firm) if sw.engaged), None)
