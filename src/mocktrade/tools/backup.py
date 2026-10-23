@@ -10,10 +10,11 @@ days are deleted.
 
 What goes in (the data folder, $MOCKTRADE_DATA):
 
-    users.db, events.db  users, accounts, sessions, layouts, settings, limits; the audit trail
+    users.db, events.db  users, accounts, layouts, settings, limits; the audit trail
                          (orders, fills, positions are rebuilt from it). Copied with SQLite's
                          online backup: consistent even while the server writes, and checked
-                         with SQLite's integrity check.
+                         with SQLite's integrity check. Logged-in sessions are left out: a
+                         restore never brings one back, everyone logs in again (#364).
     rules/  reports/  alerts/  candles/  backtests/
                          the traders' MTM limits, end-of-day reports, market alerts (with each
                          user's webhook), imported candles, backtest results. Plain files, each
@@ -63,12 +64,23 @@ FORMAT = 1
 STAMP = "%Y%m%dT%H%M%SZ"
 
 
+# tables emptied in the copy: sessions (a restore must never bring an old login back, #364)
+LEFT_OUT = {"users.db": ("sessions",)}
+
+
 def backup_one(source: Path, target: Path) -> None:
     """A consistent copy of a live database, verified."""
     src = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
     dst = sqlite3.connect(target)
     try:
         src.backup(dst)
+        if empty := LEFT_OUT.get(source.name):
+            dst.execute("PRAGMA secure_delete = ON")  # overwritten, not just freed: no trace
+            have = {r[0] for r in dst.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            for table in empty:
+                if table in have:
+                    dst.execute(f"DELETE FROM {table}")
+            dst.commit()
         dst.execute("PRAGMA journal_mode=DELETE")  # one self-contained file, no -wal/-shm
     finally:
         src.close()

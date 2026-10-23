@@ -72,7 +72,7 @@ the control.
 | 6 | Risk limit raced, or action after permission removed | risk gate + throttle per account; durable orders (#265). **Rights re-checked when the action happens (#366):** every new order or change asks the user store again; a running algo stops before its next child; a GTT that could open is deleted, a stop-loss kept; closes and cancels always go | `test_access_recheck.py` (incl. 10 orders at once vs the position and open-order limits) |
 | 7 | Secrets leaked via the screens, git or HTTP paths | screens and desktop sources scanned; `.env`, keys, tokens and databases never tracked; probes of 24 private paths (incl. path tricks) never serve a planted secret | `test_security_surface.py` (**new**), #269 |
 | 8 | SSRF via webhooks | https only, private addresses refused | #271, `test_alerts*.py` |
-| 9 | Key or credential compromised | — | rotation + drill: **#364** |
+| 9 | Key or credential compromised | `users revoke-sessions` (open screens close within 2 s), `users rotate-key` (refused while the server runs; all or nothing), backups hold no session, the playbook in `incidents.md` ("A credential is stolen") | `test_key_rotation.py`; the drill on the demo, 15/15 (`context/evidence/h-364-credential-drill.txt`) |
 | 10 | Dependency or update compromised | `npm audit` in CI | Python audit, SBOM, pins, signing: **#365** |
 | 11 | Logs leak secrets; retention | secrets kept out of backups | redaction tests, retention policy: **#367** |
 | 12 | Storage, audit or feed outage | orders refused unless on disk first (#265); stale prices refuse risk-adding orders (#267); critical loops watched, new orders pause, cancels go (#273); STOP + Flatten work through it (#262) | those PRs' tests |
@@ -84,10 +84,10 @@ This is not certification: it only shows where each requirement area stands.
 | ASVS chapter | Status |
 | --- | --- |
 | V2 Authentication | argon2id, TOTP for all, lockout; step-up for sensitive changes: #363 |
-| V3 Session management | server-side sessions, rotation on login, timeouts, revocation; a user's own session list: #363 |
+| V3 Session management | server-side sessions, rotation on login, timeouts, revocation (one user or everyone, live streams included, #364); a user's own session list: #363 |
 | V4 Access control | default-deny per account and on the stream (#270); delayed actions re-checked at the moment they act (#366) |
 | V5 Validation | strict request models (`_Strict`, field limits); path checks (#269) |
-| V6 Stored cryptography | Fernet (SecretBox) for TOTP and broker secrets; key rotation: #364 |
+| V6 Stored cryptography | Fernet (SecretBox) for the authenticator secrets in `users.db`. The broker's API secret is in `.env` and its daily tokens in owner-only files, not encrypted by MockTrade. Key rotation is all or nothing: `users rotate-key` (#364) |
 | V7 Errors and logging | audit trail of every order event and privileged action; redaction: #367 |
 | V8 Data protection | owner-only backups; retention and deletion: #367 |
 | V9 Communications | HTTPS via Caddy; HSTS and security headers (`test_server.py`) |

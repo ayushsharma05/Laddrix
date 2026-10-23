@@ -54,6 +54,7 @@ from mocktrade.positions.book import PositionView
 from mocktrade.positions.reconcile import Mismatch
 from mocktrade.risk.kill_switch import KillState
 from mocktrade.risk.mtm import MtmEvent
+from mocktrade.server import security
 from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.users import UserStore
 
@@ -107,6 +108,7 @@ class StreamHub:
         queue_limit: int = 2000,
         max_instruments: int = 200,
         recheck_s: float = 60.0,
+        revoked_s: float = 2.0,  # how soon an ended session's open streams close (#364)
         clock: Callable[[], float] = time.monotonic,
         alerts: Alerts | None = None,
         chains: ChainService | None = None,
@@ -122,6 +124,8 @@ class StreamHub:
         self._queue_limit = queue_limit
         self._max_instruments = max_instruments
         self._recheck_s = recheck_s
+        self._revoked_s = revoked_s
+        self._live: tuple[float, set[str]] | None = None  # (read at, session digests)
         self._connections: set[_Connection] = set()
         self._attached: set[str] = set()
         platform.firm_switch.on_change(self._on_kill)
@@ -410,13 +414,27 @@ class StreamHub:
                 w.cancel()
 
     async def _watch_session(self, connection: _Connection) -> None:
-        """Returns (ending the stream) once the session is gone: logout, expiry, disabling."""
+        """Returns (ending the stream) once the session is gone: logout, expiry, disabling,
+        revoked sessions (#364). Whether it still exists is checked every few seconds (one
+        read shared by all streams); the full check (expiry, permissions) every minute."""
+        digest = security.token_digest(connection.token)
+        checked = time.monotonic()
         while True:
-            await asyncio.sleep(self._recheck_s)
+            await asyncio.sleep(min(self._revoked_s, self._recheck_s))
+            due = time.monotonic() - checked >= self._recheck_s
+            if not due and digest in self._live_sessions():
+                continue
+            checked = time.monotonic()
             user = self._users.session_user(connection.token)
             if user is None:
                 return
             connection.accounts = self._viewable(user)  # permissions can change
+
+    def _live_sessions(self) -> set[str]:
+        now = time.monotonic()
+        if self._live is None or now - self._live[0] >= min(self._revoked_s, self._recheck_s) / 2:
+            self._live = (now, self._users.session_digests())
+        return self._live[1]
 
     # --- events from the platform ------------------------------------------------------------
 

@@ -101,6 +101,9 @@ class NewUser:
     totp_uri: str  # show once as a QR code; the secret is never shown again
 
 
+WRONG_KEY = "is MOCKTRADE_SECRET_KEY the key in use?"
+
+
 class UserStore:
     def __init__(
         self,
@@ -507,6 +510,64 @@ class UserStore:
         return cursor.rowcount > 0
 
     # --- inside -----------------------------------------------------------------------------
+
+    # --- the secret key and sessions in an incident (#364) -------------------------------------
+
+    def check_key(self, box: SecretBox | None = None) -> list[str]:
+        """The users whose authenticator secret this key (default: the current one) can't open.
+        Empty means the key opens everything."""
+        box = box or self._box
+        with self._db() as db:
+            rows = db.execute("SELECT id, totp_secret FROM users ORDER BY id").fetchall()
+        bad = []
+        for row in rows:
+            try:
+                box.open(row["totp_secret"])
+            except ValueError:
+                bad.append(row["id"])
+        return bad
+
+    def rotate_key(self, new: SecretBox) -> int:
+        """Re-encrypt every secret under `new`, all at once or not at all.
+
+            open each with the current key ─► any fails ─► nothing changed (ValueError)
+            seal each with the new key, open it again with the new key (proves it reads back)
+            write them all in one transaction ─► after that, only the new key opens them
+
+        The caller keeps the current key until the server runs with the new one (and keeps it
+        with the backups made before: a restored backup needs the key of its time)."""
+        with self._lock, self._db() as db:
+            db.execute("BEGIN IMMEDIATE")  # no other writer between reading and writing
+            rows = db.execute("SELECT id, totp_secret FROM users ORDER BY id").fetchall()
+            sealed = []
+            for row in rows:
+                try:
+                    plain = self._box.open(row["totp_secret"])
+                except ValueError:
+                    raise ValueError(f"the current key can't open {row['id']}'s secret: "
+                                     f"nothing was changed ({WRONG_KEY})") from None  # fmt: skip
+                again = new.seal(plain)
+                if new.open(again) != plain:  # never write what can't be read back
+                    raise ValueError(f"{row['id']}'s secret didn't read back: nothing was changed")
+                sealed.append((again, row["id"]))
+            db.executemany("UPDATE users SET totp_secret = ? WHERE id = ?", sealed)
+        self._box = new
+        return len(sealed)
+
+    def revoke_sessions(self, user_id: str | None = None) -> int:
+        """End every session (or one user's) now: each must log in again. Open live
+        connections close within seconds (the stream checks, server/stream.py)."""
+        with self._lock, self._db() as db:
+            if user_id is None:
+                return db.execute("DELETE FROM sessions").rowcount
+            if db.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone() is None:
+                raise KeyError(user_id)
+            return db.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,)).rowcount
+
+    def session_digests(self) -> set[str]:
+        """The digests of the sessions that exist: one cheap read for every open stream."""
+        with self._db() as db:
+            return {r[0] for r in db.execute("SELECT token_hash FROM sessions")}
 
     @contextmanager
     def _db(self) -> Iterator[sqlite3.Connection]:

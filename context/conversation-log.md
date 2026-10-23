@@ -510,3 +510,12 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **The fix:** one check, "may this user still trade this account?", read fresh from the user store (`risk/access.py`, the same rule as the screens). Used in three places: an order gate (new orders and changes refused with the reason; reduce-only, exit-desk closes and cancels always go); an algo's next child (the algo stops, saying why); GTTs on each poll (one that could open is deleted at the broker, a stop-loss kept, like STOP). A turned-off account stays the risk gate's business (closing only), as before.
   - **Races:** 10 orders at once against the position limit (3 lots) and the open-orders limit (4): exactly the limit gets through; already true, now tested.
   - **Checks:** 8 tests; mutation 12/12; all 1,387 tests pass.
+- 23 Oct, #366 merged (PR #374). **#364 done** (rotating the key, ending sessions, a stolen-credential drill).
+  - **Gaps confirmed:** no way to rotate `MOCKTRADE_SECRET_KEY`. Sessions could only be ended one user at a time (password change or disable), and open streams noticed only after up to a minute. Backups carried the sessions table, so a restore brought old logins back. The security doc said broker secrets were encrypted: they aren't (they're in `.env`); corrected.
+  - **The fix:**
+    - `users rotate-key` re-encrypts every authenticator secret under a new key (from `MOCKTRADE_NEW_SECRET_KEY`), all at once or not at all. Each secret is read back before writing. It is refused while a server owns the data folder or if the key in use is wrong, and `--check` changes nothing.
+    - `users revoke-sessions [--user U]`: open streams close within 2 s (one shared read of the live sessions every 2 s; the full check stays at a minute).
+    - Backups leave sessions out (overwritten, not just freed).
+    - The demo now takes the data-folder lock like the real server.
+    - Playbook "A credential is stolen" in `incidents.md` (contain, STOP, reconcile, keep evidence, rotate, restore without sessions), including Kite secret rotation.
+  - **Checks:** 8 tests; mutation 12/12; the drill on the demo 15/15 (`context/evidence/h-364-credential-drill.txt`).

@@ -37,6 +37,7 @@ from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.ops.alerts import Alerts
 from mocktrade.ops.checks import PriceOverload, audit_log
+from mocktrade.ops.fence import DataFence, FenceError
 from mocktrade.ops.guards import DayGuards
 from mocktrade.ops.protection import ProtectionGuard
 from mocktrade.ops.scheduler import Scheduler
@@ -116,6 +117,11 @@ async def main(
             raise SystemExit(f"can't replay: {exc}") from None
         for instrument in day_instruments:
             instruments.add(instrument)
+    fence = DataFence(data)  # one server per data folder, like the real one (#273)
+    try:
+        fence.acquire()
+    except FenceError as exc:
+        raise SystemExit(str(exc)) from None
     users = setup_users(data)  # after the checks: a refused replay leaves nothing behind
     md = MarketData()
     feed = None
@@ -221,6 +227,7 @@ async def main(
         for broker in brokers:
             await broker.aclose()
         await log.aclose()
+        fence.release()
 
 
 def _replay_band(alerts: Alerts, status: dict) -> None:
