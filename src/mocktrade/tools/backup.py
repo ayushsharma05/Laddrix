@@ -45,6 +45,18 @@ DATABASES = ("users.db", "events.db")
 FOLDERS = ("rules", "reports", "alerts", "candles", "backtests")
 OPTIONAL = {"ticks": "recorded days (large): --with-ticks"}
 NEVER = ("kite_token_*.json", "*.key", ".env", "*.tmp", "*.part")  # inside the folders, too
+# In the data folder but rebuilt, renewed or kept elsewhere: not state a backup must hold.
+# Anything else at the top of the data folder that isn't a database or a folder above is
+# NEW state no backup rule covers yet (#272): the backup is still made, but it says so and
+# fails, so the nightly job's alert reaches a person instead of a backup quietly missing it.
+REPRODUCIBLE = (
+    "backups", ".before-restore-*",  # the backups themselves; what a restore moved aside
+    "ticks",  # recordings: only with --with-ticks
+    "kite_instruments.csv", "kite_token_*.json",  # downloaded again; expire daily
+    "*.db-wal", "*.db-shm", "*.db-journal",  # SQLite's working files (inside the backups)
+    "*.tmp", "*.part", "*.key", ".env",
+    "demo_totp.txt",  # the demo's login secret: a secret, kept elsewhere (the demo prints it)
+)  # fmt: skip
 MANIFEST = "manifest.json"
 FORMAT = 1
 STAMP = "%Y%m%dT%H%M%SZ"
@@ -100,6 +112,15 @@ def manifest(folder: Path, now: datetime, parts: list[str]) -> dict[str, Any]:
     return {"format": FORMAT, "made_at": now.isoformat(), "parts": parts, "files": files}
 
 
+def not_covered(data_dir: Path) -> list[str]:
+    """Top-level entries of the data folder that no backup rule covers (see REPRODUCIBLE)."""
+    known = set(DATABASES) | set(FOLDERS)
+    return sorted(
+        p.name for p in data_dir.iterdir()
+        if p.name not in known and not any(p.match(pattern) for pattern in REPRODUCIBLE)
+    )  # fmt: skip
+
+
 def run_backup(
     data_dir: Path, to: Path, keep_days: int, now: datetime, *, with_ticks: bool = False
 ) -> Path:
@@ -122,7 +143,9 @@ def run_backup(
             if (data_dir / name).is_dir():
                 copy_folder(data_dir / name, part / name)
                 parts.append(f"{name}/")
-        (part / MANIFEST).write_text(json.dumps(manifest(part, now, parts), indent=1))
+        listed = manifest(part, now, parts)
+        listed["not_covered"] = not_covered(data_dir)
+        (part / MANIFEST).write_text(json.dumps(listed, indent=1))
     except BaseException:
         shutil.rmtree(part, ignore_errors=True)
         raise
@@ -154,8 +177,13 @@ def main(argv: list[str]) -> int:
     except (OSError, RuntimeError, sqlite3.Error) as exc:
         print(f"backup FAILED: {exc}", file=sys.stderr)
         return 1
-    files = json.loads((folder / MANIFEST).read_text())["files"]
-    print(f"backup OK: {folder} ({len(files)} files)")
+    listed = json.loads((folder / MANIFEST).read_text())
+    if listed.get("not_covered"):
+        print(f"backup made, but INCOMPLETE: {folder}: {', '.join(listed['not_covered'])} in "
+              f"{data} is covered by no backup rule (tools/backup.py: FOLDERS for state, "
+              "REPRODUCIBLE for what is rebuilt)", file=sys.stderr)  # fmt: skip
+        return 2
+    print(f"backup OK: {folder} ({len(listed['files'])} files)")
     return 0
 
 
