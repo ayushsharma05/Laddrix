@@ -109,3 +109,19 @@ mid-change brings it back in doubt without understating risk. So a crash at any 
 leaves every order that might be at the exchange known after the restart, with its doubt,
 and its id is never given out again. Backtests switch this off, because they never send a
 real order.
+
+### Prices that act on orders (#267)
+
+```
+ tick ──► late? (exchange time older than what we hold) ──yes──► counted, dropped
+   │ no
+   ▼
+ latest state + "seen at" (per instrument)
+   ├──► screens: conflated (only the newest per instrument; a slow screen isn't flooded)
+   └──► algos, paper broker: EVERY tick, in order (a spike through a stop and back is
+        still seen), at most 10,000 unread each, then the oldest dropped (overload band)
+
+ new order that adds risk ──► its OWN instrument's price at most 60 s old? ──no──► refused
+                                                           (closing trades always go)
+ spread algo ──► leg prices more than 3 s apart in time? ──yes──► waits ("leg prices N s apart")
+```

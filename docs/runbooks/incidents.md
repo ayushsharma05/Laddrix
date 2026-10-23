@@ -272,3 +272,30 @@ has stalled, MockTrade refuses new orders rather than send ones it couldn't reco
 4. **If the server must be restarted meanwhile,** whatever was still waiting in memory may be
    lost. Orders already sent were written first, and the broker's own order book settles the
    rest at start (recovery).
+
+## "The last price for … is N s old" (#267)
+
+**You see:** an order refused with "the last price for NIFTY26OCTFUT is 75 s old (limit 60 s):
+open its ladder or wait for a new price; closing trades still go".
+
+**Why:** an order that adds risk is checked against **its own instrument's** latest price,
+and that price must be at most 60 s old. Other instruments ticking busily don't count. A
+quiet or unsubscribed instrument's old price could be far from the market.
+
+1. Open the instrument's ladder (or watchlist row): that subscribes it, and a fresh price
+   arrives within a second if the market is open.
+2. If no price comes: the market may be closed, or the feed is down (see the prices band).
+3. Closing orders (and Flatten, square-off, loss limits) are never refused for this.
+
+## "prices: N ticks were dropped" (#267)
+
+**You see:** a yellow band "prices: N ticks were dropped since the last check because algos or
+paper fills fell behind; the server is overloaded".
+
+**Why:** algos and the paper broker see **every** tick (so a spike through a stop is never
+skipped), with up to 10,000 unread per reader. Past that, the oldest are dropped and counted,
+so memory stays bounded.
+
+1. It clears by itself at the next check with no new drops.
+2. If it keeps showing: too many algos or instruments for this machine. Stop some algos,
+   watch fewer instruments, or move to a bigger server (`/api/metrics` shows the load).

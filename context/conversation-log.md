@@ -407,3 +407,18 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **A band at any hour:** an "audit log" band shows the problem, and it clears itself once the log writes again.
     - **Backtests skip it,** because they never send a real order.
   - **Checks:** 12 tests; mutation 12/12 after one test gap; a real kill -9 drill on the demo passed (the order is known after the crash and its id isn't reused; `context/evidence/h-265-crash-drill.txt`).
+- 23 Oct, #265 merged (PR #346). **#267 done** (prices that act on orders).
+  - **Defects confirmed:**
+    - algos and the paper broker read conflated prices, so a spike through a stop that came back before they read was never seen;
+    - a late tick could overwrite newer state;
+    - the risk check only wanted a positive price, so a quiet instrument's old price passed while others ticked.
+  - **The fix:**
+    - **Every tick, in order:** algos and the paper broker read every tick, at most 10,000 unread each. Past that the oldest are dropped and counted, with a WARN band "price overload". Screens stay conflated.
+    - **Late ticks:** a tick older (by exchange time) than what we hold is counted and dropped.
+    - **Freshness per instrument:** orders that add risk need their own instrument's price at most 60 s old; closing trades always go. Growing a change is checked the same way.
+    - **Spreads:** the spreader waits when its leg prices are more than 3 s apart.
+  - **Decided (the stop semantics):** a stop is "touched" if any tick reaches it, even when the price comes back before the next read.
+  - **Checks:**
+    - 9 tests; mutation 12/12;
+    - a demo check (`e2e-exits.sh`) still passes;
+    - a mistake caught on the way: the mutation script named a test file that didn't exist, which made every mutant look "caught". The scripts now run the tests unmutated first and stop if they fail.
