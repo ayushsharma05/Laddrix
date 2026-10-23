@@ -152,8 +152,12 @@ class AlertEngine:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         name: Callable[[InstrumentId], str] = lambda i: i.split(":", 1)[-1],
         watch: Callable[[set[InstrumentId]], None] = lambda ids: None,
+        # a server with a price source per subscription (#395): whose prices each user's
+        # alerts are checked on (None: no prices of their own, nothing fires)
+        source_of: Callable[[str], Any] | None = None,
     ) -> None:
         self._latest = latest
+        self._source_of = source_of
         self._known = known
         self._clock = clock
         self._name = name
@@ -235,13 +239,17 @@ class AlertEngine:
 
     # --- every tick ---------------------------------------------------------------------------
 
-    def on_tick(self, tick: Tick) -> None:
-        """MarketData tap: only the alerts on this instrument are looked at."""
+    def on_tick(self, tick: Tick, source: Any = None) -> None:
+        """MarketData tap: only the alerts on this instrument are looked at, and (with
+        `source`, #395) only those whose owner's own prices this tick is."""
         ids = self._index.get(tick.instrument_id)
         if not ids:
             return
         for alert_id in list(ids):
             a = self._alerts.get(alert_id)
+            if (a is not None and source is not None and self._source_of is not None
+                    and self._source_of(a.user_id) is not source):  # fmt: skip
+                continue  # another subscription's price: never this user's alert's
             if a is not None and a.enabled and not a.done:
                 self.checked += 1
                 self._evaluate(a, tick)
@@ -299,6 +307,18 @@ class AlertEngine:
         """The instruments some alert needs prices of."""
         return set(self._index)
 
+    def watched_for(self, source: Any) -> set[InstrumentId]:
+        """The instruments the alerts checked on this source need (#395)."""
+        return {i for a in self._alerts.values() if self._source_of(a.user_id) is source
+                for i in a.instruments()}  # fmt: skip
+
+    def _latest_of(self, a: "Alert", instrument_id: InstrumentId) -> Tick | None:
+        """The latest price for this alert: from its owner's own prices (#395)."""
+        if self._source_of is None:
+            return self._latest(instrument_id)
+        source = self._source_of(a.user_id)
+        return source.latest(instrument_id) if source is not None else None
+
     def _index_alert(self, a: Alert) -> None:
         new = False
         for i in a.instruments():
@@ -324,7 +344,7 @@ class AlertEngine:
         t = (
             tick
             if tick is not None and tick.instrument_id == a.instrument_id
-            else self._latest(a.instrument_id)
+            else self._latest_of(a, a.instrument_id)
         )
         if t is None:
             return "waiting for a price"
@@ -357,7 +377,7 @@ class AlertEngine:
                          f"{name} open interest {t.open_interest:,} is {pct:+.2f}% from "
                          f"{a.baseline_oi:,}")  # fmt: skip
         other_tick = (tick if tick is not None and tick.instrument_id == p["other"]
-                      else self._latest(p["other"]))  # fmt: skip
+                      else self._latest_of(a, p["other"]))  # fmt: skip
         if other_tick is None:
             return f"waiting for a price of {self._name(p['other'])}"
         spread = t.ltp_paise - other_tick.ltp_paise
@@ -382,7 +402,7 @@ class AlertEngine:
             if not a.armed:
                 a.armed = True
                 if a.kind == "OI_CHANGE":
-                    t = self._latest(a.instrument_id) if tick is None else tick
+                    t = self._latest_of(a, a.instrument_id) if tick is None else tick
                     a.baseline_oi = t.open_interest if t is not None else None
             a.status = "watching"
         elif not a.armed:

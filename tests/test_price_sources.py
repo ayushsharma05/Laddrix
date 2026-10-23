@@ -10,6 +10,7 @@ import asyncio
 
 import pytest
 from kite_packets import NFO_TOKEN
+from test_gtt import CALL
 from test_kite_live import AYUSH, OTHER, FakeTicker, settle, world  # noqa: F401 (fixture)
 
 from mocktrade.broker.fake import FakeBroker
@@ -179,3 +180,149 @@ async def test_on_a_kite_server_a_paper_account_fills_on_its_owners_own_prices(t
         assert "its owner's own Kite prices" in built.not_running["acc-p2"]  # never another's
     finally:
         await built.close()
+
+
+# --- the server-wide features: each person's own prices (#395, second half) ---------------------
+
+
+def book(ltp, volume, bid, ask):
+    from mocktrade.domain.ticks import DepthLevel
+
+    return Tick(FUT, ltp, volume=volume, bids=(DepthLevel(bid, 75, 1),),
+                asks=(DepthLevel(ask, 75, 1),))  # fmt: skip
+
+
+async def test_every_market_screen_reads_the_askers_own_subscription(tmp_path, nifty_fut):
+    from test_server import ORIGIN
+    from test_server import World as ServerWorld
+
+    from mocktrade.server.app import ServerSettings, create_app
+
+    w = ServerWorld(tmp_path, nifty_fut)  # ayush owns acc-ayush, riya owns acc-riya
+    a, b = MarketData(), MarketData()
+    w.platform.prices = PriceSources(w.platform.market_data, per_account=True)
+    w.platform.prices.register("acc-ayush", a)
+    w.platform.prices.register("acc-riya", b)
+    w.app = create_app(w.platform, w.users, ServerSettings(origin=ORIGIN))  # sees both sources
+    ayush, riya, risk = [await w.logged_in(u) for u in ("ayush", "riya", "risk")]
+    for source in (a, b):
+        source.subscribe([FUT])  # a screen watches it: prints are kept
+    for t in (book(2500000, 1000, 2499990, 2500010), book(2500010, 1075, 2500000, 2500020)):
+        a.on_tick(t)
+    b.on_tick(book(2600000, 5000, 2599990, 2600010))
+
+    def ltp(c):
+        return c.get(f"/api/instruments/{FUT}")
+
+    assert (await ltp(ayush)).json()["ltp_paise"] == 2500010  # his own subscription's
+    assert (await ltp(riya)).json()["ltp_paise"] == 2600000  # hers
+    assert (await ltp(risk)).json()["ltp_paise"] is None  # no subscription of their own
+    prints = (await ayush.get(f"/api/instruments/{FUT}/prints")).json()["prints"]
+    assert [(p["qty"], p["side"]) for p in prints] == [(75, "BUY")]
+    assert (await riya.get(f"/api/instruments/{FUT}/prints")).json()["prints"] == []
+    movers = (await riya.get("/api/market/movers", params={"by": "volume"})).json()["rows"]
+    assert movers[0]["volume"] == 5000  # her feed's volume, not his
+    assert (await ayush.get(f"/api/instruments/{FUT}/vap")).json()["volume"] == 1075
+    assert (await risk.get("/api/market/movers", params={"by": "volume"})).json()["rows"] == []
+
+
+def test_a_price_alert_fires_only_on_its_owners_own_prices():
+    from mocktrade.alerts.engine import AlertEngine
+
+    a, b = MarketData(), MarketData()
+    owners = {"ayush": a, "riya": b}
+    fired = []
+    engine = AlertEngine(lambda i: None, lambda i: True, source_of=owners.get)
+    engine.on_fire(fired.append)
+    for user in ("ayush", "riya"):
+        engine.create(user, {"kind": "PRICE_ABOVE", "instrument_id": FUT,
+                             "params": {"level_paise": 2550000}})  # fmt: skip
+    for source in (a, b):
+        source.tap(lambda tick, s=source: engine.on_tick(tick, s))
+    a.on_tick(Tick(FUT, 2500000))
+    b.on_tick(Tick(FUT, 2500000))  # both arm below the level
+    b.on_tick(Tick(FUT, 2600000))  # only riya's subscription crosses
+    assert [f.alert.user_id for f in fired] == ["riya"]
+    # an alert made now is judged at once on its owner's own current price
+    late = engine.create("riya", {"kind": "PRICE_ABOVE", "instrument_id": FUT,
+                                  "params": {"level_paise": 2550000}})  # fmt: skip
+    assert late.status.startswith("already true")  # her price (₹26,000) is past the level
+    mine = engine.create("ayush", {"kind": "PRICE_ABOVE", "instrument_id": FUT,
+                                   "params": {"level_paise": 2550000}})  # fmt: skip
+    assert mine.status == "watching"  # his (₹25,000) is not
+    assert engine.watched_for(a) == {FUT} and engine.watched_for(MarketData()) == set()
+
+
+async def test_chart_history_goes_through_the_askers_own_login(world):  # noqa: F811
+    world.live.add_account(AYUSH)
+    world.live.add_account(OTHER)
+    await world.live.start()
+    await world.live.login.complete(AYUSH, "req-a")
+    await world.live.login.complete(OTHER, "req-b")
+    await settle()
+    assert world.live.account_of(world.live.prices_of(OTHER.id)) == OTHER.id
+    await world.live.reader(OTHER.id).request("GET", "/instruments/historical/1/minute")
+    assert world.kite.calls[-1][2] == "tok-b"  # its own login, not the first account's
+    world.live.log_out(world.live._links[OTHER.id], "test")
+    from mocktrade.broker.kite.http import KiteAuthError
+
+    with pytest.raises(KiteAuthError, match="isn't logged in"):
+        await world.live.reader(OTHER.id).request("GET", "/instruments/historical/1/minute")
+    await world.live.aclose()
+
+
+async def test_each_screens_forming_candle_is_built_from_its_own_ticks(tmp_path, nifty_fut):
+    import json
+
+    from test_charts import t, tick
+    from test_stream import Live, all_of, next_of
+
+    from mocktrade.charts.candles import CandleBuilder
+    from mocktrade.charts.service import Charts
+    from mocktrade.server.app import ServerSettings, create_app
+
+    server = Live(tmp_path, nifty_fut)
+    server.store.add(CALL)  # a NIFTY option, for the chain
+    a, b = MarketData(), MarketData()
+    server.platform.prices = PriceSources(server.md, per_account=True)
+    server.platform.prices.register("acc-ayush", a)
+    server.platform.prices.register("acc-riya", b)
+
+    def charts_for(source):  # as serve does on a Kite server: each source its own builder
+        own = CandleBuilder()
+        source.tap(own.on_tick)
+        return Charts(own, None)
+
+    server.app = create_app(server.platform, server.users,
+                            ServerSettings(origin=server.origin, cookie_secure=False),
+                            charts_for=charts_for)  # fmt: skip
+    server.hub = server.app.state.hub
+    server.hub.candle_interval_s = 0.1
+    await server.start()
+    try:
+        ayush, riya = await server.session("ayush"), await server.session("riya")
+        async with server.stream(ayush) as mine, server.stream(riya) as theirs:
+            for ws in (mine, theirs):
+                await ws.send(json.dumps({"op": "candles", "instrument_id": FUT,
+                                          "interval": "5m"}))  # fmt: skip
+                assert (await next_of(ws, "candle"))["candle"] is None
+            a.on_tick(tick(t(9, 20, 1), 2501000, 1000))
+            b.on_tick(tick(t(9, 20, 1), 2700000, 9000))
+            got_mine = (await all_of(mine, "candle", quiet=0.4))[-1]["candle"]
+            got_theirs = (await all_of(theirs, "candle", quiet=0.4))[-1]["candle"]
+            assert got_mine["o"] == 2501000 and got_theirs["o"] == 2700000
+            assert a.is_watched(FUT) and b.is_watched(FUT)  # each asks its own feed for it…
+            assert not server.md.is_watched(FUT)  # …never the shared one
+
+            # an option chain from each one's own prices
+            a.on_tick(Tick(CALL.id, 12000))
+            b.on_tick(Tick(CALL.id, 15000))
+            for ws in (mine, theirs):
+                await ws.send(json.dumps({"op": "chain", "underlying": "NIFTY",
+                                          "expiry": "2026-10-27", "strikes": 5}))  # fmt: skip
+            chain_mine = json.dumps(await next_of(mine, "chain"))
+            chain_theirs = json.dumps(await next_of(theirs, "chain"))
+            assert "12000" in chain_mine and "15000" not in chain_mine
+            assert "15000" in chain_theirs and "12000" not in chain_theirs
+    finally:
+        await server.stop()

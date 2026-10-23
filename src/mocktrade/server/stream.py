@@ -38,14 +38,15 @@ from mocktrade.alerts.service import MarketAlerts
 from mocktrade.algos.engine import AlgoEvent
 from mocktrade.charges.model import ChargeBill, bill_to_dict
 from mocktrade.charges.service import ChargesService
-from mocktrade.charts.service import ChartError, Charts
+from mocktrade.charts.service import ChartError
 from mocktrade.domain.accounts import MAIN, User, can_view
 from mocktrade.domain.gtt import GttView, gtt_to_dict
 from mocktrade.domain.ticks import Tick
+from mocktrade.marketdata.markets import Market
 from mocktrade.marketdata.service import MarketData, Subscription
 from mocktrade.metrics import METRICS, since_us
 from mocktrade.ops.alerts import Alert, Alerts, alert_to_dict
-from mocktrade.options.chain import ChainService, ChainWatch
+from mocktrade.options.chain import ChainWatch
 from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.orders.model import EventKind, OrderEvent
 from mocktrade.platform import AccountRuntime, Platform
@@ -111,8 +112,7 @@ class StreamHub:
         revoked_s: float = 2.0,  # how soon an ended session's open streams close (#364)
         clock: Callable[[], float] = time.monotonic,
         alerts: Alerts | None = None,
-        chains: ChainService | None = None,
-        charts: Charts | None = None,
+        market: Callable[[User], Market] | None = None,  # the person's own prices' (#395)
         market_alerts: MarketAlerts | None = None,
     ) -> None:
         self._clock = clock
@@ -133,9 +133,8 @@ class StreamHub:
         for runtime in platform.accounts.values():
             self.attach(runtime)
         self._alerts = alerts
-        self._chains = chains
+        self._market = market
         self.chain_interval_s = 1.0
-        self._charts = charts
         self.candle_interval_s = 1.0
         if market_alerts is not None:
             market_alerts.on_fire(self._on_market_alert)
@@ -276,13 +275,14 @@ class StreamHub:
         except (TypeError, ValueError):
             connection.put({"type": "error", "message": "chain needs an expiry date and strikes"})
             return
-        if self._chains is None or expiry not in self._chains.expiries(str(underlying)):
+        chains = self._market(connection.user).chains if self._market else None  # theirs only
+        if chains is None or expiry not in chains.expiries(str(underlying)):
             connection.put({"type": "error", "message": f"no options on {underlying} {expiry}"})
             return
         if len(connection.chains) >= MAX_CHAINS:
             connection.put({"type": "error", "message": f"at most {MAX_CHAINS} chains at a time"})
             return
-        watch = self._chains.watch(str(underlying), expiry, max(1, min(strikes, 40)))
+        watch = chains.watch(str(underlying), expiry, max(1, min(strikes, 40)))
         connection.chains[key] = asyncio.create_task(self._stream_chain(connection, watch))
 
     async def _stream_chain(self, connection: _Connection, watch: ChainWatch) -> None:
@@ -305,11 +305,12 @@ class StreamHub:
             old.cancel()
         if op == "candles_stop":
             return
-        if self._charts is None:
+        market = self._market(connection.user) if self._market else None
+        if market is None or market.charts is None:
             connection.put({"type": "error", "message": "charts aren't set up on this server"})
             return
         try:
-            self._charts.interval(code)
+            market.charts.interval(code)
         except ChartError as exc:
             connection.put({"type": "error", "message": str(exc)})
             return
@@ -320,18 +321,20 @@ class StreamHub:
             connection.put({"type": "error", "message": f"at most {MAX_CHARTS} charts at a time"})
             return
         connection.charts[key] = asyncio.create_task(
-            self._stream_candle(connection, instrument_id, code)
+            self._stream_candle(connection, market, instrument_id, code)
         )
 
-    async def _stream_candle(self, connection: _Connection, instrument_id: str, code: str) -> None:
+    async def _stream_candle(self, connection: _Connection, market: Market, instrument_id: str,
+                             code: str) -> None:  # fmt: skip
         """The forming candle at once, then at most once a second while it changes. The
-        instrument is watched meanwhile, so its ticks keep coming from the broker."""
-        assert self._charts is not None
-        watch = self._platform.market_data.subscribe([instrument_id])
+        instrument is watched meanwhile, so its ticks keep coming from the broker (the
+        person's own subscription, #395)."""
+        assert market.charts is not None
+        watch = market.prices.subscribe([instrument_id])
         last: Any = ()  # never a candle: the first one is always sent, even "none yet"
         try:
             while True:
-                candle = self._charts.forming(instrument_id, code)
+                candle = market.charts.forming(instrument_id, code)
                 if candle != last:
                     connection.put({"type": "candle", "instrument_id": instrument_id,
                                     "interval": code, "candle": candle})  # fmt: skip

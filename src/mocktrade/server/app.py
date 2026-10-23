@@ -48,13 +48,14 @@ from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import spec_to_dict
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Validity
 from mocktrade.domain.portfolio import trade_to_dict
-from mocktrade.marketdata.movers import Movers, MoversError
-from mocktrade.marketdata.prints import TimeAndSales, print_to_dict
+from mocktrade.marketdata.markets import Market, Markets
+from mocktrade.marketdata.movers import MoversError
+from mocktrade.marketdata.prints import print_to_dict
+from mocktrade.marketdata.service import MarketData
 from mocktrade.metrics import METRICS, process_gauges, since_us
 from mocktrade.ops.alerts import Alerts, alert_to_dict
 from mocktrade.ops.protection import GUARANTEE, ProtectionGuard, RestoreError
 from mocktrade.ops.scheduler import Scheduler
-from mocktrade.options.chain import ChainService
 from mocktrade.options.strategy import Strategies, StrategyError
 from mocktrade.options.strategy import templates as strategy_templates_list
 from mocktrade.orders.basket import BasketError, LegIn, check_to_dict
@@ -366,6 +367,8 @@ def create_app(
     backtests: Backtests | None = None,
     candles: CandleStore | None = None,
     charts: Charts | None = None,
+    # a server with a price source per subscription (#395): each source's own charts
+    charts_for: Callable[[MarketData], Charts | None] | None = None,
     market_alerts: MarketAlerts | None = None,
     starter: AccountStarter | None = None,
     protection: ProtectionGuard | None = None,
@@ -373,21 +376,24 @@ def create_app(
     static_dir: Path | None = None,
 ) -> FastAPI:
     app = FastAPI(title="MockTrade", docs_url=None, redoc_url=None, openapi_url=None)
-    chains = ChainService(platform.instruments, platform.market_data)
-    md = platform.market_data
-    prints = TimeAndSales(wanted=md.is_watched)  # trades between ticks, for watched contracts
-    md.tap(prints.on_tick)
-    movers = Movers(md.all_latest, platform.instruments.get)
-    md.tap(movers.on_tick)
-    strategies = Strategies(chains)
+    # what the screens read from prices, one per subscription (#395): never another's
+    markets = Markets(platform.instruments, charts_for=charts_for or (
+        lambda md: charts if md is platform.market_data else None))  # fmt: skip
+    no_prices = MarketData()  # someone with no subscription of their own: nothing ticks
+    for source in platform.prices.all():  # from the start: no tick is missed before a screen asks
+        markets.of(source)
+
+    def market(user: User) -> Market:
+        found = platform.prices.for_user(user, users.accounts())
+        return markets.of(found if found is not None else no_prices)
+
     hub = StreamHub(
         platform,
         users,
         origin=settings.origin,
         cookie_name=settings.cookie_name,
         alerts=alerts,
-        chains=chains,
-        charts=charts,
+        market=market,
         market_alerts=market_alerts,
     )
     app.state.hub = hub
@@ -499,11 +505,11 @@ def create_app(
 
     @app.get("/api/options")
     async def option_underlyings(user: Me) -> list[str]:
-        return chains.underlyings()
+        return market(user).chains.underlyings()
 
     @app.get("/api/options/{underlying}/expiries")
     async def option_expiries(underlying: str, user: Me) -> list[str]:
-        return [e.isoformat() for e in chains.expiries(underlying)]
+        return [e.isoformat() for e in market(user).chains.expiries(underlying)]
 
     @app.get("/api/options/{underlying}/{expiry}/chain")
     async def option_chain(
@@ -513,6 +519,7 @@ def create_app(
             day = date.fromisoformat(expiry)
         except ValueError:
             raise HTTPException(422, "expiry must be a date like 2026-10-27") from None
+        chains = market(user).chains
         if day not in chains.expiries(underlying):
             raise HTTPException(404, f"no options on {underlying} expiring {expiry}")
         return chains.snapshot(underlying, day, max(1, min(strikes, 40)))
@@ -523,6 +530,7 @@ def create_app(
 
     @app.post("/api/options/strategy/build")
     async def strategy_build(body: StrategyBuildIn, user: Me) -> dict[str, Any]:
+        strategies = Strategies(market(user).chains)
         try:
             legs = strategies.build(body.code, body.underlying, body.expiry, body.width, body.lots)
             return strategies.analyse(legs)
@@ -533,7 +541,7 @@ def create_app(
     async def strategy_analyse(body: StrategyIn, user: Me) -> dict[str, Any]:
         legs = [{**leg.model_dump(exclude_none=True), "side": leg.side.value} for leg in body.legs]
         try:
-            return strategies.analyse(legs)
+            return Strategies(market(user).chains).analyse(legs)
         except StrategyError as exc:
             raise HTTPException(422, str(exc)) from None
 
@@ -736,10 +744,11 @@ def create_app(
 
     # --- charts (K12.1) ---------------------------------------------------------------------
 
-    def chart_service() -> Charts:
-        if charts is None:
+    def chart_service(user: User) -> Charts:
+        found = market(user).charts  # the asker's own subscription's candles (#395)
+        if found is None:
             raise HTTPException(404, "charts aren't set up on this server")
-        return charts
+        return found
 
     def chart_time(text: str, name: str) -> datetime | None:
         if not text:
@@ -757,12 +766,12 @@ def create_app(
 
     @app.get("/api/charts/spec")
     async def chart_spec(user: Me) -> dict[str, Any]:
-        return chart_service().spec()
+        return chart_service(user).spec()
 
     @app.get("/api/charts/{instrument_id}/candles")
     async def chart_candles(instrument_id: str, user: Me, interval: str = "1m", start: str = "",
                             end: str = "") -> dict[str, Any]:  # fmt: skip
-        service = chart_service()
+        service = chart_service(user)
         first, last = chart_time(start, "start"), chart_time(end, "end")
         try:
             return await service.candles(chart_instrument(instrument_id), interval, first, last)
@@ -773,7 +782,7 @@ def create_app(
     async def chart_marks(account_id: str, instrument_id: str, user: Me, start: str = "",
                           end: str = "") -> dict[str, Any]:  # fmt: skip
         runtime(account_id, user)
-        service = chart_service()
+        service = chart_service(user)
         last = chart_time(end, "end") or datetime.now(IST) + timedelta(minutes=1)
         first = chart_time(start, "start") or last - timedelta(days=1)
         marks = await asyncio.to_thread(service.marks, account_id, chart_instrument(instrument_id),
@@ -1265,7 +1274,7 @@ def create_app(
         instrument = platform.instruments.get(instrument_id)
         if instrument is None:
             raise HTTPException(404, "no such instrument")
-        tick = platform.market_data.latest(instrument_id)
+        tick = market(user).prices.latest(instrument_id)  # the asker's own price (#395)
         found = _instrument(instrument, platform.expiries)
         return {**found, "ltp_paise": tick.ltp_paise if tick else None}
 
@@ -1274,7 +1283,7 @@ def create_app(
         """Today's volume at each price (an estimate from snapshots, see marketdata/vap.py)."""
         if platform.instruments.get(instrument_id) is None:
             raise HTTPException(404, "no such instrument")
-        volume, levels = platform.market_data.vap.snapshot(instrument_id)
+        volume, levels = market(user).prices.vap.snapshot(instrument_id)
         return {"volume": volume, "levels": [[p, q] for p, q in sorted(levels.items())]}
 
     @app.get("/api/instruments/{instrument_id}/prints")
@@ -1282,9 +1291,11 @@ def create_app(
                                 limit: int = 100) -> dict[str, Any]:  # fmt: skip
         if platform.instruments.get(instrument_id) is None:
             raise HTTPException(404, f"unknown instrument {instrument_id}")
-        rows = prints.recent(instrument_id, after=max(0, after), limit=max(1, min(limit, 300)))
+        mine = market(user)
+        rows = mine.prints.recent(instrument_id, after=max(0, after),
+                                  limit=max(1, min(limit, 300)))  # fmt: skip
         return {"instrument_id": instrument_id, "prints": [print_to_dict(p) for p in rows],
-                "kept": prints.keep, "watched": md.is_watched(instrument_id),
+                "kept": mine.prints.keep, "watched": mine.prices.is_watched(instrument_id),
                 "estimate": "trades between price snapshots; the side is estimated from the "
                             "touch before the trade"}  # fmt: skip
 
@@ -1292,7 +1303,7 @@ def create_app(
     async def market_movers(user: Me, by: str = "gainers", limit: int = 10, exchange: str = "",
                             kind: str = "") -> dict[str, Any]:  # fmt: skip
         try:
-            return movers.top(by, limit=limit, exchange=exchange, kind=kind)
+            return market(user).movers.top(by, limit=limit, exchange=exchange, kind=kind)
         except MoversError as exc:
             raise HTTPException(422, str(exc)) from None
 

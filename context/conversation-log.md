@@ -587,3 +587,11 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - The simulator and replays stay shared, being our own data.
   - **Second half, next:** the server-wide features (chart, option chain, market alerts, movers, time and sales, the recorder, the stale-price check) still read the shared feed.
   - **Checks:** 5 tests (two subscriptions with different prices for the same contract: each account is checked and marked on its own; each ticker feeds only its own; each screen gets only its own; serve's paper rule), mutation 11/11.
+- 23 Oct, PR #401 merged. **#395, second half:** the server-wide features read the asker's own subscription.
+  - **`Markets`:** each price source has its own option chain, time and sales, movers and charts, built at start so no tick is missed.
+  - **The routes:** the last price, volume at price, prints, movers, chain and strategies all use `market(user)`.
+  - **The stream:** the live chain and forming candle use the user's own source.
+  - **Charts on a Kite server:** a builder per source, and history through that account's own login (`KiteLive.reader`).
+  - **Price alerts:** checked only on their owner's prices (`AlertEngine.source_of`), and each source watches only its own users' instruments.
+  - **Left for #396:** the recorder and the stale-price check.
+  - **Checks:** 4 more tests (9 in all), mutation 20/20. Three first survivors were test gaps, now covered: an alert made when the price is already past its level, which feed a live chart watches, and a live chain per source.
