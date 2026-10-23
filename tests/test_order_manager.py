@@ -137,8 +137,22 @@ async def test_submit_sends_to_the_broker_and_maps_both_ids(om, broker, events):
 
 async def test_resubmitting_the_same_id_never_places_twice(om, broker):
     first = await om.submit(req("ABC1"))
-    again = await om.submit(req("ABC1", qty=75))
+    again = await om.submit(req("ABC1"))  # a retry (a lost answer, a double click)
     assert again == first and len(broker.placed) == 1
+
+
+async def test_an_id_reused_for_a_different_order_is_refused_not_answered_with_the_old_one(
+    om, broker
+):
+    """#279: before, a reused id with another quantity, price or side came back as the old
+    order, and the caller believed the new one had been sent."""
+    await om.submit(req("ABC1"))
+    for changed in (req("ABC1", qty=75), req("ABC1", price=2501010),
+                    req("ABC1", side=Side.SELL), req("ABC1", user_id="riya")):  # fmt: skip
+        with pytest.raises(OrderError, match="order id ABC1 is already used for another order"):
+            await om.submit(changed)
+    assert len(broker.placed) == 1
+    assert (await om.submit(req("ABC1"))).client_order_id == "ABC1"  # the true retry still works
 
 
 @pytest.mark.parametrize(

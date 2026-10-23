@@ -1305,7 +1305,10 @@ def create_app(
             trigger_paise=body.trigger_paise,
             market_protection=body.market_protection,
         )
-        return view_to_dict(await running.orders.submit(request))
+        try:
+            return view_to_dict(await running.orders.submit(request))
+        except OrderError as exc:  # e.g. an order id reused for a different order (#279)
+            raise HTTPException(409, exc.reason) from None
 
     @app.patch("/api/accounts/{account_id}/orders/{client_order_id}")
     async def modify(
