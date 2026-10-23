@@ -162,7 +162,7 @@ class PaperBroker:
         self._queue: asyncio.Queue[OrderUpdate] = asyncio.Queue()
         self._tasks: set[asyncio.Task] = set()
         self._ids = itertools.count(1)
-        self._subscription = market_data.subscribe()
+        self._subscription = market_data.subscribe(every_tick=True)  # fills see every price
         if every_tick:
             market_data.tap(self.on_tick)
         self._runner: asyncio.Task | None = None

@@ -394,6 +394,7 @@ class Platform:
             clock=clock,
             positions=book.net_by_instrument,
             product_position=book.qty,
+            price_age=self.market_data.age_s,  # per instrument: freshness (#267)
         )
         throttle = throttle or OrderThrottle()
         recovery = RecoveryGate() if recover_on_start else None

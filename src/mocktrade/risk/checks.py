@@ -28,6 +28,9 @@ from mocktrade.risk.limits import PRODUCTS_FOR_KIND, RiskLimits
 OPTIONS = (InstrumentKind.CALL, InstrumentKind.PUT)
 
 
+MAX_PRICE_AGE_S = 60.0  # an order that adds risk needs a price at most this old (#267)
+
+
 class RiskGate:
     """The pre-trade checks for one broker account, as an order gate (see orders.gate)."""
 
@@ -46,7 +49,11 @@ class RiskGate:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),  # same clock as the orders
         positions: Callable[[], dict[str, int]] = dict,  # every net position (covered shorts)
         product_position: Callable[[str, Product], int] | None = None,  # one product's qty
+        price_age: Callable[[str], float | None] = lambda _i: None,  # s since its last tick
+        max_price_age_s: float = MAX_PRICE_AGE_S,
     ) -> None:
+        self._price_age = price_age
+        self.max_price_age_s = max_price_age_s
         self.limits = limits  # replaced whole by an admin's edit; read fresh on every order
         self.off_reason: str | None = None  # set: the account takes only closing trades
         self._instrument = instruments
@@ -75,6 +82,7 @@ class RiskGate:
             or self._product_problem(instrument, request)
             or self._size_problem(instrument, request.qty)
             or self._price_problem(instrument, request, tick)
+            or self._stale_problem(instrument, request, request.qty, others)
             or self._value_problem(instrument, request, request.qty, tick)
             or self._position_problem(instrument, request, request.qty, others)
             or self._loss_problem(request, request.qty, others)
@@ -129,6 +137,7 @@ class RiskGate:
                 if grows
                 else None
             )
+            or (self._stale_problem(instrument, new, leaves, others) if grows else None)
             or (self._position_problem(instrument, new, leaves, others) if grows else None)
             or (self._loss_problem(new, leaves, others) if grows else None)
             or (self._off_problem(new, leaves, others) if grows else None)
@@ -314,6 +323,19 @@ class RiskGate:
             f"daily loss limit reached ({format_rupees(-pnl)} lost, limit "
             f"{format_rupees(self.limits.max_daily_loss_paise)}): only closing trades are allowed"
         )
+
+    def _stale_problem(self, instrument: Instrument, request: OrderRequest, leaves: int,
+                       others) -> str | None:  # fmt: skip
+        """An order that adds risk needs this instrument's own price to be recent (#267): a
+        busy other instrument can't hide that this one has gone quiet. Closing trades go."""
+        age = self._price_age(request.instrument_id)
+        if age is None or age <= self.max_price_age_s:
+            return None  # no price at all is _price_problem's to judge
+        if request.reduce_only or self._closes(request, leaves, others):
+            return None
+        return (f"the last price for {instrument.symbol} is {age:.0f} s old (limit "
+                f"{self.max_price_age_s:.0f} s): open its ladder or wait for a new price; "
+                "closing trades still go")  # fmt: skip
 
     def _off_problem(self, request: OrderRequest, leaves: int, others) -> str | None:
         """A turned-off account: only trades that close positions (an admin's switch)."""

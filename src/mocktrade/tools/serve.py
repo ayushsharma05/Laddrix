@@ -74,7 +74,7 @@ from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.metrics import freeze_heap, watch_loop_lag
 from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.checks import Checks, audit_log
+from mocktrade.ops.checks import Checks, PriceOverload, audit_log
 from mocktrade.ops.guards import DayGuards
 from mocktrade.ops.notify import WebhookNotifier
 from mocktrade.ops.protection import ProtectionGuard
@@ -405,6 +405,9 @@ def build(settings: ServeSettings) -> Assembly:
     )
     scheduler.every(5, lambda: audit_log(alerts, events), between=("00:00", "23:59"),
                     name="audit log", any_day=True)  # fmt: skip
+    overload = PriceOverload(alerts, md)
+    scheduler.every(15, overload.check, between=("00:00", "23:59"), name="price overload",
+                    any_day=True)  # fmt: skip
     jobs.append(scheduler.run)
     ui = settings.ui_dir if (settings.ui_dir / "index.html").exists() else None
     if ui is None:
