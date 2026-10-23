@@ -66,3 +66,21 @@ list):
 Charges are worked out on the exact value, again after a correction. The daily report reads
 fills and corrections from the audit trail, so it agrees with positions. Runbook:
 [incidents.md](../runbooks/incidents.md#an-orders-fills-dont-match-the-brokers-trades-352).
+
+## Trades made outside MockTrade (#355)
+
+A trade made in the broker's own app moves the broker's position, not ours: reconciling
+raises a mismatch. `positions/external.py` resolves it, never by setting our number to the
+broker's:
+
+```
+ preview ─► the broker's trades in that position with no order of ours (each trade id once,
+            minus any already adopted) ─► do they add up to the difference exactly?
+ adopt   ─► risk or admin, with words on what they checked; the preview again, fresh;
+            refused unless exact ─► each trade at its own price (true cost basis),
+            audited (EXTERNAL_ADOPTED, with the trade id) ─► reconcile again: it clears
+ restart ─► recovery applies today's adopted trades again from the audit trail
+```
+
+A difference the outside trades don't explain (a missed fill of ours, an old trade) stays an
+alert for a person to resolve at the broker.

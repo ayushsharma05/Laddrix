@@ -52,10 +52,19 @@ Kite's. The Recon light is red.
    - an exchange-side adjustment.
 
    The audit trail for that contract shows what MockTrade saw.
-4. If Kite is right (it usually is), MockTrade takes Kite's orders as the truth on its next
+4. **A trade made outside MockTrade** (#355; risk or admin): ask MockTrade what explains it,
+   `GET /api/accounts/<account>/external-trades?instrument_id=<id>&product=<NRML|MIS|CNC>`.
+   It lists the broker's trades in that position that no MockTrade order placed, and says
+   whether they explain the difference **exactly**. If they do, check them with whoever
+   traded, then adopt them: `POST` the same URL with
+   `{"instrument_id", "product", "acknowledgement": "what you checked"}`. Each trade goes into
+   the position at its own price, in the audit trail with your name, your words and the
+   broker's trade id (EXTERNAL_ADOPTED); it is never adopted twice and survives a restart.
+   The band clears. If they don't explain it, nothing can be adopted: go on below.
+5. If Kite is right (it usually is), MockTrade takes Kite's orders as the truth on its next
    resync, after a reconnect or a restart (`docker compose -f deploy/compose.yaml restart app`).
    The band clears by itself once the positions agree.
-5. If they still differ after a restart, keep the screenshots and the audit trail CSV and
+6. If they still differ after a restart, keep the screenshots and the audit trail CSV and
    treat it as a bug.
 
 ## Kill switch

@@ -34,6 +34,7 @@ from mocktrade.alerts.engine import spec as alert_spec
 from mocktrade.alerts.service import MarketAlerts
 from mocktrade.algos.engine import AlgoError
 from mocktrade.algos.spec import spec_to_dict as algo_spec_to_dict
+from mocktrade.broker.base import BrokerError
 from mocktrade.charges.model import bill_to_dict
 from mocktrade.charges.schedules import schedule_to_dict
 from mocktrade.charges.service import ChargesError
@@ -44,6 +45,7 @@ from mocktrade.domain.gtt import gtt_spec_to_dict, gtt_to_dict
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.order_spec import spec_to_dict
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side, Validity
+from mocktrade.domain.portfolio import trade_to_dict
 from mocktrade.marketdata.movers import Movers, MoversError
 from mocktrade.marketdata.prints import TimeAndSales, print_to_dict
 from mocktrade.metrics import METRICS, process_gauges, since_us
@@ -59,6 +61,7 @@ from mocktrade.orders.gtt import GttError, gtt_request_from
 from mocktrade.orders.model import OrderError
 from mocktrade.platform import AccountRuntime, Platform, spec_of
 from mocktrade.portfolio.service import PortfolioError, snapshot_to_dict
+from mocktrade.positions.external import ExternalError
 from mocktrade.refdata.expiry import Expiries, expiry_to_dict
 from mocktrade.reports.export import report_csv, report_pdf
 from mocktrade.reports.service import ReportError, Reports
@@ -313,6 +316,12 @@ class FlattenIn(_Strict):
     confirm: bool
     instrument_id: str | None = None  # one instrument only (else every open position)
     product: Product | None = None  # with instrument_id: one product only
+
+
+class AdoptIn(_Strict):
+    instrument_id: str
+    product: str
+    acknowledgement: str  # what the person checked: it goes in the audit trail
 
 
 class StopIn(_Strict):
@@ -1422,6 +1431,53 @@ def create_app(
                 ],
             },
         }
+
+    # --- trades made outside MockTrade (#355) -----------------------------------------------------
+
+    def _external(account_id: str, user: User):
+        running = runtime(account_id, user)
+        if not _risk_or_admin(user):
+            raise HTTPException(403, "only risk or an admin can resolve trades made outside "
+                                "MockTrade")  # fmt: skip
+        if running.external is None:
+            raise HTTPException(409, "this account's broker gives no trade list to resolve from")
+        return running.external
+
+    def _product(text: str) -> Product:
+        try:
+            return Product(text)
+        except ValueError:
+            raise HTTPException(422, f"no product {text!r}") from None
+
+    def _proposal(p) -> dict[str, Any]:
+        return {"instrument_id": p.instrument_id, "product": p.product.value, "ours": p.ours,
+                "broker": p.broker, "explains": p.explains, "words": p.words,
+                "trades": [trade_to_dict(t) for t in p.trades]}  # fmt: skip
+
+    @app.get("/api/accounts/{account_id}/external-trades")
+    async def preview_external(account_id: str, instrument_id: str, product: str,
+                               user: Me) -> dict[str, Any]:  # fmt: skip
+        """What adopting would do: the broker's trades made outside MockTrade in this position,
+        and whether they explain the difference (positions/external.py). Changes nothing."""
+        tool = _external(account_id, user)
+        try:
+            return _proposal(await tool.preview(instrument_id, _product(product)))
+        except BrokerError as exc:
+            raise HTTPException(502, f"the broker didn't answer: {exc.reason}") from None
+
+    @app.post("/api/accounts/{account_id}/external-trades")
+    async def adopt_external(account_id: str, body: AdoptIn, user: Me) -> dict[str, Any]:
+        """Adopt them, with words saying what was checked; refused unless they explain the
+        difference exactly. Each adopted trade is audited (EXTERNAL_ADOPTED)."""
+        tool = _external(account_id, user)
+        try:
+            done = await tool.adopt(body.instrument_id, _product(body.product), user.id,
+                                    body.acknowledgement)  # fmt: skip
+        except ExternalError as exc:
+            raise HTTPException(409, str(exc)) from None
+        except BrokerError as exc:
+            raise HTTPException(502, f"the broker didn't answer: {exc.reason}") from None
+        return {**_proposal(done), "adopted": True}
 
     # --- kill switches -------------------------------------------------------------------------
 

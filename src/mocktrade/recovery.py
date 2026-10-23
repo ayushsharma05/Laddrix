@@ -32,7 +32,7 @@ from zoneinfo import ZoneInfo
 
 from mocktrade.broker.base import Broker, BrokerError
 from mocktrade.domain.instruments import InstrumentId
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderUpdate, Product
+from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderUpdate, Product, Side
 from mocktrade.domain.portfolio import Holding, Trade
 from mocktrade.domain.ticks import Tick
 from mocktrade.orders.model import OrderView
@@ -95,6 +95,7 @@ class RecoveryReport:
     carried: int = 0  # positions carried in from earlier days
     holdings: int = 0  # paper: delivery holdings from earlier days (not positions, as at Kite)
     settled: int = 0  # paper: positions in contracts that expired since (#290)
+    adopted: int = 0  # trades made outside MockTrade that a person adopted today (#355)
     closed: list[str] = field(default_factory=list)  # paper orders closed (forgotten by it)
     problems: list[str] = field(default_factory=list)
 
@@ -199,6 +200,15 @@ async def recover(
                 trades.append(Trade(f"A{e.seq}", e.order.broker_order_id or "", r.instrument_id,
                                     r.side, r.product, qty, e.fill.price_paise, e.ts,
                                     e.client_order_id))  # fmt: skip
+
+    # today's trades made outside MockTrade that a person adopted (#355): theirs again,
+    # once each (earlier days' are in the broker's overnight positions)
+    for e in log_.notes(account_id, ["EXTERNAL_ADOPTED"]):
+        if e.ts >= since:
+            x = e.extra
+            book.apply_fill(x["instrument_id"], Product(x["product"]), Side(x["side"]),
+                            int(x["qty"]), int(x["price_paise"]))  # fmt: skip
+            report.adopted += 1
 
     # 3. today's orders, then the broker's word on them
     report.orders = orders.restore(log_.latest_views(account_id, since=since))
