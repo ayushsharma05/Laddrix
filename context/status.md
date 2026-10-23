@@ -149,7 +149,7 @@ Historical stack order (integrated by the recovery PR; do not replay these merge
    - #233 K12.3 alerts engine and webhooks: merged (PR #239).
    - #234 K12.4 alerts manager, time & sales, depth, movers: **done** on branch `k12-4-market-screens` (PR "Closes #234"; merge on green CI if still open). See `docs/design/charts.md` § K12.4. It also fixed a ticket that kept the previous contract's price after a switch, and simulator option prices.
 
-   Known gaps: replaying a live Kite server's recordings needs that day's instrument list (also in #240); webhook DNS rebinding (#271); an outside webhook not yet tried (do it once deployed).
+   Known gaps: replaying a live Kite server's recordings needs that day's instrument list (also in #240); webhook DNS rebinding (#271, fixed 23 Oct); an outside webhook not yet tried (do it once deployed).
 7. **Issue clean-up (16 Oct, Ayush's request).** The ~98 issues from the paused COMEX track (#17–#121) were compared with the code and each one closed with a note:
    - done on the Kite track (completed);
    - not relevant to it (not planned);
