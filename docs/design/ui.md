@@ -20,6 +20,14 @@ dockable widgets, audit trails); it copies no firm's screens or names.
 - **No popups for routine things.** Problems go to the ladder's status line and the Messages
   widget. Only STOP and resume open a small dialog.
 - **Nothing is sent blind.** While disconnected or stopped, order clicks do nothing and say why.
+  **An open connection isn't enough (#268):** after each (re)connect, an account takes no new
+  orders until its orders and positions have loaded for that connect.
+  - The band says so: "LOADING acc", or "COULDN'T LOAD acc" with why. A failed load is tried
+    again every 3 s while connected.
+  - Cancels still go: the server decides.
+  - Answers from an older connect are dropped (a load "epoch").
+  - Algos or GTTs that couldn't load show as **UNAVAILABLE**, never as an empty list
+    (`state/session.ts`, `state/gate.ts`).
 
 ## 2. Design tokens
 

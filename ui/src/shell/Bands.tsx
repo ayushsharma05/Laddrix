@@ -17,6 +17,7 @@ export function Bands() {
   const kill = useStore((s) => (s.accountId ? s.books[s.accountId]?.kill : undefined));
   const alerts = useStore((s) => (s.accountId ? s.books[s.accountId]?.alerts : undefined));
   const ops = useStore((s) => s.ops);
+  const sync = useStore((s) => s.sync);
 
   const bands = [];
   if (firm.engaged && !accountId) {
@@ -40,6 +41,29 @@ export function Bands() {
         <b>{a.level === "ERROR" ? "ACTION NEEDED" : "HEADS UP"}</b>
         <span>{a.text}</span>
         {a.key.startsWith("unprotected:") && <RestoreStop alertKey={a.key} />}
+      </div>,
+    );
+  }
+  // loaded since the last connect? (#268): an open stream alone doesn't mean the screens are right
+  const syncState = accountId ? sync.accounts[accountId] : undefined;
+  if (status === "open" && accountId && syncState !== "ready" && syncState !== undefined) {
+    bands.push(
+      <div key="sync" role="status" className="band warn">
+        <b>{syncState === "failed" ? `COULDN'T LOAD ${accountId}` : `LOADING ${accountId}`}</b>
+        <span>
+          {syncState === "failed" ? `${sync.reason || "the server didn't answer"} · trying again` : "orders and positions since reconnecting"} · new orders wait; cancels still go
+        </span>
+      </div>,
+    );
+  }
+  const missing = accountId ? (sync.missing[accountId] ?? []) : [];
+  if (status === "open" && missing.length) {
+    bands.push(
+      <div key="missing" role="status" className="band warn">
+        <b>{missing.join(" AND ").toUpperCase()} UNAVAILABLE</b>
+        <span>
+          couldn't load {accountId}'s {missing.join(" and ")}: protections held there (stops, triggers) may be running but aren't shown · they load again on the next reconnect
+        </span>
       </div>,
     );
   }

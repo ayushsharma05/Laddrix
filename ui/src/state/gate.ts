@@ -23,6 +23,9 @@ export function tradingBlock(s: State, accountId: string | null = s.accountId): 
   const blocked = cancelBlock(s, accountId);
   if (blocked) return blocked;
   const account = s.me?.accounts.find((a) => a.id === accountId);
+  const sync = s.sync.accounts[accountId ?? ""];
+  if (sync === "loading") return `loading ${accountId}'s orders and positions: order clicks wait until they're in`;
+  if (sync === "failed") return `couldn't load ${accountId}'s orders and positions${s.sync.reason ? ` (${s.sync.reason})` : ""}: trying again; cancels still go`;
   if (account?.broker_session === "login_needed") return `log in to ${brokerName(account.broker)} first: today's login is missing or expired`;
   if (s.firmKill.engaged) return `all trading is stopped${s.firmKill.reason ? `: ${s.firmKill.reason}` : ""}`;
   const kill = accountId ? s.books[accountId]?.kill : undefined;

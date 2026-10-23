@@ -35,3 +35,36 @@ describe("operational alerts", () => {
     expect(texts).toContain("ERROR Log in to Kite for acc-a (AB1): the market opens in 9 min");
   });
 });
+
+describe("loading after a (re)connect (#268)", () => {
+  it("says while the account's orders and positions are loading, and why if they failed", () => {
+    const { app } = setup();
+    const accountId = app.store.getState().accountId!;
+    act(() => app.store.startSync(1, [accountId]));
+    expect(screen.getByText(`LOADING ${accountId}`).parentElement!.textContent).toContain("new orders wait; cancels still go");
+    act(() => app.store.syncFailed(1, "server busy"));
+    expect(screen.getByText(`COULDN'T LOAD ${accountId}`).parentElement!.textContent).toContain("server busy · trying again");
+    act(() => app.store.accountSynced(1, accountId));
+    expect(screen.queryByText(/LOADING|COULDN'T LOAD/)).toBeNull();
+  });
+
+  it("an older load's answer changes nothing", () => {
+    const { app } = setup();
+    const accountId = app.store.getState().accountId!;
+    act(() => app.store.startSync(2, [accountId]));
+    act(() => app.store.accountSynced(1, accountId)); // from load 1: too late
+    expect(screen.getByText(`LOADING ${accountId}`)).toBeTruthy();
+  });
+
+  it("protections that couldn't be loaded are said, not shown as none", () => {
+    const { app } = setup();
+    const accountId = app.store.getState().accountId!;
+    act(() => {
+      app.store.startSync(1, [accountId]);
+      app.store.accountSynced(1, accountId, ["algos"]);
+    });
+    const band = screen.getByText("ALGOS UNAVAILABLE").parentElement!;
+    expect(band.getAttribute("role")).toBe("status");
+    expect(band.textContent).toContain("may be running but aren't shown");
+  });
+});
