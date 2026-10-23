@@ -335,3 +335,43 @@ fills traded for by +₹0.50").
 3. If the broker has *less*: a trade was busted (cancelled by the exchange). Tell the broker
    desk; the position follows once the order list says so.
 4. Note the order id and what you did in the day's log.
+
+## "… is restarting" or "… keeps failing" (#273)
+
+**What you see:** an alert such as `acc-ayush: broker updates failed (ConnectionError: …):
+restarting in 2 s; new orders paused until it runs`. If it keeps failing:
+`… keeps failing (…): stopped trying; new orders paused. Restart the server once the cause is
+fixed`.
+
+**What it means:** one of MockTrade's background loops crashed. They are an account's broker
+updates, recovery, GTT watch, position reconciling and algos, plus marking positions to prices.
+- **While it restarts** (1 s, 2 s, 4 s … up to 30 s): new orders and changes on that account
+  wait, and say why. **Cancels still go.**
+- **After 5 failures in 5 minutes** it stops trying, and new orders stay paused until the
+  server restarts.
+- **`GET /api/ready`** answers 503 meanwhile. `GET /api/health` still says alive: the web
+  server is fine, trading isn't.
+
+**Steps:**
+1. Read the error in the alert and in the server log (`docker compose -f deploy/compose.yaml
+   logs app --since 10m`).
+2. Fix the cause: the broker down, the disk full, the network.
+3. A loop that recovered needs nothing more: the band clears by itself. One that was stopped
+   needs a restart (`docker compose -f deploy/compose.yaml restart app`). Recovery then
+   rebuilds and reconciles before orders open.
+
+## "Another MockTrade server owns data/" (#273)
+
+**What you see:** the server refuses to start:
+`another MockTrade server owns /data (pid 1234 since …): only one may trade its accounts`.
+
+**What it means:** a second server was started on the same data folder. Two servers would
+trade the same accounts as the same owner, so the second refuses. The lock belongs to the
+operating system: a crashed or killed server frees it at once. A **hung** one keeps it, on
+purpose: it might wake up and send orders.
+
+**Steps:**
+1. Is the other server running? `docker compose -f deploy/compose.yaml ps`. If yes, use that
+   one; don't start another.
+2. If it is hung (no answer on `/api/health`), end it: `docker compose -f deploy/compose.yaml
+   kill app`. Then start again. Recovery reconciles with the broker before taking orders.

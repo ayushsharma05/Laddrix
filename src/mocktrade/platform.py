@@ -32,6 +32,7 @@ from mocktrade.domain.order_spec import OrderSpec
 from mocktrade.domain.orders import Product
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
+from mocktrade.ops.supervisor import PauseGate, Supervisor
 from mocktrade.orders.basket import Baskets
 from mocktrade.orders.gate import Gates
 from mocktrade.orders.gtt import GttService
@@ -146,11 +147,13 @@ class Platform:
     expiry_rules: ExpiryRules = field(default_factory=ExpiryRules)  # broker cut-offs (#290)
     expiries: Expiries = field(init=False, repr=False)
     surveillance: Surveillance = field(init=False, repr=False)  # alerts for risk (#291)
+    supervisor: Supervisor = field(init=False, repr=False)  # critical loops, watched (#273)
     _late: set[asyncio.Task] | None = field(default=None, init=False, repr=False)
     _reconcile: bool = field(default=True, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.expiries = Expiries(self.instruments, rules=self.expiry_rules)
+        self.supervisor = Supervisor()
         log_ = self.event_log
         self.surveillance = Surveillance(
             note=(lambda k, a, d, x: log_.record_note(k, a, d, x)) if log_ else (lambda *_: None)
@@ -171,7 +174,8 @@ class Platform:
         position checks, and marking positions to the latest prices. An account added while
         this runs (an admin's new account) starts its own loops at once, ended with these."""
         self._reconcile = reconcile
-        loops = [self._mark_loop()]
+        keep = self.supervisor.keep
+        loops = [keep("marking positions to prices", self._mark_loop), self.supervisor.watchdog()]
         for runtime in self.accounts.values():
             loops.extend(self._account_loops(runtime))
         self._late = set()
@@ -185,15 +189,26 @@ class Platform:
                 await asyncio.gather(*late, return_exceptions=True)
 
     def _account_loops(self, runtime: AccountRuntime) -> list:
-        loops = [runtime.orders.run(), self._run_algos(runtime)]
+        """Each account's loops, each watched by the supervisor (#273): a crashed one is said
+        and restarted, and a critical one that is down pauses the account's new orders."""
+        keep, a = self.supervisor.keep, runtime.account.id
+        loops = [
+            keep(f"{a}: broker updates", runtime.orders.run, account_id=a),
+            keep(f"{a}: algos", lambda: self._run_algos(runtime), account_id=a),
+        ]
         if runtime.recovery is not None:
-            loops.append(self._recover(runtime))
+            loops.append(keep(f"{a}: recovery", lambda: self._recover(runtime), account_id=a))
         if runtime.gtt is not None:
-            loops.append(self._after_recovery(runtime, runtime.gtt.run))
+            loops.append(keep(f"{a}: GTTs", lambda: self._after_recovery(runtime, runtime.gtt.run),
+                              account_id=a))  # fmt: skip
         if runtime.portfolio is not None:
-            loops.append(self._after_recovery(runtime, runtime.portfolio.run))
+            loops.append(keep(f"{a}: funds and holdings",
+                              lambda: self._after_recovery(runtime, runtime.portfolio.run),
+                              critical=False, account_id=a))  # fmt: skip
         if self._reconcile:
-            loops.append(self._after_recovery(runtime, runtime.reconciler.run))
+            loops.append(keep(f"{a}: reconciling positions",
+                              lambda: self._after_recovery(runtime, runtime.reconciler.run),
+                              account_id=a))  # fmt: skip
         return loops
 
     def _start_late(self, runtime: AccountRuntime) -> None:
@@ -548,7 +563,8 @@ class Platform:
                 )  # fmt: skip
 
         margin = MarginGate(broker, available, book.net_qty, on_unchecked=unchecked)
-        checks = (recovery, risk, margin if margin_check else None, throttle)
+        pause = PauseGate(self.supervisor, account.id)  # a critical loop down (#273)
+        checks = (pause, recovery, risk, margin if margin_check else None, throttle)
         gates = [g for g in checks if g is not None]
         orders = OrderManager(
             account.id,

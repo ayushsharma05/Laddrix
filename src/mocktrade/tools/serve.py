@@ -78,6 +78,7 @@ from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.metrics import freeze_heap, watch_loop_lag
 from mocktrade.ops.alerts import Alerts
 from mocktrade.ops.checks import Checks, PriceOverload, audit_log
+from mocktrade.ops.fence import DataFence, FenceError
 from mocktrade.ops.guards import DayGuards
 from mocktrade.ops.notify import WebhookNotifier
 from mocktrade.ops.protection import ProtectionGuard
@@ -241,6 +242,7 @@ class Assembly:
     kite: KiteLive | None = None
     alerts: Alerts | None = None
     notifier: WebhookNotifier | None = None
+    fence: DataFence | None = None  # this server owns the data folder (#273)
 
     async def close(self) -> None:
         if self.notifier is not None:
@@ -251,12 +253,19 @@ class Assembly:
             with contextlib.suppress(Exception):
                 await broker.aclose()
         await self.log.aclose()  # flushes the audit trail
+        if self.fence is not None:
+            self.fence.release()  # last: nothing of ours writes after this
 
 
 def build(settings: ServeSettings) -> Assembly:
     """Assemble the server. Raises ConfigError (naming the setting) before starting anything
     if an account can't be run as configured."""
     settings.data_dir.mkdir(parents=True, exist_ok=True)
+    fence = DataFence(settings.data_dir)
+    try:
+        fence.acquire()  # one trading server per data folder (#273)
+    except FenceError as exc:
+        raise ConfigError(str(exc)) from None
     users = UserStore(settings.data_dir / "users.db", SecretBox(settings.secret_key))
     instruments = InstrumentStore()
     md = MarketData()
@@ -343,6 +352,10 @@ def build(settings: ServeSettings) -> Assembly:
 
     # daily operation: alerts to the screens, the audit trail and (optionally) a phone
     alerts = Alerts()
+    platform.supervisor.set_alert(  # a critical loop failing is an alert (#273)
+        lambda key, level, text, account_id: alerts.clear(key, text) if level == "OK"
+        else alerts.raise_(key, level, text, account_id=account_id)
+    )  # fmt: skip
     alerts.subscribe(
         lambda a: events.record_note(
             "OPS_ALERT" if a.active else "OPS_CLEAR", "-", a.text, {"key": a.key, "level": a.level}
@@ -446,6 +459,7 @@ def build(settings: ServeSettings) -> Assembly:
         static_dir=ui,
     )
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)
+    built.fence = fence
     built.alerts, built.notifier = alerts, notifier
     return built
 
@@ -510,7 +524,12 @@ async def run(settings: ServeSettings) -> None:
         ws_ping_timeout=20,
     )
     server = _Server(config)
-    tasks = [asyncio.create_task(job()) for job in built.jobs]
+    keep = built.platform.supervisor.keep  # every job watched: a crash is said and restarted
+    tasks = [
+        asyncio.create_task(job() if job == built.platform.run else  # it watches its own loops
+                            keep(getattr(job, "__qualname__", repr(job)), job, critical=False))
+        for job in built.jobs
+    ]  # fmt: skip
     log.info(
         "MockTrade on %s:%s for %s (prices: %s; %d accounts running, %d not)",
         settings.host,

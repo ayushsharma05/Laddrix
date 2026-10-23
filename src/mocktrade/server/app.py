@@ -447,6 +447,19 @@ def create_app(
     async def health() -> dict[str, str]:
         return {"status": "ok", "version": VERSION, "build": BUILD}  # the screens show it
 
+    @app.get("/api/ready", response_model=None)
+    async def ready() -> Any:
+        """Readiness, apart from liveness (/api/health, #273): the critical loops run, the
+        supervisor's watchdog ticks, and every account's state is rebuilt. Says only yes or
+        no (it needs no login); the reasons are ops alerts on the screens."""
+        ok, problems = platform.supervisor.ready()
+        recovering = [a for a, r in platform.accounts.items()
+                      if r.recovery is not None and r.recovery.state != "ok"]  # fmt: skip
+        if ok and not recovering:
+            return {"ready": True}
+        return JSONResponse({"ready": False, "problems": len(problems) + len(recovering)},
+                            status_code=503)  # fmt: skip
+
     @app.get("/api/metrics", response_model=None)
     async def metrics(user: Me, format: str = "json") -> dict[str, Any] | Response:
         """How fast each step is (metrics.py). Admin and risk only."""

@@ -56,6 +56,7 @@ REPRODUCIBLE = (
     "*.db-wal", "*.db-shm", "*.db-journal",  # SQLite's working files (inside the backups)
     "*.tmp", "*.part", "*.key", ".env",
     "demo_totp.txt",  # the demo's login secret: a secret, kept elsewhere (the demo prints it)
+    "server.lock",  # who owns the data folder now (#273): the running server's, not state
 )  # fmt: skip
 MANIFEST = "manifest.json"
 FORMAT = 1
