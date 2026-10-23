@@ -54,6 +54,7 @@ from mocktrade.risk.loss_watch import DailyLossWatch
 from mocktrade.risk.margin import MarginGate
 from mocktrade.risk.mtm import MtmWatch
 from mocktrade.risk.squareoff import SquareOff
+from mocktrade.risk.surveillance import Surveillance
 from mocktrade.risk.throttle import OrderThrottle
 from mocktrade.store.events import EventLog
 
@@ -144,11 +145,16 @@ class Platform:
     durable_orders: bool = True
     expiry_rules: ExpiryRules = field(default_factory=ExpiryRules)  # broker cut-offs (#290)
     expiries: Expiries = field(init=False, repr=False)
+    surveillance: Surveillance = field(init=False, repr=False)  # alerts for risk (#291)
     _late: set[asyncio.Task] | None = field(default=None, init=False, repr=False)
     _reconcile: bool = field(default=True, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.expiries = Expiries(self.instruments, rules=self.expiry_rules)
+        log_ = self.event_log
+        self.surveillance = Surveillance(
+            note=(lambda k, a, d, x: log_.record_note(k, a, d, x)) if log_ else (lambda *_: None)
+        )
         if self.event_log is not None:
             self.firm_switch.on_change(self.event_log.record_kill)
 
@@ -643,6 +649,14 @@ class Platform:
             account.id, broker, self.market_data, client_id_of=client_id_of, clock=clock
         )
         orders.subscribe(portfolio.on_order_event)
+        orders.subscribe(self.surveillance.on_order_event)
+        if self.event_log is not None:  # today's alerts and acknowledgements, after a restart
+            since = session_start(clock())
+            kept = [e.extra for e in self.event_log.notes(account.id, ["SURVEILLANCE"])
+                    if e.ts >= since]  # fmt: skip
+            acks = [e.extra for e in self.event_log.notes(account.id, ["SURVEILLANCE_ACK"])
+                    if e.ts >= since]  # fmt: skip
+            self.surveillance.restore(kept, acks)
         holder["portfolio"] = portfolio
         trade_check = None
         if portfolio.offers("trades"):  # orders against the broker's trade list (#352)

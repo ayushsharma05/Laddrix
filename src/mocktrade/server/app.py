@@ -14,6 +14,8 @@ same format as the event log (orders/codec.py).
 """
 
 import asyncio
+import csv
+import io
 import json
 import logging
 import time
@@ -77,6 +79,7 @@ from mocktrade.research.replay import ReplayFeed
 from mocktrade.research.ticks import FileTickStore
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.risk.mtm import PortfolioRule, PositionRule
+from mocktrade.risk.surveillance import alert_to_dict as surveillance_to_dict
 from mocktrade.server import security
 from mocktrade.server.admin import AccountStarter, admin_router
 from mocktrade.server.formats import algo_to_dict, position_to_dict
@@ -316,6 +319,10 @@ class FlattenIn(_Strict):
     confirm: bool
     instrument_id: str | None = None  # one instrument only (else every open position)
     product: Product | None = None  # with instrument_id: one product only
+
+
+class AckIn(_Strict):
+    note: str  # what was found: it is kept
 
 
 class AdoptIn(_Strict):
@@ -1431,6 +1438,53 @@ def create_app(
                 ],
             },
         }
+
+    # --- surveillance and the auditor's export (#291) ---------------------------------------------
+
+    def _risk_only(user: User) -> None:
+        if not _risk_or_admin(user):
+            raise HTTPException(403, "only risk or an admin can see surveillance alerts")
+
+    @app.get("/api/surveillance")
+    async def surveillance_alerts(user: Me, open_only: bool = False) -> list[dict[str, Any]]:
+        """Patterns worth a look (risk/surveillance.py): self-trades, large orders, cancel
+        ratios, bursts. Kept in the audit trail; acknowledged with a note."""
+        _risk_only(user)
+        return [surveillance_to_dict(a) for a in platform.surveillance.alerts(open_only=open_only)]
+
+    @app.post("/api/surveillance/{alert_id}/ack")
+    async def acknowledge_alert(alert_id: str, body: AckIn, user: Me) -> dict[str, Any]:
+        _risk_only(user)
+        try:
+            done = platform.surveillance.acknowledge(alert_id, user.id, body.note)
+            return surveillance_to_dict(done)
+        except KeyError:
+            raise HTTPException(404, f"no surveillance alert {alert_id}") from None
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @app.get("/api/accounts/{account_id}/audit-export", response_model=None)
+    async def audit_export(account_id: str, day: str, user: Me) -> Response:
+        """One account's whole audit trail for one day, as CSV, for an auditor: every order
+        event, fill, note and surveillance alert, in order."""
+        runtime(account_id, user)
+        _risk_only(user)
+        audit_log = platform.event_log
+        if audit_log is None:
+            raise HTTPException(409, "no audit trail on this server")
+        wanted = report_day(day)
+        rows = [e for e in audit_log.events(account_id=account_id, limit=10**7)
+                if e.ts.astimezone(IST).date() == wanted]  # fmt: skip
+        out = io.StringIO()
+        w = csv.writer(out)
+        w.writerow(["seq", "time", "kind", "client_order_id", "detail", "extra"])
+        for e in rows:
+            w.writerow([e.seq, e.ts.isoformat(), e.kind, e.client_order_id, e.detail,
+                        json.dumps(e.extra, sort_keys=True, default=str)])  # fmt: skip
+        name = f"mocktrade-audit-{account_id}-{wanted.isoformat()}.csv"
+        disposition = {"Content-Disposition": f'attachment; filename="{name}"'}
+        return Response(out.getvalue(), media_type="text/csv; charset=utf-8",
+                        headers=disposition)  # fmt: skip
 
     # --- trades made outside MockTrade (#355) -----------------------------------------------------
 
