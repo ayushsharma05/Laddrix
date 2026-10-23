@@ -553,3 +553,9 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - `docs/design/data.md`: classes, retention (audit trail at least 5 years per SEBI's broker rules; the firm's compliance officer to confirm), no production data in development, what the chain does and doesn't protect against.
   - **The demo run caught** a bug the unit tests didn't: the filter broke the access log's formatting (it unpacks its parts itself). Fixed by cleaning each part in place, with a test.
   - **Checks:** 14 tests; mutation 27/27 (two survivors were test gaps, now covered; one was an equivalent mutant, and its dead code was removed); the demo run 7/7 (`context/evidence/h-367-data-drill.txt`).
+- 23 Oct, **#368 designed before coding** (`docs/design/tenancy.md`).
+  - **Workspaces:** each user and broker account belongs to one workspace. Today's admin becomes a workspace admin. The platform operator is not a web role at all: terminal only.
+  - **The one rule:** anything in another workspace answers 404.
+  - **STOP:** one kill switch per workspace.
+  - **Prices:** each Kite account is its own price source, and today's "first account carries prices for everyone" goes. Screens see only the sources of accounts the person may see. The setting `MOCKTRADE_PRICES_VISIBLE` (`owner` by default) waits on Zerodha's answer for supervisors.
+  - **Split into steps:** #394 (368a), #395 (368b), #396 (368c), #397 (368d).
