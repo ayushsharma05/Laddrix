@@ -32,6 +32,10 @@ class AlertStore:
     def _path(self, user_id: str) -> Path:
         return self.root / f"{hashlib.sha256(user_id.encode()).hexdigest()[:24]}.json"
 
+    def path_of(self, user_id: str) -> Path:
+        """Where one user's alerts and webhook are kept (erasing a user, #367)."""
+        return self._path(user_id)
+
     def load_all(self) -> list[Alert]:
         out: list[Alert] = []
         if not self.root.is_dir():

@@ -6,7 +6,7 @@ on a laptop, from a git-ignored `.env` file with lines like `KITE_API_KEY=...`.
 
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -40,9 +40,11 @@ def environment(dotenv: Path = Path(".env")) -> dict[str, str]:
 @dataclass(frozen=True)
 class KiteSettings:
     api_key: str
-    api_secret: str
+    api_secret: str = field(repr=False)  # never in a log or an error message (#367)
     token_file: Path
-    egress: str | None = None  # a proxy URL: this account's own IP; None: the server's (#372)
+    # a proxy URL: this account's own IP; None: the server's (#372). Hidden too: a proxy
+    # address can carry its own password (http://user:pass@host)
+    egress: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> "KiteSettings":

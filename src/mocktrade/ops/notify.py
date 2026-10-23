@@ -48,7 +48,7 @@ class WebhookNotifier:
             if response.status_code >= 300:
                 log.warning("alert webhook answered %s", response.status_code)
         except httpx.HTTPError as exc:
-            log.warning("alert webhook failed: %r", exc)
+            log.warning("alert webhook failed: %s", type(exc).__name__)  # no URL in logs (#367)
 
     async def aclose(self) -> None:
         if self._tasks:

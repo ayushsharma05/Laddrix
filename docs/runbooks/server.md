@@ -117,6 +117,8 @@ The 21:45 cron job runs `python -m mocktrade.tools.backup`. One folder per run:
 
 Backups hold password hashes and users' webhook secrets, so they are readable by their owner only.
 
+**Each backup also proves the audit trail (#367).** Its `manifest.json` records the audit trail's head (`audit_chain`). To check that nothing in the trail was changed or cut since a backup was made, run `python -m mocktrade.tools.audit verify --against /var/backups/mocktrade/<stamp>/manifest.json`. Do it monthly, and after any incident. A copy of the manifests kept off the machine is what makes this proof ([data.md](../design/data.md) §5).
+
 **Nothing new is left out unnoticed (#272).** Every top-level entry in the data folder must be
 either backed up or listed in `tools/backup.py` (`FOLDERS` for state, `REPRODUCIBLE` for what is
 rebuilt or kept elsewhere).

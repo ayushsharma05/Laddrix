@@ -42,6 +42,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from mocktrade.store.events import verify_chain
+
 DATABASES = ("users.db", "events.db")
 FOLDERS = ("rules", "reports", "alerts", "candles", "backtests")
 OPTIONAL = {"ticks": "recorded days (large): --with-ticks"}
@@ -158,6 +160,11 @@ def run_backup(
                 parts.append(f"{name}/")
         listed = manifest(part, now, parts)
         listed["not_covered"] = not_covered(data_dir)
+        if (part / "events.db").exists():  # the audit trail's head, kept off the machine (#367)
+            chain = verify_chain(part / "events.db")
+            listed["audit_chain"] = {"rows": chain.rows, "unchained": chain.unchained,
+                                     "head_seq": chain.head_seq, "head": chain.head,
+                                     "broken_at": chain.broken_at}  # fmt: skip
         (part / MANIFEST).write_text(json.dumps(listed, indent=1))
     except BaseException:
         shutil.rmtree(part, ignore_errors=True)

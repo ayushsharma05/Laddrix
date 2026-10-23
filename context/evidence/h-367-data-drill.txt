@@ -1,0 +1,11 @@
+# #367 data drill on the demo, 2026-10-23T18:41Z
+# python3 context/scripts/drill-data.py
+PASS 1. logged in, 3 orders placed and cancelled, a failed login, a webhook set
+PASS 2. a backup while running records the head (row 10 of 10)
+PASS 3. verify: whole, matches
+PASS 4. an edited row is named: BROKEN at row 2: this row was changed, or one before it was changed or removed
+PASS 4. a recomputed chain passes alone, fails against the backup: BROKEN: row 10 has a different chain than <a fresh temporary folder>/backups/20261023T184201Z/manifest.json recorded: the log was rewritten up to there
+PASS 5. the server log (23 lines) holds no secret
+PASS 5. the access log still writes every line, the callback's token hidden
+
+7/7 checks passed

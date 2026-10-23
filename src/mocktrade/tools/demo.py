@@ -25,6 +25,7 @@ from urllib.parse import parse_qs, urlparse
 
 import uvicorn
 
+from mocktrade import logsafe
 from mocktrade.alerts.service import build_market_alerts
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.paper import PaperBroker
@@ -211,6 +212,7 @@ async def main(
                      market_alerts=market_alerts,
                      starter=CallbackStarter(("paper",), start))  # fmt: skip
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
+    logsafe.install()  # the same filter as the real server: no secret in a log line (#367)
     what = "demo" if feed is None else f"REPLAY of {replay_day} at {speed:g}×"
     code = "python -m mocktrade.tools.demo --code" + (f" --replay {replay_day}" if feed else "")
     print(f"\nMockTrade {what} on http://localhost:{port}  (pages from {origin})")

@@ -7,6 +7,8 @@
     python -m mocktrade.tools.users disable ayush
     python -m mocktrade.tools.users revoke-sessions [--user ayush]   # everyone logs in again
     python -m mocktrade.tools.users rotate-key [--check]   # MOCKTRADE_NEW_SECRET_KEY=... (#364)
+    python -m mocktrade.tools.users export-user ayush > ayush.json   # their data (#367)
+    python -m mocktrade.tools.users erase-user ayush --confirm ayush  # server stopped (#367)
 
 add-user prints an otpauth:// link once: open it as a QR code (or paste it) in an
 authenticator app. Passwords are typed, never passed on the command line (they'd end
@@ -23,13 +25,27 @@ rotate-key (docs/runbooks/incidents.md, "A credential is stolen"):
        (keep it beside the backups made before today: they need it)
 
 revoke-sessions works while the server runs: open screens close within seconds.
+
+export-user and erase-user (docs/design/data.md, "One person's data"):
+
+    export ─► their profile, accounts, settings, layouts, sessions, alerts (the webhook's key
+              is named, not given), backtests, and every audit entry that names them; JSON
+    erase  ─► refused while a server owns the data folder, if they own an account, or if they
+              are the last admin; else their alerts and backtests deleted, then their profile
+              (sessions, settings, layouts gone; name, password, authenticator replaced)
+           ─► the audit trail keeps them, by id: it is kept by law, not by choice
 """
 
 import argparse
 import getpass
+import json
+import shutil
+import sqlite3
 import sys
 from pathlib import Path
 
+from mocktrade.alerts.engine import alert_to_dict
+from mocktrade.alerts.store import AlertStore
 from mocktrade.config import ConfigError, environment
 from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.ops.fence import DataFence, FenceError
@@ -73,6 +89,11 @@ def main(argv: list[str], env: dict[str, str], password=ask_password) -> int:
     off.add_argument("user_id")
     end = sub.add_parser("revoke-sessions")
     end.add_argument("--user", help="only this user's sessions (default: everyone's)")
+    out = sub.add_parser("export-user")
+    out.add_argument("user_id")
+    erase = sub.add_parser("erase-user")
+    erase.add_argument("user_id")
+    erase.add_argument("--confirm", required=True, help="the user id again: there is no undo")
     rotate = sub.add_parser("rotate-key")
     rotate.add_argument("--check", action="store_true", help="check both keys; change nothing")
     args = parser.parse_args(argv)
@@ -111,7 +132,85 @@ def main(argv: list[str], env: dict[str, str], password=ask_password) -> int:
               "each must log in again (password and authenticator).")  # fmt: skip
     elif args.command == "rotate-key":
         return rotate_key(store, env, check=args.check)
+    elif args.command == "export-user":
+        print(json.dumps(export_user(store, args.user_id), indent=1, ensure_ascii=False))
+    elif args.command == "erase-user":
+        if args.confirm != args.user_id:
+            raise ValueError("--confirm must repeat the user id: nothing was erased")
+        done = erase_user(store, args.user_id)
+        print(f"Erased {args.user_id}: " + ", ".join(f"{k} {v}" for k, v in done.items()))
+        print("Kept: their entries in the audit trail, by id (record keeping). Backups made "
+              "before today still hold them until they age out (14/30 days).")  # fmt: skip
     return 0
+
+
+def _named(payload: dict, user_id: str) -> bool:
+    """An audit row is about this person: they did it, it was done to them, or it is their
+    order."""
+    request = (payload.get("order") or {}).get("request") or {}
+    return user_id in (payload.get("by"), payload.get("user_id"), request.get("user_id"))
+
+
+def export_user(store: UserStore, user_id: str) -> dict:
+    try:
+        found = store.export_user(user_id)
+    except KeyError:
+        raise ValueError(f"no user {user_id}") from None
+    data = store.path.parent
+    alerts = AlertStore(data / "alerts")
+    found["alerts"] = [alert_to_dict(a) for a in alerts.load_all() if a.user_id == user_id]
+    hook = alerts.webhook(user_id)
+    found["webhook"] = {"url": hook["url"], "signing_key": "set (not shown)"} if hook else None
+    found["backtests"] = sorted(run_id for run_id, owner in _runs(data) if owner == user_id)
+    found["audit_trail"] = []
+    if (data / "events.db").exists():
+        db = sqlite3.connect(f"file:{data / 'events.db'}?mode=ro", uri=True)
+        try:
+            for seq, ts, account, kind, detail, payload in db.execute(
+                "SELECT seq, ts, account_id, kind, detail, payload FROM events ORDER BY seq"
+            ):
+                if _named(json.loads(payload), user_id):
+                    found["audit_trail"].append({"seq": seq, "ts": ts, "account": account,
+                                                 "kind": kind, "detail": detail})  # fmt: skip
+        finally:
+            db.close()
+    return found
+
+
+def _runs(data: Path) -> list[tuple[str, str]]:
+    """(run id, owner) of every backtest kept (research/backtest.py writes <id>/run.json)."""
+    found = []
+    for path in sorted((data / "backtests").glob("*/run.json")):
+        try:
+            found.append((path.parent.name, json.loads(path.read_text()).get("owner", "")))
+        except (OSError, ValueError):
+            continue  # unreadable: the server skips it too; nobody's
+    return found
+
+
+def erase_user(store: UserStore, user_id: str) -> dict[str, int]:
+    data = store.path.parent
+    fence = DataFence(data)  # the running server holds alerts in memory: it would write back
+    try:
+        fence.acquire()
+    except FenceError as exc:
+        raise ValueError(f"stop the server first: {exc}") from None
+    try:
+        store.erase_check(user_id)  # every refusal before anything is touched
+        done = {"alert_files": 0, "backtests": 0}
+        path = AlertStore(data / "alerts").path_of(user_id)
+        if path.exists():
+            path.unlink()
+            done["alert_files"] = 1
+        for run_id, owner in _runs(data):
+            if owner == user_id:
+                shutil.rmtree(data / "backtests" / run_id)
+                done["backtests"] += 1
+        return done | store.erase_user(user_id)
+    except KeyError:
+        raise ValueError(f"no user {user_id}") from None
+    finally:
+        fence.release()
 
 
 def rotate_key(store: UserStore, env: dict[str, str], *, check: bool) -> int:

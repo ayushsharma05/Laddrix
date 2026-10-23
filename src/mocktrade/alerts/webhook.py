@@ -108,7 +108,7 @@ class WebhookSender:
 
     async def _deliver(self, url: str, secret: str, payload: dict[str, Any],
                        done: Callable[[str], None]) -> None:  # fmt: skip
-        error = ""
+        error = said = ""  # said: what the log gets (never the URL: it may be the secret)
         try:
             check_url(url)
             await self._check_host(urlparse(url).hostname or "")
@@ -122,13 +122,14 @@ class WebhookSender:
                     break
                 await self._sleep(BACKOFF_S[attempt])
         except WebhookError as exc:
-            error = str(exc)
+            error = said = str(exc)
         except Exception as exc:  # never let a webhook break anything else
-            log.exception("webhook send failed")
-            error = f"{type(exc).__name__}: {exc}"
+            log.warning("webhook send failed: %s", type(exc).__name__)  # its URL may be secret
+            error = f"{type(exc).__name__}: {exc}"  # to the user only (their own webhook)
+            said = type(exc).__name__
         if error:
             self.failed += 1
-            log.warning("webhook %s: %s", urlparse(url).hostname, error)
+            log.warning("webhook %s: %s", urlparse(url).hostname, said or error)
         else:
             self.sent += 1
         try:
