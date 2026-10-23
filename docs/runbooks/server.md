@@ -117,6 +117,24 @@ The 21:45 cron job runs `python -m mocktrade.tools.backup`. One folder per run:
 
 Backups hold password hashes and users' webhook secrets, so they are readable by their owner only.
 
+**Nothing new is left out unnoticed (#272).** Every top-level entry in the data folder must be
+either backed up or listed in `tools/backup.py` (`FOLDERS` for state, `REPRODUCIBLE` for what is
+rebuilt or kept elsewhere).
+- **Something else turns up** (a new feature's folder): the backup is still made, but it prints
+  `backup made, but INCOMPLETE: <name> ...`, names it in the manifest (`not_covered`) and exits
+  with 2. The nightly job's failure alert reaches you then, not on the day you need a restore.
+- **Fix:** add it to the right list and release.
+
+**How much you can lose, and how long it takes (RPO / RTO, measured 23 Oct 2026):**
+
+| | |
+| --- | --- |
+| **RPO** (what a restore can lose) | **MockTrade's own state since the last backup.** Backups run Mon–Fri at 21:45, plus the cloud's daily snapshot, so up to a trading day: audit events, MTM limits, alerts, reports, users or settings changed since. **Positions and working orders are not lost:** at the broker they are the truth, and the restart rebuilds today's from the broker's lists before trading opens (recovery). A restored server never sends an order twice (tested). |
+| **RTO** (how long) | **The tools take seconds:** a 217 MB audit trail took 2.4 s to back up and 1.7 s to restore with every check. **The rest is people, about 15 to 20 minutes:** stop the server; check the backup into an empty folder; restore; put back the secret key and `.env` from the password manager; start; log in to Kite; wait for the recovery band to clear (it reconciles with the broker before taking orders). Rehearse it: `context/scripts/drill-backup-restore.py` (19/19 on 23 Oct, `context/evidence/h-272-backup-restore-drill.txt`). |
+
+**A backup from another MockTrade version** is refused by name (`backup format N, this
+MockTrade restores format 1`): restore with the version that made it, then upgrade.
+
 ## Restore from a backup
 
 **1. Check the backup first, without touching anything.** Restore it into an empty, isolated folder. A damaged or incomplete backup is refused at this step, naming the file.

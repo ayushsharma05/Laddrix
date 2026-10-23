@@ -487,3 +487,11 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Defect confirmed:** after a (re)connect the stream showed "open" and order clicks were allowed while orders and positions were still loading; a failed load only left a message; algos/GTTs that failed to load showed as empty lists; a slow older load could apply after a newer one.
   - **The fix:** a load epoch per connect (older answers dropped); per-account sync state (loading/ready/failed) that the order gate checks (cancels still go: the server decides); a failed load retried every 3 s; a status band ("LOADING", "COULDN'T LOAD", "ALGOS UNAVAILABLE"); a 404 (not offered) stays empty, any other failure is "unavailable".
   - **Checks:** 4 session tests (loading blocks new orders, failure and retry, older answers dropped, unavailable vs empty), 3 band tests; all 413 UI tests; on the live demo the terminal loads to no bands and the ticket enabled (`context/images/h-268-synced.png`).
+- 23 Oct, **#272 done** (backups: all authoritative state, proven restore). Done before #273, which depends on it.
+  - **Rechecked first:** the issue's evidence was from before V1.3 (#329): backups already cover users.db, events.db and rules/reports/alerts/candles/backtests, with a checksummed manifest, an atomic `.part` rename, and a 19/19 restore drill.
+  - **Gaps found and fixed:**
+    - restore accepted a backup of any format: now an unknown format is refused by name;
+    - new state in the data folder would be skipped silently: now every top-level entry must be backed up or listed as reproducible, else the backup is made but fails with exit 2 and `not_covered` in the manifest (its first real run caught `demo_totp.txt`, a secret, now listed);
+    - no test that a restored server never re-sends an order: added;
+    - RPO/RTO measured and written in `docs/runbooks/server.md` (217 MB: backup 2.4 s, restore 1.7 s; people about 15-20 min; RPO up to a trading day of MockTrade's own state, positions and orders rebuilt from the broker).
+  - **Checks:** 3 new tests (24 in test_backup.py); the drill 19/19 (`context/evidence/h-272-backup-restore-drill.txt`).

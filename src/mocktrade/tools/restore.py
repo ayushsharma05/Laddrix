@@ -26,7 +26,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from mocktrade.tools.backup import DATABASES, MANIFEST, STAMP, sha256
+from mocktrade.tools.backup import DATABASES, FORMAT, MANIFEST, STAMP, sha256
 
 FROM_ELSEWHERE = (
     "MOCKTRADE_SECRET_KEY (from the password manager): without the same key, users must set "
@@ -51,6 +51,9 @@ def check_backup(folder: Path) -> dict:
     files = listed.get("files")
     if not isinstance(files, dict) or not any(name in files for name in DATABASES):
         raise RestoreError(f"{folder}: the manifest lists no database")
+    if listed.get("format") != FORMAT:  # a backup this version can't read: never a guess
+        raise RestoreError(f"{folder}: backup format {listed.get('format')!r}, this MockTrade "
+                           f"restores format {FORMAT}: use the version that made it")  # fmt: skip
     for name, expect in files.items():
         if Path(name).is_absolute() or ".." in Path(name).parts:
             raise RestoreError(f"{folder}: the manifest names a file outside the backup: {name}")

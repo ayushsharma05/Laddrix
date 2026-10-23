@@ -264,3 +264,91 @@ def test_a_database_that_fails_its_integrity_check_is_refused(tmp_path):
     (folder / "manifest.json").write_text(json.dumps(listed))
     with pytest.raises(RestoreError, match="users.db fails SQLite's integrity check"):
         check_backup(folder)
+
+
+# --- #272: nothing new is left out unnoticed; versions; a restored server never re-sends ---
+
+
+def test_state_no_backup_rule_covers_is_said_and_fails_the_job(tmp_path, capsys):
+    """A new kind of state in the data folder (here `surveillance/`) that nobody added to the
+    backup: the backup is still made, but it names what it missed and the job fails, so the
+    nightly alert reaches a person instead of the gap being found at restore time."""
+    a_server(tmp_path / "data")
+    assert main(["--data", str(tmp_path / "data"), "--to", str(tmp_path / "b")]) == 0
+    (tmp_path / "data" / "surveillance").mkdir()
+    (tmp_path / "data" / "surveillance" / "x.json").write_text("{}")
+    assert main(["--data", str(tmp_path / "data"), "--to", str(tmp_path / "c")]) == 2
+    assert "INCOMPLETE" in capsys.readouterr().err
+    (folder,) = (tmp_path / "c").iterdir()
+    assert json.loads((folder / "manifest.json").read_text())["not_covered"] == ["surveillance"]
+
+
+def test_a_backup_of_an_unknown_format_is_refused(tmp_path):
+    a_server(tmp_path / "data")
+    folder = run_backup(tmp_path / "data", tmp_path / "b", 14, NOW)
+    listed = json.loads((folder / "manifest.json").read_text())
+    listed["format"] = 2  # made by a newer MockTrade
+    (folder / "manifest.json").write_text(json.dumps(listed))
+    with pytest.raises(RestoreError, match="backup format 2, this MockTrade restores format 1"):
+        check_backup(folder)
+
+
+async def test_a_restored_server_never_sends_an_order_twice(tmp_path, nifty_fut):
+    """An order working at the broker when the backup was made: after a restore and a
+    restart, it is known again from the audit trail and the broker's list, never re-placed."""
+    from mocktrade.broker.fake import FakeBroker
+    from mocktrade.domain.accounts import BrokerAccount
+    from mocktrade.domain.orders import (
+        OrderRequest,
+        OrderStatus,
+        OrderType,
+        OrderUpdate,
+        Product,
+        Side,
+    )
+    from mocktrade.domain.ticks import Tick
+    from mocktrade.marketdata.service import MarketData
+    from mocktrade.orders.model import ClientIds
+    from mocktrade.platform import Platform
+    from mocktrade.refdata.store import InstrumentStore
+    from mocktrade.risk.kill_switch import KillSwitch
+
+    store, md = InstrumentStore(), MarketData()
+    store.add(nifty_fut)
+    md.on_tick(Tick(nifty_fut.id, 2401000))
+    data = tmp_path / "data"
+    data.mkdir()
+
+    def start(folder, broker, recover):
+        log = EventLog(folder / "events.db")
+        log.start()
+        platform = Platform(store, md, KillSwitch("firm"), log)
+        rt = platform.add_account(BrokerAccount("acc", "kite", "AB1", "ayush"), broker,
+                                  ids=ClientIds("MT", log.last_counter("MT")),
+                                  recover_on_start=recover)  # fmt: skip
+        return log, platform, rt
+
+    first = FakeBroker()
+    log, _, rt = start(data, first, False)
+    sent = await rt.orders.submit(OrderRequest("", "acc", "ayush", nifty_fut.id, Side.BUY, 75,
+                                               OrderType.LIMIT, Product.NRML,
+                                               price_paise=2400000))  # fmt: skip
+    assert first.placed and sent.broker_order_id == "F1", sent.reason
+    await log.aclose()
+    folder = run_backup(data, tmp_path / "b", 14, NOW)
+    restore(folder, tmp_path / "restored", replace=False, now=NOW)
+
+    again = FakeBroker(broker_orders=[OrderUpdate(sent.client_order_id, "F1", OrderStatus.OPEN)])
+    log, platform, rt = start(tmp_path / "restored", again, True)
+    try:
+        await platform._recover(rt, retry_s=0.01)
+        assert rt.recovery.state == "ok", rt.recovery.reason
+        assert again.placed == []  # nothing sent twice
+        (working,) = rt.orders.working()
+        assert working.client_order_id == sent.client_order_id
+        later = await rt.orders.submit(OrderRequest("", "acc", "ayush", nifty_fut.id, Side.BUY,
+                                                    75, OrderType.LIMIT, Product.NRML,
+                                                    price_paise=2400000))  # fmt: skip
+        assert later.client_order_id != sent.client_order_id  # ids go on from the backup
+    finally:
+        await log.aclose()

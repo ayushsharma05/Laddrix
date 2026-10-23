@@ -1,0 +1,27 @@
+--- 1. a day's worth of state
+PASS a second user (201)
+PASS a saved layout
+PASS the colour-blind theme
+PASS an MTM loss limit
+PASS a market alert (201)
+   state: {"users": ["demo", "ravi"], "position": 75, "bought": 75, "layout": {"widgets": ["ladder", "ticket"], "drill": true}, "theme": {"name": "cb"}, "mtm": {"max_loss_paise": 500000, "target_paise": null, "auto_close": false, "fired_today": false}, "alerts": [["PRICE_ABOVE", "NFO:NIFTY26OCTFUT"]]} audit events: 7
+--- 2. back up while the server runs
+PASS backup OK: data/drill-backup/backups/20261023T131904Z (4 files)
+PASS no secret in it: ['alerts/2a97516c354b68848cdbd8f5.json', 'events.db', 'rules/mtm-acc-paper.json', 'users.db']
+--- 3. restore into an isolated, empty folder
+PASS restore OK: data/drill-backup/backups/20261023T131904Z -> data/drill-backup/restored
+PASS over the live folder without --replace: refused
+--- 4. a server on the restored folder
+   state: {"users": ["demo", "ravi"], "position": 75, "bought": 75, "layout": {"widgets": ["ladder", "ticket"], "drill": true}, "theme": {"name": "cb"}, "mtm": {"max_loss_paise": 500000, "target_paise": null, "auto_close": false, "fired_today": false}, "alerts": [["PRICE_ABOVE", "NFO:NIFTY26OCTFUT"]]} audit events: 8
+PASS users: ['demo', 'ravi'] -> ['demo', 'ravi']
+PASS position: 75 -> 75
+PASS bought: 75 -> 75
+PASS layout: {'widgets': ['ladder', 'ticket'], 'drill': True} -> {'widgets': ['ladder', 'ticket'], 'drill': True}
+PASS theme: {'name': 'cb'} -> {'name': 'cb'}
+PASS mtm: {'max_loss_paise': 500000, 'target_paise': None, 'auto_close': False, 'fired_today': False} -> {'max_loss_paise': 500000, 'target_paise': None, 'auto_close': False, 'fired_today': False}
+PASS alerts: [('PRICE_ABOVE', 'NFO:NIFTY26OCTFUT')] -> [('PRICE_ABOVE', 'NFO:NIFTY26OCTFUT')]
+PASS every audit event kept (7 of 7)
+PASS and only the restart's own added: ['RECOVERY_OK']
+PASS the trade made after the backup is not in it: a restore is the backup's moment
+
+19/19 checks passed
