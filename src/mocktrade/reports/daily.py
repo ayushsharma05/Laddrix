@@ -176,7 +176,7 @@ def build_day(
     earlier = PositionBook(account_id)
     for e in before:
         earlier.replay(e.client_order_id, e.order.request, e.order.filled_qty,  # type: ignore[union-attr]
-                       e.fill.qty, e.fill.price_paise)  # type: ignore[union-attr]  # fmt: skip
+                       e.fill.qty, e.fill.price_paise, e.fill.value_paise)  # type: ignore[union-attr]  # fmt: skip
     book = PositionBook(account_id)
     books: dict[str, PositionBook] = {}
     carried: dict[tuple[str, str], tuple[int, int]] = {}
@@ -205,15 +205,20 @@ def build_day(
     for e in today:
         order, fill = e.order, e.fill
         assert order is not None and fill is not None
+        r = order.request
+        strategy = strategy_of(r)
+        if fill.qty == 0:  # the broker corrected what this order traded for (#275)
+            for b in (book, books.setdefault(strategy, PositionBook(account_id))):
+                b.replay(e.client_order_id, r, order.filled_qty, 0, 0, fill.value_paise)
+            continue
         qty = order.filled_qty - counted.get(e.client_order_id, 0)
         if qty <= 0:
             continue
         counted[e.client_order_id] = order.filled_qty
-        r = order.request
-        strategy = strategy_of(r)
-        book.replay(e.client_order_id, r, order.filled_qty, fill.qty, fill.price_paise)
+        value = fill.value_paise if qty == fill.qty else None
+        book.replay(e.client_order_id, r, order.filled_qty, fill.qty, fill.price_paise, value)
         books.setdefault(strategy, PositionBook(account_id)).replay(
-            e.client_order_id, r, order.filled_qty, fill.qty, fill.price_paise
+            e.client_order_id, r, order.filled_qty, fill.qty, fill.price_paise, value
         )
         per_strategy_trades[strategy] = per_strategy_trades.get(strategy, 0) + 1
         trades.append(TradeRow(e.ts, e.client_order_id, r.instrument_id, r.side.value,

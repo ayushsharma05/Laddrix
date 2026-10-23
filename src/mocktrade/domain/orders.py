@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
+from fractions import Fraction
 
 from mocktrade.domain.instruments import Instrument, InstrumentId
 
@@ -141,7 +142,7 @@ class OrderUpdate:
     broker_order_id: str
     status: OrderStatus
     filled_qty: int = 0
-    avg_price_paise: int = 0
+    avg_price_paise: int = 0  # rounded to a paisa (for showing)
     last_fill_qty: int = 0  # size of the newest fill (0 if this update has no fill)
     last_fill_price_paise: int = 0
     reason: str = ""  # why it was rejected or cancelled
@@ -151,3 +152,6 @@ class OrderUpdate:
     qty: int | None = None
     price_paise: int | None = None
     trigger_paise: int | None = None
+    # the average as the broker wrote it, exactly (paise; Kite gives fractions of a paisa):
+    # the order's traded value is worked out from this, not the rounded one (#275)
+    avg_price_exact: Fraction | None = None

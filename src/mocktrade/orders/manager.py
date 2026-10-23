@@ -36,9 +36,11 @@ import time
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from fractions import Fraction
 
 from mocktrade.broker.base import Broker, BrokerError
 from mocktrade.domain.instruments import Instrument
+from mocktrade.domain.money import format_rupees
 from mocktrade.domain.order_spec import OrderSpec, spec_problem
 from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderUpdate
 from mocktrade.metrics import METRICS, since_us
@@ -81,6 +83,7 @@ class _Order:
     status: OrderStatus = OrderStatus.PENDING
     filled_qty: int = 0
     avg_price_paise: int = 0
+    filled_value_paise: int = 0  # exactly what its fills traded for (#275)
     reason: str = ""
     pending: Pending = Pending.NONE
     sent: bool = False  # has `place` been called?
@@ -99,6 +102,7 @@ class _Order:
             status=self.status,
             filled_qty=self.filled_qty,
             avg_price_paise=self.avg_price_paise,
+            filled_value_paise=self.filled_value_paise,
             reason=self.reason,
             pending=self.pending,
             created_at=self.created_at,
@@ -479,6 +483,7 @@ class OrderManager:
                 status=view.status,
                 filled_qty=view.filled_qty,
                 avg_price_paise=view.avg_price_paise,
+                filled_value_paise=view.filled_value_paise,
                 reason=view.reason,
                 pending=pending,
                 sent=True,
@@ -534,16 +539,23 @@ class OrderManager:
         if update.filled_qty < order.filled_qty:
             return self._ignore(order, update, "stale: reports less filled than we know")
         terms = self._broker_terms(order, update, current)
+        value = _filled_value(order, update)
+        corrected = update.filled_qty == order.filled_qty and value != order.filled_value_paise
         if status is order.status:
-            if update.filled_qty == order.filled_qty and terms is None:
+            if update.filled_qty == order.filled_qty and terms is None and not corrected:
                 return self._ignore(order, update, "duplicate")
         elif status not in ALLOWED[order.status]:
             return self._ignore(order, update, f"{order.status.value} can't become {status.value}")
 
-        fill = self._fill_from(order, update)
+        fill = self._fill_from(order, update, value)
+        correction = None
+        if corrected and order.filled_qty:  # nothing new traded, but a different value (#275)
+            correction = Fill(order.request.client_order_id, 0, 0, False,
+                              value - order.filled_value_paise)  # fmt: skip
         order.status = status
         order.filled_qty = update.filled_qty
         order.avg_price_paise = update.avg_price_paise
+        order.filled_value_paise = value
         if status in (S.CANCELLED, S.REJECTED):
             order.reason = update.reason
         detail = update.reason
@@ -563,6 +575,12 @@ class OrderManager:
         self._emit(EventKind.UPDATED, order, detail=detail)
         if fill is not None:
             self._emit(EventKind.FILL, order, fill=fill)
+        if correction is not None:
+            before = format_rupees(round(Fraction(order.filled_value_paise - correction.value,
+                                                  order.filled_qty)))  # fmt: skip
+            self._emit(EventKind.CORRECTED, order, fill=correction,
+                       detail=f"the broker corrected the average from {before} to "
+                              f"{format_rupees(order.avg_price_paise)}")  # fmt: skip
         return True
 
     @staticmethod
@@ -587,18 +605,20 @@ class OrderManager:
         doubt = order.pending is Pending.MODIFY and order.change_sent_at is not None
         return terms if terms != r or doubt else None
 
-    def _fill_from(self, order: _Order, update: OrderUpdate) -> Fill | None:
-        """The new quantity traded since the last update we applied, and its price."""
+    def _fill_from(self, order: _Order, update: OrderUpdate, value: int) -> Fill | None:
+        """The new quantity traded since the last update we applied, and its price.
+
+        Without a fill price from the broker, it is worked out from the order's value: the
+        value now (exact average x filled) minus the value before. That difference is kept
+        exactly on the fill (`value_paise`), so positions add up to the broker's numbers
+        even when the price shown is rounded (#275)."""
         qty = update.filled_qty - order.filled_qty
         if qty <= 0:
             return None
         if update.last_fill_qty == qty and update.last_fill_price_paise > 0:
             return Fill(order.request.client_order_id, qty, update.last_fill_price_paise, True)
-        # Work it out from the averages: total value now minus total value before.
-        before = order.avg_price_paise * order.filled_qty
-        after = update.avg_price_paise * update.filled_qty
-        price = round((after - before) / qty)
-        return Fill(order.request.client_order_id, qty, price, False)
+        new = value - order.filled_value_paise
+        return Fill(order.request.client_order_id, qty, round(Fraction(new, qty)), False, new)
 
     def _ignore(self, order: _Order, update: OrderUpdate, why: str) -> bool:
         log.debug("ignored update for %s: %s", order.request.client_order_id, why)
@@ -829,6 +849,28 @@ class OrderManager:
                 listener(event)
             except Exception:  # a broken screen must never stop order handling
                 log.exception("order event listener failed")
+
+
+def _filled_value(order: _Order, update: OrderUpdate) -> int:
+    """What the order's fills have traded for in all, in paise, by this update: its exact
+    average x filled qty. Exchange trades are whole paise, so the value is a whole number
+    of paise; it is rounded only when the broker's average was itself rounded."""
+    if update.filled_qty == order.filled_qty and update.avg_price_paise == 0:
+        return order.filled_value_paise  # no average given: nothing to change
+    if update.last_fill_qty == update.filled_qty - order.filled_qty > 0 and (
+        update.last_fill_price_paise > 0 and update.avg_price_exact is None
+    ):
+        return order.filled_value_paise + update.last_fill_qty * update.last_fill_price_paise
+    exact = update.avg_price_exact
+    if exact is not None:
+        return round(exact * update.filled_qty)
+    # only a rounded average: when it agrees with what we know (within the half paisa any
+    # rounding, up or to even, can move it), what we know is exact
+    known = order.filled_value_paise
+    if update.filled_qty == order.filled_qty and order.filled_qty:
+        if abs(Fraction(known, order.filled_qty) - update.avg_price_paise) <= Fraction(1, 2):
+            return known
+    return update.avg_price_paise * update.filled_qty
 
 
 def _normalise(status: OrderStatus, filled_qty: int, qty: int) -> OrderStatus:

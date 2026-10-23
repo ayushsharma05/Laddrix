@@ -390,10 +390,11 @@ class EventLog:
         return [e for e in self._query(sql, (*names, low, high)) if start <= e.ts < end]
 
     def fills(self, account_id: str) -> list[StoredEvent]:
-        """Every fill of one account, oldest first (rebuilding positions after a restart)."""
+        """Every fill of one account, and every correction of one (#275), oldest first
+        (rebuilding positions after a restart)."""
         return self._query(
-            "SELECT * FROM events WHERE account_id = ? AND kind = ? ORDER BY seq",
-            (account_id, EventKind.FILL.value),
+            "SELECT * FROM events WHERE account_id = ? AND kind IN (?, ?) ORDER BY seq",
+            (account_id, EventKind.FILL.value, EventKind.CORRECTED.value),
         )
 
     def latest_views(self, account_id: str, *, since: datetime | None = None) -> list[OrderView]:

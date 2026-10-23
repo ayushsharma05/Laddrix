@@ -8,6 +8,7 @@ is handled here, so the adapter itself only moves messages.
 import logging
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
+from fractions import Fraction
 from typing import Any
 
 from mocktrade.domain.money import PAISE_PER_RUPEE
@@ -54,6 +55,15 @@ def to_paise(value: Any) -> int:
         return 0
     rupees = value if isinstance(value, Decimal) else Decimal(str(value))
     return int((rupees * PAISE_PER_RUPEE).to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def exact_paise(value: Any) -> Fraction | None:
+    """Kite rupees -> paise exactly, fractions of a paisa kept (72.755 -> 7275.5): an order's
+    traded value is worked out from this (#275). None when there is none."""
+    if value is None or value == "":
+        return None
+    rupees = value if isinstance(value, Decimal) else Decimal(str(value))
+    return Fraction(rupees) * PAISE_PER_RUPEE
 
 
 def place_params(request: OrderRequest) -> dict[str, Any]:
@@ -107,6 +117,7 @@ def to_update(order: dict[str, Any]) -> OrderUpdate:
             status=S.PENDING,
             filled_qty=int(order.get("filled_quantity") or 0),
             avg_price_paise=to_paise(order.get("average_price")),
+            avg_price_exact=exact_paise(order.get("average_price")),
             reason=f"the broker reports a status MockTrade doesn't know: {raw_status or '(none)'}",
             ts=_timestamp(order),
             **_terms(order),
@@ -122,6 +133,7 @@ def to_update(order: dict[str, Any]) -> OrderUpdate:
         status=status,
         filled_qty=int(order.get("filled_quantity") or 0),
         avg_price_paise=to_paise(order.get("average_price")),
+        avg_price_exact=exact_paise(order.get("average_price")),
         reason=reason,
         ts=_timestamp(order),
         **_terms(order),
