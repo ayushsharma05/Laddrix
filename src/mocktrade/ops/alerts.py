@@ -26,6 +26,9 @@ class Alert:
     text: str
     active: bool
     at: datetime
+    # whose it is (#270): None = the whole firm (disk, prices, the audit log), told to everyone
+    # signed in; an account id = only people who may see that account are told
+    account_id: str | None = None
 
 
 Listener = Callable[[Alert], None]
@@ -43,20 +46,24 @@ class Alerts:
     def active(self) -> list[Alert]:
         return sorted(self._active.values(), key=lambda a: (-LEVELS.index(a.level), a.key))
 
-    def raise_(self, key: str, level: str, text: str) -> None:
+    def raise_(self, key: str, level: str, text: str, *, account_id: str | None = None) -> None:
         if level not in LEVELS[1:]:
             raise ValueError(f"level must be INFO, WARN or ERROR, got {level!r}")
         old = self._active.get(key)
         if old is not None and (old.level, old.text) == (level, text):
             return
-        alert = Alert(key, level, text, True, self._clock())
+        alert = Alert(key, level, text, True, self._clock(), account_id)
         self._active[key] = alert
         self._tell(alert)
 
     def clear(self, key: str, text: str = "") -> None:
         old = self._active.pop(key, None)
         if old is not None:
-            self._tell(Alert(key, "OK", text or f"resolved: {old.text}", False, self._clock()))
+            self._tell(
+                Alert(
+                    key, "OK", text or f"resolved: {old.text}", False, self._clock(), old.account_id
+                )
+            )  # the same people are told it ended
 
     def _tell(self, alert: Alert) -> None:
         log.log(
@@ -81,4 +88,5 @@ def alert_to_dict(a: Alert) -> dict:
         "text": a.text,
         "active": a.active,
         "at": a.at.isoformat(),
+        "account_id": a.account_id,
     }

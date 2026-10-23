@@ -151,6 +151,7 @@ class ProtectionGuard:
                 "ERROR",
                 f"UNPROTECTED {account_id}: {abs(open_qty)} {instrument_id} ({side}) is open "
                 f"with no stop: {why}. Start a stop for it, or close it.",
+                account_id=account_id,
             )
             self._raised.add(where)
 

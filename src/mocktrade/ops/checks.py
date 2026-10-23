@@ -67,7 +67,8 @@ class Checks:
                 level, when = "ERROR", f"the market opens in {minutes} min"
             else:
                 level, when = "ERROR", "the market is open and this account can't trade"
-            self._alerts.raise_(key, level, f"Log in to Kite for {who}: {when}")
+            self._alerts.raise_(key, level, f"Log in to Kite for {who}: {when}",
+                                account_id=account.id)  # fmt: skip
 
     def prices(self) -> None:
         key = "prices"

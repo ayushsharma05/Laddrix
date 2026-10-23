@@ -28,7 +28,8 @@ class DayGuards:
     def on_mtm(self, event: MtmEvent) -> None:
         key = f"mtm:{event.account_id}:{event.key}"
         self._mtm[key] = (event.account_id, event.key)
-        self._alerts.raise_(key, "ERROR", f"{event.account_id} MTM {event.text}")
+        self._alerts.raise_(key, "ERROR", f"{event.account_id} MTM {event.text}",
+                            account_id=event.account_id)  # fmt: skip
 
     async def check(self) -> None:
         """The scheduler's job, every minute."""
@@ -50,7 +51,7 @@ class DayGuards:
                 continue
             text, key = runtime.squareoff.warning(), f"squareoff:{account_id}"
             if text:
-                self._alerts.raise_(key, "WARN", text)
+                self._alerts.raise_(key, "WARN", text, account_id=account_id)
             else:
                 self._alerts.clear(key, f"{account_id}: no MIS positions left")
 
@@ -68,7 +69,8 @@ class DayGuards:
         wanted = {f"mtm-close:{account_id}:{b.key}": b for b in mtm.needs_a_person()}
         for key, b in wanted.items():
             what = "close blocked" if b.state == "BLOCKED" else "close unclear"
-            self._alerts.raise_(key, "ERROR", f"{account_id} MTM {b.key}: {what}: {b.detail}")
+            self._alerts.raise_(key, "ERROR", f"{account_id} MTM {b.key}: {what}: {b.detail}",
+                                account_id=account_id)  # fmt: skip
         for key in [k for k in self._closes if k.startswith(f"mtm-close:{account_id}:")]:
             if key not in wanted:
                 self._alerts.clear(key, f"{account_id} MTM: {key.split(':', 2)[2]} settled")
@@ -76,6 +78,7 @@ class DayGuards:
         self._closes.update(wanted)
         key = f"mtm-data:{account_id}"
         if mtm.problem:
-            self._alerts.raise_(key, "ERROR", f"{account_id} MTM {mtm.problem}")
+            self._alerts.raise_(key, "ERROR", f"{account_id} MTM {mtm.problem}",
+                                account_id=account_id)  # fmt: skip
         else:
             self._alerts.clear(key, f"{account_id} MTM limits readable again")

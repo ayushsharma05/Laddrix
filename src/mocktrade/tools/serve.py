@@ -446,7 +446,8 @@ def _recovery_alert(alerts: Alerts, account_id: str, state: str, reason: str) ->
     """A failed recovery keeps the account shut: someone must look, so say it loudly."""
     key = f"recovery:{account_id}"
     if state == "failed":
-        alerts.raise_(key, "ERROR", f"{account_id}: trading stays paused after a restart: {reason}")
+        alerts.raise_(key, "ERROR", f"{account_id}: trading stays paused after a restart: {reason}",
+                      account_id=account_id)  # fmt: skip
     elif state == "ok":
         alerts.clear(key, f"{account_id}: orders and positions rebuilt after the restart")
 
