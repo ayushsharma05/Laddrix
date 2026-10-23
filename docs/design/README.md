@@ -9,6 +9,7 @@ How MockTrade is built. Each doc is checked against the code; the diagrams' sour
 | [product-vision.md](product-vision.md) | What MockTrade is for, and its rules ("backend provides, frontend displays", every part replaceable) |
 | [kite-architecture.md](kite-architecture.md) | The whole system on Kite Connect: the parts, the price path, the order path, deployment |
 | [glossary.md](glossary.md) | Every term, in plain words |
+| [tenancy.md](tenancy.md) | Several firms on one server (#368): workspaces, the one rule every check applies, each trader's own price source, the operator only on the terminal, the leak tests |
 | [data.md](data.md) | What data we hold and its class, logs without secrets, how long each kind is kept, one person's export and erase, the audit trail's tamper evidence |
 | [domain-model.md](domain-model.md) | The main types and how they relate |
 | [order-life.md](order-life.md) | An order's states and the key journeys: partial fill, modify, cancel, reject, restart, disconnect, STOP |

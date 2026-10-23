@@ -557,3 +557,9 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Merged:** the three green minor/patch ones (#388, #389, #390).
   - **Fixed in #392:** #386 (react without react-dom) broke the screens' tests. Updates are now grouped per folder (minor and patch together) and majors are never proposed, with a test pinning the rules.
   - **Asked Ayush:** whether to close the majors (dockview 4→8, vite 7→8, TypeScript 5→7, @types/node, plugin-react, actions v7, Node 25, which isn't long-term support), each to be upgraded deliberately in its own issue.
+- 23 Oct, **#368 designed before coding** (`docs/design/tenancy.md`).
+  - **Workspaces:** each user and broker account belongs to one workspace. Today's admin becomes a workspace admin. The platform operator is not a web role at all: terminal only.
+  - **The one rule:** anything in another workspace answers 404.
+  - **STOP:** one kill switch per workspace.
+  - **Prices:** each Kite account is its own price source, and today's "first account carries prices for everyone" goes. Screens see only the sources of accounts the person may see. The setting `MOCKTRADE_PRICES_VISIBLE` (`owner` by default) waits on Zerodha's answer for supervisors.
+  - **Split into steps:** #394 (368a), #395 (368b), #396 (368c), #397 (368d).
