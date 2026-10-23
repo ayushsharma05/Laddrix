@@ -12,6 +12,7 @@ Every request carries `X-Kite-Version: 3`; authenticated ones carry
 """
 
 import json
+from collections.abc import Callable
 from decimal import Decimal
 from typing import Any
 
@@ -47,13 +48,16 @@ class KiteHttp:
         base_url: str = BASE_URL,
         timeout_s: float = 7.0,
         transport: httpx.AsyncBaseTransport | None = None,
+        proxy: str | None = None,  # this account's own way out (its own IP, #372)
     ) -> None:
         self.api_key = api_key
         self.access_token = access_token
+        self.proxy = proxy
         self._client = httpx.AsyncClient(
             base_url=base_url,
             timeout=timeout_s,
             transport=transport,
+            proxy=proxy,
             headers={"X-Kite-Version": "3"},
         )
 
@@ -112,3 +116,10 @@ def _unwrap(response: httpx.Response) -> Any:
     if error_type == "TokenException" or response.status_code == 403:
         raise KiteAuthError(message, error_type, response.status_code)
     raise KiteError(message, error_type, response.status_code)
+
+
+def http_for(factory: Callable[..., "KiteHttp"], app: Any) -> "KiteHttp":
+    """The account's REST client: out through its own proxy when it has one (`egress`, #372),
+    else directly from the server's IP."""
+    egress = getattr(app, "egress", None)
+    return factory(app.api_key, proxy=egress) if egress else factory(app.api_key)

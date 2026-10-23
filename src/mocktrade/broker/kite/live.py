@@ -29,7 +29,7 @@ from mocktrade.broker.kite import token_store
 from mocktrade.broker.kite.broker import KiteBroker
 from mocktrade.broker.kite.daily_login import KiteDailyLogin
 from mocktrade.broker.kite.feed import KiteFeed
-from mocktrade.broker.kite.http import BASE_URL, KiteAuthError, KiteHttp
+from mocktrade.broker.kite.http import BASE_URL, KiteAuthError, KiteHttp, http_for
 from mocktrade.broker.kite.instruments import load_kite_instruments
 from mocktrade.broker.kite.session import KiteSession
 from mocktrade.broker.kite.ticker import WS_URL, KiteTicker
@@ -85,7 +85,7 @@ class KiteLive:
         self._cache = instruments_cache
         self._on_reconnect = on_reconnect
         self._http_factory = http_factory or (
-            lambda key, token=None: KiteHttp(key, token, base_url=api_url)
+            lambda key, token=None, proxy=None: KiteHttp(key, token, base_url=api_url, proxy=proxy)
         )
         self._ticker_factory = ticker_factory or (
             lambda *args, **kwargs: KiteTicker(*args, url=ws_url, **kwargs)
@@ -99,7 +99,7 @@ class KiteLive:
             apps,
             token_dir,
             on_session=self.go_live,
-            http_factory=lambda key: self._http_factory(key),
+            http_factory=lambda key, **kw: self._http_factory(key, **kw),
         )
         market_data.on_demand(self._on_demand)
 
@@ -108,7 +108,7 @@ class KiteLive:
     def add_account(self, account: BrokerAccount) -> KiteBroker:
         """The account's broker, usable at once: orders are refused until it goes live."""
         app = self._apps(account)
-        http = self._http_factory(app.api_key)
+        http = http_for(self._http_factory, app)  # its own IP when it has one (#372)
         broker = KiteBroker(http, kite_user_id=account.broker_client_id, account_id=account.id)
         self._links[account.id] = _Link(account, app, http, broker)
         return broker

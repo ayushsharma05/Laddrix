@@ -26,6 +26,10 @@ Settings (environment; secrets never on the command line):
                                           (SEBI, above 10 orders a second): SLICER=AB123,...
     MOCKTRADE_ALERT_WEBHOOK    (none)     https:// address that gets WARN/ERROR alerts as
                                           JSON {"text": ...} (Slack, ntfy, Google Chat...)
+    KITE_EGRESS_<ACCOUNT>      direct     how an account's orders leave: 'direct' (the server's
+                                          static IP, shared) or its own IP through a proxy
+                                          (http:// or https://user:pass@host:port);
+                                          KITE_EGRESS sets it for every account (#372)
     KITE_API_KEY, KITE_API_SECRET         the Kite Connect app (kite mode). One account with
                                           its own app: KITE_API_KEY_<ACCOUNT>, e.g.
                                           KITE_API_KEY_ACC_AYUSH (and ..._SECRET_...)
@@ -104,6 +108,9 @@ PRICE_SOURCES = ("sim", "kite")
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
+EGRESS_SCHEMES = ("http", "https")  # a proxy giving an account its own IP (#372)
+
+
 @dataclass(frozen=True)
 class ServeSettings:
     secret_key: str
@@ -127,6 +134,12 @@ class ServeSettings:
         return dict(self.kite_env).get(name, default)
 
     def kite_app(self, account: BrokerAccount) -> KiteSettings:
+        """The account's own Kite app if it has one, else the shared one; and how its orders
+        leave (#372): KITE_EGRESS_<ACCOUNT> (or KITE_EGRESS for all) is a proxy giving it its
+        own IP; unset or 'direct': the server's static IP, shared."""
+        return self._kite_app(account)
+
+    def _kite_app(self, account: BrokerAccount) -> KiteSettings:
         """The account's own Kite app if it has one, else the shared one."""
         env = dict(self.kite_env)
         suffix = "_" + "".join(c if c.isalnum() else "_" for c in account.id.upper())
@@ -137,7 +150,13 @@ class ServeSettings:
                 f"account {account.id}: no Kite app (set KITE_API_KEY and KITE_API_SECRET, "
                 f"or KITE_API_KEY{suffix} and KITE_API_SECRET{suffix})"
             )
-        return KiteSettings(key, secret, self.data_dir / f"kite_token_{account.id}.json")
+        egress = env.get(f"KITE_EGRESS{suffix}") or env.get("KITE_EGRESS") or None
+        if egress == "direct":
+            egress = None  # the server's own IP, even if a default way out is set
+        if egress and urlparse(egress).scheme not in EGRESS_SCHEMES:
+            raise ConfigError(f"account {account.id}: KITE_EGRESS{suffix} must be 'direct' or a "
+                              "proxy address (http:// or https://user:pass@host:port)")  # fmt: skip
+        return KiteSettings(key, secret, self.data_dir / f"kite_token_{account.id}.json", egress)
 
     @property
     def cookie_secure(self) -> bool:

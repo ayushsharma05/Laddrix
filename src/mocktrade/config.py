@@ -42,6 +42,7 @@ class KiteSettings:
     api_key: str
     api_secret: str
     token_file: Path
+    egress: str | None = None  # a proxy URL: this account's own IP; None: the server's (#372)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> "KiteSettings":
