@@ -29,6 +29,7 @@ from mocktrade.domain.ticks import Tick
 from mocktrade.orders.model import OrderEvent, OrderView, Pending
 
 MODIFY_BUDGET = 24  # brokers allow 25 modifications per order
+MAX_LEG_SKEW_S = 3.0  # leg prices further apart in time than this: don't quote (#267)
 
 SPEC = AlgoSpec(
     code="SPREAD",
@@ -68,6 +69,7 @@ class Spreader(BaseStrategy):
         self.hedge_in_flight = 0  # hedge quantity sent but not yet seen as a child
         self.first_unhedged_at: datetime | None = None
         self.legging_ms: list[float] = []
+        self.stale = ""  # why the quote waits on old leg prices, in words
 
     # --- the engine's calls ---
 
@@ -135,6 +137,11 @@ class Spreader(BaseStrategy):
         b = ctx.latest(self.leg2)
         if b is None:
             return None
+        a_age, b_age = ctx.age_s(), ctx.age_s(self.leg2)
+        if a_age is not None and b_age is not None and abs(a_age - b_age) > MAX_LEG_SKEW_S:
+            self.stale = f"leg prices {abs(a_age - b_age):.0f} s apart"  # #267: one is stale
+            return None
+        self.stale = ""
         buying = ctx.side is Side.BUY
         hedge_level = b.best_bid if buying else b.best_ask  # we'd sell B (buying the spread)
         if hedge_level is None:
@@ -150,7 +157,8 @@ class Spreader(BaseStrategy):
         if price is None:
             for q in quotes:
                 ctx.cancel(q.client_order_id)  # no hedge price: don't leave a quote out
-            ctx.say("waiting: no price on leg B to hedge against")
+            ctx.say(f"waiting: {self.stale}" if self.stale
+                    else "waiting: no price on leg B to hedge against")  # fmt: skip
             return
         for q in quotes:
             if q.request.price_paise == price or q.pending is not Pending.NONE:

@@ -110,3 +110,23 @@ def audit_log(alerts: Alerts, log) -> None:
         alerts.raise_("audit_log", "ERROR", text)
     else:
         alerts.clear("audit_log", "the audit log is writing again: orders accepted")
+
+
+class PriceOverload:
+    """Every-tick readers (algos, the paper broker) fell behind and ticks were dropped (#267):
+    a WARN band while it keeps happening, cleared once a check finds no new drops."""
+
+    def __init__(self, alerts: Alerts, market_data) -> None:
+        self._alerts = alerts
+        self._md = market_data
+        self._seen = market_data.dropped
+
+    def check(self) -> None:
+        dropped = self._md.dropped - self._seen
+        self._seen = self._md.dropped
+        if dropped > 0:
+            self._alerts.raise_("price_overload", "WARN", f"prices: {dropped} ticks were "
+                                "dropped since the last check because algos or paper fills "
+                                "fell behind; the server is overloaded")  # fmt: skip
+        else:
+            self._alerts.clear("price_overload", "prices: keeping up again")

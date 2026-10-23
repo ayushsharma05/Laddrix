@@ -222,6 +222,11 @@ class AlgoContext:
     def latest(self, instrument_id: str | None = None) -> Tick | None:
         return self._engine.market_data.latest(instrument_id or self._parent.instrument_id)
 
+    def age_s(self, instrument_id: str | None = None) -> float | None:
+        """Seconds since this instrument's last price (None: no price yet)."""
+        age = getattr(self._engine.market_data, "age_s", None)
+        return None if age is None else age(instrument_id or self._parent.instrument_id)
+
     def instrument(self, instrument_id: str | None = None):
         return self._engine.instruments(instrument_id or self._parent.instrument_id)
 
@@ -412,7 +417,7 @@ class AlgoEngine:
         self._parents: dict[str, _Parent] = {}
         self._listeners: list[Callable[[AlgoEvent], None]] = []
         self._tasks: set[asyncio.Task] = set()
-        self._subscription = market_data.subscribe()
+        self._subscription = market_data.subscribe(every_tick=True)  # a spike is never skipped
         manager.subscribe(self._on_order_event)
 
     # --- reading ----------------------------------------------------------------------------

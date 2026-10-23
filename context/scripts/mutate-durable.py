@@ -23,6 +23,8 @@ MUTANTS = [
  (E, "        self._put((stamp, account_id, kind, \"\", detail, json.dumps(payload)), critical=False)", "        self._put((stamp, account_id, kind, \"\", detail, json.dumps(payload)))"),
  (P, "                self.event_log.persist\n                if self.event_log is not None and self.durable_orders", "                None\n                if self.event_log is not None and self.durable_orders"),
 ]
+if subprocess.run(TESTS, capture_output=True, timeout=300).returncode != 0:
+    raise SystemExit("the tests fail (or a test file is missing) before any mutation: fix that first")
 caught = 0
 for f, a, b in MUTANTS:
     src = open(f).read()
