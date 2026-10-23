@@ -112,10 +112,14 @@ A new firm is created with
     read them.
   - A paper account fills on its owner's own Kite prices, and is refused without one.
   - Each screen's live prices are its owner's own subscription's.
-- **368b, second half, still to do:** the server-wide features still read the shared feed
-  (the first logged-in account's), so on a Kite server with several traders they show that
-  account's prices. These are the chart, the option chain, market alerts, movers, time and
-  sales, the instrument card's last price, the recorder and the stale-price check.
+- **368b, second half, done:** each source has its own market (`marketdata/markets.py`), so the
+  screens read the asker's own subscription:
+  - the chart (candles from its own ticks, history through its own login);
+  - the option chain and strategy builder;
+  - time and sales, movers, volume at price and the instrument card's last price;
+  - price alerts, checked only on their owner's prices.
+- **Left for #396 (files and jobs):** the tick recorder and the stale-price check still use the
+  shared feed (the first logged-in account's), so a Kite server's recordings are that account's.
 
 | Step | What | Done when |
 | --- | --- | --- |

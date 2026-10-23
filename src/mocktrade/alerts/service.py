@@ -134,24 +134,31 @@ class MarketAlerts:
 
 
 def build_market_alerts(
-    platform: "Platform", folder: Path, clock: Callable[[], datetime] = lambda: datetime.now(UTC)
-) -> MarketAlerts:
-    """The server's alerts: checked on every tick, kept per user in `folder`, audited."""
+    platform: "Platform", folder: Path, clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    *, source_of: Callable[[str], Any] | None = None,
+) -> MarketAlerts:  # fmt: skip
+    """The server's alerts: checked on every tick, kept per user in `folder`, audited.
+    `source_of(user_id)`: on a server with a price source per subscription (#395), the
+    user's own prices; each alert is checked on its owner's only."""
     store = platform.instruments
 
     def name(instrument_id: str) -> str:
         found = store.get(instrument_id)
         return found.symbol if found else instrument_id
 
-    prices = platform.market_data.subscribe()  # alerts' instruments stay watched (fed by Kite)
+    # alerts' instruments stay watched (a broker feed streams them): each source its own
+    sources = platform.prices.all() if source_of is not None else [platform.market_data]
+    subscriptions = {id(s): (s, s.subscribe()) for s in sources}
 
     def watch(ids: set[str]) -> None:
-        prices.add(ids - prices.instrument_ids)
-        prices.remove(prices.instrument_ids - ids)
-        prices.drain()  # the engine reads ticks on the tap; nothing waits on this subscription
+        for source, prices in subscriptions.values():
+            wanted = engine.watched_for(source) if source_of is not None else ids
+            prices.add(wanted - prices.instrument_ids)
+            prices.remove(prices.instrument_ids - wanted)
+            prices.drain()  # the engine reads ticks on the tap; nothing waits here
 
     engine = AlertEngine(platform.market_data.latest, lambda i: store.get(i) is not None,
-                         clock=clock, name=name, watch=watch)  # fmt: skip
+                         clock=clock, name=name, watch=watch, source_of=source_of)  # fmt: skip
     events = platform.event_log
     audit: Audit | None = None
     if events is not None:
@@ -161,5 +168,6 @@ def build_market_alerts(
 
     service = MarketAlerts(engine, AlertStore(folder), WebhookSender(), audit=audit)
     service.start()
-    platform.market_data.tap(engine.on_tick)
+    for source in sources:
+        source.tap(lambda tick, s=source: engine.on_tick(tick, s if source_of else None))
     return service

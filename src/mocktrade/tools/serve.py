@@ -463,7 +463,32 @@ def build(settings: ServeSettings) -> Assembly:
     else:
         history, history_name = None, ""
     charts = Charts(builder, history, events=events, history_name=history_name)
-    market_alerts = build_market_alerts(platform, settings.data_dir / "alerts")
+
+    def charts_for(source: MarketData) -> Charts | None:
+        """On a Kite server, each subscription's own chart (#395): candles from its own ticks,
+        history through its own login."""
+        if kite is None or (account_id := kite.account_of(source)) is None:
+            return charts if source is md else None
+        own = CandleBuilder()
+        source.tap(own.on_tick)
+        reader = KiteHistory(kite.reader(account_id), lambda i: instruments.to_broker(KITE, i))
+        return Charts(own, reader, events=events, history_name="Kite historical data")
+
+    known: dict[str, tuple[float, MarketData | None]] = {}  # user -> (read at, their prices)
+
+    def own_prices(user_id: str) -> MarketData | None:
+        """A user's own subscription's prices (#395), re-read every few seconds: alerts are
+        checked on every tick, and the user store is a database."""
+        now = time.monotonic()
+        hit = known.get(user_id)
+        if hit is None or now - hit[0] > 5:
+            user = users.get_user(user_id)
+            found = prices.for_user(user, users.accounts()) if user is not None else None
+            hit = known[user_id] = (now, found)
+        return hit[1]
+
+    per_user = own_prices if prices.per_account else None  # each alert on its owner's prices
+    market_alerts = build_market_alerts(platform, settings.data_dir / "alerts", source_of=per_user)
     jobs.append(market_alerts.store.run)
     guards = DayGuards(platform, alerts)
     scheduler.every(60, guards.check, between=("09:15", "15:35"), name="day guards")
@@ -500,6 +525,7 @@ def build(settings: ServeSettings) -> Assembly:
         backtests=backtests,
         candles=candle_store,
         charts=charts,
+        charts_for=charts_for,
         market_alerts=market_alerts,
         starter=starter,
         static_dir=ui,

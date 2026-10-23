@@ -136,6 +136,21 @@ class KiteLive:
         """The account whose connection carries prices (None: no prices yet)."""
         return self._prices.account.id if self._prices else None
 
+    def account_of(self, prices: MarketData) -> str | None:
+        """Whose subscription these prices are (#395)."""
+        return next((a for a, link in self._links.items() if link.prices is prices), None)
+
+    def reader(self, account_id: str) -> "_Reader":
+        """Read requests (historical candles) through this account's own connection (#395):
+        one person's chart history is never fetched with another's login."""
+        return _Reader(self, account_id)
+
+    async def request_as(self, account_id: str, method: str, path: str, **kwargs: Any) -> Any:
+        link = self._links.get(account_id)
+        if link is None or not link.live:
+            raise KiteAuthError(f"{account_id} isn't logged in to Kite", "TokenException")
+        return await link.http.request(method, path, **kwargs)
+
     async def request(self, method: str, path: str, **kwargs: Any) -> Any:
         """A read request (e.g. historical candles) through the account that carries prices."""
         link = self._prices
@@ -318,3 +333,14 @@ class KiteLive:
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await link.task
         link.ticker, link.task = None, None
+
+
+@dataclass
+class _Reader:
+    """KiteHistory's `http`: one account's own connection (KiteLive.reader)."""
+
+    live: KiteLive
+    account_id: str
+
+    async def request(self, method: str, path: str, **kwargs: Any) -> Any:
+        return await self.live.request_as(self.account_id, method, path, **kwargs)
