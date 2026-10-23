@@ -457,3 +457,8 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Decided:** paper settles stock F&O in cash and says so (delivery of shares is not simulated yet); broker cut-offs are settings, not guesses, because they differ by broker and change. Rules checked 23 Oct 2026 with sources in `docs/design/expiry.md`.
   - **Checks:** 15 new tests plus an API test, 2 ticket and 3 watch-list tests; mutation 18/18; a real demo whose near contracts expired at 15:30 on 23 Oct, checked before and after (`context/evidence/h-290-*.txt`, `context/images/h-290-expires-today.png`).
 - 23 Oct, #290 merged (PR #350). Ayush at 79% of the 4-hour window: stopped before #276, which is large and depends on #275 (so #275 comes first).
+- 23 Oct, **#275 part 1** (exact fill economics).
+  - **Defect confirmed:** Kite's average price (fractions of a paisa) was rounded, and fills worked out from rounded averages: 50 at ₹25,010.00 + 100 at ₹25,010.05 became 100 at ₹25,010.04, the position ₹1 off. A corrected average with nothing new traded was dropped as a duplicate.
+  - **The fix:** the exact average is kept; each order carries its exact traded value; a fill worked out from averages keeps its exact value; a correction is a CORRECTED event that moves the position's cost (still held) or realised P&L (closed); the audit trail and recovery read corrections back.
+  - **Decided:** split #275; the trade-id ledger and reconciling against the broker's trade list is #352.
+  - **Checks:** 10 tests; mutation 12/12 (the first run left 3 alive and showed two missing cases: one update covering two prices, and an unknown status; added).

@@ -83,14 +83,20 @@ class _Position:
     def avg(self) -> Fraction:
         return self.cost / self.qty if self.qty else Fraction(0)
 
-    def apply(self, side: Side, qty: int, price: int) -> None:
+    def apply(self, side: Side, qty: int, price: int, value: int | None = None) -> None:
+        """`value`: the fill's exact value when qty x price isn't it (#275); the price used
+        is then value / qty, exactly."""
+        if value is None:
+            value = qty * price
+        else:
+            price = Fraction(value, qty)  # type: ignore[assignment]
         signed = side.sign * qty
         if side is Side.BUY:
             self.buy_qty += qty
-            self.buy_value += qty * price
+            self.buy_value += value
         else:
             self.sell_qty += qty
-            self.sell_value += qty * price
+            self.sell_value += value
         if self.qty == 0 or (self.qty > 0) == (signed > 0):  # opening or adding
             self.qty += signed
             self.cost += signed * price
@@ -124,20 +130,32 @@ class PositionBook:
     # --- feeding it --------------------------------------------------------------------------
 
     def on_order_event(self, event: OrderEvent) -> None:
-        """Order manager listener: applies FILL events, ignores the rest."""
-        if event.kind is not EventKind.FILL or event.fill is None or event.order is None:
+        """Order manager listener: applies FILL and CORRECTED events, ignores the rest."""
+        if event.kind not in (EventKind.FILL, EventKind.CORRECTED):
             return
-        if event.account_id != self.account_id:
+        if event.fill is None or event.order is None or event.account_id != self.account_id:
             return
         self.replay(event.client_order_id, event.order.request, event.order.filled_qty,
-                    event.fill.qty, event.fill.price_paise)  # fmt: skip
+                    event.fill.qty, event.fill.price_paise, event.fill.value_paise)  # fmt: skip
 
     def replay(
-        self, client_order_id: str, request, cumulative: int, fill_qty: int, price_paise: int
+        self,
+        client_order_id: str,
+        request,
+        cumulative: int,
+        fill_qty: int,
+        price_paise: int,
+        value_paise: int | None = None,
     ) -> None:
         """Apply one fill of an order whose filled quantity is now `cumulative`. Live fills
         and fills read back from the audit trail after a restart both come here, so a fill
-        is never counted twice: only the part beyond what this order already applied."""
+        is never counted twice: only the part beyond what this order already applied.
+        `value_paise`: the fill's exact value (#275); with `fill_qty` 0 it is a correction
+        of what the order's earlier fills were worth."""
+        if fill_qty == 0:
+            if value_paise:
+                self.correct(request.instrument_id, request.product, request.side, value_paise)
+            return
         before = self._filled.get(client_order_id, 0)
         if cumulative <= before:
             log.debug("fill for %s already applied", client_order_id)
@@ -153,15 +171,23 @@ class PositionBook:
                 qty,
             )
         self._filled[client_order_id] = cumulative
-        self.apply_fill(request.instrument_id, request.product, request.side, qty, price_paise)
+        value = value_paise if qty == fill_qty else None  # a part: its own price is all we have
+        self.apply_fill(request.instrument_id, request.product, request.side, qty, price_paise,
+                        value)  # fmt: skip
 
     def apply_fill(
-        self, instrument_id: InstrumentId, product: Product, side: Side, qty: int, price: int
+        self,
+        instrument_id: InstrumentId,
+        product: Product,
+        side: Side,
+        qty: int,
+        price: int,
+        value: int | None = None,
     ) -> None:
-        if qty <= 0 or price <= 0:
+        if qty <= 0 or price <= 0 or (value is not None and value <= 0):
             raise ValueError(f"a fill needs a positive qty and price, got {qty} @ {price}")
         position = self._positions.setdefault((instrument_id, product), _Position())
-        position.apply(side, qty, price)
+        position.apply(side, qty, price, value)
         position.updated_at = self._clock()
         self._notify(instrument_id, product)
 
@@ -185,6 +211,26 @@ class PositionBook:
             carried_avg=Fraction(carried_avg) if carried_avg is not None else None,
         )
         self._ltp.setdefault(instrument_id, reference_paise)
+
+    def correct(self, instrument_id: InstrumentId, product: Product, side: Side,
+                delta_paise: int) -> None:  # fmt: skip
+        """The broker corrected what earlier fills on one side were worth, by `delta_paise`
+        (+: buys cost more, or sells brought more), with nothing new traded (#275). While
+        the position still holds that side, its average moves; once closed, the realised
+        P&L does: a buy that cost ₹1 more is ₹1 less profit."""
+        position = self._positions.get((instrument_id, product))
+        if position is None or not delta_paise:
+            return
+        if side is Side.BUY:
+            position.buy_value += delta_paise
+        else:
+            position.sell_value += delta_paise
+        if position.qty and (position.qty > 0) == (side is Side.BUY):
+            position.cost += side.sign * delta_paise  # still held: its cost moves
+        else:
+            position.realised -= side.sign * delta_paise  # closed: the profit moves
+        position.updated_at = self._clock()
+        self._notify(instrument_id, product)
 
     def settle(self, instrument_id: InstrumentId, product: Product, price: int) -> int:
         """Close a position at its final settlement price (a contract's expiry, #290). The

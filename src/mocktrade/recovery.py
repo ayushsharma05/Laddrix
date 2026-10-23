@@ -158,7 +158,7 @@ async def recover(
         for e in fills:
             if e.ts < since and e.order is not None and e.fill is not None:
                 earlier.replay(e.client_order_id, e.order.request, e.order.filled_qty,
-                               e.fill.qty, e.fill.price_paise)  # fmt: skip
+                               e.fill.qty, e.fill.price_paise, e.fill.value_paise)  # fmt: skip
         for e in log_.notes(account_id, ["EXPIRY_SETTLED"]):  # settled at a day's roll
             if e.ts < since:
                 x = e.extra
@@ -190,7 +190,7 @@ async def recover(
     for e in today:
         if e.order is not None and e.fill is not None:
             book.replay(e.client_order_id, e.order.request, e.order.filled_qty,
-                        e.fill.qty, e.fill.price_paise)  # fmt: skip
+                        e.fill.qty, e.fill.price_paise, e.fill.value_paise)  # fmt: skip
             report.fills += 1
             qty = e.order.filled_qty - applied.get(e.client_order_id, 0)
             if qty > 0:  # the same rule as the book: each part of a fill once

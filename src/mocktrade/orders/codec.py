@@ -71,6 +71,7 @@ def view_to_dict(v: OrderView) -> dict[str, Any]:
         "pending": v.pending.value,
         "created_at": v.created_at.isoformat(),
         "updated_at": v.updated_at.isoformat(),
+        "filled_value_paise": v.filled_value_paise,
     }
 
 
@@ -85,6 +86,8 @@ def view_from_dict(d: dict[str, Any]) -> OrderView:
         pending=Pending(d.get("pending", Pending.NONE.value)),
         created_at=datetime.fromisoformat(d["created_at"]),
         updated_at=datetime.fromisoformat(d["updated_at"]),
+        # saved before #275: the rounded average is the best there is
+        filled_value_paise=d.get("filled_value_paise", d["filled_qty"] * d["avg_price_paise"]),
     )
 
 
@@ -94,8 +97,9 @@ def fill_to_dict(f: Fill) -> dict[str, Any]:
         "qty": f.qty,
         "price_paise": f.price_paise,
         "exact": f.exact,
+        "value_paise": f.value_paise,
     }
 
 
 def fill_from_dict(d: dict[str, Any]) -> Fill:
-    return Fill(d["client_order_id"], d["qty"], d["price_paise"], d["exact"])
+    return Fill(d["client_order_id"], d["qty"], d["price_paise"], d["exact"], d.get("value_paise"))

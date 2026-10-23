@@ -33,6 +33,9 @@ class OrderView:
     pending: Pending
     created_at: datetime
     updated_at: datetime
+    # what all its fills cost (or brought), exactly, in paise: qty x price summed (#275).
+    # The average above is this over filled_qty, rounded for showing.
+    filled_value_paise: int = 0
 
     @property
     def client_order_id(self) -> str:
@@ -56,6 +59,14 @@ class Fill:
     qty: int
     price_paise: int
     exact: bool  # False when the price was worked out from the average (broker gave no fill price)
+    # the fill's exact value (paise) when qty x price isn't it: a fill worked out from the
+    # averages can be 2 trades at different prices. qty 0: a correction of the order's
+    # value with nothing new traded (the broker corrected its average, #275)
+    value_paise: int | None = None
+
+    @property
+    def value(self) -> int:
+        return self.value_paise if self.value_paise is not None else self.qty * self.price_paise
 
 
 class EventKind(Enum):
@@ -65,6 +76,7 @@ class EventKind(Enum):
     UNCONFIRMED = "UNCONFIRMED"  # no answer from the broker: reconciliation will settle it
     UPDATED = "UPDATED"  # the broker reported a new state
     FILL = "FILL"  # new quantity traded (comes with an UPDATED event)
+    CORRECTED = "CORRECTED"  # the broker corrected what was traded: same qty, a new value
     MODIFY_SENT = "MODIFY_SENT"
     MODIFY_UNCONFIRMED = "MODIFY_UNCONFIRMED"  # no answer to a change: the broker's terms decide
     MODIFY_SENDING = "MODIFY_SENDING"  # a change about to go, on disk first (#265): the audit
