@@ -456,3 +456,4 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Tests not about expiry** see expiry as on 16 Oct 2026 (`tests/conftest.py`), so they don't break when the test contracts' date passes.
   - **Decided:** paper settles stock F&O in cash and says so (delivery of shares is not simulated yet); broker cut-offs are settings, not guesses, because they differ by broker and change. Rules checked 23 Oct 2026 with sources in `docs/design/expiry.md`.
   - **Checks:** 15 new tests plus an API test, 2 ticket and 3 watch-list tests; mutation 18/18; a real demo whose near contracts expired at 15:30 on 23 Oct, checked before and after (`context/evidence/h-290-*.txt`, `context/images/h-290-expires-today.png`).
+- 23 Oct, #290 merged (PR #350). Ayush at 79% of the 4-hour window: stopped before #276, which is large and depends on #275 (so #275 comes first).
