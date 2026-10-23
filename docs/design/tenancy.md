@@ -103,8 +103,19 @@ A new firm is created with
 
 ## 8. Steps
 
-**Progress:** 368a (#394) is done (the PR that closes it). Its route sweep tries all 115 routes
-from another firm: `tests/test_workspaces.py`.
+**Progress:**
+- **368a (#394), done:** its route sweep tries all 115 routes from another firm
+  (`tests/test_workspaces.py`).
+- **368b (#395), first half:** done in the PR "each account trades on its own prices".
+  - Each Kite account's ticker feeds only its own prices (`marketdata/sources.py`).
+  - Each account's risk checks, positions, algos, GTTs, MTM, recovery and expiry settlement
+    read them.
+  - A paper account fills on its owner's own Kite prices, and is refused without one.
+  - Each screen's live prices are its owner's own subscription's.
+- **368b, second half, still to do:** the server-wide features still read the shared feed
+  (the first logged-in account's), so on a Kite server with several traders they show that
+  account's prices. These are the chart, the option chain, market alerts, movers, time and
+  sales, the instrument card's last price, the recorder and the stale-price check.
 
 | Step | What | Done when |
 | --- | --- | --- |

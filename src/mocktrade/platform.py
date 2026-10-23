@@ -32,6 +32,7 @@ from mocktrade.domain.order_spec import OrderSpec
 from mocktrade.domain.orders import Product
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
+from mocktrade.marketdata.sources import PriceSources
 from mocktrade.ops.supervisor import PauseGate, Supervisor
 from mocktrade.orders.basket import Baskets
 from mocktrade.orders.gate import Gates
@@ -149,6 +150,8 @@ class Platform:
     expiries: Expiries = field(init=False, repr=False)
     surveillance: Surveillance = field(init=False, repr=False)  # alerts for risk (#291)
     supervisor: Supervisor = field(init=False, repr=False)  # critical loops, watched (#273)
+    # where each account's prices come from (#395); default: everyone on `market_data`
+    prices: PriceSources | None = None
     # may this user still trade this account? read at each order (#366); the server sets it
     access: Access = field(default=no_check, repr=False)
     # every other workspace's own "firm" switch (#368): one firm's STOP never touches another
@@ -159,6 +162,8 @@ class Platform:
 
     def __post_init__(self) -> None:
         self.expiries = Expiries(self.instruments, rules=self.expiry_rules)
+        if self.prices is None:
+            self.prices = PriceSources(self.market_data)
         self.supervisor = Supervisor()
         log_ = self.event_log
         self.surveillance = Surveillance(
@@ -259,9 +264,10 @@ class Platform:
         """Rebuild the account from the audit trail and the broker (recovery.py)."""
         assert runtime.recovery is not None and self.event_log is not None
         log, account_id = self.event_log, runtime.account.id
+        md = self.prices.of(account_id)  # its own prices (#395)
 
         def close(instrument_id: str) -> int | None:
-            tick = self.market_data.latest(instrument_id)
+            tick = md.latest(instrument_id)
             return tick.close_paise if tick is not None else None
 
         def expired(instrument_id: str) -> bool:  # before today (#290)
@@ -271,7 +277,9 @@ class Platform:
 
         def settlement(instrument_id: str) -> int | None:
             instrument = self.instruments.get(instrument_id)
-            found = instrument and self.expiries.settlement_price(instrument, self.last_price)
+            found = instrument and self.expiries.settlement_price(
+                instrument, lambda i: self.last_price(i, account_id)
+            )
             return found if found is not None else close(instrument_id)
 
         def attempt():
@@ -283,7 +291,7 @@ class Platform:
                 log,
                 since=session_start(runtime.positions._clock()),  # the account's clock
                 close=close,
-                latest=self.market_data.latest,
+                latest=md.latest,
                 expired=expired,
                 settlement=settlement,
             )
@@ -374,8 +382,10 @@ class Platform:
             adopted_ids=adopted_ids, recheck=reconciler.check,
         )  # fmt: skip
 
-    def last_price(self, instrument_id: str) -> int | None:
-        tick = self.market_data.latest(instrument_id)
+    def last_price(self, instrument_id: str, account_id: str | None = None) -> int | None:
+        """The last traded price, from this account's own prices (#395)."""
+        md = self.prices.of(account_id) if account_id is not None else self.market_data
+        tick = md.latest(instrument_id)
         return tick.ltp_paise if tick is not None and tick.ltp_paise > 0 else None
 
     def _settle_expired(self, account_id: str, runtime: AccountRuntime, today: date) -> list[str]:
@@ -389,7 +399,9 @@ class Platform:
             instrument = self.instruments.get(p.instrument_id)
             if not p.qty or instrument is None or not ended(instrument):
                 continue
-            price = self.expiries.settlement_price(instrument, self.last_price)
+            price = self.expiries.settlement_price(
+                instrument, lambda i: self.last_price(i, account_id)
+            )
             if price is None:
                 price = p.ltp_paise or round(p.avg_price_paise)
             qty = runtime.positions.settle(p.instrument_id, p.product, price)
@@ -444,24 +456,35 @@ class Platform:
         await runtime.algos.run()
 
     async def _mark_loop(self) -> None:
-        """Watch the prices of every instrument anyone holds; mark positions as they move."""
-        subscription = self.market_data.subscribe()
+        """Watch the prices of every instrument anyone holds; mark positions as they move.
+        Each account is marked from its own prices only (#395): two subscriptions can show
+        different prices for the same contract."""
+        watching: dict[int, Any] = {}  # id(source) -> its subscription
         try:
             while True:
-                held = {
-                    p.instrument_id
-                    for runtime in self.accounts.values()
-                    for p in runtime.positions.positions()
-                }
-                subscription.add(held - subscription.instrument_ids)
-                try:
-                    batch = await asyncio.wait_for(subscription.next_batch(), 1.0)
-                except TimeoutError:
+                by_source: dict[int, tuple[MarketData, list[AccountRuntime]]] = {}
+                for runtime in self.accounts.values():
+                    md = self.prices.of(runtime.account.id)
+                    by_source.setdefault(id(md), (md, []))[1].append(runtime)
+                for key, (md, runtimes) in by_source.items():
+                    sub = watching.get(key) or watching.setdefault(key, md.subscribe())
+                    held = {p.instrument_id for r in runtimes for p in r.positions.positions()}
+                    sub.add(held - sub.instrument_ids)
+                waits = {asyncio.ensure_future(watching[k].next_batch()): k for k in by_source}
+                if not waits:
+                    await asyncio.sleep(1.0)
                     continue
-                for tick in batch:
-                    self.mark(tick)
+                done, pending = await asyncio.wait(waits, timeout=1.0,
+                                                   return_when=asyncio.FIRST_COMPLETED)  # fmt: skip
+                for task in pending:
+                    task.cancel()
+                for task in done:
+                    for tick in task.result():
+                        for runtime in by_source[waits[task]][1]:
+                            runtime.positions.mark(tick)
         finally:
-            subscription.close()
+            for sub in watching.values():
+                sub.close()
 
     def _algo_engine(
         self,
@@ -473,6 +496,7 @@ class Platform:
         book: PositionBook | None = None,
         throttle: OrderThrottle | None = None,
         firm: KillSwitch | None = None,
+        prices: MarketData | None = None,
     ) -> AlgoEngine:
         """The account's algos: blocked while a kill switch is on, stopped when one engages,
         every state change audited."""
@@ -513,7 +537,7 @@ class Platform:
         engine = AlgoEngine(
             account_id,
             orders,
-            self.market_data,
+            prices or self.market_data,
             self.instruments.get,
             types,
             blocked=blocked,
@@ -559,12 +583,13 @@ class Platform:
         limits = limits or RiskLimits()
         switch = KillSwitch(f"account {account.id}", clock=clock)
         firm = self.firm_switch_of(account.workspace)  # its own firm's STOP, no other (#368)
+        md = self.prices.of(account.id)  # its own subscription's prices, no one else's (#395)
         book = PositionBook(account.id, clock=clock)
         holder: dict[str, Any] = {}  # the gates need what they guard (orders, portfolio)
         risk = RiskGate(
             limits,
             instruments=self.instruments.get,
-            prices=self.market_data.latest,
+            prices=md.latest,
             position=book.net_qty,
             working=lambda: holder["orders"].working(),
             day_pnl_paise=book.day_pnl_paise,
@@ -572,7 +597,7 @@ class Platform:
             clock=clock,
             positions=book.net_by_instrument,
             product_position=book.qty,
-            price_age=self.market_data.age_s,  # per instrument: freshness (#267)
+            price_age=md.age_s,  # per instrument: freshness (#267)
             expiry=self.expiries.info,  # expired contracts, expiry-day cut-offs (#290)
         )
         throttle = throttle or OrderThrottle()
@@ -644,7 +669,7 @@ class Platform:
                 )
             )
         algos = self._algo_engine(account.id, orders, switch, algo_types, clock, book, throttle,
-                                  firm=firm)  # fmt: skip
+                                  firm=firm, prices=md)  # fmt: skip
         basket_audit = None
         if self.event_log is not None:
             log = self.event_log
@@ -658,7 +683,7 @@ class Platform:
             risk,
             broker,
             self.instruments.get,
-            self.market_data.latest,
+            md.latest,
             audit=basket_audit,
         )
         gtt = None
@@ -671,7 +696,7 @@ class Platform:
                     log.record_note(kind, account.id, detail, extra)
 
             gtt = GttService(
-                account.id, broker, orders, risk, self.instruments.get, self.market_data.latest,
+                account.id, broker, orders, risk, self.instruments.get, md.latest,
                 audit=gtt_audit, clock=clock,
                 stopped=lambda: next((s.state.reason or s.name for s in (firm, switch)
                                       if s.engaged), None),
@@ -699,9 +724,7 @@ class Platform:
             view = orders.by_broker_id(broker_order_id)
             return view.client_order_id if view is not None else None
 
-        portfolio = PortfolioService(
-            account.id, broker, self.market_data, client_id_of=client_id_of, clock=clock
-        )
+        portfolio = PortfolioService(account.id, broker, md, client_id_of=client_id_of, clock=clock)
         orders.subscribe(portfolio.on_order_event)
         orders.subscribe(self.surveillance.on_order_event)
         if self.event_log is not None:  # today's alerts and acknowledgements, after a restart

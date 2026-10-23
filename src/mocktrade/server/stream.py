@@ -42,7 +42,7 @@ from mocktrade.charts.service import ChartError, Charts
 from mocktrade.domain.accounts import MAIN, User, can_view
 from mocktrade.domain.gtt import GttView, gtt_to_dict
 from mocktrade.domain.ticks import Tick
-from mocktrade.marketdata.service import Subscription
+from mocktrade.marketdata.service import MarketData, Subscription
 from mocktrade.metrics import METRICS, since_us
 from mocktrade.ops.alerts import Alert, Alerts, alert_to_dict
 from mocktrade.options.chain import ChainService, ChainWatch
@@ -127,6 +127,7 @@ class StreamHub:
         self._revoked_s = revoked_s
         self._live: tuple[float, set[str]] | None = None  # (read at, session digests)
         self._connections: set[_Connection] = set()
+        self._no_prices = MarketData()  # for someone with no prices of their own (#395)
         self._attached: set[str] = set()
         platform.on_firm_change(self._on_kill)  # every workspace's firm STOP (#368)
         for runtime in platform.accounts.values():
@@ -186,7 +187,7 @@ class StreamHub:
             token=token,
             accounts=self._viewable(user),
             queue=asyncio.Queue(self._queue_limit),
-            ticks=self._platform.market_data.subscribe(),
+            ticks=self._prices_for(user).subscribe(),
         )
         self._connections.add(connection)
         connection.put(
@@ -564,6 +565,12 @@ class StreamHub:
         for connection in list(self._connections):
             if account_id in connection.accounts:
                 connection.put(message)
+
+    def _prices_for(self, user: User) -> MarketData:
+        """The prices this person's screens get (#395): their own subscription's, or (a Kite
+        server, no subscription of their own) a source that never ticks."""
+        found = self._platform.prices.for_user(user, self._users.accounts())
+        return found if found is not None else self._no_prices
 
     def _viewable(self, user: User) -> set[str]:
         return {a.id for a in self._users.accounts() if can_view(user, a)}
