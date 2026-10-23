@@ -366,9 +366,13 @@ def create_app(
     replay: ReplayFeed | None = None,
     backtests: Backtests | None = None,
     candles: CandleStore | None = None,
+    # each firm's own imported candles (#396); without it, `candles` is every firm's
+    candles_for: Callable[[str], CandleStore] | None = None,
     charts: Charts | None = None,
-    # a server with a price source per subscription (#395): each source's own charts
+    # a server with a price source per subscription (#395): each source's own charts and
+    # recorded days (#396)
     charts_for: Callable[[MarketData], Charts | None] | None = None,
+    ticks_for: Callable[[MarketData], FileTickStore | None] | None = None,
     market_alerts: MarketAlerts | None = None,
     starter: AccountStarter | None = None,
     protection: ProtectionGuard | None = None,
@@ -377,8 +381,11 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="MockTrade", docs_url=None, redoc_url=None, openapi_url=None)
     # what the screens read from prices, one per subscription (#395): never another's
-    markets = Markets(platform.instruments, charts_for=charts_for or (
-        lambda md: charts if md is platform.market_data else None))  # fmt: skip
+    markets = Markets(
+        platform.instruments,
+        charts_for=charts_for or (lambda md: charts if md is platform.market_data else None),
+        ticks_for=ticks_for or (lambda md: ticks if md is platform.market_data else None),
+    )
     no_prices = MarketData()  # someone with no subscription of their own: nothing ticks
     for source in platform.prices.all():  # from the start: no tick is missed before a screen asks
         markets.of(source)
@@ -398,8 +405,9 @@ def create_app(
     )
     app.state.hub = hub
     METRICS.gauge("stream_connections", lambda: hub.connections)
-    METRICS.gauge("ticks_received", lambda: platform.market_data.ticks_received)
-    METRICS.gauge("instruments_watched", lambda: len(platform.market_data.watched()))
+    sources = platform.prices.all() or [platform.market_data]  # every subscription's (#396)
+    METRICS.gauge("ticks_received", lambda: sum(md.ticks_received for md in sources))
+    METRICS.gauge("instruments_watched", lambda: sum(len(md.watched()) for md in sources))
     process_gauges(METRICS)
     app.add_api_websocket_route("/ws", hub.serve)
     login_attempts: dict[str, deque[float]] = {}
@@ -606,14 +614,17 @@ def create_app(
 
     # --- research: recorded ticks (K11) ---------------------------------------------------------
 
-    def recordings():
-        if ticks is None:
+    def recordings(user: User) -> FileTickStore:
+        """The recorded days of the asker's own subscription (#396); on a simulator or a
+        replay, MockTrade's own, everyone's."""
+        found = market(user).ticks
+        if found is None:
             raise HTTPException(404, "ticks aren't being recorded on this server")
-        return ticks
+        return found
 
     @app.get("/api/research/recordings")
     async def recorded_days(user: Me) -> dict[str, Any]:
-        store = recordings()
+        store = recordings(user)
         admin = user.has_role(Role.ADMIN)
         days = []
         for day in reversed(store.days()):
@@ -628,7 +639,7 @@ def create_app(
 
     @app.get("/api/research/recordings/{day}")
     async def recorded_day(day: str, user: Me) -> dict[str, Any]:
-        store = recordings()
+        store = recordings(user)
         try:
             when = date.fromisoformat(day)
         except ValueError:
@@ -639,10 +650,11 @@ def create_app(
 
     @app.delete("/api/research/recordings/{day}")
     async def recorded_day_delete(day: str, user: Me) -> dict[str, Any]:
-        store = recordings()
+        store = recordings(user)
         if not user.has_role(Role.ADMIN):
             raise HTTPException(403, "only an admin can delete recordings")
-        platform_wide(user, "delete recordings")
+        if not platform.prices.per_account:  # MockTrade's own recordings: every firm's
+            platform_wide(user, "delete recordings")
         try:
             when = date.fromisoformat(day)
         except ValueError:
@@ -695,10 +707,12 @@ def create_app(
     @app.get("/api/research/backtests/form")
     async def backtest_form_spec(user: Me, instrument_id: str = "") -> dict[str, Any]:
         backtest_runs()
-        days = await asyncio.to_thread(ticks.days) if ticks is not None else []
-        out = form_spec(days, candles=candles is not None)
-        if candles is not None and instrument_id:
-            out["candle_days"] = await asyncio.to_thread(candles.days, instrument_id)
+        store = market(user).ticks  # their own subscription's days (#396)
+        days = await asyncio.to_thread(store.days) if store is not None else []
+        own = candle_store(user)
+        out = form_spec(days, candles=own is not None)
+        if own is not None and instrument_id:
+            out["candle_days"] = await asyncio.to_thread(own.days, instrument_id)
         return out
 
     @app.get("/api/research/backtests/{run_id}/days/{day}", response_model=None)
@@ -723,18 +737,24 @@ def create_app(
     async def backtest_get(run_id: str, user: Me) -> dict[str, Any]:
         return own_run(run_id, user).to_dict()
 
+    def candle_store(user: User) -> CandleStore | None:
+        """The candles the asker's backtests read: their own firm's (#396)."""
+        return candles_for(user.workspace) if candles_for is not None else candles
+
     @app.post("/api/research/candles", status_code=201)
     async def candles_import(body: CandlesIn, user: Me) -> dict[str, Any]:
-        if candles is None:
+        store = candle_store(user)
+        if store is None:
             raise HTTPException(404, "candles can't be imported on this server")
-        if not user.has_role(Role.ADMIN):  # a shared dataset: every backtest reads it (#270)
+        if not user.has_role(Role.ADMIN):  # the firm's dataset: all its backtests read it (#270)
             raise HTTPException(403, "only an admin can import candles (everyone's backtests "
                                 "use them)")  # fmt: skip
-        platform_wide(user, "import candles")
+        if candles_for is None:  # one dataset for every firm on the server
+            platform_wide(user, "import candles")
         if platform.instruments.get(body.instrument_id) is None:
             raise HTTPException(422, f"unknown instrument {body.instrument_id}")
         try:
-            n = await asyncio.to_thread(candles.put, body.instrument_id, body.day, body.rows)
+            n = await asyncio.to_thread(store.put, body.instrument_id, body.day, body.rows)
         except BacktestError as exc:
             raise HTTPException(422, str(exc)) from None
         audit("CANDLES_IMPORTED", f"{user.id} imported {n} candles for {body.instrument_id} on "

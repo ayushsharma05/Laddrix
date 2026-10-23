@@ -504,6 +504,11 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Found and fixed:** an order id reused with different details was answered with the old order (the caller would believe the new one was sent): now refused with 409, an identical retry still never places twice. **New check:** 24 private paths and path tricks against a real server never serve planted secrets; the screens and desktop sources hold no server secret; no `.env`, key, token or database is tracked in git.
   - **Gaps as child issues:** #363 step-up auth + own session list, #364 key rotation + compromised-credential drill, #365 supply chain (pip-audit, SBOM, pins, signing), #366 permission re-check before delayed actions + limit races, #367 classification/redaction/retention, #368 multi-tenant (blocked on #278), #369 independent review + pen test (Ayush to arrange).
   - **Kept open:** #279 by its own terms, until the evidence is reviewed.
+
+- 23 Oct, #279 first part merged (PR #370); all 9 trading issues done (#279 stays open by design, children #363-#369).
+  - **Ayush asked:** what he has to do, and why the app looks simple if it's production level.
+  - **Explained:** simple to read on purpose; the size is in the number of safety pieces and tests; the code is production-grade but live trading still needs the go-live steps, time running live and a security review.
+  - **Ayush decided:** MockTrade will be offered to other firms (#278 commented; #368 unblocked); go-live later; the algo-id field not now; he will arrange #369.
 - 23 Oct, **Ayush decided** (#278): each trader brings their own Zerodha subscription (₹500 each) and sees only their own prices; build for either IP rule; write to Zerodha before any outside trader (a draft from Claude, sent by Ayush). **#372 done:** `KITE_EGRESS_<ACCOUNT>` routes an account's orders and daily login through its own proxy (its own IP); unset or `direct` uses the server's shared static IP; `KITE_EGRESS` sets a default. http/https proxies only (SOCKS would need another library). Checks: 4 tests (a real local proxy sees the account's requests), mutation 7/7. Each firm's own price feed is part of #368.
 - 23 Oct, #372 merged (PR #373). **#366 done** (rights re-checked when the action happens; limit races).
   - **Defect confirmed:** rights were checked only at the door (the request). An algo, a GTT or a resting change kept acting for a trader after an admin removed them, disabled them or took the trader role away.
@@ -595,3 +600,17 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Price alerts:** checked only on their owner's prices (`AlertEngine.source_of`), and each source watches only its own users' instruments.
   - **Left for #396:** the recorder and the stale-price check.
   - **Checks:** 4 more tests (9 in all), mutation 20/20. Three first survivors were test gaps, now covered: an alert made when the price is already past its level, which feed a live chart watches, and a live chain per source.
+- 23 Oct, PR #402 merged. **#396 (368c):** files and jobs per firm and per subscription.
+  - **Recorded ticks:** a folder per Kite subscription (`data/ticks/@<account>`). Each person's Research screen lists only their own days; an admin deletes only their own subscription's days.
+  - **Imported candles:** a folder per firm (`data/candles/@<firm>`; main stays in `data/candles`). A firm's admin imports them with no operator needed.
+  - **Backtests:** each replays its owner's own subscription's days and their firm's candles.
+  - **A real bug fixed:** end-of-day reports valued open positions at the shared feed's prices (on a Kite server, the first account's). Now each report uses the account's own prices.
+  - **Checks:** each subscription is checked for silence on its own, with a band for its viewers only. Dropped ticks are counted on every subscription.
+  - **Docs:** the operator's runbook `docs/runbooks/firms.md`.
+  - **Tests:** 8 in `tests/test_firm_files.py`, including a real Kite-mode server build with two firms. Mutation 24/24.
+- 23 Oct, late. Ayush (going to sleep): "do whatever you think is right". In order:
+  - fix every open bug issue, and leave feature issues for later;
+  - close all PRs: the Dependabot majors are closed, and #371 is merged;
+  - tidy the repo: archive the NG/CME material without losing any design or future-feature information;
+  - leave only well-written feature issues, plus one issue listing Ayush's own to-dos;
+  - write one document on running everything locally.

@@ -67,7 +67,7 @@ from mocktrade.algos.builtin import BUILTIN
 from mocktrade.algos.engine import parse_algo_ids, with_exchange_ids
 from mocktrade.broker.kite.http import BASE_URL
 from mocktrade.broker.kite.instruments import BROKER as KITE
-from mocktrade.broker.kite.live import KiteLive
+from mocktrade.broker.kite.live import LIVE, KiteLive
 from mocktrade.broker.kite.ticker import WS_URL
 from mocktrade.broker.paper import PaperBroker
 from mocktrade.charges.model import ScheduleCharges
@@ -83,7 +83,7 @@ from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.marketdata.sources import PriceSources
 from mocktrade.metrics import freeze_heap, watch_loop_lag
 from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.checks import Checks, PriceOverload, audit_log
+from mocktrade.ops.checks import Checks, PriceFeed, PriceOverload, audit_log
 from mocktrade.ops.fence import DataFence, FenceError
 from mocktrade.ops.guards import DayGuards
 from mocktrade.ops.notify import WebhookNotifier
@@ -94,7 +94,7 @@ from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.reports.service import Reports
 from mocktrade.reports.store import ReportStore
-from mocktrade.research.backtest import Backtests, CandleStore
+from mocktrade.research.backtest import Backtests, CandleStores
 from mocktrade.research.ticks import FileTickStore, TickRecorder
 from mocktrade.risk.access import trading_rights
 from mocktrade.risk.kill_switch import KillSwitch
@@ -265,6 +265,8 @@ class Assembly:
     alerts: Alerts | None = None
     notifier: WebhookNotifier | None = None
     fence: DataFence | None = None  # this server owns the data folder (#273)
+    recorders: dict[str, TickRecorder] = field(default_factory=dict)  # "" or account id (#396)
+    backtests: Backtests | None = None
 
     async def close(self) -> None:
         if self.notifier is not None:
@@ -416,13 +418,17 @@ def build(settings: ServeSettings) -> Assembly:
             gate.subscribe(
                 lambda state, reason, a=account_id: _recovery_alert(alerts, a, state, reason)
             )
+    # each Kite subscription is its own feed (#395): recorded, and checked for silence, alone
+    own_feeds = [a for a in accounts if prices.has_own(a.id)]
+    feeds = [PriceFeed(prices.of(a.id), a.id, lambda a=a: kite.status(a) == LIVE)
+             for a in own_feeds]  # fmt: skip
     checks = Checks(
         alerts,
         md,
         accounts,
         settings.data_dir,
         broker_status=kite.status if kite else None,
-        prices_expected=(lambda: kite.any_live) if kite else (lambda: True),
+        feeds=feeds if kite else None,  # else the simulator's, always expected
     )
     scheduler = Scheduler(holidays=settings.holidays)
     if kite is not None:
@@ -437,20 +443,45 @@ def build(settings: ServeSettings) -> Assembly:
     )
     scheduler.daily("08:45", platform.roll_day, "new trading day")  # #266: no restart needed
     scheduler.daily("16:00", reports.close_of_day, "end-of-day reports")
-    ticks = None
-    if settings.record_days > 0:
-        ticks = FileTickStore(
-            settings.data_dir / "ticks", keep_days=settings.record_days, describe=instruments.get
-        )  # each day keeps its instrument list
-        recorder = TickRecorder(ticks)
-        md.tap(recorder.on_tick)
+    ticks = None  # the simulator's recordings: MockTrade's own, everyone's
+    recorded: dict[int, FileTickStore] = {}  # a source -> its own recordings (#396)
+    recorders: dict[str, TickRecorder] = {}  # whose ("": the simulator's) -> its recorder
+
+    def record(source: MarketData, folder: Path, whose: str) -> FileTickStore:
+        store = FileTickStore(folder, keep_days=settings.record_days, describe=instruments.get)
+        recorder = recorders[whose] = TickRecorder(store)  # each day keeps its instruments
+        source.tap(recorder.on_tick)
         jobs.append(recorder.run)
-        scheduler.daily("16:30", _rotate(ticks), "tick recordings rotation")
-    candle_store = CandleStore(settings.data_dir / "candles")
+        name = f" ({whose})" if whose else ""
+        scheduler.daily("16:30", _rotate(store), f"tick recordings rotation{name}")
+        recorded[id(source)] = store
+        return store
+
+    if settings.record_days > 0 and kite is None:
+        ticks = record(md, settings.data_dir / "ticks", "")
+    elif settings.record_days > 0:  # one firm's recorded day is never another's (#278)
+        for account in own_feeds:
+            record(prices.of(account.id), settings.data_dir / "ticks" / f"@{account.id}",
+                   account.id)  # fmt: skip
+    candle_stores = CandleStores(settings.data_dir / "candles")  # each firm its own (#396)
+
+    def sources_of(owner: str):
+        """What a backtest replays (#396): its owner's own subscription's recorded days, and
+        their firm's imported candles. Someone gone, or with no subscription: nothing."""
+        user = users.get_user(owner)
+        if user is None:
+            return (lambda _day: None), None
+        source = prices.for_user(user, users.accounts())
+        store = recorded.get(id(source)) if source is not None else None
+
+        def days(d):
+            return store.read_timed(d) if store is not None and d in store.days() else None
+
+        return days, candle_stores.of(user.workspace).rows
+
     backtests = Backtests(
         settings.data_dir / "backtests", instruments, platform.charges_model,
-        ticks=(lambda d: ticks.read_timed(d) if ticks and d in ticks.days() else None),
-        candles=candle_store.rows,
+        ticks=lambda _day: None, sources_of=sources_of,
     )  # fmt: skip
     # charts: live candles from every tick; history from Kite (or the recordings on paper)
     builder = CandleBuilder()
@@ -504,7 +535,7 @@ def build(settings: ServeSettings) -> Assembly:
     )
     scheduler.every(5, lambda: audit_log(alerts, events), between=("00:00", "23:59"),
                     name="audit log", any_day=True)  # fmt: skip
-    overload = PriceOverload(alerts, md)
+    overload = PriceOverload(alerts, *prices.all())  # every subscription's, on one server
     scheduler.every(15, overload.check, between=("00:00", "23:59"), name="price overload",
                     any_day=True)  # fmt: skip
     jobs.append(scheduler.run)
@@ -523,9 +554,10 @@ def build(settings: ServeSettings) -> Assembly:
         reports=reports,
         ticks=ticks,
         backtests=backtests,
-        candles=candle_store,
+        candles_for=candle_stores.of,
         charts=charts,
         charts_for=charts_for,
+        ticks_for=lambda source: recorded.get(id(source)),
         market_alerts=market_alerts,
         starter=starter,
         static_dir=ui,
@@ -533,6 +565,7 @@ def build(settings: ServeSettings) -> Assembly:
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)
     built.fence = fence
     built.alerts, built.notifier = alerts, notifier
+    built.recorders, built.backtests = recorders, backtests
     return built
 
 

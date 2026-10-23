@@ -47,7 +47,7 @@ from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.reports.service import Reports
 from mocktrade.reports.store import ReportStore
-from mocktrade.research.backtest import Backtests, CandleStore
+from mocktrade.research.backtest import Backtests, CandleStores
 from mocktrade.research.replay import (
     EPOCH,
     SPEEDS,
@@ -176,12 +176,18 @@ async def main(
         feed.subscribe(lambda status: _replay_band(alerts, status))
         _replay_band(alerts, feed.status())
     recorded_ticks = FileTickStore(data / "ticks" if feed is None else ticks_dir)
-    candle_store = CandleStore(data / "candles")
-    backtests = Backtests(
-        data / "backtests", instruments, platform.charges_model,
-        ticks=lambda d: recorded_ticks.read_timed(d) if d in recorded_ticks.days() else None,
-        candles=candle_store.rows,
-    )  # fmt: skip
+    candle_stores = CandleStores(data / "candles")  # each firm imports its own (#396)
+
+    def recorded(d):
+        return recorded_ticks.read_timed(d) if d in recorded_ticks.days() else None
+
+    def sources_of(owner: str):
+        """A backtest replays the simulator's days (everyone's) or its owner's firm's candles."""
+        user = users.get_user(owner)
+        return recorded, candle_stores.of(user.workspace).rows if user is not None else None
+
+    backtests = Backtests(data / "backtests", instruments, platform.charges_model,
+                          ticks=recorded, sources_of=sources_of)  # fmt: skip
     builder = CandleBuilder(clock=clock)  # charts: candles from every tick, history recorded
     md.tap(builder.on_tick)
     charts = Charts(builder, RecordedHistory(recorded_ticks, clock=clock), events=log,
@@ -208,7 +214,7 @@ async def main(
                      protection=protection,
                      replay_command=lambda d: f"python -m mocktrade.tools.demo --replay {d} "
                                               f"--port {port + 1}",
-                     backtests=backtests, candles=candle_store, charts=charts,
+                     backtests=backtests, candles_for=candle_stores.of, charts=charts,
                      market_alerts=market_alerts,
                      starter=CallbackStarter(("paper",), start))  # fmt: skip
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))

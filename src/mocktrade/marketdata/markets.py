@@ -1,8 +1,8 @@
 """What the screens read from one price source (#395): one per subscription.
 
     a source (MarketData) ─► its Market: option chain, time and sales, movers, volume at
-                             price, charts. Built the first time someone needs it, then fed by
-                             its own source's ticks only.
+                             price, charts, recorded days. Built the first time someone needs
+                             it, then fed by its own source's ticks only.
 
 The server asks `Markets.of(source)` with the asker's own source (PriceSources.for_user), so
 one person's chart, chain or movers list is never computed from another's subscription. On a
@@ -18,6 +18,7 @@ from mocktrade.marketdata.prints import TimeAndSales
 from mocktrade.marketdata.service import MarketData
 from mocktrade.options.chain import ChainService
 from mocktrade.refdata.store import InstrumentStore
+from mocktrade.research.ticks import TickStore
 
 
 @dataclass
@@ -27,6 +28,7 @@ class Market:
     prints: TimeAndSales
     movers: Movers
     charts: Charts | None
+    ticks: TickStore | None = None  # this source's recorded days (#396)
 
 
 class Markets:
@@ -35,9 +37,11 @@ class Markets:
         instruments: InstrumentStore,
         *,
         charts_for: Callable[[MarketData], Charts | None] = lambda _md: None,
+        ticks_for: Callable[[MarketData], TickStore | None] = lambda _md: None,
     ) -> None:
         self._instruments = instruments
         self._charts_for = charts_for
+        self._ticks_for = ticks_for
         self._by_source: dict[int, Market] = {}
 
     def of(self, prices: MarketData) -> Market:
@@ -48,6 +52,6 @@ class Markets:
             movers = Movers(prices.all_latest, self._instruments.get)
             prices.tap(movers.on_tick)
             found = Market(prices, ChainService(self._instruments, prices), prints, movers,
-                           self._charts_for(prices))  # fmt: skip
+                           self._charts_for(prices), self._ticks_for(prices))  # fmt: skip
             self._by_source[id(prices)] = found
         return found
