@@ -46,6 +46,7 @@ from mocktrade.positions.reconcile import PositionReconciler
 from mocktrade.recovery import IST, RecoveryGate, recover, recover_until_done, session_start
 from mocktrade.refdata.expiry import Expiries, ExpiryRules
 from mocktrade.refdata.store import InstrumentStore
+from mocktrade.risk.access import Access, AccessGate, no_check
 from mocktrade.risk.checks import RiskGate
 from mocktrade.risk.closing import ExitDesk, position_of
 from mocktrade.risk.flatten import Flatten
@@ -148,6 +149,8 @@ class Platform:
     expiries: Expiries = field(init=False, repr=False)
     surveillance: Surveillance = field(init=False, repr=False)  # alerts for risk (#291)
     supervisor: Supervisor = field(init=False, repr=False)  # critical loops, watched (#273)
+    # may this user still trade this account? read at each order (#366); the server sets it
+    access: Access = field(default=no_check, repr=False)
     _late: set[asyncio.Task] | None = field(default=None, init=False, repr=False)
     _reconcile: bool = field(default=True, init=False, repr=False)
 
@@ -490,6 +493,7 @@ class Platform:
             audit=audit,
             position=None if book is None else position_of(book),
             **({"orders_per_second": lambda: throttle.per_second} if throttle else {}),
+            access=lambda user_id: self.access(user_id, account_id),
         )
 
         def on_switch(_name: str, state) -> None:
@@ -564,7 +568,8 @@ class Platform:
 
         margin = MarginGate(broker, available, book.net_qty, on_unchecked=unchecked)
         pause = PauseGate(self.supervisor, account.id)  # a critical loop down (#273)
-        checks = (pause, recovery, risk, margin if margin_check else None, throttle)
+        rights = AccessGate(account.id, lambda: self.access)  # still allowed to trade (#366)
+        checks = (pause, rights, recovery, risk, margin if margin_check else None, throttle)
         gates = [g for g in checks if g is not None]
         orders = OrderManager(
             account.id,
@@ -641,6 +646,7 @@ class Platform:
                 stopped=lambda: next((s.state.reason or s.name for s in (self.firm_switch, switch)
                                       if s.engaged), None),
                 position=book.qty,
+                access=lambda user_id, a=account.id: self.access(user_id, a),
             )  # fmt: skip
             sweeps: set[asyncio.Task] = set()
 

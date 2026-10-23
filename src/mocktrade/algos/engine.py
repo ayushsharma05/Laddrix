@@ -325,6 +325,10 @@ class AlgoContext:
             return False
         if not hedge and (p.state is not AlgoState.WORKING or self.held):
             return False  # hedges (risk-reducing) still go out while paused or stopping
+        if not hedge and not reduce_only and (why := self._engine.access(p.user_id)):
+            # the user lost the right to trade this account since starting it (#366)
+            self._engine.stop_parent(p, why, final=AlgoState.STOPPED)
+            return False
         leg = instrument_id or p.instrument_id
         main = leg == p.instrument_id and (side or p.side) is p.side
         if check_remaining and main and qty > self.remaining():
@@ -432,8 +436,10 @@ class AlgoEngine:
         id_prefix: str = "A",
         position: Callable[[str, Any], int] | None = None,  # (instrument, product) -> qty
         orders_per_second: Callable[[], int] = lambda: 8,  # the throttle's per-second limit
+        access: Callable[[str], str | None] = lambda _user_id: None,  # still may trade? (#366)
     ) -> None:
         self._ops = orders_per_second
+        self.access = access
         self.account_id = account_id
         self._position = position
         self.manager = manager

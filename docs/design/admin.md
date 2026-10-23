@@ -166,3 +166,19 @@ An older `users.db` gets the new column (`must_change`) and table when the serve
 | Recorded ticks (market data, no account data) | shared | everyone signed in can read; admins delete |
 | Imported candles (one dataset every backtest reads) | shared | admins import; everyone's backtests read |
 | `/api/ops` (every alert, every job) | the firm | risk and admin |
+
+## Taking someone's rights away: what happens to what they left running (#366)
+
+Removing a trader from an account, disabling a user or taking the trader role away is checked
+again **when each action actually happens**, not only when it was asked. Nothing to restart.
+
+| What they left behind | What happens at once |
+| --- | --- |
+| A new order or a change that adds risk | refused, saying why ("ravi may no longer trade acc-1") |
+| A closing order (reduce-only, the exit desk), a cancel | still goes: getting out is never blocked |
+| A running algo | stops before its next child order, with the reason on the algo screen; its working children are pulled like any stopped algo. A hedge leg is held, as under STOP: the account's other traders or risk close what is left (Flatten) |
+| A GTT that could open a position | deleted at the broker on the next poll (a few seconds), saying why; one that fires anyway has its order cancelled |
+| A GTT that only reduces (a stop-loss, a target) | kept: it still protects the position |
+
+Turning an **account** off is different: everyone keeps closing rights and the risk gate lets
+only closing trades through, exactly as on the screens. Code: `risk/access.py`.

@@ -94,6 +94,7 @@ from mocktrade.reports.service import Reports
 from mocktrade.reports.store import ReportStore
 from mocktrade.research.backtest import Backtests, CandleStore
 from mocktrade.research.ticks import FileTickStore, TickRecorder
+from mocktrade.risk.access import trading_rights
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.risk.limits_spec import stored_limits
 from mocktrade.server.admin import CallbackStarter
@@ -323,6 +324,7 @@ def build(settings: ServeSettings) -> Assembly:
     events = EventLog(settings.data_dir / "events.db")
     events.start()
     platform = Platform(instruments, md, KillSwitch("firm"), events)
+    platform.access = trading_rights(users)  # re-checked at each order, algo child, GTT (#366)
     if settings.charges_file is not None:
         platform.charges_model = ScheduleCharges(load_schedule(settings.charges_file))
     brokers = []
