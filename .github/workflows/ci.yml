@@ -105,5 +105,6 @@ jobs:
           (cd ui/desktop && npm ci --no-audit --no-fund && npm sbom --sbom-format cyclonedx) > sbom/mocktrade-desktop.cdx.json
       - uses: actions/upload-artifact@v4
         with:
-          name: sbom-${{ github.ref_name }}
+          # a release: sbom-vX.Y.Z; otherwise the commit (a PR's ref has a '/', not allowed here)
+          name: sbom-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
           path: sbom/

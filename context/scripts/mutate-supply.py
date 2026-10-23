@@ -10,6 +10,7 @@ L = "requirements.lock"
 P = "pyproject.toml"
 I = ".gitleaksignore"
 E = "ui/desktop/package.json"
+K = ".dockerignore"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_supply_chain.py"]
 MUTANTS = [
  (D, "RUN pip install --require-hashes -r requirements.lock \\\n    && pip install --no-deps . \\", "RUN pip install . \\"),
@@ -25,6 +26,7 @@ MUTANTS = [
  (L, "httpx==0.28.1", "httpx==0.26.0"),
  (P, "    \"orjson>=3.10\",", "    \"orjson>=3.10\",\n    \"left-pad>=1\","),
  (I, "# Admin.test.tsx: fake one-time passwords returned by the scripted test server", "abc:src/mocktrade/server/app.py:generic-api-key:1"),
+ (K, "!requirements.lock\n", ""),
  (E, "\"electron\": ", "\"electron-updater\": \"^6.0.0\",\n    \"electron\": "),
 ]
 if subprocess.run(TESTS, capture_output=True, timeout=300).returncode != 0:

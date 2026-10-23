@@ -535,4 +535,5 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - `docs/runbooks/patching.md` sets the patch times: critical 48 h, high 7 days while live.
     - The release runbook says the desktop installer must be signed before anyone else gets it, with updates only if signature-checked.
   - **Found by the first scans:** no known vulnerability in the 30 locked Python packages. gitleaks found 2 hits in 223 commits, both made-up passwords in `Admin.test.tsx`, accepted in `.gitleaksignore` (only test files are allowed there).
-  - **Checks:** 4 tests; mutation 14/14 (one first survivor was the mutant's fault: a package has 2 hashes, it broke one).
+  - **CI caught:** the first image build failed: `.dockerignore` lets only listed files into the build, and the lock wasn't listed. Fixed, with a test. The SBOM upload also failed on a PR (its ref name has a '/'): now named by the tag on a release, else the commit.
+  - **Checks:** 4 tests; mutation 15/15 (one first survivor was the mutant's fault: a package has 2 hashes, it broke one).

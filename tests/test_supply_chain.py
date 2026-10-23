@@ -59,6 +59,8 @@ def test_the_image_and_ci_install_only_what_is_locked():
     docker = (ROOT / "Dockerfile").read_text()
     assert "pip install --require-hashes -r requirements.lock" in docker
     assert "pip install --no-deps ." in docker  # our code adds nothing unlocked
+    sent = (ROOT / ".dockerignore").read_text().splitlines()
+    assert "!requirements.lock" in sent  # the build context lets only listed files in
     assert not re.search(r"pip install \.(?!\S)", docker.replace("--no-deps .", ""))
     ci = (ROOT / ".github/workflows/ci.yml").read_text()
     assert "pip install --require-hashes -r requirements.lock" in ci
@@ -68,6 +70,7 @@ def test_the_image_and_ci_install_only_what_is_locked():
     for sbom in ("server", "screens", "desktop"):
         assert f"sbom/mocktrade-{sbom}.cdx.json" in ci
     assert 'tags: ["v*"]' in ci  # a release tag runs it: its SBOMs are the release's
+    assert "github.ref_type == 'tag' && github.ref_name || github.sha" in ci  # a valid name
 
 
 def test_every_accepted_secret_finding_is_a_test_file():
