@@ -98,3 +98,15 @@ class Checks:
             self._alerts.raise_(key, "WARN", f"Data disk low: {free >> 20} MB free")
         else:
             self._alerts.clear(key, "disk space is fine again")
+
+
+def audit_log(alerts: Alerts, log) -> None:
+    """The audit log can't write, or has fallen behind (#265): new orders are being refused,
+    so say so on every screen, at any hour; clear it once writing again."""
+    problem = log.problem
+    if problem is not None:
+        text = (f"{problem}: new orders are refused until it writes again (cancels and "
+                "forced closes still go). Check the disk.")  # fmt: skip
+        alerts.raise_("audit_log", "ERROR", text)
+    else:
+        alerts.clear("audit_log", "the audit log is writing again: orders accepted")

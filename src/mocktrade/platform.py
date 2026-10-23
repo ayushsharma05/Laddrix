@@ -132,6 +132,9 @@ class Platform:
     event_log: EventLog | None = None
     accounts: dict[str, AccountRuntime] = field(default_factory=dict)
     charges_model: ChargesModel = field(default_factory=lambda: ScheduleCharges(KITE_STANDARD))
+    # every order on disk before the broker sees it (#265); off only for backtests, which
+    # replay a day faster than real time and never send a real order
+    durable_orders: bool = True
     _late: set[asyncio.Task] | None = field(default=None, init=False, repr=False)
     _reconcile: bool = field(default=True, init=False, repr=False)
 
@@ -423,6 +426,11 @@ class Platform:
             gate=Gates(gates),
             spec=spec_of(broker),
             clock=clock,
+            durable=(
+                self.event_log.persist
+                if self.event_log is not None and self.durable_orders
+                else None
+            ),  # #265
         )
         holder["orders"] = orders
         orders.subscribe(book.on_order_event)

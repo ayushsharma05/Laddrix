@@ -67,6 +67,8 @@ class EventKind(Enum):
     FILL = "FILL"  # new quantity traded (comes with an UPDATED event)
     MODIFY_SENT = "MODIFY_SENT"
     MODIFY_UNCONFIRMED = "MODIFY_UNCONFIRMED"  # no answer to a change: the broker's terms decide
+    MODIFY_SENDING = "MODIFY_SENDING"  # a change about to go, on disk first (#265): the audit
+    #                                    trail only, with the larger quantity of the two
     CANCEL_SENT = "CANCEL_SENT"
     CANCELLED_LOCALLY = "CANCELLED_LOCALLY"  # cancelled before it was ever sent
     IGNORED = "IGNORED"  # a duplicate, stale or impossible update: kept for the audit trail

@@ -14,6 +14,16 @@ Why these choices:
 - If writing fails (disk full, file locked), events stay in memory and are retried,
   never dropped. `healthy` turns False and `on_failure` is called once per outage,
   on the event loop, so the app can alert or stop trading.
+- Durable before sending (#265): `durable()` waits until everything queued so far is on
+  disk, and fails fast (StorageError, in words) when the log can't write or has fallen
+  behind. The order manager calls it after the checks and before the broker: an order is
+  on disk (with its id) before it can exist at the exchange, so a crash at any moment
+  leaves it known, and its id is never reused. If the disk can't be written, new orders
+  are refused (the screens say why); cancels always go.
+- Bounded memory (#265): if the disk stalls, the queue doesn't grow forever. Order and
+  kill switch events are always kept (there are only as many as orders, and new orders are
+  refused while the log is behind); notes (audit extras) past `max_backlog` are dropped,
+  counted in `dropped` and logged.
 - Python's built-in sqlite3: no extra dependency. Moving to PostgreSQL later means
   another class with the same methods.
 """
@@ -89,6 +99,13 @@ class _Flush:
 _STOP = object()
 
 
+DURABLE_TIMEOUT_S = 2.0  # an order waits at most this long for its record to be on disk
+
+
+class StorageError(Exception):
+    """The event log can't confirm a write: anything that must be on disk first must wait."""
+
+
 class EventLog:
     def __init__(
         self,
@@ -97,9 +114,13 @@ class EventLog:
         on_failure: Callable[[Exception], None] | None = None,
         batch_size: int = 500,
         max_backoff_s: float = 2.0,
+        max_backlog: int = 50_000,
     ) -> None:
         self.path = Path(path)
         self._on_failure = on_failure
+        self.max_backlog = max_backlog
+        self.dropped = 0  # notes not kept because the disk was too far behind
+        self.last_error: Exception | None = None
         self._batch_size = batch_size
         self._max_backoff_s = max_backoff_s
         self._queue: queue.SimpleQueue = queue.SimpleQueue()
@@ -177,7 +198,7 @@ class EventLog:
             raise ValueError(f"{kind} is an order event kind; use record()")
         payload = {"v": SCHEMA, **(extra or {})}
         stamp = (ts or datetime.now(UTC)).isoformat()
-        self._put((stamp, account_id, kind, "", detail, json.dumps(payload)))
+        self._put((stamp, account_id, kind, "", detail, json.dumps(payload)), critical=False)
 
     async def flush(self) -> None:
         """Wait until everything queued so far is safely written."""
@@ -188,9 +209,49 @@ class EventLog:
         self._queue.put(_Flush(future, loop))
         await future
 
-    def _put(self, row: tuple) -> None:
+    @property
+    def backlog(self) -> int:
+        """Events waiting to be written."""
+        return self._queue.qsize()
+
+    @property
+    def problem(self) -> str | None:
+        """Why the log can't be trusted to keep what is sent now, in words; None when fine."""
+        if not self.healthy:
+            return f"the audit log can't write to {self.path.name} ({self.last_error!r})"
+        if self.backlog >= self.max_backlog // 2:
+            return f"the audit log has fallen behind ({self.backlog} events waiting)"
+        return None
+
+    async def durable(self, timeout_s: float = DURABLE_TIMEOUT_S) -> None:
+        """Return once everything queued so far is on disk. Raises StorageError at once if
+        the log can't write or has fallen behind, or if the write isn't confirmed in time."""
+        if (problem := self.problem) is not None:
+            raise StorageError(problem)
+        try:
+            await asyncio.wait_for(self.flush(), timeout_s)
+        except TimeoutError:
+            raise StorageError(
+                f"the audit log didn't confirm a write within {timeout_s:g} s"
+            ) from None
+
+    async def persist(self, event: OrderEvent | None = None) -> None:
+        """Record `event` (if given), then wait until it and everything before it is on disk
+        (the order manager's `durable` hook). Raises StorageError like `durable`."""
+        if (problem := self.problem) is not None:
+            raise StorageError(problem)
+        if event is not None:
+            self.record(event)
+        await self.durable()
+
+    def _put(self, row: tuple, *, critical: bool = True) -> None:
         if self._closed:
             raise RuntimeError("event log is closed")
+        if not critical and self._queue.qsize() >= self.max_backlog:
+            self.dropped += 1
+            if self.dropped == 1 or self.dropped % 1000 == 0:
+                log.error("event log behind: %d notes not kept so far", self.dropped)
+            return
         self._queue.put(row)
 
     def _writer(self) -> None:
@@ -251,6 +312,7 @@ class EventLog:
             db.executemany(_INSERT, rows)
 
     def _failed(self, exc: Exception) -> None:
+        self.last_error = exc
         if self.healthy:
             log.error("event log write failed, will retry: %r", exc)
             self.healthy = False
