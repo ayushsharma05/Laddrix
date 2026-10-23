@@ -375,3 +375,52 @@ purpose: it might wake up and send orders.
    one; don't start another.
 2. If it is hung (no answer on `/api/health`), end it: `docker compose -f deploy/compose.yaml
    kill app`. Then start again. Recovery reconciles with the broker before taking orders.
+
+## A credential is stolen (#364)
+
+Do these in order. Speed matters more than understanding. The order is: **contain → stop new risk →
+reconcile → keep the evidence → rotate → restore without the old sessions**. In the commands
+below, `users` means
+`docker compose -f deploy/compose.yaml run --rm app python -m mocktrade.tools.users`.
+
+| What leaked | Contain at once |
+| --- | --- |
+| **A session** (a laptop left logged in, a cookie copied) | `users revoke-sessions --user <id>`: their open screens close within 2 s, and logging in again needs the password **and** the authenticator. Then `users password <id>` (ends sessions too). |
+| **A password and authenticator** (a phone and password both) | Admin screen: turn the user **off** (ends their sessions; their running algos stop and opening GTTs are deleted, #366). Then reset the password and the authenticator. |
+| **`MOCKTRADE_SECRET_KEY` or `deploy/.env`** | Everything below, including both rotations. Assume the attacker can open every authenticator secret in any copy of `users.db` they also have. |
+| **The Kite API secret** | Rotate it (below), then log every Kite account in again. |
+| **A Kite token file** (`kite_token_*.json`) | It works for the rest of the day (until 6 AM). Log that account out at the broker, which ends the token, and log in again through MockTrade. If unsure, STOP the account until 6 AM. |
+
+1. **Contain.** Use the table above. If you don't know who: `users revoke-sessions` (everyone).
+2. **Stop new risk.** Press STOP for the firm (or the account). Working orders are cancelled,
+   algos stop, and opening GTTs are deleted. Closing is still allowed: see [Kill switch](#kill-switch).
+3. **Reconcile with the broker.** In the broker's own app, compare orders, trades and positions
+   with MockTrade's. Anything MockTrade didn't place shows as a reconcile alert or under
+   "trades made outside MockTrade" (#355). Don't adopt it until you know who placed it.
+4. **Keep the evidence.** Before changing anything else:
+   - make a backup (`python -m mocktrade.tools.backup`);
+   - export the audit trail of each affected account (the auditor's export, risk or admin);
+   - save the server log (`docker compose ... logs app > incident-<date>.log`).
+   Write down the times. Logins, orders and every admin change are in the audit trail with who
+   and when.
+5. **Rotate what leaked.**
+   - **The secret key:** `users new-key` and save it in the password manager. Stop the server
+     (`docker compose ... stop app`). Then run
+     `users rotate-key --check` and `users rotate-key`, with `MOCKTRADE_NEW_SECRET_KEY=<new>`
+     added for that one command (`run --rm -e MOCKTRADE_NEW_SECRET_KEY=... app ...`). It
+     refuses while the server runs, and changes nothing unless every secret re-encrypts and reads
+     back. Put the new key in `deploy/.env` and start the server. **Keep the old key** with the
+     backups made before today: restoring one of them needs it. After a restore, run
+     `rotate-key` again from the old key to the new one.
+   - **The Kite API secret:** in Zerodha's developer console, regenerate the app's API secret
+     (ask Zerodha support if the console doesn't offer it). Put it in `deploy/.env`
+     (`KITE_API_SECRET`, or `KITE_API_SECRET_<ACCOUNT>` for an account's own app), restart, and
+     log each Kite account in again. The old secret can no longer start a session.
+   - **Passwords:** each affected user changes theirs; reset authenticators if phones are in
+     doubt.
+6. **Restore without the old sessions.** Backups never hold sessions, so a restore brings none
+   back. Even so, run `users revoke-sessions` once more after the restart and before you
+   resume: it ends any session made while you worked. Resume from the STOP band only after
+   step 3 is clean.
+
+**Drilled** on the demo on 23 Oct 2026: `context/evidence/h-364-credential-drill.txt`.

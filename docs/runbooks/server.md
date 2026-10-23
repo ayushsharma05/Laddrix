@@ -102,7 +102,7 @@ The 21:45 cron job runs `python -m mocktrade.tools.backup`. One folder per run:
 
 | In the backup | What it is |
 |---|---|
-| `users.db` | users, accounts, sessions, saved layouts, settings (keys, theme), risk limits |
+| `users.db` | users, accounts, saved layouts, settings (keys, theme), risk limits. Not the logged-in sessions: after a restore everyone logs in again (#364) |
 | `events.db` | the audit trail: orders, fills and positions are rebuilt from it at start |
 | `rules/`, `reports/`, `alerts/` | MTM limits, end-of-day reports, market alerts (with each user's webhook) |
 | `candles/`, `backtests/` | imported candles, backtest results |
