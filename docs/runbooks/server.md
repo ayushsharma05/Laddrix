@@ -135,6 +135,28 @@ rebuilt or kept elsewhere).
 **A backup from another MockTrade version** is refused by name (`backup format N, this
 MockTrade restores format 1`): restore with the version that made it, then upgrade.
 
+## One IP per account, or one shared (#372)
+
+SEBI wants API orders to come from a static IP the broker has on file. Whether several traders
+may share the server's IP, or each needs their own, is for Zerodha to confirm (#278). Either
+way it is a setting:
+
+| Setting (in `deploy/.env`) | Orders and the daily login leave |
+| --- | --- |
+| nothing (default), or `KITE_EGRESS_<ACCOUNT>=direct` | from the server's static IP (shared) |
+| `KITE_EGRESS_<ACCOUNT>=http://user:pass@1.2.3.4:3128` | through that proxy: the account's own IP |
+| `KITE_EGRESS=http://…` | the same proxy for every account without its own setting |
+
+`<ACCOUNT>` is the account id in capitals with other characters as `_`: `acc-ayush` →
+`KITE_EGRESS_ACC_AYUSH`.
+- **Proxies:** `http://` and `https://` only. Any static-IP proxy service gives one.
+- **Which IP to register:** register *that* IP in the account's Kite app (Profile → IP
+  whitelist), not the server's.
+- **Prices:** the price feed is not routed this way. Only order requests are checked against
+  the IP.
+- **Check:** after setting it, restart and place one small paper-safe test (the IP check in
+  § 5) for that account.
+
 ## Restore from a backup
 
 **1. Check the backup first, without touching anything.** Restore it into an empty, isolated folder. A damaged or incomplete backup is refused at this step, naming the file.

@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from mocktrade.broker.kite import token_store
-from mocktrade.broker.kite.http import KiteHttp
+from mocktrade.broker.kite.http import KiteHttp, http_for
 from mocktrade.broker.kite.session import KiteSession, create_session, login_url
 from mocktrade.config import KiteSettings
 from mocktrade.domain.accounts import BrokerAccount
@@ -48,7 +48,7 @@ class KiteDailyLogin:
 
     async def complete(self, account: BrokerAccount, request_token: str) -> None:
         app = self._apps(account)
-        http = self._http_factory(app.api_key)
+        http = http_for(self._http_factory, app)  # the login leaves the way its orders do
         try:
             session = await create_session(http, request_token, app.api_secret)
         finally:
