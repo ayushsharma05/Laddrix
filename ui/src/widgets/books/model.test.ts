@@ -130,6 +130,7 @@ describe("the audit trail", () => {
     const part = order("o1", "PARTIAL", T, { filled_qty: 25 });
     expect(execType(ev(1, "SUBMITTED")).text).toBe("Pending new");
     expect(execType(ev(2, "SENT")).text).toBe("New");
+    expect(execType(ev(2, "MODIFY_SENDING")).text).toBe("Replace sending");
     expect(execType(ev(3, "FILL", { order: part })).text).toBe("Partial fill");
     expect(execType(ev(4, "FILL", { order: full })).text).toBe("Fill");
     expect(execType(ev(4, "UPDATED", { order: full })).text).toBe("Filled"); // the state change after it

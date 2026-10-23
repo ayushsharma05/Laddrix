@@ -119,8 +119,12 @@ class OrderManager:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         follow_up_s: Sequence[float] = FOLLOW_UP_S,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        # on disk before the broker (#265): records the event given (if any), then returns
+        # once everything so far is written; raises if it can't. None: no durable log (tests)
+        durable: Callable[[OrderEvent | None], Awaitable[None]] | None = None,
     ) -> None:
         self.account_id = account_id
+        self._durable = durable
         self._follow_up_s = tuple(follow_up_s)
         self._sleep = sleep
         self._followers: set[asyncio.Task] = set()  # not awaited by settle(): they wait
@@ -192,6 +196,15 @@ class OrderManager:
         if order.cancel_requested:  # cancelled while waiting at the gate
             self._finish_locally(order)
             return order.view()
+        if (problem := await self._make_durable(None)) is not None:
+            if not request.forced_close:  # a forced close only reduces: it still goes
+                self._reject_locally(
+                    order, f"not sent: it couldn't be recorded on disk first ({problem}); "
+                    "new orders are refused until the audit log writes again",
+                )  # fmt: skip
+                return order.view()
+            log.error("forced close %s sent without a record on disk: %s",
+                      request.client_order_id, problem)  # fmt: skip
 
         order.sent = True
         started = time.perf_counter_ns()
@@ -304,6 +317,14 @@ class OrderManager:
             if order.pending is Pending.MODIFY:
                 order.pending = Pending.NONE
             raise
+        worst = replace(new, qty=max(order.request.qty, new.qty))
+        sending = OrderEvent(EventKind.MODIFY_SENDING, self._clock(), self.account_id,
+                             client_order_id, replace(order.view(), request=worst),
+                             detail=_describe_changes(qty, price_paise, trigger_paise))  # fmt: skip
+        if (problem := await self._make_durable(sending)) is not None:
+            if order.pending is Pending.MODIFY:
+                order.pending = Pending.NONE
+            raise OrderError(f"not sent: the change couldn't be recorded on disk first ({problem})")
         started = time.perf_counter_ns()
         try:
             await self._broker.modify(
@@ -342,6 +363,16 @@ class OrderManager:
             EventKind.MODIFY_SENT, order, detail=_describe_changes(qty, price_paise, trigger_paise)
         )
         return order.view()
+
+    async def _make_durable(self, event: OrderEvent | None) -> str | None:
+        """On disk before the broker sees it (#265). None when done; else why not."""
+        if self._durable is None:
+            return None
+        try:
+            await self._durable(event)
+        except Exception as exc:  # StorageError, or anything else: not known to be on disk
+            return str(exc) or repr(exc)
+        return None
 
     async def cancel(self, client_order_id: str) -> OrderView:
         """Ask to cancel a working order. The CANCELLED status arrives as a broker update."""

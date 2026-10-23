@@ -168,6 +168,8 @@ export function execType(e: AuditEvent): { text: string; tone: Tone } {
       return { text: "Pending replace", tone: "pending" };
     case "MODIFY_UNCONFIRMED":
       return { text: "Replace unconfirmed", tone: "pending" };
+    case "MODIFY_SENDING": // recorded on disk just before a change is sent (#265)
+      return { text: "Replace sending", tone: "pending" };
     case "CANCEL_SENT":
       return { text: "Pending cancel", tone: "pending" };
     case "CANCELLED_LOCALLY":

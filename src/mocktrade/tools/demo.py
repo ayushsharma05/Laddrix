@@ -36,6 +36,7 @@ from mocktrade.marketdata.service import MarketData
 from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.ops.alerts import Alerts
+from mocktrade.ops.checks import audit_log
 from mocktrade.ops.guards import DayGuards
 from mocktrade.ops.protection import ProtectionGuard
 from mocktrade.ops.scheduler import Scheduler
@@ -189,6 +190,8 @@ async def main(
     scheduler.every(
         5, protection.run_check, between=("00:00", "23:59"), name="protection guard", any_day=True
     )
+    scheduler.every(5, lambda: audit_log(alerts, log), between=("00:00", "23:59"),
+                    name="audit log", any_day=True)  # fmt: skip
     app = create_app(platform, users, settings, static_dir=ui, scheduler=scheduler,
                      reports=reports, alerts=alerts, ticks=ticks, replay=feed,
                      protection=protection,

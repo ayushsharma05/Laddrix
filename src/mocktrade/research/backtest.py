@@ -140,7 +140,9 @@ async def run_day(
         path.unlink()
     events = EventLog(path)
     events.start()
-    platform = Platform(instruments, md, KillSwitch("firm"), events, charges_model=charges)
+    platform = Platform(
+        instruments, md, KillSwitch("firm"), events, charges_model=charges, durable_orders=False
+    )  # a replay: no real order is ever sent
     broker = PaperBroker(md, instruments, latency_s=0.0, clock=clock, every_tick=True,
                          starting_paise=spec.capital_paise)  # fmt: skip
     rt = platform.add_account(

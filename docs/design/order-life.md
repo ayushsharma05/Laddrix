@@ -92,3 +92,20 @@ While stopped, the only orders let through are the exit desk's forced closes, an
 ### Closing a position
 
 Every order that closes (a loss limit's, the square-off's, a stop algo's exit, an OCO or bracket target) is **reduce-only**: the risk gate refuses it if it would close more than is open. Forced closes go through the account's exit desk, which stops the algos on that position, cancels resting orders that would also close it, and sends only what is left. So two exits at once can never turn a long into a short. See [mtm.md](mtm.md) § Coordinated exits.
+
+### On disk before the broker (#265)
+
+```
+ checks pass ──► the order's record is written to disk (and confirmed) ──► sent to the broker
+                       │
+                 can't be confirmed in 2 s, or the disk is failing or behind?
+                       ▼
+                 NOT sent: "not sent: it couldn't be recorded on disk first (…)"
+                 (a forced close still goes: it only reduces; cancels never wait)
+```
+
+A change is written first too, at the larger of the old and new sizes, so a crash
+mid-change brings it back in doubt without understating risk. So a crash at any moment
+leaves every order that might be at the exchange known after the restart, with its doubt,
+and its id is never given out again. Backtests switch this off, because they never send a
+real order.
