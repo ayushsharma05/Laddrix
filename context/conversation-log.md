@@ -395,3 +395,15 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Checks:** 6 tests plus API and UI tests; mutation 12/12. Not yet a real-browser run: do one on Wednesday before relying on it.
   - **Browser check passed** (`context/scripts/e2e-restore-stop.cjs`, screenshot `context/images/h-264-restore-band.png`). The flag survived two demo restarts; Restore needed two clicks and named what it starts; the stop ran again and the band cleared by itself.
   - **The check found a real defect:** the scheduler ran **no** jobs on weekends and holidays, so the lost-stop band and the MTM close warnings never showed then (positions stay open over a weekend). `Scheduler.every(..., any_day=True)` now runs those two all week; trading jobs stay trading-days only.
+- 23 Oct, Ayush's limits reset; work resumed. **#265 done** (orders on disk before the broker).
+  - **Defects confirmed:**
+    - the audit log wrote in the background, after the order was at the broker: a crash in that moment left an order MockTrade forgot, and its id could be reused;
+    - serve never wired the log's failure callback;
+    - the queue was unbounded.
+  - **The fix:**
+    - **Written first:** after the checks and before the broker, the order manager waits until the order is on disk (`EventLog.persist`, 2 s limit). A change is written first too, at the larger size (MODIFY_SENDING, audit only).
+    - **Disk failing, behind, or unconfirmed:** the order is not sent and says why. Forced closes still go; cancels never wait.
+    - **Memory stays bounded:** notes past `max_backlog` are dropped and counted, while order events are always kept.
+    - **A band at any hour:** an "audit log" band shows the problem, and it clears itself once the log writes again.
+    - **Backtests skip it,** because they never send a real order.
+  - **Checks:** 12 tests; mutation 12/12 after one test gap; a real kill -9 drill on the demo passed (the order is known after the crash and its id isn't reused; `context/evidence/h-265-crash-drill.txt`).

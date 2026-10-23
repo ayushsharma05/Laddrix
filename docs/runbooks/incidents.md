@@ -251,3 +251,24 @@ limits are watched …".
 3. "What the MTM limits did today can't be read" means auto-close is held for today (it can't
    know whether it already closed). Check positions and orders by hand; tomorrow it starts
    fresh.
+
+## The audit log can't write (#265)
+
+**You see:** a red band "the audit log can't write to events.db (…): new orders are refused
+until it writes again (cancels and forced closes still go). Check the disk." Or "the audit
+log has fallen behind (N events waiting)". New orders come back refused with "not sent: it
+couldn't be recorded on disk first (…)".
+
+**Why:** every order is written to disk **before** it is sent, so that after any crash
+MockTrade still knows it and never reuses its id. If the disk is full or broken, or writing
+has stalled, MockTrade refuses new orders rather than send ones it couldn't record.
+
+1. **Cancels always work.** Flatten and the other forced closes still go, because they only
+   reduce risk; they are logged as sent without a record on disk.
+2. **Check the disk:** `df -h /data` on the server (or the disk alert band). Free space by
+   removing old backups or recorded ticks (`data/ticks/`).
+3. **It recovers by itself:** writes are retried, nothing queued is lost, and the band clears
+   once writing works again. Then new orders are accepted.
+4. **If the server must be restarted meanwhile,** whatever was still waiting in memory may be
+   lost. Orders already sent were written first, and the broker's own order book settles the
+   rest at start (recovery).

@@ -1,0 +1,3 @@
+1. placed D2610231, then the server was killed (kill -9)
+2. after the restart, orders known: {'D2610231': ('CANCELLED', 'NONE')}; the next order got: D2610232
+PASS: D2610231 is known after the crash, and its id was not given out again
