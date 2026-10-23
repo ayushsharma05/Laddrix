@@ -504,3 +504,8 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Found and fixed:** an order id reused with different details was answered with the old order (the caller would believe the new one was sent): now refused with 409, an identical retry still never places twice. **New check:** 24 private paths and path tricks against a real server never serve planted secrets; the screens and desktop sources hold no server secret; no `.env`, key, token or database is tracked in git.
   - **Gaps as child issues:** #363 step-up auth + own session list, #364 key rotation + compromised-credential drill, #365 supply chain (pip-audit, SBOM, pins, signing), #366 permission re-check before delayed actions + limit races, #367 classification/redaction/retention, #368 multi-tenant (blocked on #278), #369 independent review + pen test (Ayush to arrange).
   - **Kept open:** #279 by its own terms, until the evidence is reviewed.
+
+- 23 Oct, #279 first part merged (PR #370); all 9 trading issues done (#279 stays open by design, children #363-#369).
+  - **Ayush asked:** what he has to do, and why the app looks simple if it's production level.
+  - **Explained:** simple to read on purpose; the size is in the number of safety pieces and tests; the code is production-grade but live trading still needs the go-live steps, time running live and a security review.
+  - **Ayush decided:** MockTrade will be offered to other firms (#278 commented; #368 unblocked); go-live later; the algo-id field not now; he will arrange #369.
