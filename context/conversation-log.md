@@ -614,3 +614,8 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - tidy the repo: archive the NG/CME material without losing any design or future-feature information;
   - leave only well-written feature issues, plus one issue listing Ayush's own to-dos;
   - write one document on running everything locally.
+- 23 Oct, night. **#271 fixed:** a user's webhook connects only to the address that was checked.
+  - **Before:** the server looked the host up to check it, then httpx looked it up again to connect. A host could answer a public address the first time and a private one the second ("DNS rebinding").
+  - **Now:** each try looks up, checks every answer, then connects to that exact address, with TLS still checked against the host name (SNI).
+  - **Also:** no redirects, no proxy, no reused connections; IPv4-in-IPv6 and global multicast refused; at most 500 waiting and 20 connecting; the operator's alert webhook bounded too.
+  - **Tests:** 21 in `tests/test_webhook_pinning.py`, including a real local TLS server: the right name is accepted and a wrong name for the same address is refused. Mutation 17/17.

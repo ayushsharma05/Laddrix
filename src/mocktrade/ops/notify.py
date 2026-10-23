@@ -2,7 +2,11 @@
 service that relays to a phone). Configure MOCKTRADE_ALERT_WEBHOOK; leave it empty for none.
 
 Only WARN and ERROR alerts, and their all-clears, are sent. Sending never blocks or breaks
-trading: it runs in the background with a short timeout, and failures are only logged.
+trading: it runs in the background with a short timeout, and failures are only logged. At most
+MAX_PENDING sends wait at once; more are dropped and logged (#271).
+
+The address is the operator's own setting, not a user's, so it is trusted as given; users'
+webhooks go through alerts/webhook.py, which checks every address it connects to.
 """
 
 import asyncio
@@ -13,6 +17,7 @@ import httpx
 from mocktrade.ops.alerts import Alert
 
 log = logging.getLogger(__name__)
+MAX_PENDING = 100
 
 
 class WebhookNotifier:
@@ -34,6 +39,9 @@ class WebhookNotifier:
             self._sent.add(alert.key)
         else:
             self._sent.discard(alert.key)
+        if len(self._tasks) >= MAX_PENDING:
+            log.warning("alert webhook: %d sends waiting, this one dropped", len(self._tasks))
+            return
         icon = {"ERROR": "🔴", "WARN": "🟠", "OK": "🟢"}.get(alert.level, "")
         text = f"{icon} {self._name}: {alert.text}"
         task = asyncio.ensure_future(
