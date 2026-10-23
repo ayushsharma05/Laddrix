@@ -22,6 +22,8 @@ Settings (environment; secrets never on the command line):
                                           replay, backtests); 0 turns recording off
     MOCKTRADE_CHARGES          (built in) a charge schedule (JSON, charges/schedules.py) to use
                                           instead of the built-in rates, e.g. after a budget
+    MOCKTRADE_ALGO_IDS         (none)     exchange algo ids, once an algo is registered
+                                          (SEBI, above 10 orders a second): SLICER=AB123,...
     MOCKTRADE_ALERT_WEBHOOK    (none)     https:// address that gets WARN/ERROR alerts as
                                           JSON {"text": ...} (Slack, ntfy, Google Chat...)
     KITE_API_KEY, KITE_API_SECRET         the Kite Connect app (kite mode). One account with
@@ -57,6 +59,7 @@ from fastapi import FastAPI
 
 from mocktrade.alerts.service import build_market_alerts
 from mocktrade.algos.builtin import BUILTIN
+from mocktrade.algos.engine import parse_algo_ids, with_exchange_ids
 from mocktrade.broker.kite.http import BASE_URL
 from mocktrade.broker.kite.instruments import BROKER as KITE
 from mocktrade.broker.kite.live import KiteLive
@@ -116,6 +119,7 @@ class ServeSettings:
     paper_funds_paise: int = 10_00_000_00  # each paper account's starting balance
     charges_file: Path | None = None  # a charge schedule (JSON) instead of the built-in one
     record_days: int = 30  # keep this many days of recorded ticks (0: don't record)
+    algo_ids: tuple[tuple[str, str], ...] = ()  # exchange algo ids per algo code (#291)
 
     def kite_url(self, name: str, default: str) -> str:
         """KITE_API_URL / KITE_WS_URL: only to point at a Kite simulator (load tests)."""
@@ -193,6 +197,14 @@ class ServeSettings:
                 load_schedule(charges_text)
             except (OSError, ValueError) as exc:
                 problems.append(f"MOCKTRADE_CHARGES: {exc}")
+        algo_ids: dict[str, str] = {}
+        try:
+            algo_ids = parse_algo_ids(env.get("MOCKTRADE_ALGO_IDS", ""))
+        except ValueError as exc:
+            problems.append(str(exc))
+        unknown = sorted(set(algo_ids) - {t.spec.code for t in BUILTIN})
+        if unknown:
+            problems.append(f"MOCKTRADE_ALGO_IDS: no algo called {', '.join(unknown)}")
         if problems:
             raise ConfigError("; ".join(problems))
         return cls(
@@ -210,6 +222,7 @@ class ServeSettings:
             paper_funds_paise=int(funds_text) * 100,
             charges_file=Path(charges_text) if charges_text else None,
             record_days=int(record_text) if record_text.isdigit() else 30,
+            algo_ids=tuple(sorted(algo_ids.items())),
         )
 
 
@@ -305,7 +318,8 @@ def build(settings: ServeSettings) -> Assembly:
         else:
             return f"{account.broker} accounts need MOCKTRADE_PRICES=kite"
         platform.add_account(
-            account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN,
+            account, broker, ids=ids, auto_kill_on_loss=True,
+            algo_types=tuple(with_exchange_ids(BUILTIN, dict(settings.algo_ids))),
             recover_on_start=True,  # no new orders until rebuilt and checked (recovery.py)
             margin_check=True,  # refuse what the funds can't carry (risk/margin.py; fails open)
             rules_dir=settings.data_dir / "rules",  # the trader's MTM limits survive a restart

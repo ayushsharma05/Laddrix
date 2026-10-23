@@ -16,8 +16,10 @@ pause ─► pull working children        stop / kill switch ─► pull every c
   limits, default, help). The algo screen draws its form from it and the engine checks values
   against the same description (backend provides, frontend displays). Unknown settings are
   refused.
-- **AlgoType**: spec + factory + the exchange's algo id once empanelled (SEBI framework). Until
-  then children carry no exchange id; they are marked as algo orders by `parent_id`.
+- **AlgoType**: spec + factory + the exchange's algo id once registered (SEBI framework; set
+  with `MOCKTRADE_ALGO_IDS`). Its children carry it (`algo_id`); without one they are marked
+  as algo orders by `parent_id`, and the algo can't start if the account may send more than
+  10 orders a second ([compliance.md](compliance.md#the-exchange-algo-id), #291).
 
 ## Rules (each guards against a real failure)
 | Trap | Rule |

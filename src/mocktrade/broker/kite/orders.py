@@ -84,7 +84,9 @@ def place_params(request: OrderRequest) -> dict[str, Any]:
     if request.market_protection is not None:
         params["market_protection"] = str(request.market_protection)
     if request.algo_id is not None:
-        params["algo_id"] = request.algo_id  # the exchange-issued algo id
+        # the exchange-issued algo id. Kite's public docs name no field for it (checked 23 Oct
+        # 2026): confirm the name with Zerodha before an id is set (docs/design/compliance.md)
+        params["algo_id"] = request.algo_id
     return {k: v for k, v in params.items() if v is not None}
 
 
