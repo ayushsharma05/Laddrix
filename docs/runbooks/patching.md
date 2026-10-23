@@ -10,7 +10,7 @@ flaw in any of them is a flaw in MockTrade. This page says who fixes what, and b
 | --- | --- | --- |
 | Python packages | `pip-audit` on `requirements.lock` in every CI run | the **supply-chain** job turns red |
 | Screens and desktop app | `npm audit --audit-level=high` in every CI run | the **ui** / **desktop** job turns red |
-| Everything above + base images + CI actions | Dependabot (`.github/dependabot.yml`): weekly update PRs, security fixes at once | a PR from Dependabot |
+| Everything above + base images + CI actions | Dependabot (`.github/dependabot.yml`): one grouped PR a week per folder with the minor and patch updates (#392) | a PR from Dependabot |
 | Secrets committed by mistake | `gitleaks` over the whole history in every CI run | the **supply-chain** job turns red |
 
 A red job on `main` with no code change of ours means a new advisory was published for
@@ -36,6 +36,13 @@ feature turned off) in the decision log, and look again daily.
 Still patch within the time, because "we never call it" is easy to get wrong. If no patched
 version exists, record it in an ignore entry with the advisory id, the reason and a date to look
 again. An ignore without a date is not allowed.
+
+## Major versions
+
+Dependabot never proposes a major version (React 19→20, Vite 7→8, Node 22→24...): each can change
+behaviour. Upgrade one on purpose: an issue, the upgrade notes read, the code changed where
+needed, and the release scenarios run. The exception is a security fix that only exists in a
+new major. CI's audits fail on it, and the times above apply.
 
 ## Updating a Python dependency
 

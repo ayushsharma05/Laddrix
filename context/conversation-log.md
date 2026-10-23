@@ -553,6 +553,10 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - `docs/design/data.md`: classes, retention (audit trail at least 5 years per SEBI's broker rules; the firm's compliance officer to confirm), no production data in development, what the chain does and doesn't protect against.
   - **The demo run caught** a bug the unit tests didn't: the filter broke the access log's formatting (it unpacks its parts itself). Fixed by cleaning each part in place, with a test.
   - **Checks:** 14 tests; mutation 27/27 (two survivors were test gaps, now covered; one was an equivalent mutant, and its dead code was removed); the demo run 7/7 (`context/evidence/h-367-data-drill.txt`).
+- 23 Oct, #367 merged (PR #391). **Dependabot's first run** (turned on by #365) opened 13 PRs (#378–#390).
+  - **Merged:** the three green minor/patch ones (#388, #389, #390).
+  - **Fixed in #392:** #386 (react without react-dom) broke the screens' tests. Updates are now grouped per folder (minor and patch together) and majors are never proposed, with a test pinning the rules.
+  - **Asked Ayush:** whether to close the majors (dockview 4→8, vite 7→8, TypeScript 5→7, @types/node, plugin-react, actions v7, Node 25, which isn't long-term support), each to be upgraded deliberately in its own issue.
 - 23 Oct, **#368 designed before coding** (`docs/design/tenancy.md`).
   - **Workspaces:** each user and broker account belongs to one workspace. Today's admin becomes a workspace admin. The platform operator is not a web role at all: terminal only.
   - **The one rule:** anything in another workspace answers 404.

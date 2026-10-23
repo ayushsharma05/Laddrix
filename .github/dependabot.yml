@@ -1,19 +1,49 @@
-# Weekly update proposals for everything we depend on (#365, docs/runbooks/patching.md).
-# Security fixes arrive as soon as they are published, whatever the schedule.
+# Update proposals for everything we depend on (#365, #392, docs/runbooks/patching.md).
+#
+# - Minor and patch updates of each folder come as ONE grouped PR a week: packages that must
+#   move together (react and react-dom) always do, and there is one PR to check, not ten.
+# - Major versions are never proposed: each can change behaviour, so it is upgraded on
+#   purpose, in its own issue. A security fix that only exists in a new major still reaches
+#   us: pip-audit and npm audit fail CI, and patching.md sets how fast it is fixed.
+# - Base images and CI actions: the same rule. The language images (Python, Node) also stay on
+#   their minor line: a new Python or Node release is an upgrade, not a weekly bump.
 version: 2
 updates:
   - package-ecosystem: pip
     directory: "/"
     schedule: { interval: weekly }
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
   - package-ecosystem: npm
     directory: "/ui"
     schedule: { interval: weekly }
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
   - package-ecosystem: npm
     directory: "/ui/desktop"
     schedule: { interval: weekly }
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: "/"
     schedule: { interval: weekly }
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
   - package-ecosystem: docker
     directory: "/"
     schedule: { interval: weekly }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major, version-update:semver-minor]
