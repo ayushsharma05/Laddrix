@@ -299,3 +299,24 @@ so memory stays bounded.
 1. It clears by itself at the next check with no new drops.
 2. If it keeps showing: too many algos or instruments for this machine. Stop some algos,
    watch fewer instruments, or move to a bigger server (`/api/metrics` shows the load).
+
+## An order's fills don't match the broker's trades (#352)
+
+**What you see:** the audit trail has TRADES_DIFFER ("order MT… : MockTrade has 150 filled,
+the broker's trades 100"), or a CORRECTED row ("the broker's trade list corrected what its
+fills traded for by +₹0.50").
+
+**What it means:**
+- **CORRECTED:** the quantities agree, but the value didn't. The broker's trades are the
+  authority, so the order was corrected and positions and charges followed. Nothing to do.
+- **TRADES_DIFFER:** the quantities differ on two reads in a row. MockTrade changes nothing by
+  itself.
+
+**Steps:**
+1. Open the order's audit history (double-click it) and the broker's tradebook (Kite web →
+   Orders → Trades) for that order.
+2. If the broker has *more* filled: an order update was missed. Reconcile (Positions → the
+   broker state) brings the order in line; check the position matches the broker.
+3. If the broker has *less*: a trade was busted (cancelled by the exchange). Tell the broker
+   desk; the position follows once the order list says so.
+4. Note the order id and what you did in the day's log.

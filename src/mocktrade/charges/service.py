@@ -70,8 +70,10 @@ class ChargesService:
         return lambda: self._listeners.remove(listener)
 
     def on_order_event(self, event: OrderEvent) -> None:
-        """Order manager listener: a fill changes the day's charges."""
-        if event.kind is not EventKind.FILL or event.account_id != self.account_id:
+        """Order manager listener: a fill, or a corrected value (#352), changes the charges."""
+        if event.kind not in (EventKind.FILL, EventKind.CORRECTED):
+            return
+        if event.account_id != self.account_id:
             return
         self.refresh()
 

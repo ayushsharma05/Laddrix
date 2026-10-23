@@ -462,3 +462,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **The fix:** the exact average is kept; each order carries its exact traded value; a fill worked out from averages keeps its exact value; a correction is a CORRECTED event that moves the position's cost (still held) or realised P&L (closed); the audit trail and recovery read corrections back.
   - **Decided:** split #275; the trade-id ledger and reconciling against the broker's trade list is #352.
   - **Checks:** 10 tests; mutation 12/12 (the first run left 3 alive and showed two missing cases: one update covering two prices, and an unknown status; added).
+- 23 Oct, #275 part 1 merged (PR #353). **#352 done** (orders against the broker's trade list).
+  - **The gap:** nothing compared orders with the broker's tradebook: a value from a rounded average stayed off, and a fill the order updates missed was invisible.
+  - **The fix:** `orders/trade_check.py` on each trade list (and each fill): trades summed per order, each trade id once; same qty and a different value → the trades win (CORRECTED, positions and charges follow); a different qty on two reads in a row → TRADES_DIFFER in the audit trail, once, nothing changed by itself. Charges now use the exact value and follow corrections. Runbook entry added.
+  - **Checks:** 7 tests; mutation 8/8 (the first run found one redundant condition, removed, and two missing tests, added).

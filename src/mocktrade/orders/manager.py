@@ -583,6 +583,24 @@ class OrderManager:
                               f"{format_rupees(order.avg_price_paise)}")  # fmt: skip
         return True
 
+    def correct_value(self, client_order_id: str, value_paise: int, source: str) -> str | None:
+        """What an order's fills traded for, from an authority (the broker's trade list,
+        #352): the difference is a CORRECTED event, positions follow. Returns it in words;
+        None when nothing changes (unknown order, nothing filled, the same value)."""
+        order = self._orders.get(client_order_id)
+        if order is None or not order.filled_qty or value_paise == order.filled_value_paise:
+            return None
+        delta = value_paise - order.filled_value_paise
+        order.filled_value_paise = value_paise
+        order.avg_price_paise = round(Fraction(value_paise, order.filled_qty))
+        self._touch(order)
+        sign = "+" if delta > 0 else ""
+        words = (f"{source} corrected what its fills traded for by {sign}{format_rupees(delta)} "
+                 f"(average now {format_rupees(order.avg_price_paise)})")  # fmt: skip
+        self._emit(EventKind.CORRECTED, order, fill=Fill(client_order_id, 0, 0, False, delta),
+                   detail=words)  # fmt: skip
+        return f"order {client_order_id}: {words}"
+
     @staticmethod
     def _broker_terms(order: _Order, update: OrderUpdate, current: bool) -> OrderRequest | None:
         """The order's request with the broker's terms, when the update gives them and they
