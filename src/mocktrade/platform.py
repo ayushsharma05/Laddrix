@@ -40,6 +40,7 @@ from mocktrade.orders.model import ClientIds, EventKind
 from mocktrade.orders.trade_check import TradeCheck
 from mocktrade.portfolio.service import PortfolioService
 from mocktrade.positions.book import PositionBook
+from mocktrade.positions.external import ADOPTED, ExternalTrades
 from mocktrade.positions.reconcile import PositionReconciler
 from mocktrade.recovery import IST, RecoveryGate, recover, recover_until_done, session_start
 from mocktrade.refdata.expiry import Expiries, ExpiryRules
@@ -111,6 +112,7 @@ class AccountRuntime:
     squareoff: SquareOff | None = None  # intraday positions before the broker's cut-off
     flatten: Flatten | None = None  # closing positions on purpose, STOP or not (#262)
     trade_check: TradeCheck | None = None  # orders against the broker's trade list (#352)
+    external: ExternalTrades | None = None  # trades made outside MockTrade (#355)
     session_day: date | None = None  # the trading day its positions and limits are for (#266)
 
     def apply_limits(self, limits: RiskLimits) -> None:
@@ -304,6 +306,23 @@ class Platform:
         portfolio.subscribe(on_snapshot)
         orders.subscribe(on_fill)
         return check
+
+    def _external(self, account_id: str, book: PositionBook, broker: Broker,
+                  reconciler: PositionReconciler, portfolio) -> ExternalTrades | None:  # fmt: skip
+        """Resolving a mismatch caused by trades made outside MockTrade (#355): needs the
+        broker's trade list and the audit trail (who adopted what, and after a restart)."""
+        log_ = self.event_log
+        if log_ is None or not portfolio.offers("trades"):
+            return None
+
+        def adopted_ids() -> set[str]:
+            return {str(e.extra.get("trade_id")) for e in log_.notes(account_id, [ADOPTED])}
+
+        return ExternalTrades(
+            account_id, book, broker,
+            note=lambda k, d, x: log_.record_note(k, account_id, d, x),
+            adopted_ids=adopted_ids, recheck=reconciler.check,
+        )  # fmt: skip
 
     def last_price(self, instrument_id: str) -> int | None:
         tick = self.market_data.latest(instrument_id)
@@ -682,6 +701,7 @@ class Platform:
             squareoff,
             flatten,
             trade_check=trade_check,
+            external=self._external(account.id, book, broker, reconciler, portfolio),
         )
         self.accounts[account.id] = runtime
         runtime.session_day = clock().astimezone(IST).date()  # a start rebuilds today (recovery)
