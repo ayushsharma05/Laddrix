@@ -89,3 +89,20 @@ def test_the_desktop_app_has_no_unsigned_update_path():
         text = path.read_text()
         assert "autoUpdater" not in text and "electron-updater" not in text, path
     assert "publish" not in (ROOT / "ui/desktop/electron-builder.yml").read_text()
+
+
+def test_update_proposals_are_grouped_and_never_major():
+    """#392: react without react-dom broke the screens; majors arrived unasked."""
+    import yaml
+
+    config = yaml.safe_load((ROOT / ".github/dependabot.yml").read_text())
+    folders = {(u["package-ecosystem"], u["directory"]) for u in config["updates"]}
+    assert folders == {("pip", "/"), ("npm", "/ui"), ("npm", "/ui/desktop"),
+                       ("github-actions", "/"), ("docker", "/")}  # fmt: skip
+    for update in config["updates"]:
+        ignored = {t for rule in update.get("ignore", []) if rule["dependency-name"] == "*"
+                   for t in rule["update-types"]}  # fmt: skip
+        assert "version-update:semver-major" in ignored, update["package-ecosystem"]
+        if update["package-ecosystem"] != "docker":  # one image line: nothing to group
+            groups = update["groups"].values()
+            assert any(set(g["update-types"]) == {"minor", "patch"} for g in groups)
