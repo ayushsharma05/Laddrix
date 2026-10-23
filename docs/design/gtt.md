@@ -59,3 +59,19 @@ the API answers 404 "… doesn't hold GTT orders", so screens hide it.
   broker publishes a GTT spec.
 - **Algo screen**: the picker is grouped by the spec's `family`; protection algos carry a
   "held" tag (held by MockTrade, unlike a GTT).
+
+## While trading is stopped (#276)
+
+A kill switch (the account's or the firm's) can't stop the broker: it holds each GTT and
+places its order without asking us. So STOP sweeps the GTTs, at once and then on every poll:
+
+```
+ every leg only reduces the position in its product ─► kept (a stop-loss still protects)
+ any leg could open or add                          ─► deleted at the broker (GTT_STOPPED)
+ the delete fails or gets no answer                 ─► said (GTT_STOP_UNCLEAR); tried again
+ one fires anyway and its order would add risk      ─► that order cancelled (GTT_FIRED_IN_STOP)
+```
+
+A position closed after STOP (Flatten) turns its stop-losses into opening orders: the next
+sweep deletes them. Without STOP nothing is swept: a GTT may open a position on purpose.
+Code: `GttService.sweep`, `GttService._fired_in_stop` (`orders/gtt.py`).

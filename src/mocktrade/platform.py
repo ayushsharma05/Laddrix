@@ -595,7 +595,26 @@ class Platform:
             gtt = GttService(
                 account.id, broker, orders, risk, self.instruments.get, self.market_data.latest,
                 audit=gtt_audit, clock=clock,
+                stopped=lambda: next((s.state.reason or s.name for s in (self.firm_switch, switch)
+                                      if s.engaged), None),
+                position=book.qty,
             )  # fmt: skip
+            sweeps: set[asyncio.Task] = set()
+
+            def sweep_now(_name: str, state, gtt=gtt) -> None:
+                """STOP: broker-held GTTs that could open a position go now (#276), not at
+                the next poll."""
+                if not state.engaged:
+                    return
+                try:
+                    task = asyncio.get_running_loop().create_task(gtt.sweep())
+                except RuntimeError:  # no loop (a test without one): the next poll sweeps
+                    return
+                sweeps.add(task)
+                task.add_done_callback(sweeps.discard)
+
+            switch.on_change(sweep_now)
+            self.firm_switch.on_change(sweep_now)
 
         def client_id_of(broker_order_id: str) -> str | None:
             view = orders.by_broker_id(broker_order_id)

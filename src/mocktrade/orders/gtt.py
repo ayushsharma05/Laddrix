@@ -12,6 +12,19 @@
 What a GTT can't do: the risk checks run when it is placed, not when it fires (the broker
 places that order without asking us). Its legs are small, closing orders by design, and
 the position limits and kill switches still apply to everything else.
+
+While a kill switch is on (STOP, #276), each refresh also sweeps the GTTs:
+
+    every leg only reduces the position in its product ─► kept (a stop-loss still protects)
+    any leg could open or add                          ─► deleted at the broker (GTT_STOPPED);
+                                                          an unclear delete is said
+                                                          (GTT_STOP_UNCLEAR) and tried again
+                                                          on the next refresh
+    one fired anyway, and its order would add risk     ─► that order is cancelled at once
+                                                          (GTT_FIRED_IN_STOP)
+
+A position closed after STOP (Flatten) turns its protective GTTs into opening ones: the next
+sweep deletes them.
 """
 
 import asyncio
@@ -59,7 +72,11 @@ class GttService:
         audit: Callable[[str, str, dict], None] | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         poll_s: float = POLL_S,
+        stopped: Callable[[], str | None] = lambda: None,  # why trading is stopped, if it is
+        position: Callable[[str, Product], int] = lambda _i, _p: 0,  # qty in one product
     ) -> None:
+        self._stopped = stopped
+        self._position = position
         self.account_id = account_id
         self._broker = broker
         self._orders = orders
@@ -157,7 +174,8 @@ class GttService:
                 continue
             theirs = replace(theirs, updated_at=self._clock())
             if theirs.status is GttStatus.TRIGGERED and theirs.order_id:
-                self._adopt(theirs)
+                adopted = self._adopt(theirs)
+                await self._fired_in_stop(theirs, adopted)
             if ours is None:
                 self._changed(theirs, "GTT_FOUND", f"GTT {theirs.gtt_id} at the broker: "
                               f"{theirs.status.value}, {_words(theirs.request)}")  # fmt: skip
@@ -169,6 +187,59 @@ class GttService:
                 if theirs.reason:
                     detail += f" ({theirs.reason})"
                 self._changed(theirs, kind, detail)
+        await self.sweep()
+
+    # --- STOP (#276) ------------------------------------------------------------------------------
+
+    def protective(self, view: GttView) -> bool:
+        """Every leg only reduces the position it is for (in its product), now."""
+        held = self._position(view.request.instrument_id, view.request.product)
+        return all(_reduces(leg, held) for leg in view.request.legs)
+
+    async def sweep(self) -> "list[str]":  # (`list` here is the method above)
+        """While trading is stopped: delete each active GTT that could open or add a position
+        (see the module notes). Returns what it did, in words."""
+        why = self._stopped()
+        if why is None:
+            return []
+        done = []
+        for view in list(self._gtts.values()):
+            if view.status is not GttStatus.ACTIVE or self.protective(view):
+                continue
+            try:
+                await self._broker.delete_gtt(view.gtt_id)
+            except Exception as exc:  # refused or no answer: it may still be live; say so
+                reason = exc.reason if isinstance(exc, BrokerError) else type(exc).__name__
+                words = (f"GTT {view.gtt_id} could open a position while trading is stopped, "
+                         f"and deleting it failed ({reason}): trying again")  # fmt: skip
+                self._changed(replace(view, reason=words), "GTT_STOP_UNCLEAR", words)
+                done.append(words)
+                continue
+            words = (f"GTT {view.gtt_id} deleted: trading is stopped ({why}) and it could open "
+                     "a position")  # fmt: skip
+            self._changed(replace(view, status=GttStatus.DELETED, updated_at=self._clock(),
+                                  reason=words), "GTT_STOPPED", words)  # fmt: skip
+            done.append(words)
+        return done
+
+    async def _fired_in_stop(self, view: GttView, adopted) -> None:
+        """A GTT fired while trading is stopped: its order stays only if it reduces."""
+        why = self._stopped()
+        if why is None or view.fired_leg is None:
+            return
+        leg = view.request.legs[view.fired_leg]
+        if _reduces(leg, self._position(view.request.instrument_id, view.request.product)):
+            return  # a stop-loss or target doing its job
+        words = (f"GTT {view.gtt_id} fired while trading is stopped ({why}): its order "
+                 f"{adopted.client_order_id} would add risk, so it is being cancelled")  # fmt: skip
+        try:
+            await self._orders.cancel(adopted.client_order_id)
+        except Exception as exc:  # e.g. already filled: say so, a person must look
+            words = (f"GTT {view.gtt_id} fired while trading is stopped ({why}); cancelling "
+                     f"its order {adopted.client_order_id} failed: {exc}")  # fmt: skip
+        if self._audit is not None:
+            self._audit("GTT_FIRED_IN_STOP", words, {"gtt_id": view.gtt_id,
+                        "client_order_id": adopted.client_order_id})  # fmt: skip
 
     async def run(self) -> None:
         """Poll the broker's GTTs until cancelled. A broker that can't be asked yet (Kite
@@ -221,14 +292,15 @@ class GttService:
             raise GttError(f"GTT {gtt_id} is {view.status.value}: it can't be changed")
         return view
 
-    def _adopt(self, view: GttView) -> None:
+    def _adopt(self, view: GttView):
         assert view.order_id is not None and view.fired_leg is not None
         leg, r = view.request.legs[view.fired_leg], view.request
         order = OrderRequest(
             "", self.account_id, r.user_id or "gtt", r.instrument_id, leg.side, leg.qty,
             OrderType.LIMIT, r.product, price_paise=leg.price_paise,
         )  # fmt: skip
-        self._orders.adopt(order, view.order_id, f"placed by the broker for GTT {view.gtt_id}")
+        return self._orders.adopt(order, view.order_id,
+                                  f"placed by the broker for GTT {view.gtt_id}")  # fmt: skip
 
     def _changed(self, view: GttView, kind: str, detail: str) -> None:
         self._gtts[view.gtt_id] = view
@@ -240,6 +312,11 @@ class GttService:
                 listener(view)
             except Exception:
                 log.exception("GTT listener failed")
+
+
+def _reduces(leg: GttLeg, held: int) -> bool:
+    """This leg only takes away from a position of `held` (+ long, - short)."""
+    return held != 0 and leg.side.sign == -(1 if held > 0 else -1) and leg.qty <= abs(held)
 
 
 def _words(r: GttRequest) -> str:

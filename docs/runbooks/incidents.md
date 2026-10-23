@@ -75,6 +75,12 @@ Kite's. The Recon light is red.
   were asked to cancel, any cancel that was refused (check those at the broker), any order
   the broker never answered (it is cancelled the moment the broker names it), how many algos
   stopped, and which positions are still open. The same lines go to Messages.
+- **GTTs at the broker** (#276): a GTT whose every leg only reduces the position (a
+  stop-loss or a target) is **kept**. Any GTT that could open or add is **deleted at the
+  broker** (audit: GTT_STOPPED). If a delete fails (GTT_STOP_UNCLEAR) it is tried again every
+  few seconds; if it keeps failing, delete it in the broker's app. One that fires anyway has its
+  order cancelled (GTT_FIRED_IN_STOP); if that cancel failed too, the message says so: check
+  the order at the broker. After Flatten, the closed position's stop-losses are deleted too.
 - **Positions are not closed for you.** To close them **without resuming**, press
   **Flatten (N)** in the red band, then **Confirm**. It closes with orders that can only
   reduce (never reverse), through the exit desk; nothing else gets through the stop. Pressing
