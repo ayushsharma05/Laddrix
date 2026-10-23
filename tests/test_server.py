@@ -686,6 +686,25 @@ async def test_instrument_search_and_detail(world):
     await c.aclose()
 
 
+@pytest.mark.real_expiry
+async def test_expiry_facts_come_with_instruments_and_order_specs(world):
+    """The screens' warnings come from the server (#290); an expired contract leaves search
+    but keeps its detail page (charts and recordings still find it by its id)."""
+    c = await world.logged_in()
+    expiries = world.platform.expiries
+    expiries._clock = lambda: datetime(2026, 10, 27, 5, 0, tzinfo=UTC)  # 10:30 on expiry day
+    detail = (await c.get(f"/api/instruments/{FUT}")).json()
+    assert detail["expiry_info"]["expires_today"] is True
+    assert detail["expiry_info"]["settlement"] == "cash"
+    spec = (await c.get(f"/api/accounts/acc-ayush/instruments/{FUT}/order-spec")).json()
+    assert spec["expiry"] == detail["expiry_info"]
+    expiries._clock = lambda: datetime(2026, 10, 27, 10, 0, tzinfo=UTC)  # 15:30: it has ended
+    assert (await c.get("/api/instruments", params={"q": "nifty"})).json() == []
+    detail = (await c.get(f"/api/instruments/{FUT}")).json()
+    assert detail["expiry_info"]["expired"] is True
+    await c.aclose()
+
+
 async def test_volume_at_price(world):
     c = await world.logged_in()
     md = world.platform.market_data

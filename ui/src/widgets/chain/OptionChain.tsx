@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChainRow, OptionChain as Chain } from "../../api/types";
 import { useApp } from "../../app/context";
+import { ExpiryNote } from "../../components/ExpiryBadge";
 import { price } from "../../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
 import { cell, COLUMNS, expiryLabel, inTheMoney, maxOi, pickColumns, strikeText, type Column, type ColumnKey } from "./model";
@@ -143,6 +144,7 @@ export function OptionChain({ params, setParams, publish, open }: WidgetProps<Ch
           Columns ▾
         </button>
       </div>
+      <ExpiryNote info={chain?.expiry_info} />
       {picking && <ColumnPicker chosen={columns.map((c) => c.key)} onChange={(keys) => setParams({ columns: keys })} />}
       <div className="book-scroll" ref={grid} tabIndex={0} onKeyDown={onKey} aria-label="Option chain" role="grid">
         <div className="grid-head chain-head">

@@ -21,6 +21,7 @@ How MockTrade is built. Each doc is checked against the code; the diagrams' sour
 | [portfolio.md](portfolio.md), [charges.md](charges.md), [margin.md](margin.md), [mtm.md](mtm.md), [reports.md](reports.md) | Funds and holdings, charges, margin, MTM limits and square-off, end-of-day reports |
 | [charts.md](charts.md), [research.md](research.md) | Charts and alerts; recorded ticks, replay, backtests |
 | [admin.md](admin.md) | Users, roles, accounts and limits |
+| [expiry.md](expiry.md) | F&O expiry day: warnings, cut-offs, refusals, settlement, restarts |
 | [performance.md](performance.md) | Measured speed |
 
 Operations are in [`../runbooks/`](../runbooks/README.md), the test plan is in [`../test/`](../test/README.md), and decisions are in [`../adr/`](../adr/README.md).

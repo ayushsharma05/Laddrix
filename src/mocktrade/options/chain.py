@@ -26,6 +26,7 @@ from mocktrade.options.model import (
     option_quote,
     time_to_expiry,
 )
+from mocktrade.refdata.expiry import Expiries, expiry_to_dict
 from mocktrade.refdata.store import InstrumentStore
 
 K = InstrumentKind
@@ -55,6 +56,7 @@ class ChainService:
         self._rate = rate
         self._clock = clock
         self._first_oi: dict[InstrumentId, tuple[date, int]] = {}  # today's first OI
+        self._expiries = Expiries(store, clock=clock)  # expiry warnings (#290)
 
     # --- what is listed ---
 
@@ -62,14 +64,15 @@ class ChainService:
         return self._store.underlyings()
 
     def expiries(self, underlying: str) -> list[date]:
-        today = self._clock().astimezone(IST).date()
+        now = self._clock()  # an expiry has gone once its contracts expired at 15:30 (#290)
         return sorted(
             {
                 i.expiry
                 for i in self._store.derivatives(underlying)
-                if i.kind in (K.CALL, K.PUT) and i.expiry is not None and i.expiry >= today
+                if i.kind in (K.CALL, K.PUT) and i.expiry is not None
+                and not self._expiries.expired(i, now)
             }
-        )
+        )  # fmt: skip
 
     def _series(self, underlying: str, expiry: date) -> _Series:
         calls: dict[int, Instrument] = {}
@@ -136,9 +139,12 @@ class ChainService:
         atm_ivs = [
             leg["iv"] for leg in (atm_row or {}).values() if isinstance(leg, dict) and leg["iv"]
         ]
+        any_option = next(iter([*series.calls.values(), *series.puts.values()]), None)
+        expiry_info = self._expiries.info(any_option, now) if any_option else None
         return {
             "underlying": underlying,
             "expiry": expiry.isoformat(),
+            "expiry_info": expiry_to_dict(expiry_info),  # expires today? how it settles
             "forward_paise": round(forward) if forward else None,
             "atm_strike_paise": atm,
             "days_to_expiry": round(time_to_expiry(expiry, now) * 365, 2),

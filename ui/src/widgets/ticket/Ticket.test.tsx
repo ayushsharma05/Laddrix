@@ -116,6 +116,20 @@ describe("Order ticket", () => {
     expect(screen.getByRole("group", { name: "Order type" }).textContent).toBe("LMTMKT");
   });
 
+  it("warns on the contract's expiry day, in the server's words (#290)", async () => {
+    const note = "Expires today at 15:30 on 27 Oct 2026; settles in cash at the final settlement price";
+    const expiry = { expires_at: "2026-10-27T15:30:00+05:30", settlement: "cash" as const, expires_today: true, expired: false, opening_cutoff: null, opening_closed: false, note };
+    setup({}, { [`GET /api/accounts/acc-a/instruments/${encodeURIComponent(ID)}/order-spec`]: orderSpec(ID, { expiry }) });
+    await ready();
+    expect(screen.getByRole("note").textContent).toBe(note);
+  });
+
+  it("shows no expiry line on other days", async () => {
+    setup();
+    await ready();
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+
   it("starts at the last price and sends a limit order", async () => {
     const { calls } = setup();
     const price = await ready();

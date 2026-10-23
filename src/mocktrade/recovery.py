@@ -94,6 +94,7 @@ class RecoveryReport:
     fills: int = 0  # replayed
     carried: int = 0  # positions carried in from earlier days
     holdings: int = 0  # paper: delivery holdings from earlier days (not positions, as at Kite)
+    settled: int = 0  # paper: positions in contracts that expired since (#290)
     closed: list[str] = field(default_factory=list)  # paper orders closed (forgotten by it)
     problems: list[str] = field(default_factory=list)
 
@@ -105,6 +106,8 @@ class RecoveryReport:
         done = f"{self.orders} orders, {self.fills} fills, {self.carried} carried positions"
         if self.holdings:
             done += f", {self.holdings} holdings"
+        if self.settled:
+            done += f", {self.settled} expired positions settled"
         if self.closed:
             done += f"; {len(self.closed)} paper orders closed ({PAPER_GONE})"
         return done if self.ok else f"{'; '.join(self.problems)} ({done})"
@@ -120,9 +123,13 @@ async def recover(
     since: datetime,
     close: Callable[[InstrumentId], int | None] = lambda _i: None,
     latest: Callable[[InstrumentId], Tick | None] = lambda _i: None,
+    expired: Callable[[InstrumentId], bool] = lambda _i: False,
+    settlement: Callable[[InstrumentId], int | None] = lambda _i: None,
 ) -> RecoveryReport:
     """Rebuild one account (see the module notes). Raises BrokerError if the broker can't be
-    asked yet: nothing has been changed then, so it can simply be tried again."""
+    asked yet: nothing has been changed then, so it can simply be tried again.
+    `expired`: did this contract expire before today? Paper positions in it are settled at
+    `settlement` (its final settlement price; None: unknown, so at its average: no P&L)."""
     broker_positions = await broker.positions()
     broker_orders = await broker.orders()
     durable = getattr(broker, "durable", True)
@@ -152,6 +159,17 @@ async def recover(
             if e.ts < since and e.order is not None and e.fill is not None:
                 earlier.replay(e.client_order_id, e.order.request, e.order.filled_qty,
                                e.fill.qty, e.fill.price_paise)  # fmt: skip
+        for e in log_.notes(account_id, ["EXPIRY_SETTLED"]):  # settled at a day's roll
+            if e.ts < since:
+                x = e.extra
+                earlier.settle(x["instrument_id"], Product(x["product"]), int(x["price_paise"]))
+        for p in earlier.positions():  # expired while the server was down: settle them now
+            if p.qty and expired(p.instrument_id):
+                price = settlement(p.instrument_id)
+                earlier.settle(
+                    p.instrument_id, p.product, round(p.avg_price_paise) if price is None else price
+                )
+                report.settled += 1
         earlier_pnl = Fraction(earlier.realised_paise())
         for p in earlier.positions():
             if not p.qty:

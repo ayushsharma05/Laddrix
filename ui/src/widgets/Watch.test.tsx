@@ -6,9 +6,9 @@ import { Watch, type WatchParams } from "./Watch";
 const NIFTY = { id: "NFO:NIFTY26OCTFUT", exchange: "NFO", symbol: "NIFTY26OCTFUT", kind: "FUT", tick_paise: 10, lot_size: 75, expiry: "2026-10-27", strike_paise: null, underlying: "NIFTY", tradable: true };
 const SBIN = { id: "NSE:SBIN", exchange: "NSE", symbol: "SBIN", kind: "EQ", tick_paise: 5, lot_size: 1, expiry: null, strike_paise: null, underlying: null, tradable: true };
 
-function setup(items: string[]) {
+function setup(items: string[], nifty: object = NIFTY) {
   const server = fakeRest({
-    [`GET /api/instruments/${encodeURIComponent(NIFTY.id)}`]: NIFTY,
+    [`GET /api/instruments/${encodeURIComponent(NIFTY.id)}`]: nifty,
     [`GET /api/instruments/${encodeURIComponent(SBIN.id)}`]: SBIN,
     "GET /api/instruments": [SBIN],
   });
@@ -98,5 +98,30 @@ describe("Watch", () => {
     const option = await screen.findByRole("option", { name: /SBIN/ });
     fireEvent.mouseDown(option);
     expect(setParams).toHaveBeenCalledWith({ items: [NIFTY.id, SBIN.id] });
+  });
+
+  describe("expiry (#290)", () => {
+    const info = { expires_at: "2026-10-27T15:30:00+05:30", settlement: "cash", opening_cutoff: null, opening_closed: false };
+
+    it("tags a contract that expires today, with the server's words on hover", async () => {
+      const note = "Expires today at 15:30 on 27 Oct 2026; settles in cash at the final settlement price";
+      setup([NIFTY.id], { ...NIFTY, expiry_info: { ...info, expires_today: true, expired: false, note } });
+      const tag = await screen.findByLabelText("EXP TODAY");
+      expect(tag.textContent).toBe("EXP"); // short: the column is narrow
+      expect(tag.getAttribute("title")).toBe(note);
+    });
+
+    it("drops contracts that have expired, several at once, and keeps the rest", async () => {
+      const ended = { ...NIFTY, expiry_info: { ...info, expires_today: false, expired: true, note: "expired" } };
+      const { setParams } = setup([NIFTY.id, SBIN.id], ended);
+      await vi.waitFor(() => expect(setParams).toHaveBeenCalledWith({ items: [SBIN.id] }));
+    });
+
+    it("leaves shares and live contracts alone", async () => {
+      const { setParams } = setup([NIFTY.id, SBIN.id], { ...NIFTY, expiry_info: { ...info, expires_today: false, expired: false, note: "" } });
+      await screen.findByText("SBIN");
+      expect(screen.queryByLabelText("EXP TODAY")).toBeNull();
+      expect(setParams).not.toHaveBeenCalled();
+    });
   });
 });

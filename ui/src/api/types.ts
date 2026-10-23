@@ -79,6 +79,17 @@ export interface Position {
   updated_at: string | null;
 }
 
+/** A future's or option's expiry, as the server judges it now (#290; refdata/expiry.py). */
+export interface ExpiryInfo {
+  expires_at: string; // 15:30 India time on the expiry date
+  settlement: "cash" | "physical";
+  expires_today: boolean;
+  expired: boolean;
+  opening_cutoff: string | null; // from here, only closing trades
+  opening_closed: boolean;
+  note: string; // one sentence to show as it is
+}
+
 export interface Instrument {
   id: string;
   exchange: string;
@@ -91,6 +102,7 @@ export interface Instrument {
   underlying: string | null;
   tradable: boolean;
   ltp_paise?: number | null;
+  expiry_info?: ExpiryInfo | null; // null for shares and indices
 }
 
 export interface AccountSummary {
@@ -205,6 +217,7 @@ export interface OrderSpec {
   products: string[];
   auto_protection_pct: string; // decimal text, e.g. "2"
   max_modifications: number;
+  expiry?: ExpiryInfo | null; // F&O only: expires today? cut-off? (#290)
 }
 
 // --- algos (GET …/algo-specs, …/algos; stream "algo") -------------------------------------------
@@ -295,6 +308,7 @@ export interface OptionChain {
   forward_paise: number | null;
   atm_strike_paise: number | null;
   days_to_expiry: number;
+  expiry_info?: ExpiryInfo | null; // expires today? how it settles (#290)
   rate: number;
   pcr: number | null;
   max_pain_paise: number | null;

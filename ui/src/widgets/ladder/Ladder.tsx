@@ -14,6 +14,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { ApiError } from "../../api/rest";
 import type { Instrument, OrderView, Side, Tick } from "../../api/types";
 import { useApp, useInstrument, useKeyAction, useOrderSpec, useStore } from "../../app/context";
+import { ExpiryNote } from "../../components/ExpiryBadge";
 import { SearchBox } from "../../components/SearchBox";
 import { change, price, qty as fmtQty, rupees, shortName, shortVolume } from "../../lib/format";
 import { cancelBlock, tradingBlock } from "../../state/gate";
@@ -340,6 +341,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
         e.preventDefault();
       }}
     >
+      <ExpiryNote info={spec?.expiry} />
       <div className="ladder-head">
         <span className={`ladder-net ${net === null ? "" : net >= 0 ? "good" : "bad"}`}>
           {net === null ? "–" : change(tick!.ltp_paise, close)}

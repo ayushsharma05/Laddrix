@@ -5,6 +5,7 @@ live only here, as a two-way mapping per broker, so the rest of MockTrade only
 ever sees our ids ("NSE:RELIANCE").
 """
 
+from collections.abc import Callable
 from datetime import date
 from typing import Any
 
@@ -63,12 +64,18 @@ class InstrumentStore:
             if any(i.kind is not InstrumentKind.FUTURE for i in items.values())
         )
 
-    def search(self, text: str, limit: int = 20) -> list[Instrument]:
-        """Instruments whose symbol starts with `text` (case-insensitive), shortest first."""
+    def search(
+        self, text: str, limit: int = 20, keep: Callable[[Instrument], bool] | None = None
+    ) -> list[Instrument]:
+        """Instruments whose symbol starts with `text` (case-insensitive), shortest first;
+        only those `keep` accepts, when given (e.g. not expired, #290)."""
         needle = text.strip().upper()
         if not needle:
             return []
-        found = [i for i in self._by_id.values() if i.symbol.upper().startswith(needle)]
+        found = [
+            i for i in self._by_id.values()
+            if i.symbol.upper().startswith(needle) and (keep is None or keep(i))
+        ]  # fmt: skip
         found.sort(key=lambda i: (len(i.symbol), i.symbol, i.exchange.value))
         return found[:limit]
 

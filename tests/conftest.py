@@ -1,12 +1,34 @@
 """Shared test data: a few realistic instruments, users and accounts."""
 
 import os
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 
 from mocktrade.domain.accounts import BrokerAccount, Role, User
 from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
+from mocktrade.refdata.expiry import Expiries
+
+# The test contracts are dated October 2026 (NIFTY26OCTFUT expires 27 Oct 2026). Tests that
+# aren't about expiry, many of them on the real clock, see expiry as on 16 Oct 2026, so they
+# don't start failing once that date has passed. Tests about expiry (#290) mark themselves
+# `real_expiry` and use the time their own clock gives.
+EXPIRY_TESTS_AS_OF = datetime(2026, 10, 16, 4, 30, tzinfo=UTC)  # 10:00 India time
+
+
+@pytest.fixture(autouse=True)
+def _test_contracts_dont_expire(request, monkeypatch):
+    if request.node.get_closest_marker("real_expiry"):
+        return
+    info, expired_by = Expiries.info, Expiries.expired_by
+    monkeypatch.setattr(
+        Expiries, "info", lambda self, i, now=None: info(self, i, EXPIRY_TESTS_AS_OF)
+    )
+    monkeypatch.setattr(
+        Expiries,
+        "expired_by",
+        lambda self, day: expired_by(self, min(day, EXPIRY_TESTS_AS_OF.date())),
+    )
 
 
 @pytest.fixture

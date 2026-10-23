@@ -1865,3 +1865,31 @@ label.algo-field {
     padding: 3px 0;
   }
 }
+
+/* --- expiry warnings (#290): the server's words, components/ExpiryBadge.tsx --- */
+.expiry-tag {
+  display: inline-block;
+  margin-right: 6px; /* before the name: a narrow column cuts the name, not the warning */
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+  background: var(--warn-fill);
+  color: var(--warn-ink);
+}
+.expiry-tag.ended {
+  background: var(--bad-fill);
+  color: var(--bad-ink);
+}
+.expiry-note {
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--warn-fill);
+  color: var(--warn-ink);
+}
+.expiry-note.ended {
+  background: var(--bad-fill);
+  color: var(--bad-ink);
+}

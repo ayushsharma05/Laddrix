@@ -299,6 +299,14 @@ class PaperBroker:
             book.apply_fill(t.instrument_id, t.product, t.side, t.qty, t.price_paise)
         self._book = book
 
+    def settle_expired(
+        self, instrument_id: InstrumentId, product: Product, price_paise: int
+    ) -> int:
+        """The exchange settles an expired contract (#290): its position closes at the final
+        settlement price, as the platform's own book does. Delivery of shares for stock F&O
+        isn't simulated: paper settles those in cash too (docs/design/expiry.md)."""
+        return self._book.settle(instrument_id, product, price_paise)
+
     async def positions(self) -> list[BrokerPosition]:
         """One row per instrument and product, as Kite lists them (for reconciling)."""
         return [
