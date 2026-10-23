@@ -2,7 +2,7 @@
 #   docker build -t mocktrade .          (or: docker compose -f deploy/compose.yaml build)
 
 # --- 1. the screens --------------------------------------------------------------------------
-FROM node:22-slim AS screens
+FROM node:25-slim AS screens
 WORKDIR /ui
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci --no-audit --no-fund
