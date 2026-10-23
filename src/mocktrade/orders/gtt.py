@@ -74,7 +74,9 @@ class GttService:
         poll_s: float = POLL_S,
         stopped: Callable[[], str | None] = lambda: None,  # why trading is stopped, if it is
         position: Callable[[str, Product], int] = lambda _i, _p: 0,  # qty in one product
+        access: Callable[[str], str | None] = lambda _user_id: None,  # still may trade? (#366)
     ) -> None:
+        self._access = access
         self._stopped = stopped
         self._position = position
         self.account_id = account_id
@@ -197,14 +199,16 @@ class GttService:
         return all(_reduces(leg, held) for leg in view.request.legs)
 
     async def sweep(self) -> "list[str]":  # (`list` here is the method above)
-        """While trading is stopped: delete each active GTT that could open or add a position
-        (see the module notes). Returns what it did, in words."""
-        why = self._stopped()
-        if why is None:
-            return []
+        """While trading is stopped, or once its owner may no longer trade this account (#366):
+        delete each active GTT that could open or add a position (see the module notes).
+        Returns what it did, in words."""
+        stopped = self._stopped()
         done = []
         for view in list(self._gtts.values()):
             if view.status is not GttStatus.ACTIVE or self.protective(view):
+                continue
+            why = self._why_not(view, stopped)
+            if why is None:
                 continue
             try:
                 await self._broker.delete_gtt(view.gtt_id)
@@ -215,22 +219,29 @@ class GttService:
                 self._changed(replace(view, reason=words), "GTT_STOP_UNCLEAR", words)
                 done.append(words)
                 continue
-            words = (f"GTT {view.gtt_id} deleted: trading is stopped ({why}) and it could open "
-                     "a position")  # fmt: skip
+            words = f"GTT {view.gtt_id} deleted: {why} and it could open a position"
             self._changed(replace(view, status=GttStatus.DELETED, updated_at=self._clock(),
                                   reason=words), "GTT_STOPPED", words)  # fmt: skip
             done.append(words)
         return done
 
+    def _why_not(self, view: GttView, stopped: str | None) -> str | None:
+        """Why this GTT may not add risk now: trading stopped, or its owner lost the right."""
+        if stopped is not None:
+            return f"trading is stopped ({stopped})"
+        if who := self._access(view.request.user_id):
+            return f"its owner may no longer trade this account ({who})"
+        return None
+
     async def _fired_in_stop(self, view: GttView, adopted) -> None:
         """A GTT fired while trading is stopped: its order stays only if it reduces."""
-        why = self._stopped()
+        why = self._why_not(view, self._stopped())
         if why is None or view.fired_leg is None:
             return
         leg = view.request.legs[view.fired_leg]
         if _reduces(leg, self._position(view.request.instrument_id, view.request.product)):
             return  # a stop-loss or target doing its job
-        words = (f"GTT {view.gtt_id} fired while trading is stopped ({why}): its order "
+        words = (f"GTT {view.gtt_id} fired but {why}: its order "
                  f"{adopted.client_order_id} would add risk, so it is being cancelled")  # fmt: skip
         try:
             await self._orders.cancel(adopted.client_order_id)
