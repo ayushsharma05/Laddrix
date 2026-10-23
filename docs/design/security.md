@@ -64,7 +64,7 @@ the control.
 
 | # | Case | Today | Evidence / gap |
 | --- | --- | --- | --- |
-| 1 | Stolen session places orders | Sessions: httponly + SameSite=Strict + Secure cookie, 2 h idle / 12 h max, ended on logout, password change and disable; Origin checked on changes and on the stream | `test_server.py` (cookie, expiry, Origin); step-up for privileged changes: **#363** |
+| 1 | Stolen session places orders | Sessions: httponly + SameSite=Strict + Secure cookie, 2 h idle / 12 h max, ended on logout, password change and disable; Origin checked on changes and on the stream | `test_server.py` (cookie, expiry, Origin). **A stolen session can't loosen limits, add traders, reset logins or resume the firm** without a fresh authenticator code (5 min; wrong codes lock the user and end all their sessions); everyone sees and ends their own sessions (#363): `test_step_up.py` |
 | 2 | Brute force or credential stuffing | argon2id; TOTP mandatory for everyone; 5 failures → 15 min lock; per-address limit | `test_server.py` (lockout, same answer for any wrong part) |
 | 3 | Another user's account read or traded | default-deny per account, also on the stream; a missing account is the same answer as no access (404) | `test_server.py`, `test_ownership.py` (#270) |
 | 4 | Broker login callback replayed or swapped | `state` single-use, bound to the session's user + account, 10 min; the Zerodha user id must match the account | `app.py /kite/callback`, `daily_login.py` |
@@ -83,8 +83,8 @@ This is not certification: it only shows where each requirement area stands.
 
 | ASVS chapter | Status |
 | --- | --- |
-| V2 Authentication | argon2id, TOTP for all, lockout; step-up for sensitive changes: #363 |
-| V3 Session management | server-side sessions, rotation on login, timeouts, revocation (one user or everyone, live streams included, #364); a user's own session list: #363 |
+| V2 Authentication | argon2id, TOTP for all, lockout; a fresh code (step-up) for privileged changes, never for STOP, Flatten or cancels (#363) |
+| V3 Session management | server-side sessions, rotation on login, timeouts, revocation (one user or everyone, live streams included, #364); each user lists and ends their own sessions (device, address, times) (#363) |
 | V4 Access control | default-deny per account and on the stream (#270); delayed actions re-checked at the moment they act (#366) |
 | V5 Validation | strict request models (`_Strict`, field limits); path checks (#269) |
 | V6 Stored cryptography | Fernet (SecretBox) for the authenticator secrets in `users.db`. The broker's API secret is in `.env` and its daily tokens in owner-only files, not encrypted by MockTrade. Key rotation is all or nothing: `users rotate-key` (#364) |

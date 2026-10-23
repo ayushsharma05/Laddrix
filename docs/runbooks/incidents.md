@@ -385,7 +385,7 @@ below, `users` means
 
 | What leaked | Contain at once |
 | --- | --- |
-| **A session** (a laptop left logged in, a cookie copied) | `users revoke-sessions --user <id>`: their open screens close within 2 s, and logging in again needs the password **and** the authenticator. Then `users password <id>` (ends sessions too). |
+| **A session** (a laptop left logged in, a cookie copied) | The user can end it themselves: menu bar **Sessions** → **End**. A stolen session alone can't make privileged changes (they need a fresh code, #363). Or `users revoke-sessions --user <id>`: their open screens close within 2 s, and logging in again needs the password **and** the authenticator. Then `users password <id>` (ends sessions too). |
 | **A password and authenticator** (a phone and password both) | Admin screen: turn the user **off** (ends their sessions; their running algos stop and opening GTTs are deleted, #366). Then reset the password and the authenticator. |
 | **`MOCKTRADE_SECRET_KEY` or `deploy/.env`** | Everything below, including both rotations. Assume the attacker can open every authenticator secret in any copy of `users.db` they also have. |
 | **The Kite API secret** | Rotate it (below), then log every Kite account in again. |
