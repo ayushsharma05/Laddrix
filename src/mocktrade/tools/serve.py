@@ -80,6 +80,7 @@ from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.marketdata.service import MarketData
 from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
+from mocktrade.marketdata.sources import PriceSources
 from mocktrade.metrics import freeze_heap, watch_loop_lag
 from mocktrade.ops.alerts import Alerts
 from mocktrade.ops.checks import Checks, PriceOverload, audit_log
@@ -324,7 +325,9 @@ def build(settings: ServeSettings) -> Assembly:
 
     events = EventLog(settings.data_dir / "events.db")
     events.start()
-    platform = Platform(instruments, md, KillSwitch("firm"), events)
+    # each Kite account trades on its own subscription's prices, never another's (#395)
+    prices = PriceSources(md, per_account=kite is not None)
+    platform = Platform(instruments, md, KillSwitch("firm"), events, prices=prices)
     platform.access = trading_rights(users)  # re-checked at each order, algo child, GTT (#366)
     if settings.charges_file is not None:
         platform.charges_model = ScheduleCharges(load_schedule(settings.charges_file))
@@ -334,16 +337,31 @@ def build(settings: ServeSettings) -> Assembly:
     day = f"S{time.strftime('%y%m%d')}"
     ids = ClientIds(day, events.last_counter(day))  # one sequence for the day, all accounts
 
+    def own_kite(account: BrokerAccount) -> str | None:
+        """The Kite account a paper account fills against: its owner's own (#395)."""
+        mine = sorted(a.id for a in users.accounts()
+                      if a.broker == "kite" and a.owner_user_id == account.owner_user_id
+                      and a.workspace == account.workspace and prices.has_own(a.id))  # fmt: skip
+        return mine[0] if mine else None
+
     def start(account: BrokerAccount, limits: dict | None) -> str | None:
         """Run one account (at start, or an admin's new one); None, or why it can't run."""
         if account.broker == "paper":
+            if prices.per_account:
+                source = own_kite(account)
+                if source is None:
+                    return ("a paper account on a Kite server fills against its owner's own "
+                            "Kite prices: add their Kite account first")  # fmt: skip
+                prices.borrow(account.id, source)
             broker = PaperBroker(
-                md, instruments, name="paper", starting_paise=settings.paper_funds_paise
-            )
+                prices.of(account.id), instruments, name="paper",
+                starting_paise=settings.paper_funds_paise,
+            )  # fmt: skip
             broker.start()
             brokers.append(broker)
         elif account.broker == "kite" and kite is not None and account.id in kite_ready:
-            broker = kite.add_account(account)  # refuses orders until its daily login
+            broker = kite_brokers.pop(account.id, None) or kite.add_account(account)
+            prices.register(account.id, kite.prices_of(account.id))  # its own prices
         elif account.broker == "kite" and kite is not None:
             return "a Kite account starts after a restart (its app key in the settings first)"
         else:
@@ -360,7 +378,13 @@ def build(settings: ServeSettings) -> Assembly:
         return None
 
     kite_ready = {a.id for a in accounts if a.broker == "kite"}  # their apps were checked above
-    for account in accounts:
+    kite_brokers = {}  # every Kite account's own prices exist before a paper account needs them
+    if kite is not None:
+        for account in accounts:
+            if account.id in kite_ready:
+                kite_brokers[account.id] = kite.add_account(account)
+                prices.register(account.id, kite.prices_of(account.id))
+    for account in sorted(accounts, key=lambda a: a.broker != "kite"):  # Kite ones first
         why = start(account, users.account_limits(account.id))
         if why:
             not_running[account.id] = why

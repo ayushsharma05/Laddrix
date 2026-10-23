@@ -577,3 +577,13 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - this FastAPI wraps included routers, so the sweep had silently missed all 13 admin routes;
     - an empty body was refused before the workspace check;
     - "main" is the default, so creating users only as main's admin proved nothing.
+- 23 Oct, #394 merged (PR #400). **#395, first half:** each account trades on its own prices.
+  - **Before:** the first logged-in Kite account's ticker carried prices for everyone. Under Ayush's rule each trader sees only their own subscription.
+  - **Now:**
+    - `PriceSources`: each Kite account's ticker feeds its own MarketData.
+    - That account's risk checks, positions (the mark loop runs per source), algos, GTTs, MTM, recovery and expiry settlement read only its own source.
+    - A paper account fills on its owner's own Kite prices. With none it is refused, and never falls back to another's.
+    - Each screen's live prices are its owner's subscription's; someone with none gets none on a Kite server.
+    - The simulator and replays stay shared, being our own data.
+  - **Second half, next:** the server-wide features (chart, option chain, market alerts, movers, time and sales, the recorder, the stale-price check) still read the shared feed.
+  - **Checks:** 5 tests (two subscriptions with different prices for the same contract: each account is checked and marked on its own; each ticker feeds only its own; each screen gets only its own; serve's paper rule), mutation 11/11.

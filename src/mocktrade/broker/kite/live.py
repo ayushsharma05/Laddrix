@@ -4,8 +4,11 @@
                a saved token still valid today?   ─► go live
     login      the daily login from the screen     ─► go live, no restart
     go live    the token goes into the account's KiteHttp: its orders work
-               the first live account downloads today's instruments and carries PRICES
-               every live account's ticker carries its own ORDER updates
+               the first live account downloads today's instruments and carries the shared
+               PRICES (charts, option chains: per account in #395b)
+               every live account's ticker carries its own ORDER updates and its OWN PRICES
+               into its own MarketData (#395): that account's checks, algos, positions and
+               its owner's screens read only those, never another subscription's
     demand     a screen opens a contract ─► its token is subscribed at once (full mode)
     reconnect  order updates may have been missed ─► that account's orders are resynced
     6 AM       the token expires ─► orders refused ("log in to Kite"), ticker stopped;
@@ -54,6 +57,8 @@ class _Link:
     app: KiteSettings
     http: KiteHttp
     broker: KiteBroker
+    prices: MarketData  # this account's own subscription's prices (#395)
+    feed: KiteFeed  # its ticks, decoded into `prices`
     ticker: KiteTicker | None = None
     task: asyncio.Task | None = None
     expires: datetime | None = None
@@ -110,8 +115,15 @@ class KiteLive:
         app = self._apps(account)
         http = http_for(self._http_factory, app)  # its own IP when it has one (#372)
         broker = KiteBroker(http, kite_user_id=account.broker_client_id, account_id=account.id)
-        self._links[account.id] = _Link(account, app, http, broker)
+        prices = MarketData()
+        link = _Link(account, app, http, broker, prices, KiteFeed(self._store, prices))
+        prices.on_demand(lambda instrument_id, link=link: self._on_own_demand(link, instrument_id))
+        self._links[account.id] = link
         return broker
+
+    def prices_of(self, account_id: str) -> MarketData:
+        """This account's own prices (#395), fed only by its own ticker."""
+        return self._links[account_id].prices
 
     def status(self, account: BrokerAccount) -> str | None:
         link = self._links.get(account.id)
@@ -162,6 +174,9 @@ class KiteLive:
         )
         link.task = asyncio.create_task(link.ticker.run(), name=f"kite-ticker-{account.id}")
         link.task.add_done_callback(lambda task, link=link: self._ticker_ended(link, task))
+        own = self._tokens(link.prices.watched(), link.feed)  # what its screens already watch
+        if own:
+            await self._subscribe(link, own)
         if self._prices is None or not self._prices.live:
             await self._take_prices(link)
 
@@ -225,8 +240,17 @@ class KiteLive:
         log.info("prices from kite account %s (%d contracts)", link.account.id, len(tokens))
 
     def _on_ticks(self, link: _Link, ticks: list) -> None:
+        link.feed.on_ticks(ticks)  # its own prices, always (#395)
         if link is self._prices:
             self._feed.on_ticks(ticks)
+
+    def _on_own_demand(self, link: _Link, instrument_id: InstrumentId) -> None:
+        """Its own screens or checks want a contract: its own ticker subscribes it."""
+        if link.ticker is None:
+            return  # subscribed when it goes live
+        tokens = self._tokens([instrument_id], link.feed)
+        if tokens:
+            asyncio.ensure_future(self._subscribe(link, tokens))
 
     def _on_demand(self, instrument_id: InstrumentId) -> None:
         link = self._prices
@@ -236,11 +260,11 @@ class KiteLive:
         if tokens:
             asyncio.ensure_future(self._subscribe(link, tokens))
 
-    def _tokens(self, instrument_ids) -> list[int]:
+    def _tokens(self, instrument_ids, feed: KiteFeed | None = None) -> list[int]:
         tokens = []
         for instrument_id in instrument_ids:
             try:
-                tokens.extend(self._feed.tokens_for([instrument_id]))
+                tokens.extend((feed or self._feed).tokens_for([instrument_id]))
             except KeyError:
                 pass  # not a Kite contract (e.g. listed only by another broker)
         return tokens
