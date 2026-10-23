@@ -27,7 +27,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, Protocol
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from mocktrade.domain.accounts import ROLE_HELP, BrokerAccount, Role, User
@@ -112,6 +112,7 @@ def admin_router(
     current_user: Callable[..., User],
     audit: Callable[[str, str, dict[str, Any], str], None],
     starter: AccountStarter | None,
+    step_up: Callable[[Request, str], None] = lambda _request, _what: None,  # (#363)
 ) -> APIRouter:
     router = APIRouter(prefix="/api/admin")
     Me = Annotated[User, Depends(current_user)]
@@ -143,8 +144,9 @@ def admin_router(
         return [_user_dict(e) for e in users.users()]
 
     @router.post("/users", status_code=201)
-    async def create_user(body: NewUserIn, user: Me) -> dict[str, Any]:
+    async def create_user(body: NewUserIn, user: Me, request: Request) -> dict[str, Any]:
         can_change(user)
+        step_up(request, "add a user")
         temporary = security.new_temporary_password()
         roles = {Role(r) for r in body.roles}
         try:
@@ -159,10 +161,13 @@ def admin_router(
                         "the first login"}  # fmt: skip
 
     @router.patch("/users/{user_id}")
-    async def change_user(user_id: str, body: UserPatch, user: Me) -> dict[str, Any]:
+    async def change_user(user_id: str, body: UserPatch, user: Me,
+                          request: Request) -> dict[str, Any]:  # fmt: skip
         can_change(user)
         if user_id == user.id and body.active is False:
             raise HTTPException(409, "you can't turn yourself off: ask another admin")
+        if body.roles is not None or body.active is True:  # what someone may do: privileged
+            step_up(request, "change roles or turn a user on")
         try:
             before, after = users.update_user(
                 user_id, name=body.name, active=body.active,
@@ -194,8 +199,9 @@ def admin_router(
         return _user_dict(entry_for(user_id))
 
     @router.post("/users/{user_id}/reset-password")
-    async def reset_password(user_id: str, user: Me) -> dict[str, Any]:
+    async def reset_password(user_id: str, user: Me, request: Request) -> dict[str, Any]:
         can_change(user)
+        step_up(request, "reset a password")
         try:
             temporary = users.reset_password(user_id)
         except KeyError:
@@ -207,8 +213,9 @@ def admin_router(
                         "next login"}  # fmt: skip
 
     @router.post("/users/{user_id}/reset-authenticator")
-    async def reset_authenticator(user_id: str, user: Me) -> dict[str, Any]:
+    async def reset_authenticator(user_id: str, user: Me, request: Request) -> dict[str, Any]:
         can_change(user)
+        step_up(request, "reset an authenticator")
         try:
             uri = users.reset_authenticator(user_id)
         except KeyError:
@@ -244,8 +251,9 @@ def admin_router(
                 "brokers": list(starter.brokers) if starter else []}  # fmt: skip
 
     @router.post("/accounts", status_code=201)
-    async def create_account(body: NewAccountIn, user: Me) -> dict[str, Any]:
+    async def create_account(body: NewAccountIn, user: Me, request: Request) -> dict[str, Any]:
         can_change(user)
+        step_up(request, "add an account")
         if starter is None or body.broker not in starter.brokers:
             can = ", ".join(starter.brokers) if starter else "none"
             raise HTTPException(422, f"this server can add {can} accounts, not {body.broker}")
@@ -270,8 +278,11 @@ def admin_router(
         return account_dict(account)
 
     @router.patch("/accounts/{account_id}")
-    async def change_account(account_id: str, body: AccountPatch, user: Me) -> dict[str, Any]:
+    async def change_account(account_id: str, body: AccountPatch, user: Me,
+                             request: Request) -> dict[str, Any]:  # fmt: skip
         can_change(user)
+        if body.traders is not None or body.active is True:  # turning off never asks
+            step_up(request, "change who trades an account or turn it on")
         try:
             before, after = users.update_account(
                 account_id, active=body.active,
@@ -315,7 +326,7 @@ def admin_router(
                 "running": running is not None}  # fmt: skip
 
     @router.put("/accounts/{account_id}/limits")
-    async def put_limits(account_id: str, body: LimitsIn, user: Me,
+    async def put_limits(account_id: str, body: LimitsIn, user: Me, request: Request,
                          dry_run: bool = False) -> dict[str, Any]:  # fmt: skip
         can_change(user)
         old, running = in_force(account_id)
@@ -336,6 +347,8 @@ def admin_router(
                 held[instrument_id] = (qty, instrument.lot_size if instrument else 1)
             said = warnings(new, positions=held, working_orders=len(running.orders.working()),
                             day_pnl_paise=book.day_pnl_paise())  # fmt: skip
+        if any(c["looser"] for c in changed) and not dry_run:  # tightening never asks
+            step_up(request, "loosen limits")
         if changed and not dry_run:
             users.set_account_limits(account_id, limits_to_dict(new), user.id)
             if running is not None:

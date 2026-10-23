@@ -182,3 +182,23 @@ again **when each action actually happens**, not only when it was asked. Nothing
 
 Turning an **account** off is different: everyone keeps closing rights and the risk gate lets
 only closing trades through, exactly as on the screens. Code: `risk/access.py`.
+
+## A fresh code for privileged changes (#363)
+
+A session alone (the browser's cookie) can't make changes that add risk or give someone
+access. These need an authenticator code given in the last **5 minutes**. Logging in counts,
+because it just checked a code. When one is due, the screen asks **"Confirm it's you"**, sends
+the code, and repeats the change. Five wrong codes in a row (counted with failed logins) lock the user for 15 minutes and end
+**every** one of their sessions, so a stolen session can't sit and guess.
+
+| Asks for a code | Never asks |
+| --- | --- |
+| loosening a limit (any change marked looser) | tightening a limit; a dry-run preview |
+| adding or removing an account's traders; turning an account **on**; adding an account | turning an account **off** |
+| changing a user's roles; turning a user **on**; adding a user | turning a user **off** |
+| resetting a password or an authenticator | |
+| resuming the whole firm after STOP | STOP (account or firm), Flatten, cancels, closing orders |
+
+**Your sessions:** the menu bar's **Sessions** lists every browser or app logged in as you, with
+when and from which address, and **End** for each. Your current one is ended with Log out. A
+session you don't recognise: end it, change your password, and tell an admin.

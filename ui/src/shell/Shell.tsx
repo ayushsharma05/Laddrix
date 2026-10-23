@@ -1,6 +1,6 @@
 // The terminal around the widgets:
 //
-//   menu bar     MockTrade · account ▾                                   user · Log out
+//   menu bar     MockTrade · account ▾                        user · Sessions · Log out
 //   toolbar      Widgets ▾ · Search (/) ······ lights · rate · Day P&L · Layouts ▾ · clock · Save · Lock · STOP
 //   env strip    PAPER · orders fill against live prices, nothing goes to the exchange
 //   bands        (only when needed)
@@ -22,6 +22,8 @@ import { Bands, PRICES_OLD_MS } from "./Bands";
 import { EnvStrip } from "./EnvStrip";
 import { ReplayBar } from "./ReplayBar";
 import { ServerVersion } from "./ServerVersion";
+import { SessionsDialog } from "./SessionsDialog";
+import { StepUpDialog } from "./StepUpDialog";
 import { StopDialog } from "./StopDialog";
 import { ThemePick } from "./ThemePick";
 
@@ -140,6 +142,7 @@ export function Shell() {
       <Bands />
       <Workspace controller={controller} footer={<ServerVersion />} />
       {dialog && <StopDialog mode={dialog} onClose={() => setDialog(null)} />}
+      <StepUpDialog />
     </div>
   );
 }
@@ -148,6 +151,7 @@ function MenuBar() {
   const { session, store } = useApp();
   const me = useStore((s) => s.me)!;
   const accountId = useStore((s) => s.accountId);
+  const [sessions, setSessions] = useState(false);
   return (
     <nav className="menubar" aria-label="Menu">
       <span className="brand">MockTrade</span>
@@ -167,9 +171,13 @@ function MenuBar() {
       <span className="dim">
         {me.user.name} · {me.user.roles.join(", ")}
       </span>
+      <button type="button" className="link-btn" onClick={() => setSessions(true)}>
+        Sessions
+      </button>
       <button type="button" className="link-btn" onClick={() => void session.logout()}>
         Log out
       </button>
+      {sessions && <SessionsDialog onClose={() => setSessions(false)} />}
     </nav>
   );
 }

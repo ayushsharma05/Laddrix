@@ -143,6 +143,10 @@ class _Strict(BaseModel):
 PASSWORD_FIRST = frozenset({"/api/me", "/api/me/password", "/api/session"})
 
 
+class CodeIn(_Strict):
+    code: str = Field(min_length=6, max_length=6)
+
+
 class PasswordIn(_Strict):
     old: str = Field(min_length=1, max_length=256)
     new: str = Field(min_length=1, max_length=256)
@@ -1144,7 +1148,8 @@ def create_app(
         except LoginFailed as exc:
             audit("LOGIN_FAILED", body.username, {"ip": ip})
             raise HTTPException(401, str(exc)) from None
-        token = users.start_session(user)
+        token = users.start_session(user, device=request.headers.get("user-agent", ""), ip=ip,
+                                    stepped_up=True)  # it just checked the code  # fmt: skip
         response.set_cookie(
             settings.cookie_name,
             token,
@@ -1177,7 +1182,41 @@ def create_app(
             raise HTTPException(422, str(exc)) from None
         audit("PASSWORD_CHANGED", f"{user.id} changed their password", {"user_id": user.id})
 
-    app.include_router(admin_router(platform, users, current_user, audit, starter))
+    # --- step-up and the user's own sessions (#363) ----------------------------------------------
+
+    def require_step_up(request: Request, what: str) -> None:
+        """Privileged changes need a fresh authenticator code, not just the session: a stolen
+        session alone can't loosen limits, add traders, reset others' logins or resume the
+        firm. Never asked for STOP, Flatten or cancels (reducing risk is never blocked)."""
+        if not users.stepped_up(request.cookies.get(settings.cookie_name)):
+            raise HTTPException(428, f"step-up: enter a fresh authenticator code to {what}")
+
+    @app.post("/api/me/step-up", status_code=204)
+    async def step_up(body: CodeIn, user: Me, request: Request) -> None:
+        ip = request.client.host if request.client else "?"
+        try:
+            await asyncio.to_thread(users.step_up, request.cookies.get(settings.cookie_name, ""),
+                                    body.code)  # fmt: skip
+        except LoginFailed as exc:
+            audit("STEP_UP_FAILED", f"{user.id}: wrong authenticator code", {"user_id": user.id,
+                                                                             "ip": ip})  # fmt: skip
+            raise HTTPException(401 if str(exc) == "please log in" else 403, str(exc)) from None
+        audit("STEP_UP_OK", f"{user.id} confirmed with a fresh code", {"user_id": user.id,
+                                                                       "ip": ip})  # fmt: skip
+
+    @app.get("/api/me/sessions")
+    async def my_sessions(user: Me, request: Request) -> list[dict[str, Any]]:
+        return users.own_sessions(user.id, request.cookies.get(settings.cookie_name))
+
+    @app.delete("/api/me/sessions/{session_id}", status_code=204)
+    async def end_my_session(session_id: str, user: Me) -> None:
+        if not users.end_own_session(user.id, session_id):
+            raise HTTPException(404, "no such session")  # someone else's is the same answer
+        audit("SESSION_ENDED", f"{user.id} ended one of their sessions",
+              {"user_id": user.id, "session": session_id})  # fmt: skip
+
+    app.include_router(admin_router(platform, users, current_user, audit, starter,
+                                    require_step_up))  # fmt: skip
 
     # --- instruments and layouts -------------------------------------------------------------
 
@@ -1588,9 +1627,10 @@ def create_app(
         return {"stopped": True, "failed_cancels": _failures(failures), "reports": reports}
 
     @app.post("/api/firm/resume")
-    async def resume_firm(user: Me) -> dict[str, Any]:
+    async def resume_firm(user: Me, request: Request) -> dict[str, Any]:
         if not user.has_role(Role.ADMIN):
             raise HTTPException(403, "only an admin can resume the whole firm")
+        require_step_up(request, "resume the whole firm")
         platform.firm_switch.reset(by=user.id)
         return {"stopped": False}
 

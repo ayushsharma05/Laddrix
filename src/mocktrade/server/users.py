@@ -27,6 +27,8 @@ LOCK_FOR = timedelta(minutes=15)
 SESSION_MAX = timedelta(hours=12)
 SESSION_IDLE = timedelta(hours=2)
 TOUCH_EVERY = timedelta(minutes=1)  # don't write last_seen on every request
+SESSION_ID = 16  # hex characters of the digest that name a session in the list (#363)
+STEP_UP_FOR = timedelta(minutes=5)  # a fresh code covers privileged changes this long (#363)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -78,7 +80,12 @@ CREATE TABLE IF NOT EXISTS layouts (
 """
 
 # columns added after the first release: (table, column, definition)
-_ADDED = (("users", "must_change", "INTEGER NOT NULL DEFAULT 0"),)
+_ADDED = (
+    ("users", "must_change", "INTEGER NOT NULL DEFAULT 0"),
+    ("sessions", "stepped_up_at", "TEXT"),  # the last fresh authenticator code (#363)
+    ("sessions", "device", "TEXT NOT NULL DEFAULT ''"),  # the browser, as it says (#363)
+    ("sessions", "ip", "TEXT NOT NULL DEFAULT ''"),
+)
 
 MAX_LAYOUT_BYTES = 256 * 1024
 # a user's own screen settings, kept on the server so they follow the user to another machine
@@ -387,16 +394,19 @@ class UserStore:
 
     # --- sessions ------------------------------------------------------------------------------
 
-    def start_session(self, user: User) -> str:
-        """A new session for a user who just logged in. Returns the cookie value."""
+    def start_session(self, user: User, *, device: str = "", ip: str = "",
+                      stepped_up: bool = False) -> str:  # fmt: skip
+        """A new session for a user who just logged in. Returns the cookie value. A login
+        that just checked the authenticator counts as a step-up (`stepped_up`)."""
         token = security.new_session_token()
         now = self._clock().isoformat()
         with self._db() as db:
             db.execute(
-                "INSERT INTO sessions (token_hash, user_id, created_at, last_seen) "
-                "VALUES (?, ?, ?, ?)",
-                (security.token_digest(token), user.id, now, now),
-            )
+                "INSERT INTO sessions (token_hash, user_id, created_at, last_seen, "
+                "stepped_up_at, device, ip) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (security.token_digest(token), user.id, now, now, now if stepped_up else None,
+                 device[:200], ip[:64]),
+            )  # fmt: skip
         return token
 
     def session_user(self, token: str | None) -> User | None:
@@ -424,6 +434,73 @@ class UserStore:
                     (now.isoformat(), digest),
                 )
         return _user(row)
+
+    # --- step-up and a user's own sessions (#363) ----------------------------------------------
+
+    def step_up(self, token: str, code: str) -> None:
+        """A fresh authenticator code for this session: privileged changes are allowed for
+        STEP_UP_FOR. A wrong code counts like a failed login: after MAX_FAILURES the user is
+        locked and every one of their sessions ends, so a stolen session can't guess codes.
+        Raises LoginFailed."""
+        digest = security.token_digest(token)
+        now = self._clock()
+        with self._lock:
+            with self._db() as db:
+                row = db.execute(
+                    "SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id "
+                    "WHERE s.token_hash = ?", (digest,)).fetchone()  # fmt: skip
+            if row is None or not row["active"]:
+                raise LoginFailed("please log in")
+            step = security.match_totp(self._box.open(row["totp_secret"]), code,
+                                       now.timestamp(), row["last_totp_step"])  # fmt: skip
+            with self._db() as db:  # commit before raising: an error inside rolls back
+                if step is None:
+                    failures = row["failures"] + 1
+                    if failures >= MAX_FAILURES:
+                        db.execute("UPDATE users SET failures = 0, locked_until = ? WHERE id = ?",
+                                   ((now + LOCK_FOR).isoformat(), row["id"]))  # fmt: skip
+                        db.execute("DELETE FROM sessions WHERE user_id = ?", (row["id"],))
+                    else:
+                        db.execute("UPDATE users SET failures = ? WHERE id = ?",
+                                   (failures, row["id"]))  # fmt: skip
+                else:
+                    db.execute("UPDATE users SET failures = 0, last_totp_step = ? WHERE id = ?",
+                               (step, row["id"]))  # fmt: skip
+                    db.execute("UPDATE sessions SET stepped_up_at = ? WHERE token_hash = ?",
+                               (now.isoformat(), digest))  # fmt: skip
+        if step is None:
+            raise LoginFailed("wrong code")
+
+    def stepped_up(self, token: str | None) -> bool:
+        """True if this session gave a fresh authenticator code in the last STEP_UP_FOR."""
+        if not token:
+            return False
+        with self._db() as db:
+            row = db.execute("SELECT stepped_up_at FROM sessions WHERE token_hash = ?",
+                             (security.token_digest(token),)).fetchone()  # fmt: skip
+        if row is None or row["stepped_up_at"] is None:
+            return False
+        return self._clock() - datetime.fromisoformat(row["stepped_up_at"]) <= STEP_UP_FOR
+
+    def own_sessions(self, user_id: str, token: str | None) -> list[dict]:
+        """A user's own sessions, newest first. `id` is a short public name for each (a
+        prefix of the stored digest: it can't be turned back into a cookie)."""
+        mine = security.token_digest(token) if token else ""
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT token_hash, created_at, last_seen, device, ip FROM sessions "
+                "WHERE user_id = ? ORDER BY created_at DESC", (user_id,)).fetchall()  # fmt: skip
+        return [{"id": r["token_hash"][:SESSION_ID], "created_at": r["created_at"],
+                 "last_seen": r["last_seen"], "device": r["device"], "ip": r["ip"],
+                 "current": r["token_hash"] == mine} for r in rows]  # fmt: skip
+
+    def end_own_session(self, user_id: str, session_id: str) -> bool:
+        """End one of the user's own sessions by its public id. False if none matches."""
+        if len(session_id) != SESSION_ID or not all(c in "0123456789abcdef" for c in session_id):
+            return False
+        with self._lock, self._db() as db:
+            return db.execute("DELETE FROM sessions WHERE user_id = ? AND token_hash LIKE ?",
+                              (user_id, session_id + "%")).rowcount > 0  # fmt: skip
 
     def end_session(self, token: str | None) -> None:
         if token:

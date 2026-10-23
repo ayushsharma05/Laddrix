@@ -519,3 +519,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - The demo now takes the data-folder lock like the real server.
     - Playbook "A credential is stolen" in `incidents.md` (contain, STOP, reconcile, keep evidence, rotate, restore without sessions), including Kite secret rotation.
   - **Checks:** 8 tests; mutation 12/12; the drill on the demo 15/15 (`context/evidence/h-364-credential-drill.txt`).
+- 23 Oct, #364 merged (PR #375). **#363 done** (a fresh code for privileged changes; everyone's own session list).
+  - **Gap confirmed:** an admin's session alone (the cookie) could loosen limits, add traders, reset other people's logins and resume the firm.
+  - **The fix:** these need an authenticator code given in the last 5 minutes (a login counts). The server answers 428 "step-up: ..."; the screens ask "Confirm it's you", send the code and repeat the change once. Asked for: loosening a limit, changing traders, turning an account or user on, adding users or accounts, changing roles, resetting a password or authenticator, resuming the firm. Never asked for: STOP, Flatten, cancels, tightening, turning off, dry runs. Five wrong codes lock the user and end every session. Menu bar **Sessions**: your own logins (browser, address, times) with End.
+  - **Checks:** 6 server tests, 6 UI tests (all 419 pass), mutation 17/17. Browser check on the demo 7/7 (`context/scripts/e2e-step-up.cjs`; `context/images/h-363-step-up.png`, `h-363-sessions.png`); it caught a repeated phrase in the dialog, fixed.

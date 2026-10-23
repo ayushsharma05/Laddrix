@@ -16,7 +16,16 @@ export class ApiError extends Error {
 
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
+/** Asks the person for a fresh authenticator code (#363). `confirm(code)` sends it to the
+ * server (throws ApiError on a wrong code, so the asker can say so and ask again). Resolves
+ * true once confirmed, false if the person cancels. */
+export type StepUp = (reason: string, confirm: (code: string) => Promise<void>) => Promise<boolean>;
+
 export class Rest {
+  /** Set by the shell: privileged changes answered 428 "step-up: ..." ask for a code and are
+   * sent once more (#363). Without it the 428 is an error like any other. */
+  stepUp: StepUp | null = null;
+
   constructor(private readonly fetcher: Fetch = (i, init) => fetch(i, init)) {}
 
   get<T>(path: string): Promise<T> {
@@ -35,7 +44,7 @@ export class Rest {
     return this.call<T>("DELETE", path);
   }
 
-  private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async call<T>(method: string, path: string, body?: unknown, retried = false): Promise<T> {
     const init: RequestInit = { method, credentials: "same-origin", headers: {} };
     if (body !== undefined) {
       init.headers = { "content-type": "application/json" };
@@ -51,7 +60,14 @@ export class Rest {
     const text = await response.text();
     const data: unknown = text ? safeJson(text) : undefined;
     if (!response.ok) {
-      throw new ApiError(response.status, describe(data) ?? `${response.status} ${response.statusText}`);
+      const message = describe(data) ?? `${response.status} ${response.statusText}`;
+      if (response.status === 428 && message.startsWith("step-up") && this.stepUp && !retried) {
+        const confirm = (code: string) => this.call<void>("POST", "/api/me/step-up", { code }, true);
+        if (await this.stepUp(message.replace(/^step-up: /, ""), confirm)) {
+          return this.call<T>(method, path, body, true); // once: a second 428 is an error
+        }
+      }
+      throw new ApiError(response.status, message);
     }
     return data as T;
   }
