@@ -238,7 +238,10 @@ def executed(orders: Iterable[Any], instrument_of) -> list[ExecutedOrder]:
                 product=view.request.product,
                 side=view.request.side,
                 qty=view.filled_qty,
-                value_paise=Fraction(view.filled_qty * view.avg_price_paise),
+                # the exact traded value (#275); the rounded average only for old records
+                value_paise=Fraction(
+                    getattr(view, "filled_value_paise", 0) or view.filled_qty * view.avg_price_paise
+                ),
             )
         )
     return result

@@ -36,7 +36,8 @@ from mocktrade.orders.basket import Baskets
 from mocktrade.orders.gate import Gates
 from mocktrade.orders.gtt import GttService
 from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds
+from mocktrade.orders.model import ClientIds, EventKind
+from mocktrade.orders.trade_check import TradeCheck
 from mocktrade.portfolio.service import PortfolioService
 from mocktrade.positions.book import PositionBook
 from mocktrade.positions.reconcile import PositionReconciler
@@ -109,6 +110,7 @@ class AccountRuntime:
     mtm: MtmWatch | None = None  # the trader's own loss limits (per position, portfolio)
     squareoff: SquareOff | None = None  # intraday positions before the broker's cut-off
     flatten: Flatten | None = None  # closing positions on purpose, STOP or not (#262)
+    trade_check: TradeCheck | None = None  # orders against the broker's trade list (#352)
     session_day: date | None = None  # the trading day its positions and limits are for (#266)
 
     def apply_limits(self, limits: RiskLimits) -> None:
@@ -281,6 +283,27 @@ class Platform:
                 extra = {"day": today.isoformat(), "expired": expired}
                 self.event_log.record_note("SESSION_ROLLED", account_id, words, extra)
         return done
+
+    def _trade_check(self, account_id: str, orders: OrderManager,
+                     portfolio: PortfolioService) -> TradeCheck:  # fmt: skip
+        """Each new trade list, and each new fill (against the last list), checks the orders
+        against the broker's trades (orders/trade_check.py)."""
+        log_ = self.event_log
+        note = (lambda k, d, x: log_.record_note(k, account_id, d, x)) if log_ else None
+        check = TradeCheck(orders, **({"note": note} if note else {}))
+
+        def on_snapshot(_account: str, snapshot) -> None:
+            if snapshot.kind == "trades" and not snapshot.error:
+                check.check(snapshot.items)
+
+        def on_fill(event) -> None:
+            last = portfolio.snapshot("trades")
+            if event.kind is EventKind.FILL and last is not None and not last.error:
+                check.check(last.items)
+
+        portfolio.subscribe(on_snapshot)
+        orders.subscribe(on_fill)
+        return check
 
     def last_price(self, instrument_id: str) -> int | None:
         tick = self.market_data.latest(instrument_id)
@@ -583,6 +606,9 @@ class Platform:
         )
         orders.subscribe(portfolio.on_order_event)
         holder["portfolio"] = portfolio
+        trade_check = None
+        if portfolio.offers("trades"):  # orders against the broker's trade list (#352)
+            trade_check = self._trade_check(account.id, orders, portfolio)
         charges = ChargesService(
             account.id, self.charges_model, orders, self.instruments.get, clock=clock
         )
@@ -636,6 +662,7 @@ class Platform:
             mtm,
             squareoff,
             flatten,
+            trade_check=trade_check,
         )
         self.accounts[account.id] = runtime
         runtime.session_day = clock().astimezone(IST).date()  # a start rebuilds today (recovery)

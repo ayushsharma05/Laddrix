@@ -46,9 +46,23 @@ A broker correction (the same quantity, a new average) was thrown away as a "dup
 | --- | --- |
 | Positions, realised and unrealised P&L | exact to the paisa, given the broker's average |
 | A broker that rounds its average (not Kite) | within half a paisa per unit of the order |
-| Charges | worked out on fills as they come; a later correction doesn't recompute them (brokerage and taxes on a few paise) |
+| Charges | on the exact value; worked out again after a correction |
+| Against the broker's trades | exact; a quantity that differs is named, not changed |
 
-## Still to do
+## Against the broker's trade list (#352)
 
-Checking orders against the **broker's own trade list** (each trade by its trade id), so
-positions, charges and reports can be proven against the contract note: #352 (child of #275).
+`orders/trade_check.py` runs on each new trade list (and on each fill, against the last
+list):
+
+```
+ trades ─► per broker order: the sum of its trades, each trade id once
+           (a trade id read again counts once; one that comes back changed replaces the old)
+ orders ─► same qty, different value ─► the trades win: a CORRECTED event
+                                        (positions, charges follow)
+           different qty, two reads in a row ─► TRADES_DIFFER in the audit trail, once;
+                                                nothing changed by itself
+```
+
+Charges are worked out on the exact value, again after a correction. The daily report reads
+fills and corrections from the audit trail, so it agrees with positions. Runbook:
+[incidents.md](../runbooks/incidents.md#an-orders-fills-dont-match-the-brokers-trades-352).
