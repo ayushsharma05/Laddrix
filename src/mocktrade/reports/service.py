@@ -88,10 +88,18 @@ class Reports:
             raise ReportError("reports need the audit trail")
         report = build_day(
             account_id, day, platform.event_log, platform.instruments.get,
-            platform.charges_model, prices=platform.market_data.latest if prices else None,
+            platform.charges_model, prices=self._marks(account_id) if prices else None,
             now=self._clock(), final=final,
         )  # fmt: skip
         return report_to_dict(report)
+
+    def _marks(self, account_id: str):
+        """Open positions are valued at the account's own subscription's prices (#396), never
+        another's; an account with none (no longer running on a Kite server) gets no marks."""
+        try:
+            return self._platform.prices.of(account_id).latest
+        except LookupError:
+            return None
 
 
 def _dates(first: date, last: date) -> list[date]:

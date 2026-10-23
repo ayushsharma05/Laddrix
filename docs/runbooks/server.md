@@ -122,7 +122,7 @@ Backups hold password hashes and users' webhook secrets, so they are readable by
 It makes the workspace and its first admin, prints the admin's authenticator link once, and
 asks for their first password. Their admin adds their users and accounts from the Admin screen
 and sees nothing of any other firm. Don't let an outside firm trade until #395–#397 and
-Zerodha's answer (#278) are done ([tenancy.md](../design/tenancy.md)).
+Zerodha's answer (#278) are done ([tenancy.md](../design/tenancy.md)). The full steps: [firms.md](firms.md).
 
 **Each backup also proves the audit trail (#367).** Its `manifest.json` records the audit trail's head (`audit_chain`). To check that nothing in the trail was changed or cut since a backup was made, run `python -m mocktrade.tools.audit verify --against /var/backups/mocktrade/<stamp>/manifest.json`. Do it monthly, and after any incident. A copy of the manifests kept off the machine is what makes this proof ([data.md](../design/data.md) §5).
 

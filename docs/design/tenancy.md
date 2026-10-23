@@ -118,8 +118,13 @@ A new firm is created with
   - the option chain and strategy builder;
   - time and sales, movers, volume at price and the instrument card's last price;
   - price alerts, checked only on their owner's prices.
-- **Left for #396 (files and jobs):** the tick recorder and the stale-price check still use the
-  shared feed (the first logged-in account's), so a Kite server's recordings are that account's.
+- **368c (#396), done:** files and jobs per firm and per subscription
+  (`tests/test_firm_files.py`, the operator's runbook [firms.md](../runbooks/firms.md)):
+  - recorded ticks in a folder per Kite subscription (`data/ticks/@<account>`);
+  - imported candles in a folder per firm (`data/candles/@<firm>`); a firm's admin imports them;
+  - a backtest replays its owner's own subscription's days and their firm's candles;
+  - end-of-day reports value open positions at the account's own prices;
+  - each subscription is checked for silence on its own, with a band for its viewers only.
 
 | Step | What | Done when |
 | --- | --- | --- |

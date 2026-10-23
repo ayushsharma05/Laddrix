@@ -35,7 +35,7 @@ from mocktrade.algos.engine import HEARTBEAT_S, AlgoError
 from mocktrade.algos.spec import spec_to_dict
 from mocktrade.broker.paper import PaperBroker
 from mocktrade.charges.model import ChargesModel
-from mocktrade.domain.accounts import BrokerAccount
+from mocktrade.domain.accounts import MAIN, BrokerAccount
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.orders import Product, Side
 from mocktrade.domain.ticks import DepthLevel, Tick
@@ -95,6 +95,7 @@ class BacktestSpec:
 
 
 TickSource = Callable[[date], Iterator[tuple[int, Tick]] | None]  # None: nothing that day
+CandleSource = Callable[[str, date], list[dict[str, Any]] | None]  # (instrument, day) -> rows
 
 
 def candles_to_ticks(
@@ -278,14 +279,16 @@ class Backtests:
         charges: ChargesModel,
         ticks: TickSource,
         *,
-        candles: Callable[[str, date], list[dict[str, Any]] | None] | None = None,
+        candles: CandleSource | None = None,
+        sources_of: Callable[[str], tuple[TickSource, CandleSource | None]] | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.root = Path(root)
         self._instruments = instruments
         self._charges = charges
-        self._ticks = ticks
-        self._candles = candles
+        # what a run replays, by who started it (#396): their own subscription's recordings
+        # and their own firm's candles. Without it, everyone's runs read the same data.
+        self._sources = sources_of or (lambda _owner: (ticks, candles))
         self._clock = clock
         self._runs: dict[str, Run] = {}
         self._lock = asyncio.Lock()  # one run at a time: a backtest is CPU-bound
@@ -298,7 +301,7 @@ class Backtests:
             problems.append(f"unknown instrument {spec.instrument_id}")
         if spec.algo not in {t.spec.code for t in BUILTIN}:
             problems.append(f"unknown algo {spec.algo!r}")
-        if candles and self._candles is None:
+        if candles and self._sources(owner)[1] is None:
             problems.append("no candles were imported")
         if problems:
             raise BacktestError("; ".join(problems))
@@ -363,10 +366,11 @@ class Backtests:
             self._save(run)
 
     def _source(self, run: Run, instrument, day: date) -> Iterator[tuple[int, Tick]] | None:
+        ticks, candles = self._sources(run.owner)
         if run.candles:
-            rows = self._candles(run.spec.instrument_id, day) if self._candles else None
+            rows = candles(run.spec.instrument_id, day) if candles else None
             return iter(candles_to_ticks(instrument, rows)) if rows else None
-        return self._ticks(day)
+        return ticks(day)
 
     def _save(self, run: Run) -> None:
         folder = self.root / run.run_id
@@ -487,6 +491,23 @@ class CandleStore:
         except BacktestError:
             return None
         return json.loads(path.read_text()) if path.exists() else None
+
+
+class CandleStores:
+    """Imported candles kept per workspace (#396): the main workspace's in `<root>`, as before
+    #368; another firm's in `<root>/@<workspace>`. A firm's imports feed only its own
+    backtests, and its admin imports without touching another firm's. ("@" never starts an
+    instrument's folder, so the two can't meet.)"""
+
+    def __init__(self, root: Path) -> None:
+        self.root = Path(root)
+
+    def of(self, workspace: str) -> CandleStore:
+        if workspace == MAIN:
+            return CandleStore(self.root)
+        if not workspace.isascii() or not workspace.replace("-", "").isalnum():
+            raise BacktestError(f"not a workspace id: {workspace!r}")  # never a path
+        return CandleStore(self.root / f"@{workspace}")
 
 
 def _whole(value: Any) -> int:

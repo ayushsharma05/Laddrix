@@ -3,13 +3,15 @@
 kite_login   08:30–15:30, every minute: a kite account without today's login.
              WARN until 09:05, then ERROR ("the market opens in 10 min" / "is open")
 prices       09:15–15:30, every 15 s: no new price for PRICES_SILENT_S while the feed
-             should be running (Kite logged in, or the simulator)
+             should be running (Kite logged in, or the simulator). On a Kite server each
+             subscription is checked on its own (#396), its band shown to that account's viewers
 disk         every 5 min: the data volume nearly full (backups, audit trail)
 """
 
 import math
 import shutil
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, time
 from pathlib import Path
 
@@ -25,6 +27,21 @@ DISK_WARN_BYTES = 1 << 30  # 1 GB
 DISK_ERROR_BYTES = 200 << 20
 
 
+@dataclass
+class PriceFeed:
+    """One subscription's prices, checked for silence on its own (#396)."""
+
+    prices: MarketData
+    account_id: str | None = None  # None: the server's own feed (the simulator)
+    expected: Callable[[], bool] = lambda: True  # e.g. its Kite login is live
+    seen: int = field(default=0, init=False)
+    changed_at: datetime | None = field(default=None, init=False)
+
+    @property
+    def key(self) -> str:
+        return "prices" if self.account_id is None else f"prices:{self.account_id}"
+
+
 class Checks:
     def __init__(
         self,
@@ -35,19 +52,20 @@ class Checks:
         *,
         broker_status: Callable[[BrokerAccount], str | None] | None = None,
         prices_expected: Callable[[], bool] = lambda: True,
+        feeds: Iterable[PriceFeed] | None = None,  # each subscription's own (#396)
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         disk_free: Callable[[Path], int] = lambda p: shutil.disk_usage(p).free,
     ) -> None:
         self._alerts = alerts
-        self._md = market_data
         self._accounts = list(accounts)
         self._data_dir = data_dir
         self._status = broker_status
-        self._prices_expected = prices_expected
         self._clock = clock
         self._disk_free = disk_free
-        self._ticks_seen = market_data.ticks_received
-        self._ticks_changed_at = clock()
+        self._feeds = list(feeds) if feeds is not None else [
+            PriceFeed(market_data, expected=prices_expected)]  # fmt: skip
+        for feed in self._feeds:
+            feed.seen, feed.changed_at = feed.prices.ticks_received, clock()
 
     def kite_login(self) -> None:
         if self._status is None:
@@ -71,23 +89,26 @@ class Checks:
                                 account_id=account.id)  # fmt: skip
 
     def prices(self) -> None:
-        key = "prices"
+        for feed in self._feeds:
+            self._check_feed(feed)
+
+    def _check_feed(self, feed: PriceFeed) -> None:
         now = self._clock()
-        if self._md.ticks_received != self._ticks_seen:
-            self._ticks_seen = self._md.ticks_received
-            self._ticks_changed_at = now
-            self._alerts.clear(key, "prices are flowing again")
+        whose = f"{feed.account_id}: " if feed.account_id is not None else ""
+        if feed.prices.ticks_received != feed.seen:
+            feed.seen, feed.changed_at = feed.prices.ticks_received, now
+            self._alerts.clear(feed.key, f"{whose}prices are flowing again")
             return
-        if not self._prices_expected():
-            self._ticks_changed_at = now  # no feed expected (e.g. not logged in): not silence
+        if not feed.expected():
+            feed.changed_at = now  # no feed expected (e.g. not logged in): not silence
             return
-        silent = (now - self._ticks_changed_at).total_seconds()
-        if silent >= PRICES_SILENT_S:
+        if (now - feed.changed_at).total_seconds() >= PRICES_SILENT_S:
             self._alerts.raise_(
-                key,
+                feed.key,
                 "ERROR",
-                "No prices for over a minute during market hours: check the Kite connection "
-                "(runbook: websocket down)",
+                f"{whose}No prices for over a minute during market hours: check the Kite "
+                "connection (runbook: websocket down)",
+                account_id=feed.account_id,  # one firm's subscription: its viewers' band
             )
 
     def disk(self) -> None:
@@ -117,14 +138,17 @@ class PriceOverload:
     """Every-tick readers (algos, the paper broker) fell behind and ticks were dropped (#267):
     a WARN band while it keeps happening, cleared once a check finds no new drops."""
 
-    def __init__(self, alerts: Alerts, market_data) -> None:
+    def __init__(self, alerts: Alerts, *sources: MarketData) -> None:
         self._alerts = alerts
-        self._md = market_data
-        self._seen = market_data.dropped
+        self._sources = sources  # every subscription's (#396): one server, one CPU
+        self._seen = self._dropped()
+
+    def _dropped(self) -> int:
+        return sum(md.dropped for md in self._sources)
 
     def check(self) -> None:
-        dropped = self._md.dropped - self._seen
-        self._seen = self._md.dropped
+        dropped = self._dropped() - self._seen
+        self._seen += dropped
         if dropped > 0:
             self._alerts.raise_("price_overload", "WARN", f"prices: {dropped} ticks were "
                                 "dropped since the last check because algos or paper fills "
