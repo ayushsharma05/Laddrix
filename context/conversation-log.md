@@ -494,4 +494,4 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - new state in the data folder would be skipped silently: now every top-level entry must be backed up or listed as reproducible, else the backup is made but fails with exit 2 and `not_covered` in the manifest (its first real run caught `demo_totp.txt`, a secret, now listed);
     - no test that a restored server never re-sends an order: added;
     - RPO/RTO measured and written in `docs/runbooks/server.md` (217 MB: backup 2.4 s, restore 1.7 s; people about 15-20 min; RPO up to a trading day of MockTrade's own state, positions and orders rebuilt from the broker).
-  - **Checks:** 3 new tests (24 in test_backup.py); the drill 19/19 (`context/evidence/h-272-backup-restore-drill.txt`).
+  - **Checks:** 3 new tests (21 in test_backup.py); the drill 19/19 (`context/evidence/h-272-backup-restore-drill.txt`).
