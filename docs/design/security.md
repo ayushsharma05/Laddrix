@@ -74,7 +74,7 @@ the control.
 | 8 | SSRF via webhooks | https only, private addresses refused | #271, `test_alerts*.py` |
 | 9 | Key or credential compromised | `users revoke-sessions` (open screens close within 2 s), `users rotate-key` (refused while the server runs; all or nothing), backups hold no session, the playbook in `incidents.md` ("A credential is stolen") | `test_key_rotation.py`; the drill on the demo, 15/15 (`context/evidence/h-364-credential-drill.txt`) |
 | 10 | Dependency or update compromised | `npm audit` and `pip-audit` (on the lock) in CI; Python pinned by hash (`requirements.lock`, the image installs `--require-hashes`), npm by `package-lock.json`; Dependabot; gitleaks over the whole history; CycloneDX SBOMs at each release; patch times in `patching.md`; the desktop app has no update path until it is signed (#365) | `test_supply_chain.py`; the **supply-chain** CI job |
-| 11 | Logs leak secrets; retention | secrets kept out of backups | redaction tests, retention policy: **#367** |
+| 11 | Logs leak secrets; retention; a changed audit trail | every log line filtered (`logsafe.py`), objects holding secrets don't print them; data classes and retention in [data.md](data.md); a person's data exported or erased (`users export-user` / `erase-user`); the audit trail hash-chained, its head kept in every backup's manifest (#367) | `test_log_redaction.py`, `test_audit_chain.py`, `test_personal_data.py` |
 | 12 | Storage, audit or feed outage | orders refused unless on disk first (#265); stale prices refuse risk-adding orders (#267); critical loops watched, new orders pause, cancels go (#273); STOP + Flatten work through it (#262) | those PRs' tests |
 
 ## 5. Mapped to OWASP ASVS 4.0.3 (selected chapters, target Level 2)
@@ -88,8 +88,8 @@ This is not certification: it only shows where each requirement area stands.
 | V4 Access control | default-deny per account and on the stream (#270); delayed actions re-checked at the moment they act (#366) |
 | V5 Validation | strict request models (`_Strict`, field limits); path checks (#269) |
 | V6 Stored cryptography | Fernet (SecretBox) for the authenticator secrets in `users.db`. The broker's API secret is in `.env` and its daily tokens in owner-only files, not encrypted by MockTrade. Key rotation is all or nothing: `users rotate-key` (#364) |
-| V7 Errors and logging | audit trail of every order event and privileged action; redaction: #367 |
-| V8 Data protection | owner-only backups; retention and deletion: #367 |
+| V7 Errors and logging | audit trail of every order event and privileged action, tamper-evident (hash chain); logs filtered of secrets (#367) |
+| V8 Data protection | owner-only backups; data classified, retention set, a person's data exported or erased ([data.md](data.md), #367) |
 | V9 Communications | HTTPS via Caddy; HSTS and security headers (`test_server.py`) |
 | V10 Malicious code | no user code runs on the server (algos are built-in, declarative settings) |
 | V12 Files | path traversal fixed (#269); request and upload size limits: #274 |

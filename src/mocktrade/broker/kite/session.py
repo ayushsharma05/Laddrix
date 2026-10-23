@@ -12,7 +12,7 @@ passwords or TOTP secrets and never automates the login itself.
 """
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from mocktrade.broker.kite.http import KiteError, KiteHttp
@@ -23,7 +23,7 @@ LOGIN_URL = "https://kite.zerodha.com/connect/login"
 @dataclass(frozen=True)
 class KiteSession:
     user_id: str  # the Zerodha client id that logged in
-    access_token: str
+    access_token: str = field(repr=False)  # never in a log or an error message (#367)
 
 
 def login_url(api_key: str, state: str | None = None) -> str:

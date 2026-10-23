@@ -435,6 +435,84 @@ class UserStore:
                 )
         return _user(row)
 
+    # --- one person's data: export and erase (#367) ---------------------------------------------
+
+    def export_user(self, user_id: str) -> dict:
+        """What this store holds about one person, for them to keep (docs/design/data.md).
+        Secrets are named, never given: the password hash and authenticator secret are
+        credentials, not information about the person."""
+        with self._db() as db:
+            row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            if row is None:
+                raise KeyError(user_id)
+            accounts = [_account(r) for r in db.execute("SELECT * FROM accounts ORDER BY id")]
+            mine = (user_id,)
+            settings = db.execute("SELECT name, value FROM user_settings WHERE user_id = ? "
+                                  "ORDER BY name", mine).fetchall()  # fmt: skip
+            layouts = db.execute("SELECT name, layout FROM layouts WHERE user_id = ? "
+                                 "ORDER BY name", mine).fetchall()  # fmt: skip
+        user = _user(row)
+        return {
+            "user": {"id": user.id, "name": user.name, "roles": sorted(r.value for r in user.roles),
+                     "active": user.active},
+            "accounts": [{"id": a.id, "broker": a.broker, "as": "owner"
+                          if a.owner_user_id == user_id else "trader"}
+                         for a in accounts
+                         if a.owner_user_id == user_id or user_id in a.traders],
+            "settings": {r["name"]: json.loads(r["value"]) for r in settings},
+            "layouts": {r["name"]: json.loads(r["layout"]) for r in layouts},
+            "sessions": self.own_sessions(user_id, None),
+            "held_but_not_given": ["password (only a one-way hash is stored)",
+                                   "authenticator secret (encrypted)"],
+        }  # fmt: skip
+
+    def erase_check(self, user_id: str) -> None:
+        """Raise what erase_user would refuse with (KeyError, ValueError, LastAdmin)."""
+        with self._db() as db:
+            self._erase_refusal(db, user_id)
+
+    def _erase_refusal(self, db: sqlite3.Connection, user_id: str) -> None:
+        if db.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone() is None:
+            raise KeyError(user_id)
+        owned = [r["id"] for r in db.execute(
+            "SELECT id FROM accounts WHERE owner_user_id = ?", (user_id,))]  # fmt: skip
+        if owned:
+            raise ValueError(f"{user_id} owns {', '.join(owned)}: give each account another "
+                             "owner first (nothing was erased)")  # fmt: skip
+        admins = [r["id"] for r in db.execute("SELECT id, roles FROM users WHERE active = 1")
+                  if Role.ADMIN.value in r["roles"].split(",")]  # fmt: skip
+        if admins == [user_id]:
+            raise LastAdmin(f"{user_id} is the last active admin: nothing was erased")
+
+    def erase_user(self, user_id: str) -> dict[str, int]:
+        """Remove what this store holds about one person. Their id stays, as a pseudonym:
+        the audit trail is kept (record keeping, docs/design/data.md) and names them by id.
+
+            owns an account ─► refused (hand it to someone else first)
+            the last active admin ─► refused
+            removed from every account's traders; sessions, settings, layouts deleted;
+            name replaced, password and authenticator replaced by random ones, turned off
+        """
+        with self._lock, self._db() as db:
+            self._erase_refusal(db, user_id)
+            done = {"traders_of": 0}
+            for account in [_account(r) for r in db.execute("SELECT * FROM accounts")]:
+                if user_id in account.traders:
+                    left = ",".join(sorted(account.traders - {user_id}))
+                    db.execute("UPDATE accounts SET traders = ? WHERE id = ?", (left, account.id))
+                    done["traders_of"] += 1
+            for table in ("sessions", "user_settings", "layouts"):
+                done[table] = db.execute(f"DELETE FROM {table} WHERE user_id = ?",
+                                         (user_id,)).rowcount  # fmt: skip
+            db.execute(
+                "UPDATE users SET name = 'erased user', roles = '', active = 0, "
+                "password_hash = ?, totp_secret = ?, failures = 0, locked_until = NULL, "
+                "must_change = 0 WHERE id = ?",
+                (security.hash_password(security.new_temporary_password() * 2),
+                 self._box.seal(security.new_totp_secret()), user_id),
+            )  # fmt: skip
+        return done
+
     # --- step-up and a user's own sessions (#363) ----------------------------------------------
 
     def step_up(self, token: str, code: str) -> None:

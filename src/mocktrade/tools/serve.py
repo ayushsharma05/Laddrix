@@ -61,6 +61,7 @@ from urllib.parse import urlparse
 import uvicorn
 from fastapi import FastAPI
 
+from mocktrade import logsafe
 from mocktrade.alerts.service import build_market_alerts
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.algos.engine import parse_algo_ids, with_exchange_ids
@@ -114,7 +115,7 @@ EGRESS_SCHEMES = ("http", "https")  # a proxy giving an account its own IP (#372
 
 @dataclass(frozen=True)
 class ServeSettings:
-    secret_key: str
+    secret_key: str = field(repr=False)  # never in a log or an error message (#367)
     origin: str
     data_dir: Path = Path("data")
     host: str = "127.0.0.1"
@@ -544,6 +545,7 @@ async def run(settings: ServeSettings) -> None:
         ws_ping_interval=20,
         ws_ping_timeout=20,
     )
+    logsafe.install()  # after uvicorn set up its loggers: every line passes the filter (#367)
     server = _Server(config)
     keep = built.platform.supervisor.keep  # every job watched: a crash is said and restarted
     tasks = [

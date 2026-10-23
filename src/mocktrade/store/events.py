@@ -24,11 +24,17 @@ Why these choices:
   kill switch events are always kept (there are only as many as orders, and new orders are
   refused while the log is behind); notes (audit extras) past `max_backlog` are dropped,
   counted in `dropped` and logged.
+- Tamper-evident (#367): each row carries `chain`, a SHA-256 of the row and the chain before
+  it. Changing or deleting any earlier row breaks every chain after it (`verify_chain`,
+  tools/audit.py). It is evidence, not a lock: someone with the file can rewrite the whole
+  chain, which is caught only against a head kept elsewhere (each backup's manifest records
+  it, docs/design/data.md). Rows written before #367 have no chain and are reported as such.
 - Python's built-in sqlite3: no extra dependency. Moving to PostgreSQL later means
   another class with the same methods.
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import queue
@@ -72,9 +78,55 @@ CREATE INDEX IF NOT EXISTS events_by_account ON events (account_id, client_order
 """
 
 _INSERT = (
-    "INSERT INTO events (ts, account_id, kind, client_order_id, detail, payload) "
-    "VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO events (ts, account_id, kind, client_order_id, detail, payload, chain) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?)"
 )
+
+
+def link(previous: str, row: tuple) -> str:
+    """The chain value of `row` (ts, account, kind, order id, detail, payload) after
+    `previous` (the chain of the row before it; "" for the first)."""
+    text = json.dumps([previous, *row], separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class ChainReport:
+    rows: int
+    unchained: int  # written before #367: before the first chained row, not covered
+    head_seq: int | None  # the last row, and its chain: what a backup's manifest records
+    head: str | None
+    broken_at: int | None = None  # the first row whose chain doesn't follow
+    why: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return self.broken_at is None
+
+
+def verify_chain(path: str | Path) -> ChainReport:
+    """Walk the whole log and recompute every chain. Read-only."""
+    db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        previous, rows, unchained, last_seq = "", 0, 0, None
+        cur = db.execute("SELECT seq, ts, account_id, kind, client_order_id, detail, payload, "
+                         "chain FROM events ORDER BY seq")  # fmt: skip
+        for seq, *row, chain in cur:
+            rows += 1
+            if chain is None:
+                if previous:
+                    return ChainReport(rows, unchained, last_seq, previous, seq,
+                                       "a row without a chain after chained rows")  # fmt: skip
+                unchained += 1
+                last_seq = seq
+                continue
+            if chain != link(previous, tuple(row)):
+                why = "this row was changed, or one before it was changed or removed"
+                return ChainReport(rows, unchained, last_seq, previous or None, seq, why)
+            previous, last_seq = chain, seq
+        return ChainReport(rows, unchained, last_seq, previous or None)
+    finally:
+        db.close()
 
 
 @dataclass(frozen=True)
@@ -129,9 +181,13 @@ class EventLog:
         self._closed = False
         self.healthy = True
         self.written = 0
+        self._head: str | None = None  # the last chain written (the writer thread's own)
         with self._reader() as db:
             db.execute("PRAGMA journal_mode=WAL")
             db.executescript(_SCHEMA_SQL)
+            have = {r[1] for r in db.execute("PRAGMA table_info(events)")}
+            if "chain" not in have:  # a log from before #367: new rows are chained from here
+                db.execute("ALTER TABLE events ADD COLUMN chain TEXT")
 
     # --- lifecycle --------------------------------------------------------------------------
 
@@ -308,8 +364,17 @@ class EventLog:
             rows.append(item)
 
     def _write(self, db: sqlite3.Connection, rows: list[tuple]) -> None:
+        if self._head is None:
+            last = db.execute("SELECT chain FROM events WHERE chain IS NOT NULL "
+                              "ORDER BY seq DESC LIMIT 1").fetchone()  # fmt: skip
+            self._head = last[0] if last else ""
+        head, chained = self._head, []
+        for row in rows:
+            head = link(head, row)
+            chained.append((*row, head))
         with db:  # one transaction: all or nothing
-            db.executemany(_INSERT, rows)
+            db.executemany(_INSERT, chained)
+        self._head = head  # only once written: a failed batch is chained again on retry
 
     def _failed(self, exc: Exception) -> None:
         self.last_error = exc

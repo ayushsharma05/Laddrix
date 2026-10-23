@@ -537,3 +537,19 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Found by the first scans:** no known vulnerability in the 30 locked Python packages. gitleaks found 2 hits in 223 commits, both made-up passwords in `Admin.test.tsx`, accepted in `.gitleaksignore` (only test files are allowed there).
   - **CI caught:** the first image build failed: `.dockerignore` lets only listed files into the build, and the lock wasn't listed. Fixed, with a test. The SBOM upload also failed on a PR (its ref name has a '/'): now named by the tag on a release, else the commit.
   - **Checks:** 4 tests; mutation 15/15 (one first survivor was the mutant's fault: a package has 2 hashes, it broke one).
+- 23 Oct, #365 merged (PR #377). **#367 done** (data classification, logs, retention, one person's data, audit trail protection).
+  - **Found:**
+    - nothing filtered the logs;
+    - the web server's access log would have written the broker login's `request_token` (it is in the callback URL);
+    - the HTTP client logs every request's full URL, and a webhook's URL is often its secret;
+    - two places logged a webhook error's full text;
+    - printing the broker settings, the broker session or the server settings showed their secrets;
+    - there was no way to export or erase one person's data;
+    - nothing could show whether the audit trail had been edited.
+  - **The fix:**
+    - `logsafe.py` filters every log line, including the access log: secret parameters and JSON fields, auth headers, encrypted values, authenticator links, URL paths. The HTTP client's log is turned down to warnings, and secrets are left out when those objects are printed.
+    - The audit trail is hash-chained, the head is recorded in each backup's manifest, and `tools/audit.py verify [--against manifest]` checks it.
+    - `users export-user` / `erase-user`: the audit trail keeps an erased person by id, as record keeping requires.
+    - `docs/design/data.md`: classes, retention (audit trail at least 5 years per SEBI's broker rules; the firm's compliance officer to confirm), no production data in development, what the chain does and doesn't protect against.
+  - **The demo run caught** a bug the unit tests didn't: the filter broke the access log's formatting (it unpacks its parts itself). Fixed by cleaning each part in place, with a test.
+  - **Checks:** 14 tests; mutation 27/27 (two survivors were test gaps, now covered; one was an equivalent mutant, and its dead code was removed); the demo run 7/7 (`context/evidence/h-367-data-drill.txt`).
