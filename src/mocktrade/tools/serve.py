@@ -362,6 +362,7 @@ def build(settings: ServeSettings) -> Assembly:
         ReportStore(settings.data_dir / "reports"),
         is_trading_day=scheduler.is_trading_day,
     )
+    scheduler.daily("08:45", platform.roll_day, "new trading day")  # #266: no restart needed
     scheduler.daily("16:00", reports.close_of_day, "end-of-day reports")
     ticks = None
     if settings.record_days > 0:

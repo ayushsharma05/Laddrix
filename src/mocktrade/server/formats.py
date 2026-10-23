@@ -23,6 +23,9 @@ def position_to_dict(p: PositionView) -> dict[str, Any]:
         "buy_value_paise": p.buy_value_paise,
         "sell_value_paise": p.sell_value_paise,
         "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+        "carried_avg_paise": (
+            decimal_text(p.carried_avg_paise) if p.carried_avg_paise is not None else None
+        ),
     }
 
 

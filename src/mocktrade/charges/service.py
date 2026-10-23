@@ -73,6 +73,11 @@ class ChargesService:
         """Order manager listener: a fill changes the day's charges."""
         if event.kind is not EventKind.FILL or event.account_id != self.account_id:
             return
+        self.refresh()
+
+    def refresh(self) -> None:
+        """Work the day's bill out again (a fill, or a new trading day: #266) and tell the
+        listeners if it changed."""
         bill = self._work_out()
         if bill == self._bill:
             return
