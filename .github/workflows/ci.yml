@@ -10,7 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -26,7 +26,7 @@ jobs:
       run:
         working-directory: ui
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
@@ -46,7 +46,7 @@ jobs:
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1" # the rules are tested without starting Electron
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
@@ -61,7 +61,7 @@ jobs:
   image:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: shellcheck deploy/*.sh
       - run: docker build -t mocktrade:ci .
       - name: compose file is valid
@@ -75,7 +75,7 @@ jobs:
     # #365: known vulnerabilities in what we ship, secrets in the history, and the SBOMs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the whole history: a secret removed later is still leaked
       - uses: actions/setup-python@v6
