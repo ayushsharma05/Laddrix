@@ -34,7 +34,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from mocktrade.alerts.engine import AlertError
 from mocktrade.alerts.engine import spec as alert_spec
 from mocktrade.alerts.service import MarketAlerts
-from mocktrade.algos.engine import AlgoError
+from mocktrade.algos.engine import AlgoError, algo_id_note
 from mocktrade.algos.spec import spec_to_dict as algo_spec_to_dict
 from mocktrade.broker.base import BrokerError
 from mocktrade.charges.model import bill_to_dict
@@ -1368,7 +1368,12 @@ def create_app(
 
     @app.get("/api/accounts/{account_id}/algo-specs")
     async def algo_specs(account_id: str, user: Me) -> list[dict[str, Any]]:
-        return [algo_spec_to_dict(s) for s in runtime(account_id, user).algos.specs()]
+        engine = runtime(account_id, user).algos
+        return [
+            {**algo_spec_to_dict(t.spec), "exchange_algo_id": t.exchange_algo_id,
+             "exchange_algo_note": algo_id_note(t)}  # said, not hidden (#291)
+            for t in engine.types.values()
+        ]  # fmt: skip
 
     @app.get("/api/accounts/{account_id}/algos")
     async def list_algos(account_id: str, user: Me) -> list[dict[str, Any]]:

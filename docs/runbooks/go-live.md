@@ -21,6 +21,7 @@ The steps marked "test" point to automated tests that check the same logic again
 | Holidays set | `MOCKTRADE_HOLIDAYS` has NSE's list for the year | — | ☐ |
 | Alerts reach your phone | set `MOCKTRADE_ALERT_WEBHOOK`, restart, stop the price feed briefly (or wait for the 08:30 login reminder): the message arrives | private and plain-http addresses refused (paper) | ☐ |
 | Limits are right | Admin → Limits: max order value, max lots, daily loss, OPS ≤ 10/s | — | ☐ |
+| SEBI algo rules re-checked (#291) | `docs/design/compliance.md`: the 10 orders/s line and the static IP still hold; if any algo runs above 10/s, it is registered, `MOCKTRADE_ALGO_IDS` set, and Kite's field name for the algo id confirmed with Zerodha | algos refuse to start above 10/s without an id (tests) | ☐ |
 
 ## 1. Login and session expiry
 

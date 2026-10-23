@@ -55,4 +55,19 @@ other people, means registering first (the algo id, below).
 
 ## The exchange algo id
 
-See the section below once #291's second part lands.
+```
+ settings: MOCKTRADE_ALGO_IDS=SLICER=AB123,TWAP=CD456   (once each is registered)
+      ─► each algo type carries its id (AlgoType.exchange_algo_id)
+      ─► every order the algo sends carries it (OrderRequest.algo_id): the audit trail and the
+         auditor's export show it; the Kite adapter sends it to the broker
+ start an algo with no id while the account may send more than 10 orders a second
+      ─► refused, in words: register it first
+ the algo screens (GET .../algo-specs) say for each algo whether it has an id, and what
+ that means ("no exchange algo id: allowed while orders stay at or below 10 a second")
+```
+
+- **Today no id is needed.** MockTrade's throttle allows 8 orders a second, below the line.
+  The ids matter once the rate goes up, or the algos are offered to other people.
+- **Kite's field for the id isn't in its public documentation** (checked 23 Oct 2026). The
+  adapter sends it as `algo_id`, and only when an id is set. Confirm the field name with
+  Zerodha before setting one. This is on the go-live checklist.

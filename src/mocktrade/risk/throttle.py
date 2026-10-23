@@ -135,6 +135,8 @@ class OrderThrottle:
         self._max_wait_s = max_wait_s
         self._counters = [_Counter(rule) for rule in rules]
         self._broker_limits = broker_limits
+        # the most new orders allowed in one second (the SEBI line for algos is 10, #291)
+        self.per_second = min((r.limit for r in rules if r.window_s == 1.0), default=0)
         self._waiting = {"orders": asyncio.Lock(), "cancels": asyncio.Lock()}
         self._modifications: dict[str, int] = {}
         self._modifications_day: date | None = None

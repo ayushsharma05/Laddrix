@@ -427,6 +427,7 @@ class Platform:
         types: tuple[AlgoType, ...],
         clock: Callable[[], datetime],
         book: PositionBook | None = None,
+        throttle: OrderThrottle | None = None,
     ) -> AlgoEngine:
         """The account's algos: blocked while a kill switch is on, stopped when one engages,
         every state change audited."""
@@ -473,6 +474,7 @@ class Platform:
             clock=clock,
             audit=audit,
             position=None if book is None else position_of(book),
+            **({"orders_per_second": lambda: throttle.per_second} if throttle else {}),
         )
 
         def on_switch(_name: str, state) -> None:
@@ -591,7 +593,7 @@ class Platform:
                     },
                 )
             )
-        algos = self._algo_engine(account.id, orders, switch, algo_types, clock, book)
+        algos = self._algo_engine(account.id, orders, switch, algo_types, clock, book, throttle)
         basket_audit = None
         if self.event_log is not None:
             log = self.event_log

@@ -24,7 +24,7 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import Awaitable, Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
@@ -145,6 +145,35 @@ class AlgoType:
     spec: AlgoSpec
     make: StrategyFactory
     exchange_algo_id: str | None = None  # the exchange's id once empanelled (SEBI framework)
+
+
+OPS_WITHOUT_ALGO_ID = 10  # SEBI: orders a second an unregistered algo may send (#291)
+
+
+def algo_id_note(kind: "AlgoType") -> str:
+    """What the screens say about an algo's exchange id."""
+    if kind.exchange_algo_id:
+        return (f"exchange algo id {kind.exchange_algo_id}: its orders carry it (in the audit "
+                "trail, and to the broker where its API takes it)")  # fmt: skip
+    return (f"no exchange algo id: allowed while orders stay at or below "
+            f"{OPS_WITHOUT_ALGO_ID} a second, as MockTrade's throttle keeps them")  # fmt: skip
+
+
+def with_exchange_ids(types: Iterable["AlgoType"], ids: dict[str, str]) -> list["AlgoType"]:
+    """The algo types with the exchange ids given per code (settings: MOCKTRADE_ALGO_IDS)."""
+    return [replace(t, exchange_algo_id=ids.get(t.spec.code) or t.exchange_algo_id)
+            for t in types]  # fmt: skip
+
+
+def parse_algo_ids(text: str) -> dict[str, str]:
+    """ "SLICER=AB123, TWAP=CD456" -> {"SLICER": "AB123", "TWAP": "CD456"}; ValueError if bad."""
+    ids = {}
+    for part in filter(None, (p.strip() for p in text.split(","))):
+        code, sep, value = part.partition("=")
+        if not sep or not code.strip() or not value.strip():
+            raise ValueError(f"MOCKTRADE_ALGO_IDS: {part!r} is not CODE=ID")
+        ids[code.strip().upper()] = value.strip()
+    return ids
 
 
 class AlgoError(Exception):
@@ -402,7 +431,9 @@ class AlgoEngine:
         audit: Callable[[AlgoEvent], None] | None = None,
         id_prefix: str = "A",
         position: Callable[[str, Any], int] | None = None,  # (instrument, product) -> qty
+        orders_per_second: Callable[[], int] = lambda: 8,  # the throttle's per-second limit
     ) -> None:
+        self._ops = orders_per_second
         self.account_id = account_id
         self._position = position
         self.manager = manager
@@ -458,6 +489,12 @@ class AlgoEngine:
             raise AlgoError(f"there is no algo called {code!r}")
         if (why := self._blocked()) is not None:
             raise AlgoError(why)
+        if not kind.exchange_algo_id and self._ops() > OPS_WITHOUT_ALGO_ID:
+            raise AlgoError(
+                f"{code} has no exchange algo id, and this account may send {self._ops()} "
+                f"orders a second: above {OPS_WITHOUT_ALGO_ID}, SEBI's framework needs the "
+                "algo registered with the exchange first (docs/design/compliance.md)"
+            )
         instrument = self.instruments(instrument_id)
         if instrument is None:
             raise AlgoError(f"unknown instrument {instrument_id}")
