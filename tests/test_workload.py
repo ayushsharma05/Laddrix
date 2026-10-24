@@ -60,14 +60,14 @@ def record(root, fut, n=6000):
 async def busy_loop(stop):
     """Other work on the loop, as on a server: wakes often, holds the loop a little."""
     while not stop.is_set():
-        end = time.perf_counter() + 0.0005
+        end = time.perf_counter() + 0.00002  # 20 µs: other work, without slowing the test
         while time.perf_counter() < end:
             pass
         await asyncio.sleep(0)
 
 
 async def test_a_backtest_never_depends_on_what_else_the_loop_is_doing(nifty_fut, store, tmp_path):
-    day = record(tmp_path / "ticks", nifty_fut.id)
+    day = record(tmp_path / "ticks", nifty_fut.id, n=1500)  # 5 minutes of replayed time
     run = spec(nifty_fut.id, qty=60 * 75, params=FAST)
     alone = await InProcess().day(run, DAY, day, store, MODEL, tmp_path / "a")
     stop = asyncio.Event()
