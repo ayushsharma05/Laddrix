@@ -38,6 +38,7 @@ The production-hardening pass (#257) and the security gate (#279). Each item's P
   - workspaces, with every check scoped (#394);
   - each trader's own Zerodha prices (#395);
   - files and jobs per firm (#396).
+- **Paper broker ids after a restart (#419):** order and trade ids no longer repeat after a restart, so a new fill is never "corrected" to an earlier trade's price.
 - **Workload:** backtests in their own process, reports off the trading loop, scheduler jobs that never hold each other up, and backtests whose results don't depend on the machine (#274).
 - **Free pages (#410):** a page can hold its widgets as windows of any size, anywhere, with gaps, and scroll both ways to reach them; edges snap to neighbours and an 8 px grid (Alt: no snapping). New pages are free; each page switches between free and docked from its tab, and layouts saved before keep opening docked.
 - **Autospreader, part 1 (#414):** multi-leg spread definitions (2 to 6 legs, ratios, price multipliers, a quoting leg, pay-up) and their live implied bid and ask, priced from each trader's own leg prices; the Autospreader widget. Execution (#415) and the spread ladder (#416) follow.

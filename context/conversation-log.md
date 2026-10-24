@@ -693,4 +693,9 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - 16 algo tests, including a butterfly end to end on the paper broker: positions +75 / −150 / +75;
     - 5 API tests;
     - mutation 34/34 (after tightening four gaps it found).
+- 24 Oct, evening. **Bug #419, found by the spread ladder's browser check.**
+  - **What happened:** after a demo restart, a NIFTY Oct buy at 25,009.60 was "corrected" to 25,145.70, a Nov price.
+  - **Why:** the paper broker numbered orders and trades from P1/T1 on every start. The day's adopted trades already held a P1/T1, so the trade check (#352) took that old trade as the new order's.
+  - **Fix:** each start's ids carry its start time (`P<base36 seconds>-1`). A replay with a fixed clock keeps the same ids.
+  - **Checks:** a regression test with a real morning run, a restart, and a new fill at its own price; mutation 5/5.
 
