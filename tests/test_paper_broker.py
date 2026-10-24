@@ -6,12 +6,13 @@ Prices below are in paise (2501000 = 25,010.00).
 
 import asyncio
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 
 from mocktrade.broker.base import Broker, BrokerError
-from mocktrade.broker.paper import PaperBroker
+from mocktrade.broker.paper import PaperBroker, _base36
 from mocktrade.broker.rules import MAX_MODIFICATIONS_PER_ORDER, protected_limit
 from mocktrade.domain.orders import (
     OrderRequest,
@@ -122,7 +123,7 @@ async def test_ids_are_sequential_and_ack_waits_for_latency(broker, market):
     _, md = market
     first = await place(broker, md, order(price=2500000))
     second = await place(broker, md, order(cid="MT2", price=2500000))
-    assert (first, second) == ("P1", "P2")
+    assert (first, second) == (f"P{broker.run_id}-1", f"P{broker.run_id}-2")
     assert broker.sleeps == [0.08, 0.08]
     statuses = [u.status for u in await drain(broker)]
     assert statuses == [OrderStatus.OPEN, OrderStatus.OPEN]
@@ -604,3 +605,49 @@ async def test_a_late_older_tick_does_not_make_volume_count_twice(broker, market
     broker.on_tick(tick(2501000, bids=[(2501000, 50)], asks=[(2501010, 75)], volume=10_150))
     # really 150 traded (exactly the queue ahead); counting from the late tick would say 250
     assert await drain(broker) == []
+
+
+# --- ids across a restart (#419) ------------------------------------------------------------
+
+
+async def test_ids_never_repeat_across_a_restart_so_old_trades_never_correct_new_fills(market):
+    """Found by the spread ladder's browser check: after a restart the first new order was
+    "P1" again, the day's adopted trades held an older "P1"/"T1" (another price), and the
+    trade check took that trade as the new order's and "corrected" it."""
+    from mocktrade.orders.trade_check import ledger
+
+    store, md = market
+    first_start = datetime(2026, 10, 24, 9, 30, tzinfo=UTC)
+    md.on_tick(Tick(FUT, 2514570, bids=(DepthLevel(2514560, 750, 3),),
+                    asks=(DepthLevel(2514570, 750, 3),)))  # fmt: skip
+    before = PaperBroker(md, store, latency_s=0.0, clock=lambda: first_start)
+    before.start()
+    old = await before.place(order(cid="MT1", price=2514570))  # the morning: it fills
+    await before.settle()
+    earlier = await before.trades()
+    await before.aclose()
+
+    later = first_start + timedelta(minutes=7)
+    after = PaperBroker(md, store, latency_s=0.0, clock=lambda: later)  # the restart
+    after.adopt(trades=earlier)  # today's earlier trades come back
+    after.start()
+    try:
+        md.on_tick(Tick(FUT, 2500960, bids=(DepthLevel(2500950, 750, 3),),
+                        asks=(DepthLevel(2500960, 750, 3),)))  # fmt: skip
+        new = await after.place(order(cid="MT9", price=2500960))
+        await after.settle()
+        trades = await after.trades()
+        assert new != old
+        assert len({t.trade_id for t in trades}) == len(trades) == 2  # no trade id twice
+        assert ledger(trades)[new] == (75, 75 * 2500960)  # its own fill, at its own price
+        assert ledger(trades)[old] == (75, 75 * 2514570)
+    finally:
+        await after.aclose()
+
+
+def test_a_replay_with_a_fixed_clock_gets_the_same_ids_every_run(market):
+    store, md = market
+    start = datetime(2026, 10, 14, 3, 45, tzinfo=UTC)
+    runs = [PaperBroker(md, store, clock=lambda: start).run_id for _ in range(2)]
+    assert runs[0] == runs[1] and runs[0] == _base36(int(start.timestamp()))
+    assert [_base36(n) for n in (0, 35, 36, 1792834471)] == ["0", "z", "10", "tnenxj"]
