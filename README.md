@@ -96,7 +96,7 @@ More: [architecture](docs/design/kite-architecture.md) · [domain model](docs/de
 | | |
 | --- | --- |
 | **Size** | ~27k lines of Python and ~14k lines of TypeScript, plus ~29k lines of tests |
-| **Tests** | 1,450+ pytest and 420 vitest tests, run in CI on every pull request, with dependency audit, secret scanning and an SBOM |
+| **Tests** | 1,480+ pytest and 420 vitest tests, run in CI on every pull request, with dependency audit, secret scanning and an SBOM |
 | **Mutation testing** | 60+ scripts that inject deliberate bugs into safety rules and check that a test catches each one |
 | **Real-browser checks** | Playwright runs against the live demo, with the results kept as evidence |
 | **Drills** | Crash-and-restart, backup-and-restore and deploy-and-rollback, each rehearsed for real |

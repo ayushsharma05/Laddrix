@@ -637,3 +637,24 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - The operator added acme from the terminal, as the runbook says. Each firm saw only its own accounts and users. An acme order was invisible to main, and each firm's request for the other's account was answered "not found".
   - Acme's STOP showed on acme's screens only and cancelled acme's resting order; main kept trading.
   - With this, #368 (multi-tenant) is done. What remains before an outside firm trades is Zerodha's answer (#278), on Ayush's to-do list.
+- 24 Oct, morning (India). **The repo tidied, while Ayush slept** (his ask: bugs first, then a clean professional repo, keeping every piece of design and future-feature information).
+  - **Bug issues:** all fixed and merged: #271 (PR #404), #274 (PR #405), #277 (PR #406), plus the #397 two-firm drill (PR #407), which completed #368.
+  - **Pull requests:** none left open. The Dependabot majors were already closed. #399 (React minor) is merged. #371's two notes were carried into PR #403 and it was closed.
+  - **Issues:**
+    - Ayush's own steps are in one issue, #408. #240 (accept v1), #278 (Zerodha's questions) and #369 (the security review) are closed into it.
+    - The gates #257 and #279 are closed as done.
+    - Every open feature issue (#241–#255, #297–#322) had its stale "after #240/#257" opening rewritten. Its scope and acceptance criteria are kept word for word.
+  - **Archived, not deleted** (`docs/archive/`, with an index):
+    - the COMEX/CME track: the CME guide, its requirements, its diagrams;
+    - project history: the build map, the backlog scripts, the 15 Oct merge recovery, the old status file.
+    - The one-chart stays: it is current architecture.
+  - **New:**
+    - `docs/README.md` (the index);
+    - `docs/running-locally.md` (run and test everything on one computer);
+    - `docs/roadmap/` (with the feature research moved there);
+    - a fresh short `context/status.md`;
+    - the changelog's "Unreleased" section.
+  - **Made portable:** the 34 browser checks no longer hard-code the cloud container's paths (`PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`).
+  - **Found on the way:**
+    - a new undici advisory failed the desktop audit (fixed in PR #405);
+    - the workload tests took 13 minutes on CI (now about 20 s, and the CI test job has a 30-minute limit).
