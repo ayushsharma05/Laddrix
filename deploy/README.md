@@ -1,6 +1,6 @@
 # Deploy
 
-MockTrade runs as two containers:
+MockTrade runs as two containers (plus two optional ones for monitoring):
 
 ```
 browser ──https──► caddy (ports 80/443, certificates) ──► app (port 8000, private network)
@@ -13,7 +13,8 @@ browser ──https──► caddy (ports 80/443, certificates) ──► app (p
 | `compose.yaml` | The app and Caddy. The app has a read-only filesystem, no capabilities and a private network, and keeps its data in a volume. |
 | `Caddyfile` | HTTPS for `MOCKTRADE_DOMAIN`. Stream messages pass through unbuffered. |
 | `.env.example` | The settings to copy into `deploy/.env`. Never commit `deploy/.env`. |
-| `smoke.sh` | Checks a built image: it starts locked down, answers, and stops with exit code 0. CI runs it. |
+| `smoke.sh` | Checks a built image: it starts locked down, becomes healthy (ready), answers, logs JSON, and stops with exit code 0. CI runs it. |
+| `monitoring/` | Optional Prometheus and Grafana with the MockTrade dashboard (`--profile monitoring`). See `docs/runbooks/monitoring.md`. |
 | `deploy.sh`, `rollback.sh`, `window.sh` | Deploy a tagged release outside market hours, with a backup first and an automatic rollback if it isn't healthy; go back by hand. See `docs/runbooks/release.md`. |
 
 The server entry point is `python -m mocktrade.tools.serve`. Its settings are listed at the
@@ -57,8 +58,8 @@ so contracts can be searched after a restart even before that day's login.
 
 | Task | Command |
 |---|---|
-| Logs | `docker compose -f deploy/compose.yaml logs -f app` |
-| Status | `docker compose -f deploy/compose.yaml ps` (the app shows `healthy`) |
+| Logs | `docker compose -f deploy/compose.yaml logs -f app` (JSON lines: search them with `jq`, see `docs/runbooks/monitoring.md`) |
+| Status | `docker compose -f deploy/compose.yaml ps` (the app shows `healthy` when it can trade); which part and why: Admin → Status |
 | Update | `git pull && docker compose -f deploy/compose.yaml up -d --build` |
 | Stop | `docker compose -f deploy/compose.yaml stop` |
 | Back up | `docker run --rm -v mocktrade_data:/data -v "$PWD":/out alpine tar czf /out/mocktrade-data.tgz -C /data .` |

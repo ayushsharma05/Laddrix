@@ -37,7 +37,9 @@ ENV MOCKTRADE_BUILD=$MOCKTRADE_BUILD \
 USER mocktrade
 VOLUME /data
 EXPOSE 8000
-HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
-    CMD ["python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"]
+# healthy = ready (#287): no part starting or down (GET /api/ready, src/mocktrade/ops/status.py).
+# A restart's recovery may ask the broker for a while: the start period allows for it.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --retries=3 \
+    CMD ["python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/ready', timeout=2)"]
 STOPSIGNAL SIGTERM
 CMD ["python", "-m", "mocktrade.tools.serve"]

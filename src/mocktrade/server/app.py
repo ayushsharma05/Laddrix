@@ -15,14 +15,15 @@ same format as the event log (orders/codec.py).
 
 import asyncio
 import csv
+import hmac
 import io
 import json
 import logging
 import time
 from collections import deque
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol
@@ -54,9 +55,11 @@ from mocktrade.marketdata.movers import MoversError
 from mocktrade.marketdata.prints import print_to_dict
 from mocktrade.marketdata.service import MarketData
 from mocktrade.metrics import METRICS, process_gauges, since_us
+from mocktrade.ops import logs
 from mocktrade.ops.alerts import Alerts, alert_to_dict
 from mocktrade.ops.protection import GUARANTEE, ProtectionGuard, RestoreError
 from mocktrade.ops.scheduler import Scheduler
+from mocktrade.ops.status import NOT_READY, Status, worst
 from mocktrade.options.strategy import Strategies, StrategyError
 from mocktrade.options.strategy import templates as strategy_templates_list
 from mocktrade.orders.basket import BasketError, LegIn, check_to_dict
@@ -134,6 +137,9 @@ SECURITY_HEADERS = {
 class ServerSettings:
     origin: str  # where the screens are served from, e.g. "https://trade.example.in"
     cookie_secure: bool = True  # False only for local development over plain http
+    # a monitoring system's own key to read GET /api/metrics?format=prometheus with no
+    # login (#287): "Authorization: Bearer <it>". Empty: only signed-in admin and risk read
+    metrics_token: str = field(default="", repr=False)
 
     @property
     def cookie_name(self) -> str:
@@ -471,6 +477,14 @@ def create_app(
     )
     app.state.hub = hub
     METRICS.gauge("stream_connections", lambda: hub.connections)
+    status = Status(platform.supervisor, lambda: platform.accounts, alerts,
+                    lambda: platform.event_log.problem if platform.event_log else None)  # fmt: skip
+    app.state.status = status  # its watch() runs with the server's other jobs
+    METRICS.gauge("ready", lambda: 1 if status.ready()[0] else 0)  # the dashboard's top row
+    for level in ("WARN", "ERROR"):
+        METRICS.gauge(f"ops_alerts{{level={level}}}",
+                      lambda level=level: sum(a.level == level for a in alerts.active())
+                      if alerts else 0)  # fmt: skip
     sources = platform.prices.all() or [platform.market_data]  # every subscription's (#396)
     METRICS.gauge("ticks_received", lambda: sum(md.ticks_received for md in sources))
     METRICS.gauge("instruments_watched", lambda: sum(len(md.watched()) for md in sources))
@@ -484,6 +498,7 @@ def create_app(
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable[[Request], Awaitable[Response]]):
         started = time.perf_counter_ns()
+        request_id = logs.start_request(request.headers.get("x-request-id"))  # #287
         if request.method in UNSAFE_METHODS and request.url.path.startswith("/api/"):
             if request.headers.get("origin") != settings.origin:
                 return _headers(JSONResponse({"detail": "request from another site"}, 403))
@@ -491,10 +506,12 @@ def create_app(
                 if request.method != "DELETE":
                     return _headers(JSONResponse({"detail": "send JSON"}, 415))
         response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id  # quoted in a report: finds its log lines
         if request.url.path.startswith("/api/"):
             route = request.scope.get("route")
             name = getattr(route, "path", "other")  # the template: no ids in metric names
             METRICS.observe(f"http_us{{route={request.method} {name}}}", since_us(started))
+            METRICS.inc(f"http_responses{{status={response.status_code // 100}xx}}")
         if request.url.path.startswith("/assets/") and response.status_code == 200:
             # built files carry a content hash in their name: safe to cache for a year
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -504,6 +521,7 @@ def create_app(
         user = users.session_user(request.cookies.get(settings.cookie_name))
         if user is None:
             raise HTTPException(401, "please log in")
+        logs.note(user=user.id)  # this request's log lines say whose it is
         if user.must_change_password and request.url.path not in PASSWORD_FIRST:
             raise HTTPException(403, "set a new password first (an admin reset it)")
         return user
@@ -555,22 +573,45 @@ def create_app(
 
     @app.get("/api/ready", response_model=None)
     async def ready() -> Any:
-        """Readiness, apart from liveness (/api/health, #273): the critical loops run, the
-        supervisor's watchdog ticks, and every account's state is rebuilt. Says only yes or
-        no (it needs no login); the reasons are ops alerts on the screens."""
-        ok, problems = platform.supervisor.ready()
-        recovering = [a for a, r in platform.accounts.items()
-                      if r.recovery is not None and r.recovery.state != "ok"]  # fmt: skip
-        if ok and not recovering:
+        """Readiness, apart from liveness (/api/health, #273, #287): no part of the server is
+        starting or down (ops/status.py). Says only yes or no and how many parts are in the
+        way (it needs no login); which and why: GET /api/status, for admin and risk."""
+        ok, blocking = status.ready()
+        if ok:
             return {"ready": True}
-        return JSONResponse({"ready": False, "problems": len(problems) + len(recovering)},
-                            status_code=503)  # fmt: skip
+        return JSONResponse({"ready": False, "problems": len(blocking)}, status_code=503)
+
+    @app.get("/api/status")
+    async def server_status(user: Me) -> dict[str, Any]:
+        """The status page (#287): each part, its state, why and since when. Another firm's
+        accounts are never shown (#368)."""
+        if not _risk_or_admin(user):
+            raise HTTPException(403, "the status page is for admin and risk users")
+        every = status.parts()
+        parts = [p for p in every if p.account_id is None or in_workspace(user, p.account_id)]
+        hidden = sum(p.state in NOT_READY for p in every) - sum(p.state in NOT_READY for p in parts)
+        return {
+            "state": worst(parts),
+            "ready": hidden == 0 and all(p.state not in NOT_READY for p in parts),
+            "other_firms_not_ready": hidden,  # the server is shared: say so, never whose
+            "at": datetime.now(UTC).isoformat(),
+            "parts": [p.to_dict() for p in parts],
+        }
+
+    def scraper(request: Request) -> bool:
+        """The monitoring system's own key (#287), compared in constant time."""
+        given = request.headers.get("authorization", "")
+        token = settings.metrics_token
+        return bool(token) and hmac.compare_digest(given.encode(), f"Bearer {token}".encode())
 
     @app.get("/api/metrics", response_model=None)
-    async def metrics(user: Me, format: str = "json") -> dict[str, Any] | Response:
-        """How fast each step is (metrics.py). Admin and risk only."""
-        if not _risk_or_admin(user):
-            raise HTTPException(403, "metrics are for admin and risk users")
+    async def metrics(request: Request, format: str = "json") -> dict[str, Any] | Response:
+        """How fast each step is (metrics.py). Admin and risk, or the monitoring system's key
+        (the Prometheus format only: it reads nothing else)."""
+        if not (format == "prometheus" and scraper(request)):
+            user = current_user(request)
+            if not _risk_or_admin(user):
+                raise HTTPException(403, "metrics are for admin and risk users")
         if format == "prometheus":
             return Response(METRICS.prometheus(), media_type="text/plain; version=0.0.4")
         return METRICS.snapshot()

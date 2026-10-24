@@ -914,6 +914,24 @@ export interface AdminAccounts {
   brokers: string[]; // what this server can add
 }
 
+/** One part of the server on the status page (#287, ops/status.py). */
+export interface StatusPart {
+  name: string;
+  state: "ready" | "starting" | "degraded" | "down";
+  reason: string;
+  since: string | null;
+  account_id: string | null; // null: the whole server
+}
+
+/** GET /api/status: every part this user may see, and the worst of them. */
+export interface ServerStatus {
+  state: StatusPart["state"];
+  ready: boolean; // what Docker and the monitor see (GET /api/ready)
+  other_firms_not_ready: number; // a shared server: another firm's part, never named
+  at: string;
+  parts: StatusPart[];
+}
+
 /** The limits spec: the algo-spec format, with the kinds money, choices and instruments. */
 export interface LimitsSpec {
   code: string;

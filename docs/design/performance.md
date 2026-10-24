@@ -4,8 +4,12 @@ How fast MockTrade is, how it is measured, and what changed because of the measu
 
 ## How it is measured
 
-- **`/api/metrics`** (admin and risk; add `?format=prometheus` for a monitoring system):
-  histograms with p50, p90, p99 and max for every step (`src/mocktrade/metrics.py`).
+- **`/api/metrics`** (admin and risk; add `?format=prometheus` for a monitoring system, which
+  reads it with its own key, `MOCKTRADE_METRICS_TOKEN`, #287): histograms with p50, p90, p99 and
+  max for every step (`src/mocktrade/metrics.py`). Counters and gauges beside them: answers by
+  status class (`http_responses`), order events by kind (`order_events`), readiness (`ready`),
+  active alerts (`ops_alerts`). The Grafana dashboard that draws them:
+  [runbooks/monitoring.md](../runbooks/monitoring.md#the-dashboard-optional).
 
   | Metric | What it times |
   |---|---|

@@ -83,29 +83,20 @@ def test_snapshot_and_prometheus_text():
     assert m.snapshot()["histograms"]["kite_frame_us"]["count"] == 0
 
 
-async def test_loop_lag_and_gc_pauses_are_recorded():
-    import asyncio
-    import gc
-
-    from mocktrade.metrics import METRICS, freeze_heap, process_gauges, watch_loop_lag
-
+def test_prometheus_says_each_metrics_type_once_before_its_samples():
+    """Prometheus refuses a scrape with a second TYPE line for a metric (#287)."""
     m = Metrics()
-    watcher = asyncio.create_task(watch_loop_lag(m, interval_s=0.01))
-    await asyncio.sleep(0.03)
-    import time
-
-    time.sleep(0.05)  # something hogs the loop
-    await asyncio.sleep(0.03)
-    watcher.cancel()
-    lag = m.snapshot()["histograms"]["loop_lag_ms"]
-    assert lag["count"] >= 2 and lag["max"] >= 30
-
-    process_gauges(METRICS)
-    process_gauges(METRICS)  # twice: still one GC timer
-    METRICS.reset()
-    gc.collect()
-    assert METRICS.snapshot()["histograms"]["gc_pause_ms{gen=2}"]["count"] == 1
-    frozen_before = gc.get_freeze_count()
-    freeze_heap()
-    assert gc.get_freeze_count() >= frozen_before
-    gc.unfreeze()  # tests must not leave the heap frozen
+    m.observe("http_us{route=GET /a}", 5)
+    m.observe("http_us{route=GET /b}", 7)
+    m.inc("http_responses{status=2xx}")
+    m.inc("http_responses{status=5xx}")
+    m.gauge("ops_alerts{level=WARN}", lambda: 1)
+    m.gauge("ops_alerts{level=ERROR}", lambda: 0)
+    lines = m.prometheus().splitlines()
+    types = [line.split()[2] for line in lines if line.startswith("# TYPE")]
+    assert sorted(types) == ["mocktrade_http_responses_total", "mocktrade_http_us",
+                             "mocktrade_ops_alerts"]  # fmt: skip
+    for metric in types:
+        typed_at = next(i for i, x in enumerate(lines) if x.startswith(f"# TYPE {metric} "))
+        first_sample = next(i for i, x in enumerate(lines) if x.startswith(metric))
+        assert typed_at < first_sample

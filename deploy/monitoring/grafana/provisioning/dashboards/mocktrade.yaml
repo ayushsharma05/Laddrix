@@ -1,0 +1,10 @@
+# The MockTrade dashboard, loaded from deploy/monitoring/grafana/dashboards (#287).
+apiVersion: 1
+providers:
+  - name: mocktrade
+    folder: MockTrade
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

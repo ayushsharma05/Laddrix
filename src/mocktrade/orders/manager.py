@@ -31,6 +31,8 @@ share state, so they can later run in separate processes.
 """
 
 import asyncio
+import functools
+import inspect
 import logging
 import time
 from collections.abc import Awaitable, Callable, Iterable, Sequence
@@ -44,6 +46,7 @@ from mocktrade.domain.money import format_rupees
 from mocktrade.domain.order_spec import OrderSpec, spec_problem
 from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderUpdate
 from mocktrade.metrics import METRICS, since_us
+from mocktrade.ops import logs
 from mocktrade.orders.gate import OpenGate, OrderGate
 from mocktrade.orders.model import (
     ClientIds,
@@ -56,6 +59,35 @@ from mocktrade.orders.model import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _logged(method):
+    """Lines logged while `method` runs carry its account and order ids (#287, ops/logs.py).
+    Its first argument is the order: a client order id, a request or a broker update."""
+
+    def ids(self, what) -> dict:
+        if isinstance(what, str):
+            return {"account_id": self.account_id, "client_order_id": what}
+        return {"account_id": self.account_id,
+                "client_order_id": getattr(what, "client_order_id", None) or None,
+                "broker_order_id": getattr(what, "broker_order_id", None) or None}  # fmt: skip
+
+    if inspect.iscoroutinefunction(method):
+
+        @functools.wraps(method)
+        async def run_async(self, what, *args, **kwargs):
+            with logs.bound(**ids(self, what)):
+                return await method(self, what, *args, **kwargs)
+
+        return run_async
+
+    @functools.wraps(method)
+    def run(self, what, *args, **kwargs):
+        with logs.bound(**ids(self, what)):
+            return method(self, what, *args, **kwargs)
+
+    return run
+
 
 S = OrderStatus
 ALLOWED: dict[OrderStatus, frozenset[OrderStatus]] = {
@@ -175,6 +207,7 @@ class OrderManager:
 
     # --- new orders -----------------------------------------------------------------------
 
+    @_logged
     async def submit(self, request: OrderRequest) -> OrderView:
         """Send a new order. Leave `client_order_id` empty to get a fresh one.
 
@@ -183,6 +216,7 @@ class OrderManager:
         """
         if not request.client_order_id:
             request = replace(request, client_order_id=self._ids.next())
+            logs.note(client_order_id=request.client_order_id)  # this order's lines from here
         existing = self._orders.get(request.client_order_id)
         if existing is not None:
             first = existing.asked or existing.request
@@ -284,6 +318,7 @@ class OrderManager:
 
     # --- changing and cancelling ------------------------------------------------------------
 
+    @_logged
     async def modify(
         self,
         client_order_id: str,
@@ -386,6 +421,7 @@ class OrderManager:
             return str(exc) or repr(exc)
         return None
 
+    @_logged
     async def cancel(self, client_order_id: str) -> OrderView:
         """Ask to cancel a working order. The CANCELLED status arrives as a broker update."""
         order = self._working_order(client_order_id)
@@ -515,6 +551,7 @@ class OrderManager:
         async for update in self._broker.updates():
             self.apply(update)
 
+    @_logged
     def apply(self, update: OrderUpdate, *, current: bool = False) -> bool:
         """Apply one broker update. Returns True if it changed the order.
 
@@ -870,6 +907,7 @@ class OrderManager:
         )
 
     def _publish(self, event: OrderEvent) -> None:
+        METRICS.inc(f"order_events{{kind={event.kind.value}}}")  # orders, fills, rejects (#287)
         for listener in list(self._listeners):
             try:
                 listener(event)

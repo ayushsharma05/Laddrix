@@ -224,6 +224,7 @@ async def main(
                      market_alerts=market_alerts,
                      spreads=spreads,
                      starter=CallbackStarter(("paper",), start))  # fmt: skip
+    jobs.append(app.state.status.watch())  # "since when" on the status page (#287)
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
     logsafe.install()  # the same filter as the real server: no secret in a log line (#367)
     what = "demo" if feed is None else f"REPLAY of {replay_day} at {speed:g}×"
