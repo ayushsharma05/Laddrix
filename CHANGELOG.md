@@ -39,6 +39,7 @@ The production-hardening pass (#257) and the security gate (#279). Each item's P
   - each trader's own Zerodha prices (#395);
   - files and jobs per firm (#396).
 - **Workload:** backtests in their own process, reports off the trading loop, scheduler jobs that never hold each other up, and backtests whose results don't depend on the machine (#274).
+- **Free pages (#410):** a page can hold its widgets as windows of any size, anywhere, with gaps, and scroll both ways to reach them; edges snap to neighbours and an 8 px grid (Alt: no snapping). New pages are free; each page switches between free and docked from its tab, and layouts saved before keep opening docked.
 
 ## 1.0.0-rc.1 (16 Oct 2026)
 

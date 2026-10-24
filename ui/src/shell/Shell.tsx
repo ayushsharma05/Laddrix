@@ -4,7 +4,7 @@
 //   toolbar      Widgets ▾ · Search (/) ······ lights · rate · Day P&L · Layouts ▾ · clock · Save · Lock · STOP
 //   env strip    PAPER · orders fill against live prices, nothing goes to the exchange
 //   bands        (only when needed)
-//   desktop      dockview widgets
+//   desktop      the page: free windows or docked tiles (#410)
 //   page tabs    Main | + ……………………………… working count · layout saved · version
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -15,7 +15,7 @@ import { SearchBox } from "../components/SearchBox";
 import { clock, rupees } from "../lib/format";
 import { browserStorage, LayoutStore } from "../workspace/layouts";
 import { WorkspaceController } from "../workspace/controller";
-import { buildDefault } from "../workspace/defaults";
+import { buildDefault, defaultCanvas } from "../workspace/defaults";
 import { widgetsFor } from "../workspace/registry";
 import { Workspace } from "../workspace/Workspace";
 import { Bands, PRICES_OLD_MS } from "./Bands";
@@ -38,6 +38,7 @@ export function Shell() {
       new WorkspaceController({
         layouts: new LayoutStore(app.rest, browserStorage(), me.user.id),
         buildDefault: (api, page) => buildDefault(api, page, app.instruments),
+        buildDefaultCanvas: (page) => defaultCanvas(page, app.instruments),
         notify: (level, text) => app.store.addMessage(level, "", text),
       }),
     [app, me.user.id],

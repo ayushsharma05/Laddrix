@@ -2,10 +2,14 @@
 // futures in the middle, and the order book, positions and audit trail (Messages in a tab
 // beside it) along the bottom, like canvas board 2.
 // Only widgets that exist are placed, so this grows as widgets are added.
+//
+// A free page (#410) starts with the same widgets as windows (defaultCanvas); the ones that
+// sit in tabs behind others on a docked page are left for Widgets ▾.
 
 import type { DockviewApi } from "dockview-react";
 import type { Instrument } from "../api/types";
 import type { Instruments } from "../state/instruments";
+import { GAP, type CanvasWindow } from "./canvas";
 import { newPanelId } from "./controller";
 import type { LinkGroup } from "./links";
 import { widget } from "./registry";
@@ -118,4 +122,45 @@ export async function buildDefault(api: DockviewApi, pageName: string, instrumen
       // sizes are a nicety
     }
   }
+}
+
+/**
+ * The first free Main page, sized for a 1600 px wide screen (bigger screens get empty space,
+ * smaller ones scroll):
+ *
+ *   ┌watch┐┌ladder┐┌ladder┐┌ticket┐
+ *   │     ││      ││      ││      │
+ *   └─────┘└──────┘└──────┘└──────┘
+ *   ┌order book──┐┌positions─┐┌audit trail┐
+ *   └────────────┘└──────────┘└───────────┘
+ */
+export async function defaultCanvas(pageName: string, instruments: Instruments): Promise<CanvasWindow[]> {
+  if (pageName !== "Main") return []; // other pages start empty: Widgets ▾ fills them
+  const starter = await starterInstruments(instruments);
+  const futures = starter.filter((i) => i.kind === "FUT" && i.tradable).slice(0, 2);
+  const link: LinkGroup = "pink";
+  const out: CanvasWindow[] = [];
+  const put = (kind: string, params: Record<string, unknown>, x: number, y: number, w: number, h: number) => {
+    const def = widget(kind);
+    if (!def) return;
+    out.push({ id: newPanelId(kind), kind, params: { ...def.defaults(), ...params }, x, y, w, h, z: out.length + 1 });
+  };
+  const top = 8;
+  const tall = 520;
+  let x = 8;
+  const next = (w: number) => {
+    const at = x;
+    x += w + GAP;
+    return at;
+  };
+  put("watch", { link, items: starter.map((i) => i.id) }, next(296), top, 296, tall);
+  for (const [n, f] of futures.entries()) put("ladder", { link: n === 0 ? link : "none", instrumentId: f.id }, next(400), top, 400, tall);
+  put("ticket", { link, instrumentId: futures[0]?.id }, next(380), top, 380, tall);
+  const low = top + tall + GAP;
+  const short = 300;
+  x = 8;
+  put("orders", {}, next(640), low, 640, short);
+  put("positions", {}, next(520), low, 520, short);
+  put("audit", {}, next(320), low, 320, short);
+  return out;
 }

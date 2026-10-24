@@ -1,5 +1,6 @@
-// The frame around every widget inside dockview: hands the widget its saved params, saves
-// changes, follows the link group, and keeps the tab title in step.
+// The frame around every widget: hands the widget its saved params, saves changes, follows the
+// link group (WidgetBody, shared with free windows), and for docked tiles keeps the tab title
+// in step.
 
 import type { IDockviewPanelHeaderProps, IDockviewPanelProps } from "dockview-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type FunctionComponent } from "react";
@@ -32,6 +33,30 @@ export function panelFor(kind: string): FunctionComponent<IDockviewPanelProps<Ba
 
 function PanelBody({ kind, params, api }: IDockviewPanelProps<BaseParams> & { kind: string }) {
   const def = widget(kind);
+  const controller = useController();
+  const update = useCallback(
+    (next: BaseParams) => {
+      api.updateParameters(next);
+      controller.changed();
+    },
+    [api, controller],
+  );
+
+  // keep the tab title in step with the params
+  const title = def ? (def.tabTitle?.(params) ?? def.title) : kind;
+  useEffect(() => {
+    if (api.title !== title) api.setTitle(title);
+  }, [api, title]);
+
+  return <WidgetBody kind={kind} params={params} update={update} />;
+}
+
+/**
+ * A widget with its settings: hands it its saved params, saves changes (through `update`),
+ * and follows its link group. Used by docked tiles and free windows alike.
+ */
+export function WidgetBody({ kind, params, update }: { kind: string; params: BaseParams; update: (next: BaseParams) => void }) {
+  const def = widget(kind);
   const { links } = useApp();
   const controller = useController();
   const latest = useRef(params);
@@ -41,10 +66,9 @@ function PanelBody({ kind, params, api }: IDockviewPanelProps<BaseParams> & { ki
     (change: Partial<BaseParams>) => {
       const next = { ...latest.current, ...change };
       latest.current = next;
-      api.updateParameters(next);
-      controller.changed();
+      update(next);
     },
-    [api, controller],
+    [update],
   );
 
   const setInstrument = useCallback(
@@ -74,12 +98,6 @@ function PanelBody({ kind, params, api }: IDockviewPanelProps<BaseParams> & { ki
     });
   }, [def, link, links, setParams]);
 
-  // keep the tab title in step with the params
-  const title = def ? (def.tabTitle?.(params) ?? def.title) : kind;
-  useEffect(() => {
-    if (api.title !== title) api.setTitle(title);
-  }, [api, title]);
-
   if (!def) return <div className="empty-note">This widget ({kind}) isn't available in this version.</div>;
   const Component = def.component;
   return (
@@ -89,7 +107,6 @@ function PanelBody({ kind, params, api }: IDockviewPanelProps<BaseParams> & { ki
   );
 }
 
-/** The tab: link colour (click to change group), title, close. Acts as the window title bar. */
 /** "grid", "floating" or "popout", kept current as the widget moves between windows. */
 function useLocation(api: IDockviewPanelHeaderProps<BaseParams>["api"]): string {
   const [where, setWhere] = useState(() => api.group.api.location.type);
@@ -113,6 +130,7 @@ function useTitle(api: IDockviewPanelHeaderProps<BaseParams>["api"]): string {
   return title;
 }
 
+/** The tab: link colour (click to change group), title, close. Acts as the window title bar. */
 export function WidgetTab({ api, params }: IDockviewPanelHeaderProps<BaseParams>) {
   const controller = useController();
   const where = useLocation(api);

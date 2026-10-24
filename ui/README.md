@@ -1,6 +1,6 @@
 # MockTrade UI
 
-The trading terminal: React + TypeScript (Vite), dockview workspace. Design: `../docs/design/ui.md`;
+The trading terminal: React + TypeScript (Vite); each workspace page is free windows (our canvas) or docked tiles (dockview). Design: `../docs/design/ui.md`;
 stream contract: `../docs/design/stream.md`.
 
 ```bash
@@ -16,14 +16,14 @@ npm run build      # production build in dist/ (served by the Python server)
 main.tsx ─► AppProvider (rest, stream, store, session, instruments, links)
               └► App ─► Login            (no session)
                     └► Shell             (menu bar, toolbar, env strip, bands)
-                          └► Workspace   (dockview + page tabs) ─► widgets
+                          └► Workspace   (free canvas or dockview + page tabs) ─► widgets
 ```
 
 | Folder | What lives there |
 |---|---|
 | `src/api/` | `rest.ts` (HTTP + errors), `stream.ts` (the one WebSocket, shared subscriptions, reconnect), `types.ts` (server shapes) |
 | `src/state/` | `store.ts` (orders, positions, kill switches, messages; merge by `updated_at`), `session.ts` (login, snapshots after every reconnect), `gate.ts` (why an order click can't go), `instruments.ts` |
-| `src/workspace/` | `controller.ts` (pages, autosave), `layouts.ts` (server + browser storage), `registry.ts` (widget kinds), `links.ts` (link groups), `Panel.tsx`, `Workspace.tsx`, `defaults.ts` (first-run layout) |
+| `src/workspace/` | `controller.ts` (pages, autosave), `layouts.ts` (server + browser storage), `registry.ts` (widget kinds), `links.ts` (link groups), `Panel.tsx`, `Workspace.tsx`, `canvas.ts` + `FreeCanvas.tsx` (free pages: windows, snapping, scrolling), `defaults.ts` (first-run layout) |
 | `src/widgets/` | one file per widget; importing it registers it |
 | `src/shell/` | Login, Shell (menu bar, toolbar), Bands, STOP dialog |
 | `src/lib/format.ts` | paise → Indian-grouped text (₹56,27,250.00) |

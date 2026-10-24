@@ -19,7 +19,12 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   - #274: research and reports never hold up trading; a backtest's results no longer depend
     on the machine;
   - #277: honest labels for estimated data, and the combined fault drills.
-- **Pull requests:** none open.
+- **Free pages (#410, 24 Oct, Ayush's ask):** a page can hold widgets as windows of any
+  size, anywhere, with gaps; the page scrolls both ways to reach them. Edges snap to
+  neighbours and an 8 px grid (Alt: no snap). Each page tab is FREE or DOCKED (click the label
+  to switch); new pages and the first-run Main are free; old layouts open docked. Screenshot:
+  `context/images/free-canvas-page.png`.
+- **Pull requests:** the #410 PR (free pages), until it merges.
 
 ## What's next
 

@@ -1,7 +1,8 @@
 import type { DockviewApi } from "dockview-react";
 import { fakeRest } from "../test/fakes";
 import { WorkspaceController, uniqueName } from "./controller";
-import { CURRENT, LayoutStore, type WorkspaceDoc } from "./layouts";
+import type { CanvasWindow } from "./canvas";
+import { CURRENT, LayoutStore, type PageMode, type WorkspaceDoc } from "./layouts";
 import { registerWidget } from "./registry";
 
 registerWidget({
@@ -26,7 +27,30 @@ function fakeDock() {
     clear: () => {
       panels = [];
     },
+    added: [] as Record<string, unknown>[],
+    // where each tile is on screen (none: hidden, as in a test without layout)
+    rects: new Map<string, { left: number; top: number; width: number; height: number }>(),
+    // tabs: panels sharing a group (by default each panel is alone in its own), and the one showing
+    tabbed: new Map<string, string>(),
+    showing: new Map<string, string>(),
+    groups: new Map<string, object>(),
+    get panels() {
+      return panels.map((p) => {
+        const key = api.tabbed.get(p.id) ?? p.id;
+        if (!api.groups.has(key)) {
+          api.groups.set(key, {
+            api: { location: { type: "grid" } },
+            element: { getBoundingClientRect: () => api.rects.get(key) ?? { left: 0, top: 0, width: 0, height: 0 } },
+            get activePanel() {
+              return { id: api.showing.get(key) ?? p.id };
+            },
+          });
+        }
+        return { id: p.id, params: p.params, api: { component: p.component }, group: api.groups.get(key) };
+      });
+    },
     addPanel: (o: { id: string; component: string; params: unknown }) => {
+      api.added.push(o);
       panels.push({ id: o.id, component: o.component, params: o.params });
       layoutListener?.();
       return { id: o.id };
@@ -70,7 +94,7 @@ function fakeDock() {
   return { api: api as unknown as DockviewApi, raw: api, panels: () => panels, move: () => layoutListener?.() };
 }
 
-function setup(saved?: WorkspaceDoc) {
+function setup(saved?: WorkspaceDoc, mode: PageMode = "docked") {
   const kept = new Map<string, unknown>();
   if (saved) kept.set(CURRENT, saved);
   const server = fakeRest({});
@@ -85,7 +109,20 @@ function setup(saved?: WorkspaceDoc) {
   const timers: (() => void)[] = [];
   const notes: string[] = [];
   const built: string[] = [];
+  const opened: { url: string; box: { width: number; height: number }; closed: boolean; close(): void }[] = [];
+  let allowPopups = true;
   const controller = new WorkspaceController({
+    newPageMode: mode,
+    buildDefaultCanvas: (page) => {
+      built.push(`${page} (free)`);
+      return page === "Main" ? [win("probe-main", 8, 8, 400, 300)] : [];
+    },
+    openWindow: (url, box) => {
+      if (!allowPopups) return null;
+      const w = { url, box, closed: false, close: () => void (w.closed = true) };
+      opened.push(w);
+      return w as unknown as Window;
+    },
     layouts: new LayoutStore(server.rest, null, "ayush"),
     buildDefault: (api, page) => {
       built.push(page);
@@ -103,7 +140,12 @@ function setup(saved?: WorkspaceDoc) {
     pending.forEach((fn) => fn());
     await new Promise((r) => setTimeout(r, 0));
   };
-  return { controller, kept, timers, notes, built, flush };
+  const blockPopups = () => void (allowPopups = false);
+  return { controller, kept, timers, notes, built, flush, opened, blockPopups };
+}
+
+function win(id: string, x: number, y: number, w: number, h: number, z = 1): CanvasWindow {
+  return { id, kind: "probe", params: { link: "none", n: 1 }, x, y, w, h, z };
 }
 
 describe("WorkspaceController", () => {
@@ -245,6 +287,184 @@ describe("WorkspaceController", () => {
     await controller.open("Morning");
     expect(dock.panels()).toHaveLength(2);
     expect(notes.at(-1)).toBe('OK Layout "Morning" opened');
+  });
+});
+
+describe("free pages (#410)", () => {
+  it("starts a first-run Main page as free windows, and new pages free and empty", async () => {
+    const { controller, built, kept } = setup(undefined, "free");
+    const dock = fakeDock();
+    await controller.start(dock.api);
+    expect(built).toEqual(["Main (free)"]);
+    expect(controller.mode).toBe("free");
+    expect(controller.canvas?.windows.map((w) => w.id)).toEqual(["probe-main"]);
+    expect(dock.panels()).toEqual([]); // dockview stays empty behind a free page
+    expect(kept.has(CURRENT)).toBe(false); // the starter windows are not a user change
+    await controller.addPage("Scalping");
+    expect(controller.doc.pages[1]!.mode).toBe("free");
+    expect(controller.canvas?.windows).toEqual([]);
+  });
+
+  it("moves, resizes, raises and closes windows, and saves each change", async () => {
+    const { controller, kept, flush } = setup(undefined, "free");
+    await controller.start(fakeDock().api);
+    controller.addWidget("probe", { n: 2 });
+    const [a, b] = controller.canvas!.windows;
+    expect([b!.x, b!.y]).toEqual([a!.x, a!.y + a!.h + 4]); // below the window in front (a grid-like widget), a 4 px gap
+    expect(b!.z).toBeGreaterThan(a!.z);
+    expect(controller.moveWindow(a!.id, { x: 3000, y: 2000, w: 500, h: 250 })).toBe(true); // past the screen: fine
+    expect(controller.moveWindow(a!.id, { x: 3000, y: 2000, w: 500, h: 250 })).toBe(false); // nothing changed
+    controller.focusWindow(a!.id);
+    expect(controller.canvas!.windows.find((w) => w.id === a!.id)!.z).toBe(2);
+    await flush();
+    const saved = kept.get(CURRENT) as WorkspaceDoc;
+    expect(saved.pages[0]).toMatchObject({ name: "Main", mode: "free", dock: null });
+    expect(saved.pages[0]!.canvas!.windows.find((w) => w.id === a!.id)).toMatchObject({ x: 3000, y: 2000, w: 500, h: 250, z: 2 });
+    controller.closeWindow(b!.id);
+    expect(controller.canvas!.windows.map((w) => w.id)).toEqual([a!.id]);
+  });
+
+  it("restores free windows exactly after a reload, next to docked pages", async () => {
+    const first = setup(undefined, "free");
+    await first.controller.start(fakeDock().api);
+    first.controller.moveWindow("probe-main", { x: 40, y: 1200, w: 640, h: 200 });
+    first.controller.setWindowParams("probe-main", { link: "pink", n: 7 });
+    await first.controller.addPage("Tiles", "docked");
+    first.controller.addWidget("probe", { n: 9 });
+    await first.flush();
+    const saved = first.kept.get(CURRENT) as WorkspaceDoc;
+
+    const second = setup(saved, "free");
+    const dock = fakeDock();
+    await second.controller.start(dock.api);
+    expect(second.built).toEqual([]);
+    expect(second.controller.mode).toBe("docked");
+    expect(second.controller.canvas).toBeNull();
+    expect(dock.panels().map((p) => (p.params as { n: number }).n)).toEqual([9]);
+    await second.controller.switchTo(0);
+    expect(dock.panels()).toEqual([]);
+    expect(second.controller.canvas!.windows).toEqual([
+      { id: "probe-main", kind: "probe", params: { link: "pink", n: 7 }, x: 40, y: 1200, w: 640, h: 200, z: 1 },
+    ]);
+  });
+
+  it("opens an old layout (no mode) as docked tiles, as before", async () => {
+    const old: WorkspaceDoc = { version: 1, pages: [{ name: "Main", dock: { panels: [{ id: "p1", component: "probe", params: { n: 4 } }] } }], active: 0 };
+    const { controller } = setup(old, "free");
+    const dock = fakeDock();
+    await controller.start(dock.api);
+    expect(controller.mode).toBe("docked");
+    expect(dock.panels().map((p) => p.id)).toEqual(["p1"]);
+  });
+
+  it("switches a page between docked tiles and free windows, keeping its widgets", async () => {
+    const { controller, flush, kept } = setup(undefined, "docked");
+    const dock = fakeDock();
+    await controller.start(dock.api);
+    controller.addWidget("probe", { n: 2 });
+    controller.setPageMode("free");
+    expect(controller.mode).toBe("free");
+    expect(dock.panels()).toEqual([]);
+    const windows = controller.canvas!.windows;
+    expect(windows.map((w) => w.params.n)).toEqual([1, 2]);
+    expect(new Set(windows.map((w) => `${w.x},${w.y}`)).size).toBe(2); // not stacked on each other
+    await flush();
+    expect((kept.get(CURRENT) as WorkspaceDoc).pages[0]!.mode).toBe("free");
+
+    controller.moveWindow(windows[1]!.id, { x: 8, y: 600, w: 300, h: 200 }); // below the first: a second row
+    controller.setPageMode("docked");
+    expect(controller.canvas).toBeNull();
+    expect(dock.panels().map((p) => (p.params as { n: number }).n)).toEqual([1, 2]);
+    expect(dock.raw.added.at(-1)).toMatchObject({ position: { direction: "below" } });
+  });
+
+  it("keeps tiles where they were when a docked page turns free", async () => {
+    const { controller } = setup(undefined, "docked");
+    const dock = fakeDock();
+    await controller.start(dock.api);
+    controller.addWidget("probe", { n: 2 });
+    dock.raw.rects.set("probe-main", { left: 104, top: 50, width: 300, height: 500 });
+    dock.raw.rects.set(dock.panels()[1]!.id, { left: 408, top: 50, width: 600, height: 500 });
+    controller.setPageMode("free");
+    expect(controller.canvas!.windows.map(({ x, y, w, h }) => [x, y, w, h])).toEqual([
+      [0, 0, 300, 500],
+      [304, 0, 600, 500],
+    ]);
+  });
+
+  it("keeps the showing tab in front when tabs turn into windows", async () => {
+    const { controller } = setup(undefined, "docked");
+    const dock = fakeDock();
+    await controller.start(dock.api);
+    controller.addWidget("probe", { n: 2 });
+    const second = dock.panels()[1]!.id;
+    dock.raw.tabbed.set("probe-main", "g").set(second, "g"); // one group, two tabs
+    dock.raw.showing.set("g", "probe-main"); // the first tab is the one showing
+    dock.raw.rects.set("g", { left: 10, top: 10, width: 500, height: 400 });
+    controller.setPageMode("free");
+    const [first, behind] = controller.canvas!.windows;
+    expect([first!.x, first!.y, behind!.x, behind!.y]).toEqual([0, 0, 24, 24]); // the tab behind: a step down and right
+    expect(first!.z).toBeGreaterThan(behind!.z); // what showed still shows
+  });
+
+  it("opens up to 200 windows on a page, and says so after that", async () => {
+    const { controller, notes } = setup(undefined, "free");
+    await controller.start(fakeDock().api);
+    for (let i = 1; i < 200; i += 1) controller.addWidget("probe");
+    expect(controller.canvas!.windows).toHaveLength(200);
+    expect(notes).toEqual([]);
+    controller.addWidget("probe");
+    expect(controller.canvas!.windows).toHaveLength(200);
+    expect(notes).toEqual(["WARN At most 200 widgets on one page: open another page"]);
+  });
+
+  it("pops a window out and back, and says so when the browser blocks it", async () => {
+    const { controller, opened, notes, blockPopups } = setup(undefined, "free");
+    await controller.start(fakeDock().api);
+    expect(await controller.popOut("probe-main")).toBe(true);
+    expect(opened[0]).toMatchObject({ url: "/popout.html", box: { width: 400, height: 640 } }); // never too small
+    expect(controller.popoutOf("probe-main")).toBeDefined();
+    expect(controller.canvas!.windows).toHaveLength(1); // still the page's widget
+    controller.dockBack("probe-main");
+    expect(opened[0]!.closed).toBe(true);
+    expect(controller.popoutOf("probe-main")).toBeUndefined();
+    blockPopups();
+    expect(await controller.popOut("probe-main")).toBe(false);
+    expect(notes.pop()).toContain("allow pop-ups");
+  });
+
+  it("closes popped-out windows when their page goes away", async () => {
+    const { controller, opened } = setup(undefined, "free");
+    await controller.start(fakeDock().api);
+    await controller.popOut("probe-main");
+    await controller.addPage();
+    expect(opened[0]!.closed).toBe(true);
+    await controller.switchTo(0);
+    expect(controller.canvas!.windows.map((w) => w.id)).toEqual(["probe-main"]);
+  });
+
+  it("refuses moving, closing, adding and switching mode while locked", async () => {
+    const { controller, notes } = setup(undefined, "free");
+    await controller.start(fakeDock().api);
+    controller.setLocked(true);
+    expect(controller.moveWindow("probe-main", { x: 400, y: 400, w: 400, h: 300 })).toBe(false);
+    controller.closeWindow("probe-main");
+    controller.addWidget("probe");
+    controller.setPageMode("docked");
+    expect(controller.mode).toBe("free");
+    expect(controller.canvas!.windows).toHaveLength(1);
+    expect(notes).toHaveLength(2);
+  });
+
+  it("places a new window in an empty spot in view when nothing is beside the front one", async () => {
+    const { controller } = setup(undefined, "free");
+    await controller.start(fakeDock().api);
+    controller.setViewport(() => ({ x: 0, y: 2000, w: 1000, h: 700 })); // scrolled down
+    controller.moveWindow("probe-main", { x: 0, y: 0, w: 2000, h: 300 }); // nothing fits right or below in view
+    controller.addWidget("probe");
+    const added = controller.canvas!.windows[1]!;
+    expect(added.y).toBeGreaterThanOrEqual(2000);
+    expect(controller.reveal).toBe(added.id); // the canvas scrolls to it
   });
 });
 

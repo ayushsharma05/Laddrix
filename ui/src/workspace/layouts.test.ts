@@ -1,5 +1,5 @@
 import { fakeRest } from "../test/fakes";
-import { CURRENT, isWorkspaceDoc, LayoutStore, type StorageLike, type WorkspaceDoc } from "./layouts";
+import { CURRENT, isWorkspaceDoc, LayoutStore, modeOf, type StorageLike, type WorkspaceDoc } from "./layouts";
 
 class MemoryStorage implements StorageLike {
   data = new Map<string, string>();
@@ -113,5 +113,18 @@ describe("isWorkspaceDoc", () => {
     expect(isWorkspaceDoc({ ...DOC, active: 2 })).toBe(false);
     expect(isWorkspaceDoc({ ...DOC, active: -1 })).toBe(false);
     expect(isWorkspaceDoc({ ...DOC, pages: [{ name: 1, dock: null }] })).toBe(false);
+  });
+
+  it("accepts free pages with their windows, and old pages without a mode (#410)", () => {
+    const window = { id: "w1", kind: "watch", params: { link: "pink" }, x: 8, y: 2000, w: 300, h: 500, z: 1 };
+    const free = (page: object) => ({ ...DOC, pages: [{ name: "Free", mode: "free", dock: null, ...page }], active: 0 });
+    expect(isWorkspaceDoc(free({ canvas: { windows: [window] } }))).toBe(true);
+    expect(isWorkspaceDoc(free({ canvas: null }))).toBe(true); // fresh: gets its starter windows
+    expect(isWorkspaceDoc(free({}))).toBe(true);
+    expect(isWorkspaceDoc(free({ canvas: { windows: [{ ...window, w: "wide" }] } }))).toBe(false);
+    expect(isWorkspaceDoc(free({ canvas: { windows: "w1" } }))).toBe(false);
+    expect(isWorkspaceDoc(free({ mode: "floating" }))).toBe(false);
+    expect(modeOf({ name: "Old", dock: null })).toBe("docked");
+    expect(modeOf({ name: "New", mode: "free", dock: null })).toBe("free");
   });
 });

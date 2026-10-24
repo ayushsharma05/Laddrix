@@ -8,11 +8,34 @@
 // people sharing a browser never see each other's layouts.
 
 import { ApiError, type Rest } from "../api/rest";
+import { isCanvas, type Canvas } from "./canvas";
 
-/** One workspace tab (Main, Options, …) and its dockview layout. */
+/**
+ * How a page arranges its widgets (#410):
+ * - "free": windows anywhere, any size, gaps allowed, the page scrolls (canvas.ts)
+ * - "docked": tiles that always fill the page (dockview)
+ * Pages saved before #410 have no mode: they are docked.
+ */
+export type PageMode = "free" | "docked";
+
+/** One workspace tab (Main, Options, …) and its widgets. */
 export interface Page {
   name: string;
-  dock: unknown; // dockview's own JSON (api.toJSON()); null for a fresh page
+  mode?: PageMode; // missing: "docked"
+  dock: unknown; // a docked page: dockview's own JSON (api.toJSON()); null for a fresh page
+  canvas?: Canvas | null; // a free page: its windows; null or missing for a fresh page
+}
+
+export function modeOf(page: Page): PageMode {
+  return page.mode === "free" ? "free" : "docked";
+}
+
+function isPage(value: unknown): value is Page {
+  if (!value || typeof value !== "object") return false;
+  const p = value as Partial<Page>;
+  if (typeof p.name !== "string" || !("dock" in p)) return false;
+  if (p.mode !== undefined && p.mode !== "free" && p.mode !== "docked") return false;
+  return p.canvas === undefined || p.canvas === null || isCanvas(p.canvas);
 }
 
 export interface WorkspaceDoc {
@@ -38,7 +61,7 @@ export function isWorkspaceDoc(value: unknown): value is WorkspaceDoc {
     Array.isArray(doc.pages) &&
     doc.pages.length > 0 &&
     doc.pages.length <= MAX_PAGES &&
-    doc.pages.every((p) => p && typeof p.name === "string" && "dock" in p) &&
+    doc.pages.every(isPage) &&
     typeof doc.active === "number" &&
     doc.active >= 0 &&
     doc.active < doc.pages.length
