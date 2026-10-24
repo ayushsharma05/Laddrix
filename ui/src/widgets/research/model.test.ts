@@ -38,6 +38,8 @@ describe("research model", () => {
     expect(runState(run("BT1", { state: "running", progress: 1, days: 5 }))).toEqual({ text: "Running: 1 of 5 days", tone: "pending" });
     expect(runState(run("BT1", { state: "failed", error: "boom" }))).toEqual({ text: "Failed: boom", tone: "bad" });
     expect(runState(run("BT1"))).toEqual({ text: "Done", tone: "good" });
+    expect(runState(run("BT1", { state: "cancelled", summary: undefined }))).toEqual({ text: "Cancelled", tone: "dim" });
+    expect(anyGoing([run("A", { state: "cancelled", summary: undefined })])).toBe(false);
     expect(runState(run("BT1", { summary: summary({ days_skipped: ["a"] }) })).text).toBe("Done (1 day skipped)");
     expect(runState(run("BT1", { summary: summary({ days_skipped: ["a", "b"] }) })).text).toBe("Done (2 days skipped)");
     expect(anyGoing([run("A"), run("B", { state: "failed" })])).toBe(false);

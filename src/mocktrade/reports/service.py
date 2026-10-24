@@ -6,6 +6,7 @@ and the 16:00 job that keeps each account's report.
     GET history ─► kept reports in the range ─► by day / instrument / strategy
 """
 
+import asyncio
 import logging
 from collections.abc import Callable
 from datetime import UTC, date, datetime
@@ -63,14 +64,16 @@ class Reports:
             raise ReportError(str(exc)) from None
 
     async def close_of_day(self) -> None:
-        """The scheduler's job after the close: keep every account's report for today."""
+        """The scheduler's job after the close: keep every account's report for today. Each
+        is read and written in a worker thread (#274): the trading loop only waits."""
         if self.store is None:
             return
         day = self.today()
         for account_id in list(self._platform.accounts):
             try:
-                report = self._build(account_id, day, prices=True, final=True)
-                path = self.store.save(report)
+                report = await asyncio.to_thread(self._build, account_id, day, prices=True,
+                                                 final=True)  # fmt: skip
+                path = await asyncio.to_thread(self.store.save, report)
                 log.info("end-of-day report kept: %s", path)
                 if self._platform.event_log is not None:
                     t = report["totals"]

@@ -128,7 +128,7 @@ export function Backtests({ params, setParams, publish }: WidgetProps<BacktestsP
             onToggle={(id) => setSlots((s) => togglePick(s, id))}
           />
         )}
-        {mode === "runs" && current && <RunDetail run={current} publish={publish} />}
+        {mode === "runs" && current && <RunDetail run={current} publish={publish} onChanged={refresh} />}
         {mode === "compare" && runs && <Compare runs={runs} slots={slots} />}
       </div>
     </div>
@@ -197,8 +197,9 @@ function RunList(props: { runs: BacktestRun[]; picked: string | null; onPick: (i
 
 // --- one run -----------------------------------------------------------------------------------
 
-function RunDetail({ run, publish }: { run: BacktestRun; publish: (id: string) => void }) {
+function RunDetail({ run, publish, onChanged }: { run: BacktestRun; publish: (id: string) => void; onChanged: () => void }) {
   const { rest } = useApp();
+  const [stopping, setStopping] = useState(false);
   const [full, setFull] = useState<BacktestRun | null>(null);
   const [day, setDay] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -243,6 +244,23 @@ function RunDetail({ run, publish }: { run: BacktestRun; publish: (id: string) =
         </div>
       )}
       {run.state === "failed" && <div className="empty-note tone-bad">{run.error}</div>}
+      {(run.state === "queued" || run.state === "running") && (
+        <button
+          type="button"
+          className="btn small"
+          disabled={stopping}
+          onClick={() => {
+            setStopping(true);
+            rest
+              .post<BacktestRun>(`/api/research/backtests/${encodeURIComponent(run.run_id)}/cancel`, {})
+              .then(() => onChanged())
+              .catch((e: unknown) => setError(errorText(e)))
+              .finally(() => setStopping(false));
+          }}
+        >
+          {stopping ? "Cancelling…" : "Cancel this run"}
+        </button>
+      )}
       {summary && (
         <div className="report-totals" aria-label="Run totals">
           <span>

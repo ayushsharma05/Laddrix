@@ -235,6 +235,26 @@ describe("Backtests", () => {
     expect(within(detail).queryByLabelText("Run totals")).toBeNull();
   });
 
+  it("a waiting or running run can be cancelled; a finished one can't", async () => {
+    let cancelled = false;
+    const going = () => run("BT1", cancelled ? { state: "cancelled", error: "cancelled", summary: undefined } : { state: "running", progress: 0, summary: undefined });
+    const server = mount(<Backtests {...props()} />, {
+      "GET /api/research/backtests": () => ({ status: 200, body: [going()] }),
+      "GET /api/research/backtests/BT1": () => ({ status: 200, body: going() }),
+      "POST /api/research/backtests/BT1/cancel": () => {
+        cancelled = true;
+        return { status: 200, body: going() };
+      },
+    });
+    fireEvent.click(await screen.findByText("SLICER BUY 150 NIFTY26OCTFUT"));
+    const detail = await screen.findByRole("region", { name: "Backtest BT1" });
+    fireEvent.click(within(detail).getByRole("button", { name: "Cancel this run" }));
+    const grid = screen.getByRole("grid", { name: "Backtest runs" });
+    await within(grid).findByText("Cancelled");
+    expect(server.calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/research/backtests/BT1/cancel"]);
+    await vi.waitFor(() => expect(within(detail).queryByRole("button", { name: "Cancel this run" })).toBeNull());
+  });
+
   it("compare: two to four finished runs side by side, each keeping its colour", async () => {
     const b = run("BT2", { spec: { ...run("BT2").spec, name: "patient" }, summary: summary({ net_paise: -2000, equity_curve: [["2026-10-16", -2000]] }) });
     mount(<Backtests {...props({ mode: "compare" })} />, {

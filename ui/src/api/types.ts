@@ -649,7 +649,7 @@ export interface BacktestSummary {
 /** A day of a run: the K10.3 report plus its intraday curve, or why it was skipped. */
 export type BacktestDay = (DayReport & { equity_curve: [string, number][]; algo_started: boolean }) | { day: string; skipped: string };
 
-export type BacktestState = "queued" | "running" | "done" | "failed";
+export type BacktestState = "queued" | "running" | "done" | "failed" | "cancelled";
 
 export interface BacktestRun {
   run_id: string;
