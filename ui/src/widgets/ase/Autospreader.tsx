@@ -3,7 +3,7 @@
 // it streams as the instrument "SPREAD:<id>", like any contract.
 //
 //   [Spreads (2)] [New]                                            2 of 50
-//   NIFTY Nov/Dec   +1 NIFTY26NOVFUT −1 NIFTY26DECFUT   bid −152.00 (10)  ask −149.00 (2)  Edit
+//   NIFTY Nov/Dec   +1 NIFTY26NOVFUT −1 NIFTY26DECFUT   bid −152.00 (10)  ask −149.00 (2)  Ladder Edit
 //
 //   New / Edit:   Name [NIFTY Nov/Dec]
 //                 Leg  Contract         Ratio  Price ×  Quote  Pay-up
@@ -28,7 +28,7 @@ export interface AutospreaderParams extends BaseParams {
 const MAX_SPREADS = 50; // the server's limit per user (it says so too)
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-export function Autospreader({ params, setParams }: WidgetProps<AutospreaderParams>) {
+export function Autospreader({ params, setParams, open }: WidgetProps<AutospreaderParams>) {
   const { rest } = useApp();
   const [spreads, setSpreads] = useState<Spread[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +67,7 @@ export function Autospreader({ params, setParams }: WidgetProps<AutospreaderPara
         {mode === "list" && (
           <SpreadList
             spreads={spreads}
+            onLadder={(s) => open("ladder", { instrumentId: s.instrument_id, link: "none" })}
             onEdit={(s) => setParams({ mode: "edit", spreadId: s.spread_id })}
             onGone={(id) => setSpreads((l) => (l ?? []).filter((s) => s.spread_id !== id))}
           />
@@ -87,7 +88,7 @@ export function Autospreader({ params, setParams }: WidgetProps<AutospreaderPara
   );
 }
 
-function SpreadList({ spreads, onEdit, onGone }: { spreads: Spread[]; onEdit: (s: Spread) => void; onGone: (id: string) => void }) {
+function SpreadList({ spreads, onLadder, onEdit, onGone }: { spreads: Spread[]; onLadder: (s: Spread) => void; onEdit: (s: Spread) => void; onGone: (id: string) => void }) {
   const { rest } = useApp();
   const [armed, setArmed] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -119,6 +120,9 @@ function SpreadList({ spreads, onEdit, onGone }: { spreads: Spread[]; onEdit: (s
             <span className="dim">{legSummary(s.legs, shortName)}</span>
             <LivePrice spread={s} />
             <span className="alert-actions">
+              <button type="button" className="btn small" title="Trade it: a ladder of its implied prices" onClick={() => onLadder(s)}>
+                Ladder
+              </button>
               <button type="button" className="btn small" onClick={() => onEdit(s)}>
                 Edit
               </button>

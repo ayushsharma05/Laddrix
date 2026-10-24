@@ -30,9 +30,12 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
 - **Autospreader (Ayush's ask, 24 Oct), in three parts** ([docs/design/spreads.md](../docs/design/spreads.md)):
   1. #414 spread definitions (2 to 6 legs) and live implied prices, the Autospreader widget:
      merged (PR #417).
-  2. #415 multi-leg execution (the ASE algo: quote one leg, hedge the others): done, in its PR.
-  3. #416 the spread ladder, with right-click "Autospreader settings…": next.
-- **Pull requests:** the #415 PR, until it merges.
+  2. #415 multi-leg execution (the ASE algo: quote one leg, hedge the others): merged (PR #418).
+  3. #416 the spread ladder, with right-click "Autospreader settings…": done, in its PR.
+  Left in #250/#251: several quoting legs, a maximum unhedged exposure, timeouts, restart
+  recovery, structure positions, historical spread charts.
+- **Bug #419** (paper ids repeated after a restart; found by the spread ladder check): fixed, PR #420.
+- **Pull requests:** #420 (#419) and the #416 PR, until they merge.
 
 ## What's next
 

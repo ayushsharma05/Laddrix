@@ -240,7 +240,9 @@ price, qty, filled, state.
 Your spreads of 2 to 6 legs: each one's legs ("+1 NIFTY26NOVFUT −1 NIFTY26DECFUT") and its
 live implied bid and ask with their size in spread lots. **New** / **Edit** define the legs:
 contract (search), ratio, price ×, which leg quotes, pay-up. The server checks the rules and
-says what's wrong in words. Design: [spreads.md](spreads.md).
+says what's wrong in words. **Ladder** opens the spread's ladder: the normal ladder on its
+implied prices, where a click buys or sells spread lots (the Autospreader algo works the legs)
+and the right-click menu offers "Autospreader settings…". Design: [spreads.md](spreads.md).
 
 ## 5. Safety interactions
 

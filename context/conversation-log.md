@@ -698,4 +698,13 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Why:** the paper broker numbered orders and trades from P1/T1 on every start. The day's adopted trades already held a P1/T1, so the trade check (#352) took that old trade as the new order's.
   - **Fix:** each start's ids carry its start time (`P<base36 seconds>-1`). A replay with a fixed clock keeps the same ids.
   - **Checks:** a regression test with a real morning run, a restart, and a new fill at its own price; mutation 5/5.
+- 24 Oct, night. **The Autospreader, part 3 (#416): the spread ladder.** This is what Ayush described: "an ASE ladder made using Autospreader… clicking on that ladder shows ladder related settings and also ase settings option".
+  - **The ladder:** the normal ladder on `SPREAD:<id>`. A click starts the ASE algo with the spread's side, lots and price. Work shows running spread orders; cancel stops the algo, and move stops it and restarts the lots left. No order type, TIF or product is offered (the server trades the legs). The title is the spread's name.
+  - **Right-click:** "Autospreader settings…" first, then the ladder's own settings. The Autospreader has a Ladder button.
+  - **In the browser on the demo:**
+    - buying 1 spread lot at its ask filled both legs (+75 Oct, −75 Nov), at −138.60 for −138.50 asked;
+    - a resting order was cancelled from Work;
+    - the menu opened the settings. 9/9. Mutation 22/22 (one gap tightened: a move must restart the lots left, not the lots box).
+  - **Found on the way:** bug #419 (fixed separately in PR #420).
+  - **Also seen:** a ticket test failed once and passed in 18 reruns. It is noted as a possible flake, not caused by this change.
 
