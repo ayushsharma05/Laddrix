@@ -1,6 +1,8 @@
 // Algo manager: start, watch and control algos (docs/design/algos.md, K6.4).
 //
-//   [New algo ▾]  Pause  Resume  Stop                                         Stop all (2)
+//   [New algo ▾]  Pause  Resume  Stop  [Hedge now] [Flatten]                  Stop all (2)
+//   (an algo's own actions, #425: a click shows what it would do, in the server's words;
+//    Confirm does exactly that, or the server says what has changed since)
 //   ▸ Algo   Type    Contract        Side  Qty   Filled  Avg        Working  State    Status
 //   ▾ A0003  SPREAD  NIFTY26OCTFUT   BUY   150       75  25,010.00       75  Working  hedging 75…
 //       Leg2 NIFTY26NOVFUT · Level 120.00 · Leg a filled 75 · Unhedged 0 · Legging max 4 ms
@@ -12,7 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/rest";
-import type { AlgoParamSpec, AlgoSpec, AlgoView, OrderView, Side } from "../../api/types";
+import type { ActionPreview, AlgoActionSpec, AlgoParamSpec, AlgoSpec, AlgoView, OrderView, Side } from "../../api/types";
 import { useApp, useInstrument, useOrderSpec, useStore } from "../../app/context";
 import { SearchBox } from "../../components/SearchBox";
 import { clock, price, qty, shortName } from "../../lib/format";
@@ -100,6 +102,23 @@ export function AlgoManager({ params, publish }: WidgetProps<AlgoParams>) {
 
   const current = selected ? algos[selected] : undefined;
   const stoppable = useMemo(() => rows.filter(canStop), [rows]);
+  const [asked, setAsked] = useState<{ algoId: string; preview: ActionPreview } | null>(null);
+  const actionUrl = (algoId: string, name: string) =>
+    `/api/accounts/${encodeURIComponent(accountId ?? "")}/algos/${encodeURIComponent(algoId)}/actions/${encodeURIComponent(name)}`;
+  const ask = (a: AlgoView, action: AlgoActionSpec) =>
+    rest
+      .get<ActionPreview>(actionUrl(a.algo_id, action.name))
+      .then((preview) => setAsked({ algoId: a.algo_id, preview }))
+      .catch((e: unknown) => store.addMessage("ERROR", a.instrument_id, `${action.label} ${a.algo_id}: ${errorText(e)}`));
+  const confirm = () => {
+    if (!asked || !accountId) return;
+    const { algoId, preview } = asked;
+    setAsked(null);
+    rest
+      .post<AlgoView>(actionUrl(algoId, preview.name), { expect: preview.lines })
+      .then((view) => store.applyAlgos(accountId, [view]))
+      .catch((e: unknown) => store.addMessage("ERROR", "", `${preview.label} ${algoId} not done: ${errorText(e)}`));
+  };
 
   return (
     <div className="book algos">
@@ -122,6 +141,13 @@ export function AlgoManager({ params, publish }: WidgetProps<AlgoParams>) {
         <button type="button" className="btn small" disabled={!current || !canStop(current)} onClick={() => current && control([current], "stop")}>
           Stop
         </button>
+        {current &&
+          canStop(current) &&
+          (current.actions ?? []).map((action) => (
+            <button key={action.name} type="button" className="btn small" title={action.help} onClick={() => void ask(current, action)}>
+              {action.label}…
+            </button>
+          ))}
         <span className="book-spacer" />
         <button
           type="button"
@@ -133,6 +159,28 @@ export function AlgoManager({ params, publish }: WidgetProps<AlgoParams>) {
           Stop all{stoppable.length ? ` (${stoppable.length})` : ""}
         </button>
       </div>
+      {asked && (
+        <div className="algo-action-preview" role="dialog" aria-label={`${asked.preview.label} ${asked.algoId}`}>
+          <b>
+            {asked.preview.label} {asked.algoId}
+          </b>
+          {asked.preview.ok ? (
+            <ul>
+              {asked.preview.lines.length ? asked.preview.lines.map((line) => <li key={line}>{line}</li>) : <li>nothing to send now</li>}
+            </ul>
+          ) : (
+            <div className="tone-bad">{asked.preview.why}</div>
+          )}
+          {asked.preview.ok && (
+            <button type="button" className="btn small danger" onClick={confirm}>
+              Confirm
+            </button>
+          )}{" "}
+          <button type="button" className="btn small" onClick={() => setAsked(null)}>
+            {asked.preview.ok ? "Cancel" : "Close"}
+          </button>
+        </div>
+      )}
       {starting && accountId && specError && <div className="algo-form empty-note">Algos unavailable: {specError}</div>}
       {starting && accountId && !specError && !specs && <div className="algo-form empty-note">Loading algos…</div>}
       {starting && accountId && specs && !specs.length && <div className="algo-form empty-note">This account offers no algos.</div>}

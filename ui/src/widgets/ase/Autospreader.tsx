@@ -10,15 +10,18 @@
 //                 1    NIFTY26NOVFUT     +1      +1       ●      2      ×
 //                 2    NIFTY26DECFUT     −1      −1       ○      2      ×
 //                 + Add leg                       price = NIFTY26NOVFUT − NIFTY26DECFUT
+//                 Controls: Re-quote threshold [1] ticks  Max unhedged [0]  Chase [0] ticks
+//                           Hedge timeout [5] s           (drawn from GET /api/spreads/spec)
 //                 [Save] [Cancel]           (problems, in the server's words)
 
 import { useEffect, useState } from "react";
-import type { Spread } from "../../api/types";
+import type { AlgoParamSpec, Spread, SpreadSpec } from "../../api/types";
 import { useApp, useTick } from "../../app/context";
 import { SearchBox } from "../../components/SearchBox";
 import { price, shortName } from "../../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
-import { addLeg, bodyOf, draftOf, emptyDraft, formula, legSummary, MAX_LEGS, missing, quoteLeg, removeLeg, setLeg, type Draft } from "./model";
+import { ParamInput } from "../algos/AlgoManager";
+import { addLeg, bodyOf, controlsBody, controlText, draftOf, emptyDraft, formula, legSummary, MAX_LEGS, missing, quoteLeg, removeLeg, setLeg, type Draft } from "./model";
 
 export interface AutospreaderParams extends BaseParams {
   mode?: "list" | "edit";
@@ -31,6 +34,7 @@ const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export function Autospreader({ params, setParams, open }: WidgetProps<AutospreaderParams>) {
   const { rest } = useApp();
   const [spreads, setSpreads] = useState<Spread[] | null>(null);
+  const [controls, setControls] = useState<AlgoParamSpec[]>([]);
   const [error, setError] = useState<string | null>(null);
   const mode = params.mode ?? "list";
 
@@ -40,6 +44,10 @@ export function Autospreader({ params, setParams, open }: WidgetProps<Autospread
       .get<Spread[]>("/api/spreads")
       .then((list) => live && setSpreads(list))
       .catch((e: unknown) => live && setError(errorText(e)));
+    rest
+      .get<SpreadSpec>("/api/spreads/spec")
+      .then((spec) => live && setControls(spec.controls))
+      .catch(() => undefined); // without it the form sends no controls: the server keeps them
     return () => {
       live = false;
     };
@@ -76,6 +84,7 @@ export function Autospreader({ params, setParams, open }: WidgetProps<Autospread
           <SpreadForm
             key={editing?.spread_id ?? "new"}
             spread={editing}
+            controls={controls}
             onSaved={(s) => {
               setSpreads((l) => [...(l ?? []).filter((x) => x.spread_id !== s.spread_id), s].sort((a, b) => a.name.localeCompare(b.name)));
               setParams({ mode: "list", spreadId: undefined });
@@ -161,17 +170,18 @@ function LivePrice({ spread }: { spread: Spread }) {
   );
 }
 
-function SpreadForm({ spread, onSaved, onCancel }: { spread?: Spread; onSaved: (s: Spread) => void; onCancel: () => void }) {
+function SpreadForm({ spread, controls, onSaved, onCancel }: { spread?: Spread; controls: AlgoParamSpec[]; onSaved: (s: Spread) => void; onCancel: () => void }) {
   const { rest } = useApp();
   const [draft, setDraft] = useState<Draft>(() => (spread ? draftOf(spread) : emptyDraft()));
   const [problems, setProblems] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const save = () => {
-    const first = missing(draft);
+    const tuned = controlsBody(controls, draft);
+    const first = [...missing(draft), ...tuned.problems];
     setProblems(first);
     if (first.length) return;
     setBusy(true);
-    const body = bodyOf(draft);
+    const body = controls.length ? { ...bodyOf(draft), controls: tuned.controls } : bodyOf(draft);
     (spread ? rest.put<Spread>(`/api/spreads/${spread.spread_id}`, body) : rest.post<Spread>("/api/spreads", body))
       .then(onSaved)
       .catch((e: unknown) => setProblems(errorText(e).split("; ")))
@@ -225,6 +235,14 @@ function SpreadForm({ spread, onSaved, onCancel }: { spread?: Spread; onSaved: (
         </button>
         <span className="dim">{legs.length >= 2 ? `price = ${formula(legs, shortName)}` : "pick each leg's contract"}</span>
       </div>
+      {controls.length > 0 && (
+        <fieldset className="algo-params ase-controls">
+          <legend>Controls</legend>
+          {controls.map((p) => (
+            <ParamInput key={p.name} param={p} value={controlText(draft, p)} onChange={(v) => setDraft({ ...draft, controls: { ...draft.controls, [p.name]: v } })} />
+          ))}
+        </fieldset>
+      )}
       {problems.length > 0 && (
         <ul className="tone-bad ase-problems" role="alert">
           {problems.map((p) => (

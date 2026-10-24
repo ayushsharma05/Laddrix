@@ -12,13 +12,14 @@ Ayush asked for this on 24 Oct 2026. It is built in three parts:
 | 1 | #414 | spread definitions, their live implied price, the Autospreader widget | done |
 | 2 | #415 | multi-leg execution: quote one leg, hedge every other | done |
 | 3 | #416 | the spread ladder: click to trade a spread; right-click "Autospreader settings…" | done |
+| – | #424 | freeze quantities: every order fits the exchange's most per order | done |
+| – | #425 | each spread's controls; "Hedge now" and "Flatten" on a running ASE | done |
 
-Still to come, in #250 and #251:
-- several quoting legs at once;
-- a maximum unhedged exposure and timeouts;
-- recovery after a restart;
-- positions grouped by structure;
-- historical spread charts.
+Still to come, in #250 and #251 (one issue each, in this order):
+- #426 recovery after a restart;
+- #427 several quoting legs at once;
+- #428 positions grouped by structure;
+- #429 historical spread charts.
 
 ## 1. A definition
 
@@ -43,6 +44,17 @@ The server checks every rule and says what is wrong in words:
 - pay-up is 0 to 50 ticks;
 - the name is 1 to 40 characters;
 - at most 50 spreads per user.
+
+**Controls (#425)**: how the Autospreader trades the spread, set in the same form. The server
+publishes them (`GET /api/spreads/spec`: label, limits, default, help) and the form is drawn
+from that list; an edit without controls keeps the spread's own.
+
+| Control | Default | What it does |
+| --- | --- | --- |
+| **Re-quote threshold** | 1 tick | The quote moves only when its target has moved this many ticks (fewer of the 25 modifications spent). A move that would make the spread worse than its price is made at once. |
+| **Max unhedged** | 0 (none) | A quote never carries more than this many spread lots, so one fill never leaves more than this unhedged. |
+| **Chase** | 0 ticks | A working hedge follows the market to its new best ± pay-up, never more than this many ticks past its first price, and never back. |
+| **Hedge timeout** | 5 s | A leg unhedged this long raises one ALERT, and the algo keeps saying "UNHEDGED 75 on NOV for 6 s: hedge now or flatten". |
 
 Definitions belong to one user (in one firm). Nobody else sees them, prices them or streams
 them; the cross-firm leak test (`tests/test_workspaces.py`) covers every spread route.
@@ -102,6 +114,19 @@ POST /api/accounts/{account}/spreads/{spread}/orders   {"side": "BUY", "lots": 2
          quote it where the spread = the price, hedge every other leg the moment it fills
 ```
 
+**Actions on a running ASE (#425)**, on the algo screen. A click shows what it would do, in
+the server's words; Confirm sends those words back and the server does exactly that, or
+refuses with what it would do now (`GET`/`POST …/algos/{id}/actions/{name}`).
+- **Hedge now:** every short leg crosses the market within the broker's protection. Working
+  hedges are moved there; what nothing covers is sent there.
+- **Flatten:** undo what is unhedged. Stop quoting and cancel every working order; once the
+  cancels have landed (a fill they cross is counted), close each leg's part beyond the
+  complete spread lots, crossing the market. The algo stops with whole spreads only.
+
+Hedges, and a flatten's closing orders, keep working while the algo is paused or stopping,
+and the heartbeat still drives them (the engine's `on_watch`). Before #425 a hedge sent while
+paused was cancelled the moment the broker accepted it: fixed, with a test.
+
 The server works out every leg's side and size; the screens send only the spread, its side,
 lots and price. Every order the algo sends fits the account's per-order limits (lots and
 value): bigger hedges go out in pieces at once, and the quote rests one piece at a time
@@ -148,6 +173,7 @@ Work | PIQ | Bids |  Price  | Asks | LTQ | VAP        prices: the spread's impli
   - `ui/src/widgets/ase/*.test.ts*`, `ui/src/widgets/ladder/SpreadLadder.test.tsx`.
 - Checks:
   - `context/scripts/mutate-spreads.py` (50/50), `context/scripts/mutate-autospreader.py` (34/34),
-    `context/scripts/mutate-ase-pieces.py` (18/18, #422);
+    `context/scripts/mutate-ase-pieces.py` (18/18, #422),
+    `context/scripts/mutate-ase-controls.py` (32/32, #425);
   - `context/scripts/e2e-autospreader.cjs` (real browser, 11/11);
   - `context/scripts/e2e-spread-ladder.cjs` (real browser, 9/9), `context/scripts/mutate-spread-ladder.py` (22/22).

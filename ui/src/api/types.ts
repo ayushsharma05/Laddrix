@@ -123,8 +123,14 @@ export interface Spread {
   name: string;
   legs: SpreadLeg[];
   tick_paise: number;
+  controls?: Record<string, number>; // how the Autospreader trades it (#425): see SpreadSpec
   created_at: string;
   updated_at: string;
+}
+
+/** GET /api/spreads/spec: what a spread's controls are; the form is drawn from it (#425). */
+export interface SpreadSpec {
+  controls: AlgoParamSpec[];
 }
 
 export interface AccountSummary {
@@ -300,6 +306,22 @@ export interface AlgoView {
   extra: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  actions?: AlgoActionSpec[]; // what the trader may ask it to do (#425), e.g. "Hedge now"
+}
+
+export interface AlgoActionSpec {
+  name: string;
+  label: string;
+  help: string;
+}
+
+/** GET …/algos/{id}/actions/{name}: what the action would do now, in words. */
+export interface ActionPreview {
+  name: string;
+  label: string;
+  lines: string[];
+  ok: boolean;
+  why: string;
 }
 
 // --- options (GET /api/options/…, stream "chain") ---------------------------------------------

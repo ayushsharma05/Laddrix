@@ -24,6 +24,7 @@ from mocktrade.domain.instruments import Instrument
 from mocktrade.spreads.model import (
     MAX_SPREADS_PER_USER,
     PREFIX,
+    Controls,
     SpreadDef,
     SpreadLeg,
     check,
@@ -105,7 +106,9 @@ class SpreadBook:
 
     # --- changing (each one is written by `save`) ------------------------------------------
 
-    def create(self, user: User, name: str, legs: list[SpreadLeg]) -> SpreadDef:
+    def create(
+        self, user: User, name: str, legs: list[SpreadLeg], controls: Controls | None = None
+    ) -> SpreadDef:
         problems = check(name, legs, self._lookup, self._expired)
         if len(self.mine(user)) >= MAX_SPREADS_PER_USER:
             problems.append(f"at most {MAX_SPREADS_PER_USER} spreads: delete one first")
@@ -115,12 +118,16 @@ class SpreadBook:
         spread_id = secrets.token_hex(4)
         while spread_id in self._by_id:
             spread_id = secrets.token_hex(4)
-        spread = SpreadDef(spread_id, user.id, user.workspace, name.strip(), tuple(legs), now, now)
+        spread = SpreadDef(spread_id, user.id, user.workspace, name.strip(), tuple(legs), now, now,
+                           controls or Controls())  # fmt: skip
         self._by_id[spread_id] = spread
         self._tell(spread_id, spread)
         return spread
 
-    def update(self, user: User, spread_id: str, name: str, legs: list[SpreadLeg]) -> SpreadDef:
+    def update(
+        self, user: User, spread_id: str, name: str, legs: list[SpreadLeg],
+        controls: Controls | None = None,  # None: keep its own
+    ) -> SpreadDef:  # fmt: skip
         old = self._by_id.get(spread_id)
         if old is None or not _owns(user, old):
             raise SpreadError([f"no spread {spread_id}"], missing=True)
@@ -128,7 +135,7 @@ class SpreadBook:
         if problems:
             raise SpreadError(problems)
         spread = SpreadDef(spread_id, old.user_id, old.workspace, name.strip(), tuple(legs),
-                           old.created_at, self._clock())  # fmt: skip
+                           old.created_at, self._clock(), controls or old.controls)  # fmt: skip
         self._by_id[spread_id] = spread
         self._tell(spread_id, spread)
         return spread

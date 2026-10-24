@@ -41,14 +41,14 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   time, and a leg that can't fit one lot fails at start in words. Fixed (PR #423).
 - **Ayush asked (24 Oct, night) to continue with the Autospreader's open items.** Split into
   six issues, done in this order, one PR each:
-  1. #424 freeze quantities (the exchange's most per order): in its PR;
+  1. #424 freeze quantities (the exchange's most per order): merged (PR #430);
   2. #425 Autospreader controls (re-quote threshold, max unhedged, hedge chase and timeout,
-     hedge-now and flatten actions);
+     hedge-now and flatten actions): in its PR;
   3. #426 algos survive a restart (reconcile first, come back paused, hedges kept);
   4. #427 several quoting legs at once;
   5. #428 structure positions (spreads held, their P&L, the unallocated rest);
   6. #429 spread charts (history from the legs, gaps shown).
-- **Pull requests:** the #424 PR.
+- **Pull requests:** the #425 PR.
 
 ## What's next
 

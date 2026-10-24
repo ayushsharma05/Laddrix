@@ -13,13 +13,13 @@ PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_autospreader.py", "tes
        "tests/test_spread_api.py"], ".")
 MUTANTS = [
  # hedges in pieces
- (A, "                piece = need if cap is None else min(need, cap)", "                piece = need", PY),
- (A, "                need -= piece", "                need = 0", PY),
- (A, "            cap = self._cap(ctx, leg.instrument_id, price)\n", "            cap = self._cap(ctx, leg.instrument_id, None)\n", PY),
- (A, "            if cap == 0:\n                ctx.say(f\"UNHEDGED", "            if False:\n                ctx.say(f\"UNHEDGED", PY),
+ (A, "            piece = need if cap is None else min(need, cap)", "            piece = need", PY),
+ (A, "            need -= piece", "            need = 0", PY),
+ (A, "        cap = self._cap(ctx, leg.instrument_id, price)\n", "        cap = self._cap(ctx, leg.instrument_id, None)\n", PY),
+ (A, "        if cap == 0:\n            ctx.say(f\"UNHEDGED", "        if False:\n            ctx.say(f\"UNHEDGED", PY),
  # the quote, one piece at a time
  (A, "            want = ctx.remaining() if piece is None else min(ctx.remaining(), piece)", "            want = ctx.remaining()", PY),
- (A, "        return cap // unit * unit", "        return cap", PY),
+ (A, "        return min(known) // unit * unit", "        return min(known)", PY),
  (A, "        unit = abs(self.q.ratio) * ctx.instrument().lot_size", "        unit = ctx.instrument().lot_size", PY),
  (A, "            if piece is not None and c.leaves_qty > piece:", "            if False:", PY),
  (A, "        piece = self._piece(ctx, price)\n", "        piece = self._piece(ctx, None)\n", PY),
@@ -30,7 +30,7 @@ MUTANTS = [
  # the risk gate
  (R, "            lots = min(lots, self.limits.max_order_value_paise // one_lot)", "            lots = lots", PY),
  (R, "            one_lot = price_paise * instrument.lot_size", "            one_lot = price_paise", PY),
- (R, "        return max(0, lots) * instrument.lot_size", "        return max(1, lots) * instrument.lot_size", PY),
+ (R, "        qty = max(0, lots) * instrument.lot_size", "        qty = max(1, lots) * instrument.lot_size", PY),
  (R, "        if instrument is None:\n            return 0\n        lots = self.limits", "        if instrument is None:\n            return 750\n        lots = self.limits", PY),
  # the wiring
  (E, "        return self._engine.order_cap(instrument_id or self._parent.instrument_id, price_paise)", "        return None", PY),

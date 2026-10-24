@@ -46,7 +46,7 @@ MUTANTS = [
  (S, "        if len(self.mine(user)) >= MAX_SPREADS_PER_USER:", "        if len(self.mine(user)) > MAX_SPREADS_PER_USER:", PY),
  (S, "        if old is None or not _owns(user, old):\n            raise SpreadError([f\"no spread {spread_id}\"], missing=True)\n        problems", "        if old is None:\n            raise SpreadError([f\"no spread {spread_id}\"], missing=True)\n        problems", PY),
  (S, "        if old is None or not _owns(user, old):\n            raise SpreadError([f\"no spread {spread_id}\"], missing=True)\n        del", "        if old is None:\n            raise SpreadError([f\"no spread {spread_id}\"], missing=True)\n        del", PY),
- (S, "                           old.created_at, self._clock())", "                           self._clock(), self._clock())", PY),
+ (S, "                           old.created_at, self._clock(), controls or old.controls)  # fmt: skip", "                           self._clock(), self._clock(), controls or old.controls)  # fmt: skip", PY),
  (S, "        os.replace(tmp, path)", "", PY),
  (S, "        spreads = [spread_to_dict(s) for s in self._by_id.values() if s.user_id == user_id]", "        spreads = [spread_to_dict(s) for s in self._by_id.values()]", PY),
  (S, "        self._tell(spread_id, spread)\n        return spread\n\n    def delete", "        return spread\n\n    def delete", PY),

@@ -1924,6 +1924,27 @@ label.algo-field {
   margin: 6px 0;
   padding-left: 18px;
 }
+.ase-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 6px 0;
+  padding: 2px 8px 6px;
+  border: 1px solid var(--border);
+}
+.ase-controls legend {
+  padding: 0 4px;
+  color: var(--text-2);
+}
+.algo-action-preview {
+  margin: 4px 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+}
+.algo-action-preview ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
 .ladder-spread-note {
   font-size: 11px;
   color: var(--text-2);

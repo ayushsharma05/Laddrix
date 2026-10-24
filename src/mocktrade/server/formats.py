@@ -55,4 +55,5 @@ def algo_to_dict(a: AlgoView) -> dict[str, Any]:
         "extra": a.extra,
         "created_at": a.created_at.isoformat(),
         "updated_at": a.updated_at.isoformat(),
+        "actions": [{"name": x.name, "label": x.label, "help": x.help} for x in a.actions],
     }

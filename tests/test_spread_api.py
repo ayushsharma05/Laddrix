@@ -177,3 +177,52 @@ async def test_trading_a_spread_starts_the_ase_algo_on_its_quoting_leg(tmp_path,
     await ayush.aclose()
     await riya.aclose()
     w.log.close()
+
+
+async def test_controls_are_set_with_the_spread_and_published_for_the_screens(tmp_path, nifty_fut):
+    w, book = world(tmp_path, nifty_fut)
+    c = await w.logged_in("ayush")
+    spec = (await c.get("/api/spreads/spec")).json()
+    assert [p["name"] for p in spec["controls"]] == [
+        "requote_ticks", "max_unhedged_lots", "chase_ticks", "hedge_timeout_s"]  # fmt: skip
+    assert spec["controls"][0] | {"help": ""} == {
+        "name": "requote_ticks", "label": "Re-quote threshold", "kind": "ticks", "help": "",
+        "required": False, "default": 1, "min": 1, "max": 50, "choices": []}  # fmt: skip
+    made = (await c.post("/api/spreads", json=CALENDAR)).json()
+    assert made["controls"] == {"requote_ticks": 1, "max_unhedged_lots": 0, "chase_ticks": 0,
+                                "hedge_timeout_s": 5.0}  # fmt: skip
+    sid = made["spread_id"]
+    tuned = {**CALENDAR, "controls": {"chase_ticks": 3, "hedge_timeout_s": 8}}
+    changed = (await c.put(f"/api/spreads/{sid}", json=tuned)).json()
+    assert changed["controls"]["chase_ticks"] == 3 and changed["controls"]["hedge_timeout_s"] == 8
+    renamed = (await c.put(f"/api/spreads/{sid}", json={**CALENDAR, "name": "x"})).json()
+    assert renamed["controls"]["chase_ticks"] == 3  # an edit without controls keeps them
+    bad = await c.post("/api/spreads", json={**CALENDAR, "controls": {"chase_ticks": 99}})
+    assert (bad.status_code, bad.json()["detail"]) == (422, "Chase must be at most 50")
+    await c.aclose()
+    w.log.close()
+
+
+async def test_an_algos_actions_are_previewed_then_done_as_previewed(tmp_path, nifty_fut):
+    w, book = world(tmp_path, nifty_fut)
+    for running in w.platform.accounts.values():
+        running.algos.types["ASE"] = ase_type(book.get)
+    ayush = await w.logged_in("ayush")
+    sid = (await ayush.post("/api/spreads", json=CALENDAR)).json()["spread_id"]
+    order = {"side": "BUY", "lots": 1, "price_paise": -13000}
+    algo = (await ayush.post(f"/api/accounts/acc-ayush/spreads/{sid}/orders", json=order)).json()
+    assert [a["label"] for a in algo["actions"]] == ["Hedge now", "Flatten"]
+    url = f"/api/accounts/acc-ayush/algos/{algo['algo_id']}/actions"
+    preview = (await ayush.get(f"{url}/flatten")).json()
+    assert preview == {"name": "flatten", "label": "Flatten", "lines": [], "ok": False,
+                       "why": "nothing is unhedged: use Stop"}  # fmt: skip
+    refused = await ayush.post(f"{url}/flatten", json={"expect": []})
+    assert (refused.status_code, refused.json()["detail"]) == (409, "nothing is unhedged: use Stop")
+    assert (await ayush.get(f"{url}/dance")).status_code == 404
+    missing = await ayush.get("/api/accounts/acc-ayush/algos/A999/actions/flatten")
+    assert missing.status_code == 404
+    riya = await w.logged_in("riya")
+    assert (await riya.get(f"{url}/flatten")).status_code in (403, 404)  # not her account
+    await ayush.aclose()
+    await riya.aclose()
+    w.log.close()

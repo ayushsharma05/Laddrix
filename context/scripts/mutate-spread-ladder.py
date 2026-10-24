@@ -34,7 +34,7 @@ MUTANTS = [
  (L, '          {spread ? (\n            <span className="ladder-spread-note"', '          {false ? (\n            <span className="ladder-spread-note"', UI),
  (A, '            onLadder={(s) => open("ladder", { instrumentId: s.instrument_id, link: "none" })}', '            onLadder={() => undefined}', UI),
  (S, '            lots=ctx.qty // per_lot,', '            lots=ctx.qty,', PY),
- (S, '            lots_done=ctx.filled(ctx.instrument_id, ctx.side) // per_lot,', '            lots_done=0,', PY),
+ (S, '            lots_done=self._net(ctx, self.q) // per_lot,', '            lots_done=0,', PY),
  (P, '        "tradable": True,  # a spread ladder', '        "tradable": False,  # a spread ladder', PY),
 ]
 for cmd, cwd in (PY, UI):

@@ -2,7 +2,8 @@
 // small conveniences (the price multiplier follows the ratio; one quoting leg), and the body
 // sent to the server. The server checks every rule and says what's wrong in words.
 
-import type { Spread, SpreadLeg } from "../../api/types";
+import type { AlgoParamSpec, Spread, SpreadLeg } from "../../api/types";
+import { parseParam, type FormValues } from "../algos/model";
 
 export const MAX_LEGS = 6; // the server's limit (spreads/model.py); it says so too
 export const MIN_LEGS = 2;
@@ -18,20 +19,41 @@ export interface LegDraft {
 export interface Draft {
   name: string;
   legs: LegDraft[];
+  controls: FormValues; // typed text per control (#425); missing: the server's default
 }
 
 const blankLeg = (ratio: number, quote = false): LegDraft => ({ instrumentId: "", ratio, multiplier: ratio, quote, payupTicks: 2 });
 
 /** A new spread: two legs, buy the first and sell the second (a calendar), quoting the first. */
 export function emptyDraft(): Draft {
-  return { name: "", legs: [blankLeg(1, true), blankLeg(-1)] };
+  return { name: "", legs: [blankLeg(1, true), blankLeg(-1)], controls: {} };
 }
 
 export function draftOf(s: Spread): Draft {
   return {
     name: s.name,
     legs: s.legs.map((l) => ({ instrumentId: l.instrument_id, ratio: l.ratio, multiplier: l.multiplier, quote: l.quote, payupTicks: l.payup_ticks })),
+    controls: Object.fromEntries(Object.entries(s.controls ?? {}).map(([k, v]) => [k, String(v)])),
   };
+}
+
+/** A control's text in the form: what was typed, else the server's default. */
+export function controlText(d: Draft, p: AlgoParamSpec): string {
+  const typed = d.controls[p.name];
+  if (typeof typed === "string") return typed;
+  return p.default === null || p.default === undefined ? "" : String(p.default);
+}
+
+/** The controls to send, from the spec (each checked against its limits), or the problems. */
+export function controlsBody(specs: AlgoParamSpec[], d: Draft): { controls: Record<string, unknown>; problems: string[] } {
+  const controls: Record<string, unknown> = {};
+  const problems: string[] = [];
+  for (const p of specs) {
+    const parsed = parseParam(p, controlText(d, p));
+    if (!parsed.ok) problems.push(parsed.problem);
+    else if (!("skip" in parsed)) controls[p.name] = parsed.value;
+  }
+  return { controls, problems };
 }
 
 export function bodyOf(d: Draft): { name: string; legs: SpreadLeg[] } {
