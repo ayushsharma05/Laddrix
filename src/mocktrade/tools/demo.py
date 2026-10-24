@@ -47,7 +47,7 @@ from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.reports.service import Reports
 from mocktrade.reports.store import ReportStore
-from mocktrade.research.backtest import Backtests, CandleStores
+from mocktrade.research.backtest import Backtests, CandleStores, RecordedDay, Worker
 from mocktrade.research.replay import (
     EPOCH,
     SPEEDS,
@@ -178,8 +178,8 @@ async def main(
     recorded_ticks = FileTickStore(data / "ticks" if feed is None else ticks_dir)
     candle_stores = CandleStores(data / "candles")  # each firm imports its own (#396)
 
-    def recorded(d):
-        return recorded_ticks.read_timed(d) if d in recorded_ticks.days() else None
+    def recorded(d):  # opened by the backtest worker, never on the trading loop (#274)
+        return RecordedDay(recorded_ticks.root, d) if d in recorded_ticks.days() else None
 
     def sources_of(owner: str):
         """A backtest replays the simulator's days (everyone's) or its owner's firm's candles."""
@@ -187,7 +187,7 @@ async def main(
         return recorded, candle_stores.of(user.workspace).rows if user is not None else None
 
     backtests = Backtests(data / "backtests", instruments, platform.charges_model,
-                          ticks=recorded, sources_of=sources_of)  # fmt: skip
+                          ticks=recorded, sources_of=sources_of, runner=Worker())  # fmt: skip
     builder = CandleBuilder(clock=clock)  # charts: candles from every tick, history recorded
     md.tap(builder.on_tick)
     charts = Charts(builder, RecordedHistory(recorded_ticks, clock=clock), events=log,

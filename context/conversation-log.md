@@ -619,3 +619,11 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Now:** each try looks up, checks every answer, then connects to that exact address, with TLS still checked against the host name (SNI).
   - **Also:** no redirects, no proxy, no reused connections; IPv4-in-IPv6 and global multicast refused; at most 500 waiting and 20 connecting; the operator's alert webhook bounded too.
   - **Tests:** 21 in `tests/test_webhook_pinning.py`, including a real local TLS server: the right name is accepted and a wrong name for the same address is refused. Mutation 17/17.
+- 23 Oct, night, PR #404 merged. **#274 fixed:** research and report work never holds up trading.
+  - **Measured first** (`context/scripts/measure-workload.py`): a probe that asks the loop to wake every 5 ms.
+  - **A real bug the measurement found:** a backtest's order rate (8/s) was counted in real time. A day replayed in seconds made orders wait real milliseconds while replayed ticks ran on, so the same backtest gave different fills depending on what else ran on the loop (net -1,975.50 vs -2,095.51 on the same day). There were also ~1,100 "still busy" stalls per day. Now the throttle counts and waits in replayed time: the same result every time, and no stalls.
+  - **Backtests** run in a worker process: memory capped at 2 GB, 15 min per day, at most 10 waiting (2 per person, 429 beyond), cancellable (POST .../cancel, and a button on the Research screen). A worker killed by the system fails only its run.
+  - **Found by the tests:** cancelling a *waiting* run killed the worker of the *running* one. Fixed: only a running run stops its worker.
+  - **Reports** (16:00 job, a day's report, P&L, CSV/PDF) are built in a worker thread: the loop was 10.5 ms late while reports were built on it, now about 1 ms.
+  - **Scheduler:** each job runs in its own task, so a slow 16:00 report can't delay the 5 s protection guard; a job still running when due again is skipped, never doubled.
+  - **Tests:** 11 in `tests/test_workload.py` plus a UI test for Cancel.

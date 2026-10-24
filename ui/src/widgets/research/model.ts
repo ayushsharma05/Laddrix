@@ -22,7 +22,7 @@ export function bytesText(n: number): string {
 
 // --- runs ----------------------------------------------------------------------------------
 
-export const isFinished = (r: BacktestRun) => r.state === "done" || r.state === "failed";
+export const isFinished = (r: BacktestRun) => r.state === "done" || r.state === "failed" || r.state === "cancelled";
 
 /** Keep asking the server while any run is still going. */
 export const anyGoing = (runs: BacktestRun[]) => runs.some((r) => !isFinished(r));
@@ -38,6 +38,7 @@ export function runState(r: BacktestRun): { text: string; tone: "good" | "bad" |
   if (r.state === "queued") return { text: "Waiting for the run before it", tone: "pending" };
   if (r.state === "running") return { text: `Running: ${r.progress} of ${r.days} days`, tone: "pending" };
   if (r.state === "failed") return { text: `Failed: ${r.error}`, tone: "bad" };
+  if (r.state === "cancelled") return { text: "Cancelled", tone: "dim" };
   const skipped = r.summary?.days_skipped.length ?? 0;
   return { text: skipped ? `Done (${skipped} day${skipped > 1 ? "s" : ""} skipped)` : "Done", tone: "good" };
 }

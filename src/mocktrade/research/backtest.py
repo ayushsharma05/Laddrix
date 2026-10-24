@@ -13,16 +13,25 @@ Deterministic: the same days and spec give the same result, every time. Nothing 
 reads the wall clock; the order manager's update loop is the only task, and the feed gives it
 loop turns between ticks (research/replay.py).
 
+Where it runs (#274): on a server, each day runs in a worker process of its own (`Worker`),
+never on the trading loop. The worker has a memory cap, each day a time limit, at most
+MAX_WAITING runs wait (MAX_PER_USER per person), and a run can be cancelled. What a day replays
+is handed over as a description (`RecordedDay`, `CandleDay`) that the worker opens itself.
+Tests run days in-process (`InProcess`), the same code.
+
 Candles (OHLC rows) become ticks O → the far extreme first → the other extreme → C, each with
 one tick of spread on either side, so market orders pay the spread and resting orders fill
 only when the price trades through them: conservative, and the run says it is candle-based.
 """
 
 import asyncio
+import concurrent.futures
 import json
 import logging
+import multiprocessing
 import os
 import re
+import resource
 import secrets
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import asdict, dataclass, field
@@ -45,9 +54,10 @@ from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.reports.daily import build_day, report_to_dict
 from mocktrade.research.replay import EPOCH, ReplayClock, ReplayFeed
-from mocktrade.research.ticks import IST
+from mocktrade.research.ticks import IST, FileTickStore
 from mocktrade.risk.kill_switch import KillSwitch
 from mocktrade.risk.limits import RiskLimits
+from mocktrade.risk.throttle import OrderThrottle
 from mocktrade.store.events import EventLog
 
 log = logging.getLogger(__name__)
@@ -55,10 +65,18 @@ ACCOUNT = "backtest"
 BEAT = timedelta(seconds=HEARTBEAT_S)
 DRAIN_TURNS = 200  # far more than one order's path needs (about a dozen)
 MAX_DAYS = 250  # about a year of trading days in one run
+MAX_WAITING = 10  # runs queued or running on the server; more are refused (#274)
+MAX_PER_USER = 2  # of those, one person's
+DAY_TIMEOUT_S = 900.0  # one day longer than this is stopped (a worker, #274)
+WORKER_MEMORY = 2 << 30  # the worker process's address-space cap, bytes
 
 
 class BacktestError(Exception):
     """A spec that can't run (said in words)."""
+
+
+class BacktestBusy(BacktestError):
+    """Too many backtests waiting: try later (#274)."""
 
 
 @dataclass(frozen=True)
@@ -94,7 +112,27 @@ class BacktestSpec:
         return out
 
 
-TickSource = Callable[[date], Iterator[tuple[int, Tick]] | None]  # None: nothing that day
+@dataclass(frozen=True)
+class RecordedDay:
+    """A recorded day on disk, opened where the day runs (a worker process, #274)."""
+
+    root: Path
+    day: date
+
+    def open(self) -> Iterator[tuple[int, Tick]]:
+        return FileTickStore(self.root).read_timed(self.day)
+
+
+@dataclass(frozen=True)
+class CandleDay:
+    """A day of imported candles, turned into ticks where the day runs."""
+
+    rows: tuple[dict[str, Any], ...]
+
+
+DayInput = Iterator[tuple[int, Tick]] | RecordedDay | CandleDay
+# a day's ticks: an iterator (in-process only), or a description a worker opens itself
+TickSource = Callable[[date], Iterator[tuple[int, Tick]] | RecordedDay | None]  # None: nothing
 CandleSource = Callable[[str, date], list[dict[str, Any]] | None]  # (instrument, day) -> rows
 
 
@@ -146,9 +184,26 @@ async def run_day(
     )  # a replay: no real order is ever sent
     broker = PaperBroker(md, instruments, latency_s=0.0, clock=clock, every_tick=True,
                          starting_paise=spec.capital_paise)  # fmt: skip
+    asleep = {"n": 0}  # orders waiting for their turn at the order rate, in replayed time
+
+    async def replay_sleep(seconds: float) -> None:
+        """The throttle's wait, in replayed time: ticks go on until it has passed (#274)."""
+        until = clock() + timedelta(seconds=seconds)
+        asleep["n"] += 1
+        try:
+            while clock() < until:
+                await asyncio.sleep(0)
+        finally:
+            asleep["n"] -= 1
+
+    # the order rate counted in replayed time, never the computer's: a day replayed in
+    # seconds would otherwise wait real milliseconds while ticks run on (#274)
+    throttle = OrderThrottle(monotonic=lambda: (clock() - EPOCH).total_seconds(),
+                             today=lambda: clock().astimezone(IST).date(),
+                             sleep=replay_sleep)  # fmt: skip
     rt = platform.add_account(
         BrokerAccount(ACCOUNT, "paper", "BT", "backtest"), broker, ids=ClientIds("BT"),
-        algo_types=BUILTIN, clock=clock,
+        algo_types=BUILTIN, clock=clock, throttle=throttle,
         limits=RiskLimits(max_order_value_paise=10**13, max_position_lots=10**4,
                           max_order_lots=10**3, max_daily_loss_paise=10**13),
     )  # fmt: skip
@@ -185,7 +240,7 @@ async def run_day(
         stamped with the time of the tick that caused it, as it would be live."""
         for _ in range(DRAIN_TURNS):
             await asyncio.sleep(0)
-            if broker.idle and not rt.algos.busy:
+            if broker.idle and (not rt.algos.busy or asleep["n"]):  # a wait needs the clock
                 return
         log.warning("%s: still busy after %d loop turns", day, DRAIN_TURNS)
 
@@ -211,6 +266,99 @@ async def run_day(
         await asyncio.gather(runner, return_exceptions=True)
         await broker.aclose()
         await events.aclose()
+
+
+def _open(source: DayInput, instrument: Instrument) -> Iterator[tuple[int, Tick]]:
+    if isinstance(source, RecordedDay):
+        return source.open()
+    if isinstance(source, CandleDay):
+        return iter(candles_to_ticks(instrument, source.rows))
+    return source
+
+
+class InProcess:
+    """Days run on the caller's own loop: tests, and a source that can't be handed over."""
+
+    async def day(self, spec: BacktestSpec, day: date, source: DayInput,
+                  instruments: InstrumentStore, charges: ChargesModel,
+                  folder: Path) -> dict[str, Any]:  # fmt: skip
+        ticks = _open(source, instruments.get(spec.instrument_id))
+        return await run_day(spec, day, ticks, instruments, charges, folder)
+
+    def stop(self) -> None:
+        """Nothing to stop: cancelling the run's task stops the day."""
+
+    def close(self) -> None:
+        pass
+
+
+def _cap_memory(limit: int) -> None:
+    """In the worker, before any day: an address-space cap, so a runaway day fails alone."""
+    if limit > 0:
+        resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
+
+
+def _day_in_worker(spec: BacktestSpec, day: date, source: RecordedDay | CandleDay,
+                   instruments: list[Instrument], charges: ChargesModel,
+                   folder: Path) -> dict[str, Any]:  # fmt: skip
+    store = InstrumentStore()
+    for i in instruments:
+        store.add(i)
+    ticks = _open(source, store.get(spec.instrument_id))
+    return asyncio.run(run_day(spec, day, ticks, store, charges, folder))
+
+
+class Worker:
+    """Days run in a process of their own (#274): the trading loop never runs a backtest's
+    ticks, reads its files or builds its reports. One process, one day at a time; it is
+    started when first needed and stopped (killed) on a cancel, a time-out or close."""
+
+    def __init__(self, *, timeout_s: float = DAY_TIMEOUT_S, memory: int = WORKER_MEMORY) -> None:
+        self._timeout_s = timeout_s
+        self._memory = memory
+        self._pool: concurrent.futures.ProcessPoolExecutor | None = None
+
+    def _executor(self) -> concurrent.futures.ProcessPoolExecutor:
+        if self._pool is None:
+            self._pool = concurrent.futures.ProcessPoolExecutor(
+                max_workers=1, mp_context=multiprocessing.get_context("spawn"),
+                initializer=_cap_memory, initargs=(self._memory,),
+            )  # fmt: skip
+        return self._pool
+
+    async def day(self, spec: BacktestSpec, day: date, source: DayInput,
+                  instruments: InstrumentStore, charges: ChargesModel,
+                  folder: Path) -> dict[str, Any]:  # fmt: skip
+        if not isinstance(source, RecordedDay | CandleDay):  # an iterator can't be handed over
+            return await InProcess().day(spec, day, source, instruments, charges, folder)
+        everything = list(instruments._by_id.values())
+        job = asyncio.get_running_loop().run_in_executor(
+            self._executor(), _day_in_worker, spec, day, source, everything, charges, folder
+        )
+        try:
+            return await asyncio.wait_for(job, self._timeout_s)
+        except TimeoutError:
+            self.stop()
+            raise BacktestError(
+                f"{day}: took longer than {self._timeout_s:.0f} s, stopped"
+            ) from None
+        except concurrent.futures.process.BrokenProcessPool:
+            self.stop()
+            raise BacktestError(f"{day}: the backtest worker stopped (out of memory?)") from None
+        except MemoryError:
+            raise BacktestError(f"{day}: needed more memory than a backtest may use") from None
+
+    def stop(self) -> None:
+        """Kill the worker (a cancel or a time-out); the next day starts a fresh one."""
+        pool, self._pool = self._pool, None
+        if pool is None:
+            return
+        for process in list((pool._processes or {}).values()):
+            process.kill()
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    def close(self) -> None:
+        self.stop()
 
 
 def summarise(days: list[dict[str, Any]]) -> dict[str, Any]:
@@ -246,7 +394,7 @@ class Run:
     run_id: str
     spec: BacktestSpec
     candles: bool
-    state: str = "queued"  # queued | running | done | failed
+    state: str = "queued"  # queued | running | done | failed | cancelled
     progress: int = 0  # days done
     error: str = ""
     created_at: str = ""
@@ -281,6 +429,7 @@ class Backtests:
         *,
         candles: CandleSource | None = None,
         sources_of: Callable[[str], tuple[TickSource, CandleSource | None]] | None = None,
+        runner: InProcess | Worker | None = None,  # where days run: a Worker on a server
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.root = Path(root)
@@ -290,9 +439,10 @@ class Backtests:
         # and their own firm's candles. Without it, everyone's runs read the same data.
         self._sources = sources_of or (lambda _owner: (ticks, candles))
         self._clock = clock
+        self._runner = runner or InProcess()
         self._runs: dict[str, Run] = {}
         self._lock = asyncio.Lock()  # one run at a time: a backtest is CPU-bound
-        self._tasks: set[asyncio.Task] = set()
+        self._tasks: dict[str, asyncio.Task] = {}  # run id -> its task, while queued or running
         self._load()
 
     def start(self, spec: BacktestSpec, *, candles: bool = False, owner: str = "") -> Run:
@@ -305,14 +455,30 @@ class Backtests:
             problems.append("no candles were imported")
         if problems:
             raise BacktestError("; ".join(problems))
+        waiting = [self._runs[r] for r in self._tasks]
+        if len(waiting) >= MAX_WAITING:
+            raise BacktestBusy(f"{len(waiting)} backtests are already waiting: try later")
+        if sum(r.owner == owner for r in waiting) >= MAX_PER_USER:
+            raise BacktestBusy(f"you already have {MAX_PER_USER} backtests waiting or running: "
+                               "wait for one, or cancel it")  # fmt: skip
         run = Run(f"BT{self._clock().strftime('%y%m%d%H%M%S')}{secrets.token_hex(2).upper()}",
                   spec, candles, created_at=self._clock().isoformat(), owner=owner)  # fmt: skip
         self._runs[run.run_id] = run
         self._save(run)
         task = asyncio.ensure_future(self._run(run))
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+        self._tasks[run.run_id] = task
+        task.add_done_callback(lambda _t, r=run.run_id: self._tasks.pop(r, None))
         return run
+
+    async def cancel(self, run_id: str) -> bool:
+        """Stop a queued or running run (its worker is killed) and wait until it has; False
+        if it had already ended."""
+        task = self._tasks.get(run_id)
+        if task is None:
+            return False
+        task.cancel()
+        await asyncio.wait({task}, timeout=5)
+        return True
 
     def get(self, run_id: str) -> Run | None:
         return self._runs.get(run_id)
@@ -336,40 +502,52 @@ class Backtests:
 
     async def settle(self) -> None:
         while self._tasks:
-            await asyncio.gather(*list(self._tasks), return_exceptions=True)
+            await asyncio.gather(*list(self._tasks.values()), return_exceptions=True)
+
+    def close(self) -> None:
+        """The server is stopping: its worker goes too. A run cut short reads as failed on the
+        next start ("the server stopped during the run"), not as cancelled."""
+        self._runner.close()
 
     async def _run(self, run: Run) -> None:
-        async with self._lock:
-            run.state = "running"
-            self._save(run)
-            daily = []
-            try:
-                instrument = self._instruments.get(run.spec.instrument_id)
-                for text in run.spec.days:
-                    day = date.fromisoformat(text)
-                    ticks = self._source(run, instrument, day)
-                    if ticks is None:
-                        daily.append({"day": text, "skipped": "nothing recorded"})
-                    else:
-                        folder = self.root / run.run_id
-                        daily.append(await run_day(run.spec, day, ticks, self._instruments,
-                                                   self._charges, folder))  # fmt: skip
-                    run.progress += 1
-                    self._save(run)
-                run.result = {"summary": summarise(daily), "daily": daily}
-                run.state = "done"
-            except BacktestError as exc:
-                run.state, run.error = "failed", str(exc)
-            except Exception as exc:
-                log.exception("backtest %s failed", run.run_id)
-                run.state, run.error = "failed", f"{type(exc).__name__}: {exc}"
-            self._save(run)
+        try:
+            async with self._lock:
+                await self._days(run)
+        except asyncio.CancelledError:  # cancelled while queued or running (#274)
+            if run.state == "running":  # only its own day: a queued one stops nobody's
+                self._runner.stop()
+            run.state, run.error = "cancelled", "cancelled"
+        self._save(run)
 
-    def _source(self, run: Run, instrument, day: date) -> Iterator[tuple[int, Tick]] | None:
+    async def _days(self, run: Run) -> None:
+        run.state = "running"
+        self._save(run)
+        daily = []
+        try:
+            for text in run.spec.days:
+                day = date.fromisoformat(text)
+                source = self._source(run, day)
+                if source is None:
+                    daily.append({"day": text, "skipped": "nothing recorded"})
+                else:
+                    folder = self.root / run.run_id
+                    daily.append(await self._runner.day(run.spec, day, source, self._instruments,
+                                                        self._charges, folder))  # fmt: skip
+                run.progress += 1
+                self._save(run)
+            run.result = {"summary": summarise(daily), "daily": daily}
+            run.state = "done"
+        except BacktestError as exc:
+            run.state, run.error = "failed", str(exc)
+        except Exception as exc:
+            log.exception("backtest %s failed", run.run_id)
+            run.state, run.error = "failed", f"{type(exc).__name__}: {exc}"
+
+    def _source(self, run: Run, day: date) -> DayInput | None:
         ticks, candles = self._sources(run.owner)
         if run.candles:
             rows = candles(run.spec.instrument_id, day) if candles else None
-            return iter(candles_to_ticks(instrument, rows)) if rows else None
+            return CandleDay(tuple(rows)) if rows else None
         return ticks(day)
 
     def _save(self, run: Run) -> None:
