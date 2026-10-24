@@ -11,6 +11,9 @@ definition later never changes an algo already running.
     the other legs move ─► re-quote Q (within the modify budget: 24, then cancel and re-send)
     Q fills f lots      ─► at once, every other leg: floor(f · |its ratio| / |Q's ratio|) lots,
                            at its best price ± its pay-up ticks (a limit: never chases further)
+    pieces (#422)       every order fits the account's per-order limits (lots and value):
+                           a bigger hedge goes out in pieces at once; the quote rests one
+                           piece (whole spread lots) at a time, the next once all is hedged
     every leg complete  ─► DONE; the spread actually traded (Σ price× · average) is reported
 
 Buying the spread buys the + legs and sells the − legs; selling it mirrors that.
@@ -21,6 +24,7 @@ Rules (the two-leg spreader's, for N legs):
   fill or working hedge covers yet, so a repeated or out-of-order update never over-hedges.
 - No new quote while any leg is unhedged, while a leg has no price, or while the legs'
   prices are more than MAX_LEG_SKEW_S apart (one is stale, #267).
+- It fails at start, in words, if any leg can't fit what it must trade in one order.
 - The algo ends only with every leg complete. Ending with any leg short (stopped, a kill
   switch, a hedge refused) raises an alert naming each leg and quantity.
 """
@@ -98,6 +102,8 @@ class AutoSpreader(BaseStrategy):
             found = ctx.instrument(leg.instrument_id)
             if found is None or not found.tradable:
                 return ctx.fail(f"{leg.instrument_id} can't be traded")
+        if why := self._too_big(ctx):
+            return ctx.fail(why)
         ctx.watch(*(leg.instrument_id for leg in self.others))
         self._report(ctx)
         self._quote(ctx)
@@ -184,6 +190,30 @@ class AutoSpreader(BaseStrategy):
         price = (math.floor(exact) if down else math.ceil(exact)) * tick_size
         return price if price > 0 else None
 
+    def _cap(self, ctx: AlgoContext, instrument_id: str, price: int | None) -> int | None:
+        """The most one order on this leg may carry at this price, or None: no limit known.
+        Asked each time: the account's limits can change while the algo works."""
+        return ctx.max_order_qty(instrument_id, price)
+
+    def _piece(self, ctx: AlgoContext, price: int | None) -> int | None:
+        """The biggest quote that fits one order, in whole spread lots (0: not even one)."""
+        cap = self._cap(ctx, ctx.instrument_id, price)
+        if cap is None:
+            return None
+        unit = abs(self.q.ratio) * ctx.instrument().lot_size
+        return cap // unit * unit
+
+    def _too_big(self, ctx: AlgoContext) -> str | None:
+        """Why a leg can't trade even its smallest piece in one order at its price now."""
+        if self._piece(ctx, self._quote_price(ctx)) == 0:
+            return (f"one spread lot ({abs(self.q.ratio)} lots of {self.q.instrument_id}) "
+                    f"is over this account's per-order limit")  # fmt: skip
+        for leg in self.others:
+            level = self._best(ctx, leg)
+            if self._cap(ctx, leg.instrument_id, level.price_paise if level else None) == 0:
+                return f"one lot of {leg.instrument_id} is over this account's per-order limit"
+        return None
+
     def _quote(self, ctx: AlgoContext) -> None:
         price = self._quote_price(ctx)
         quotes = [c for c in ctx.working() if c.request.instrument_id == ctx.instrument_id]
@@ -193,8 +223,12 @@ class AutoSpreader(BaseStrategy):
             ctx.say(f"waiting: {self.stale}" if self.stale
                     else "waiting: a leg has no price to hedge against")  # fmt: skip
             return
+        piece = self._piece(ctx, price)
         for c in quotes:
             if c.request.price_paise == price or c.pending is not Pending.NONE:
+                continue
+            if piece is not None and c.leaves_qty > piece:
+                ctx.cancel(c.client_order_id)  # too big at the new price: re-quote smaller
                 continue
             done = self.modifies.get(c.client_order_id, 0)
             if done >= MODIFY_BUDGET:
@@ -203,8 +237,10 @@ class AutoSpreader(BaseStrategy):
             self.modifies[c.client_order_id] = done + 1
             ctx.modify(c.client_order_id, price_paise=price)
         if not quotes:
-            want = ctx.remaining()
-            if want > 0 and not self._short(ctx) and ctx.send(want, price):
+            want = ctx.remaining() if piece is None else min(ctx.remaining(), piece)
+            if piece == 0 and ctx.remaining():
+                ctx.say(f"waiting: one spread lot at {price / 100:.2f} is over the per-order limit")
+            elif want > 0 and not self._short(ctx) and ctx.send(want, price):
                 ctx.say(f"quoting {want} of {ctx.instrument_id} at {price / 100:.2f} "
                         f"(spread {self.level / 100:.2f})")  # fmt: skip
 
@@ -231,10 +267,19 @@ class AutoSpreader(BaseStrategy):
                 continue
             step = ctx.instrument(leg.instrument_id).tick_paise * leg.payup_ticks
             price = level.price_paise + (step if side is Side.BUY else -step)
-            if ctx.send(need, price, side=side, instrument_id=leg.instrument_id,
-                        check_remaining=False, hedge=True):  # fmt: skip
-                self.in_flight[leg.instrument_id] += need
-                ctx.say(f"hedging {need} of {leg.instrument_id} at {price / 100:.2f}")
+            cap = self._cap(ctx, leg.instrument_id, price)
+            if cap == 0:
+                ctx.say(f"UNHEDGED {need} on {leg.instrument_id}: one lot is over the "
+                        f"per-order limit")  # fmt: skip
+                continue
+            while need > 0:  # in pieces that each fit one order (#422), all sent at once
+                piece = need if cap is None else min(need, cap)
+                if not ctx.send(piece, price, side=side, instrument_id=leg.instrument_id,
+                                check_remaining=False, hedge=True):  # fmt: skip
+                    break
+                self.in_flight[leg.instrument_id] += piece
+                need -= piece
+                ctx.say(f"hedging {piece} of {leg.instrument_id} at {price / 100:.2f}")
 
     def _sync(self, ctx: AlgoContext) -> None:
         """A hedge the order manager has registered is no longer 'in flight'."""

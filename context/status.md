@@ -32,7 +32,11 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
      merged (PR #417).
   2. #415 multi-leg execution (the ASE algo: quote one leg, hedge the others): done, in its PR.
   3. #416 the spread ladder, with right-click "Autospreader settings…": next.
-- **Pull requests:** the #415 PR, until it merges.
+- **Bug #422 (found reviewing the Autospreader against the old brief):** a hedge bigger than
+  one order may carry was refused whole and left the spread unhedged. Now every ASE order fits
+  the account's lots and value limits: hedges go in pieces at once, the quote one piece at a
+  time, and a leg that can't fit one lot fails at start in words. In its PR.
+- **Pull requests:** the #415 PR, until it merges; the #422 PR.
 
 ## What's next
 

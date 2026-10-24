@@ -103,7 +103,9 @@ POST /api/accounts/{account}/spreads/{spread}/orders   {"side": "BUY", "lots": 2
 ```
 
 The server works out every leg's side and size; the screens send only the spread, its side,
-lots and price. The algo's rules are in [algos.md](algos.md#autospreader-algosautospreaderpy-415).
+lots and price. Every order the algo sends fits the account's per-order limits (lots and
+value): bigger hedges go out in pieces at once, and the quote rests one piece at a time
+(#422). With the default ₹50 lakh, 2 lots of a NIFTY future (about ₹37.5 lakh) fit one order. The algo's rules are in [algos.md](algos.md#autospreader-algosautospreaderpy-415).
 
 ## 5. Code
 
@@ -118,5 +120,6 @@ lots and price. The algo's rules are in [algos.md](algos.md#autospreader-algosau
   - `tests/test_autospreader.py` (the algo: quotes, hedges, stops, the paper broker);
   - `ui/src/widgets/ase/*.test.ts*`.
 - Checks:
-  - `context/scripts/mutate-spreads.py` (50/50), `context/scripts/mutate-autospreader.py` (34/34);
+  - `context/scripts/mutate-spreads.py` (50/50), `context/scripts/mutate-autospreader.py` (34/34),
+    `context/scripts/mutate-ase-pieces.py` (18/18, #422);
   - `context/scripts/e2e-autospreader.cjs` (real browser, 11/11).

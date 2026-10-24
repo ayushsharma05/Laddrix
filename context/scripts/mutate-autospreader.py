@@ -29,7 +29,7 @@ MUTANTS = [
  (A, "        lots = q_lots * abs(leg.ratio) // abs(self.q.ratio)", "        lots = q_lots * abs(leg.ratio)", PY),
  (A, "        lots = q_lots * abs(leg.ratio) // abs(self.q.ratio)", "        lots = -(-q_lots * abs(leg.ratio) // abs(self.q.ratio))", PY),
  (A, "            need = short.get(leg.instrument_id, 0) - covering", "            need = short.get(leg.instrument_id, 0)", PY),
- (A, "                self.in_flight[leg.instrument_id] += need", "", PY),
+ (A, "                self.in_flight[leg.instrument_id] += piece", "", PY),
  (A, "                self.in_flight[leg] = max(0, self.in_flight[leg] - c.request.qty)", "", PY),
  (A, "            step = ctx.instrument(leg.instrument_id).tick_paise * leg.payup_ticks", "            step = ctx.instrument(leg.instrument_id).tick_paise * 2", PY),
  (A, "            price = level.price_paise + (step if side is Side.BUY else -step)", "            price = level.price_paise - (step if side is Side.BUY else -step)", PY),

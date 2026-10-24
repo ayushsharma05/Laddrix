@@ -394,6 +394,13 @@ class AlgoContext:
             self._parent.status = status
             self._engine.changed(self._parent, "UPDATED")
 
+    def max_order_qty(
+        self, instrument_id: str | None = None, price_paise: int | None = None
+    ) -> int | None:
+        """The most one child order may carry on this instrument at this price (the account's
+        per-order limits, #422), or None when no limit is known. More goes in pieces."""
+        return self._engine.order_cap(instrument_id or self._parent.instrument_id, price_paise)
+
     def position(self) -> int | None:
         """The account's position in this algo's instrument and product now (+ long, − short),
         or None when the engine wasn't given positions."""
@@ -442,7 +449,10 @@ class AlgoEngine:
         position: Callable[[str, Any], int] | None = None,  # (instrument, product) -> qty
         orders_per_second: Callable[[], int] = lambda: 8,  # the throttle's per-second limit
         access: Callable[[str], str | None] = lambda _user_id: None,  # still may trade? (#366)
+        # the most one order may carry (instrument, price) -> qty; None: no limit known (#422)
+        order_cap: Callable[[str, int | None], int | None] = lambda _i, _p: None,
     ) -> None:
+        self.order_cap = order_cap
         self._ops = orders_per_second
         self.access = access
         self.account_id = account_id

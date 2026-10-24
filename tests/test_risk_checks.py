@@ -236,6 +236,19 @@ async def test_too_many_lots_in_one_order(world):
     assert reason == "11 lots (825) is more than the 10-lot limit per order"
 
 
+def test_how_much_fits_one_order(world):
+    """What an algo may put in one order (#422): the lots limit and the value limit."""
+    gate = world.gate()
+    # ₹50 lakh: 2 lots of 75 at ₹25,010 (₹37.5 lakh), not 3 (₹56.3 lakh); 10 lots at most
+    assert gate.max_order_qty(FUT, 2501000) == 150
+    assert gate.max_order_qty(FUT, 100) == 750  # cheap: the lots limit
+    assert gate.max_order_qty(FUT, None) == 750  # no price (market): the lots limit
+    assert gate.max_order_qty(FUT, 1_00_00_000_00) == 0  # one lot is over the value limit
+    assert gate.max_order_qty("NFO:NOPE", 2501000) == 0
+    gate.limits = RiskLimits(max_order_lots=4, max_order_value_paise=10**12)  # read live
+    assert gate.max_order_qty(FUT, 2501000) == 300
+
+
 async def test_order_value_limit(world):
     reason = await check(world.gate(), req(qty=225))  # 3 lots × ₹25,010 × 75 = ₹56.27 lakh
     assert reason == "order value ₹56,27,250.00 is above the ₹50,00,000.00 limit per order"
