@@ -11,7 +11,7 @@ Ayush asked for this on 24 Oct 2026. It is built in three parts:
 | --- | --- | --- | --- |
 | 1 | #414 | spread definitions, their live implied price, the Autospreader widget | done |
 | 2 | #415 | multi-leg execution: quote one leg, hedge every other | done |
-| 3 | #416 | the spread ladder: click to trade a spread; right-click "Autospreader settings…" | next |
+| 3 | #416 | the spread ladder: click to trade a spread; right-click "Autospreader settings…" | done |
 
 Still to come, in #250 and #251:
 - several quoting legs at once;
@@ -88,7 +88,7 @@ a leg ticks ─► SpreadPricer (a tap) ─► implied() ─► MarketData.on_de
   - `GET /api/instruments/SPREAD:<id>` (owner only) answers with `kind: "SPREAD"`, its tick,
     `lot_size: 1` (one spread lot) and its legs.
   - The stream accepts `SPREAD:<id>`, again for the owner only.
-  - It is not yet `tradable`; that comes with #416.
+  - It is `tradable`: a spread ladder trades it (§5).
 - **Kept and erased like other personal data.**
   - Saved per user, written off the trading loop, and loaded at start.
   - In the backup (`spreads/`).
@@ -105,18 +105,46 @@ POST /api/accounts/{account}/spreads/{spread}/orders   {"side": "BUY", "lots": 2
 The server works out every leg's side and size; the screens send only the spread, its side,
 lots and price. The algo's rules are in [algos.md](algos.md#autospreader-algosautospreaderpy-415).
 
-## 5. Code
+## 5. The spread ladder (#416)
+
+The normal ladder, opened on `SPREAD:<id>`, from the Autospreader's **Ladder** button.
+
+```
+Work | PIQ | Bids |  Price  | Asks | LTQ | VAP        prices: the spread's implied ones (may be negative)
+     |     |   6  | −138.80 |      |     |            click Bids: buy the spread lots box at that price
+     |     |      | −138.60 |  1   |     |            click Asks: sell; Ctrl+click joins the best price
+```
+
+- **A click** sends `POST /api/accounts/{account}/spreads/{id}/orders`, which starts the ASE
+  algo (§4). There is no order type, TIF or product to choose: the server trades the legs.
+- **Work** shows each running ASE algo on this spread at its spread price, with the spread lots
+  not yet done. A click selects it and a second click cancels it, which stops the algo: its
+  quote is pulled and its hedges finish. A click on another row moves it: the algo stops and
+  the lots left start again at the new price.
+- **Right-click:** "Autospreader settings…" first (the spread opens in the Autospreader, ready
+  to edit), then the ladder's own settings and what every widget offers.
+- The title is the spread's name; the position is shown in its legs (Positions).
+- Checked in a real browser on the demo:
+  - buying 1 spread lot at its ask filled both legs, +75 Oct and −75 Nov;
+  - the spread traded at −138.60 for −138.50 asked, so better than asked;
+  - a resting order showed in Work and was cancelled;
+  - the right-click menu opened the settings.
+
+## 6. Code
 
 - `src/mocktrade/spreads/model.py`: definitions, checks, the implied price.
 - `src/mocktrade/spreads/store.py`: `SpreadBook`, per user, on disk.
 - `src/mocktrade/spreads/pricer.py`: live prices as derived ticks.
 - `src/mocktrade/algos/autospreader.py`: the ASE algo (#415).
 - `ui/src/widgets/ase/`: the Autospreader widget and its form model.
+- `ui/src/widgets/ladder/`: the spread ladder (`spreadWorking` in `model.ts`, the spread path in
+  `Ladder.tsx`).
 - Tests:
   - `tests/test_spreads.py` (hand-worked prices, rules, the book, the pricer);
   - `tests/test_spread_api.py` (routes, ownership, the stream, trading a spread);
   - `tests/test_autospreader.py` (the algo: quotes, hedges, stops, the paper broker);
-  - `ui/src/widgets/ase/*.test.ts*`.
+  - `ui/src/widgets/ase/*.test.ts*`, `ui/src/widgets/ladder/SpreadLadder.test.tsx`.
 - Checks:
   - `context/scripts/mutate-spreads.py` (50/50), `context/scripts/mutate-autospreader.py` (34/34);
-  - `context/scripts/e2e-autospreader.cjs` (real browser, 11/11).
+  - `context/scripts/e2e-autospreader.cjs` (real browser, 11/11);
+  - `context/scripts/e2e-spread-ladder.cjs` (real browser, 9/9), `context/scripts/mutate-spread-ladder.py` (22/22).

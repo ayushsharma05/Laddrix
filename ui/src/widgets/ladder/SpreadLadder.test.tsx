@@ -40,13 +40,14 @@ function setup() {
   stream.start();
   socket().open();
   const params = { link: "none", instrumentId: ID, lots: 2, type: "LMT", tif: "DAY", confirmOverPaise: 0 } as LadderParams;
+  const setParams = vi.fn();
   render(
     <AppProvider app={app}>
-      <Ladder params={params} setParams={vi.fn()} setInstrument={vi.fn()} publish={vi.fn()} open={vi.fn()} />
+      <Ladder params={params} setParams={setParams} setInstrument={vi.fn()} publish={vi.fn()} open={vi.fn()} />
     </AppProvider>,
   );
   const push = () => act(() => socket().receive({ type: "ticks", ticks: [BOOK] }));
-  return { ...server, app, push };
+  return { ...server, app, push, setParams };
 }
 
 const posts = (calls: { method: string; path: string; body: unknown }[]) => calls.filter((c) => c.method !== "GET");
@@ -60,6 +61,15 @@ describe("a spread ladder", () => {
     expect(calls.some((c) => c.path.includes("order-spec") || c.path.endsWith("/vap"))).toBe(false); // the server's legs, not ours
     expect(screen.queryByLabelText("Type")).toBeNull(); // no order type, TIF or product to pick
     expect(screen.getByText("spread lots")).toBeTruthy();
+  });
+
+  it("is titled by the spread's name, not its id", async () => {
+    const { setParams } = setup();
+    await screen.findByText("−130.00", { selector: ".price" });
+    expect(setParams).toHaveBeenCalledWith({ label: "NIFTY Oct/Nov" });
+    const title = widget("ladder")!.tabTitle!;
+    expect(title({ link: "none", instrumentId: ID, lots: 1, label: "NIFTY Oct/Nov" } as LadderParams)).toBe("NIFTY Oct/Nov");
+    expect(title({ link: "none", instrumentId: "NFO:NIFTY26OCTFUT", lots: 1 } as LadderParams)).toBe("NIFTY26OCTFUT");
   });
 
   it("a click buys or sells spread lots at that spread price: the Autospreader works the legs", async () => {
@@ -91,13 +101,13 @@ describe("a spread ladder", () => {
     const { push, calls, app } = setup();
     await screen.findByText("−130.00", { selector: ".price" });
     push();
-    act(() => app.store.applyAlgos("acc-a", [working("A1", { lots: 3, lots_done: 1 })]));
+    act(() => app.store.applyAlgos("acc-a", [working("A1", { lots: 4, lots_done: 1 })])); // 3 left; the lots box says 2
     fireEvent.click(screen.getByLabelText("Select my orders at −130.50"));
     fireEvent.click(screen.getByLabelText("Move selected orders to −130.30"));
     await vi.waitFor(() => expect(posts(calls)).toHaveLength(2));
     expect(posts(calls).map((c) => [c.path, c.body])).toEqual([
       ["/api/accounts/acc-a/algos/A1/stop", {}],
-      ["/api/accounts/acc-a/spreads/s1/orders", { side: "BUY", lots: 2, price_paise: -13030 }],
+      ["/api/accounts/acc-a/spreads/s1/orders", { side: "BUY", lots: 3, price_paise: -13030 }],
     ]);
   });
 

@@ -66,7 +66,7 @@ const check = (name, ok, detail = '') => {
   await ladder.evaluate((el) => el.scrollIntoView());
   await ladder.locator('.price.last').waitFor({ timeout: 15000 });
   const title = await ladder.getAttribute('aria-label');
-  check('the spread ladder opens, titled by the spread', /Oct\/Nov|SPREAD/.test(title ?? ''), title);
+  check('the spread ladder opens, titled by the spread\'s name', title === 'NIFTY Oct/Nov', title);
   await page.waitForFunction(() => document.querySelectorAll('.ladder-spread-note').length && [...document.querySelectorAll('section.frame:has(.ladder-spread-note) [aria-label^="Sell at"]')].some((c) => c.textContent.trim() !== ''), null, { timeout: 15000 });
   await page.screenshot({ path: `${out}/spread-ladder-1.png` });
 
@@ -91,8 +91,10 @@ const check = (name, ok, detail = '') => {
     after.oct - before.oct === 75 && after.nov - before.nov === -75, `Oct ${before.oct}→${after.oct}, Nov ${before.nov}→${after.nov}`);
   const algos = await api('/api/accounts/acc-paper/algos');
   const mine = algos.filter((a) => a.code === 'ASE').at(-1);
-  check('the Autospreader algo is done, the spread traded reported', mine?.state === 'DONE' && mine.extra.traded_spread_paise !== null,
-    `${mine?.state} ${mine?.extra?.legs} traded ${mine?.extra?.traded_spread_paise}`);
+  const traded = mine?.extra?.traded_spread_paise;
+  const level = mine?.params?.level_paise;
+  check('the Autospreader algo is done; the spread traded is at or better than the price asked',
+    mine?.state === 'DONE' && typeof traded === 'number' && traded <= level, `${mine?.state} ${mine?.extra?.legs} traded ${traded} for ${level}`);
 
   // a resting buy far below the market shows in Work; select and cancel it
   const bidCell = ladder.locator('[aria-label^="Buy at"]').last();

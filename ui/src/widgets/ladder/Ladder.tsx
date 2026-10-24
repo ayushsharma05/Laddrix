@@ -47,6 +47,7 @@ export interface LadderParams extends BaseParams {
   product?: string; // unset: the first that fits the instrument
   accountId?: string; // unset: the account picked in the toolbar
   confirmOverPaise: number; // 0 = never ask; else orders worth more need a second click
+  label?: string; // a spread ladder's title: the spread's name (its id says nothing)
 }
 
 export const LOT_PRESETS = [1, 2, 5, 10, 25, 50];
@@ -89,6 +90,10 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
   // a spread ladder (#416): its prices are the spread's implied ones; a click starts the ASE
   // algo; the Work column shows those algos. The server works out every leg.
   const spread = isSpread(id);
+  // the window shows the spread's name, kept in step when it is renamed
+  useEffect(() => {
+    if (spread && params.label !== instrument.symbol) setParams({ label: instrument.symbol });
+  }, [spread, params.label, instrument.symbol, setParams]);
 
   // --- which account ------------------------------------------------------------------------
   const me = useStore((s) => s.me);
@@ -631,7 +636,7 @@ registerWidget<LadderParams>({
   component: Ladder,
   defaults: () => ({ link: "pink", lots: 1, type: "LIMIT", tif: "DAY", confirmOverPaise: 0 }),
   link: "follows",
-  tabTitle: (p) => (p.instrumentId ? shortName(p.instrumentId) : undefined),
+  tabTitle: (p) => (p.instrumentId ? (isSpread(p.instrumentId) && p.label ? p.label : shortName(p.instrumentId)) : undefined),
   size: { width: 470 },
   menu: (p, act) => [
     // a spread ladder (#416): its definition, in the Autospreader, ready to edit
