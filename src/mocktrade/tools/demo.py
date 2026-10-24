@@ -27,6 +27,7 @@ import uvicorn
 
 from mocktrade import logsafe
 from mocktrade.alerts.service import build_market_alerts
+from mocktrade.algos.autospreader import algo_type as ase_type
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.paper import PaperBroker
 from mocktrade.charts.candles import CandleBuilder
@@ -141,6 +142,8 @@ async def main(
     log = EventLog(data / "events.db")
     log.start()
     platform = Platform(instruments, md, KillSwitch("firm"), log)
+    # each user's spreads (#414): the screens price them, the ASE algo trades them (#415)
+    spreads = SpreadBook.at(data / "spreads", instruments.get, platform.expiries.expired)
     brokers = []
     day = clock().astimezone(IST).strftime("%y%m%d")
     ids = ClientIds(f"D{day}", log.last_counter(f"D{day}"))  # one sequence, all accounts
@@ -152,7 +155,8 @@ async def main(
         broker.start()
         brokers.append(broker)
         platform.add_account(
-            account, broker, ids=ids, auto_kill_on_loss=True, algo_types=BUILTIN,
+            account, broker, ids=ids, auto_kill_on_loss=True,
+            algo_types=(*BUILTIN, ase_type(spreads.get)),
             recover_on_start=True, margin_check=True, rules_dir=data / "rules", clock=clock,
             limits=stored_limits(limits),
         )  # fmt: skip
@@ -217,8 +221,7 @@ async def main(
                                               f"--port {port + 1}",
                      backtests=backtests, candles_for=candle_stores.of, charts=charts,
                      market_alerts=market_alerts,
-                     spreads=SpreadBook.at(data / "spreads", platform.instruments.get,
-                                           platform.expiries.expired),
+                     spreads=spreads,
                      starter=CallbackStarter(("paper",), start))  # fmt: skip
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
     logsafe.install()  # the same filter as the real server: no secret in a log line (#367)

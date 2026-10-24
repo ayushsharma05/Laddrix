@@ -63,6 +63,8 @@ from fastapi import FastAPI
 
 from mocktrade import logsafe
 from mocktrade.alerts.service import build_market_alerts
+from mocktrade.algos.autospreader import SPEC as ASE
+from mocktrade.algos.autospreader import algo_type as ase_type
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.algos.engine import parse_algo_ids, with_exchange_ids
 from mocktrade.broker.kite.http import BASE_URL
@@ -226,7 +228,7 @@ class ServeSettings:
             algo_ids = parse_algo_ids(env.get("MOCKTRADE_ALGO_IDS", ""))
         except ValueError as exc:
             problems.append(str(exc))
-        unknown = sorted(set(algo_ids) - {t.spec.code for t in BUILTIN})
+        unknown = sorted(set(algo_ids) - {t.spec.code for t in BUILTIN} - {ASE.code})
         if unknown:
             problems.append(f"MOCKTRADE_ALGO_IDS: no algo called {', '.join(unknown)}")
         if problems:
@@ -334,6 +336,11 @@ def build(settings: ServeSettings) -> Assembly:
     prices = PriceSources(md, per_account=kite is not None)
     platform = Platform(instruments, md, KillSwitch("firm"), events, prices=prices)
     platform.access = trading_rights(users)  # re-checked at each order, algo child, GTT (#366)
+    # each user's spreads (#414): the screens price them, the ASE algo trades them (#415)
+    spreads = SpreadBook.at(
+        settings.data_dir / "spreads", instruments.get, platform.expiries.expired
+    )
+    algo_types = (*BUILTIN, ase_type(spreads.get))
     if settings.charges_file is not None:
         platform.charges_model = ScheduleCharges(load_schedule(settings.charges_file))
     brokers = []
@@ -373,7 +380,7 @@ def build(settings: ServeSettings) -> Assembly:
             return f"{account.broker} accounts need MOCKTRADE_PRICES=kite"
         platform.add_account(
             account, broker, ids=ids, auto_kill_on_loss=True,
-            algo_types=tuple(with_exchange_ids(BUILTIN, dict(settings.algo_ids))),
+            algo_types=tuple(with_exchange_ids(algo_types, dict(settings.algo_ids))),
             recover_on_start=True,  # no new orders until rebuilt and checked (recovery.py)
             margin_check=True,  # refuse what the funds can't carry (risk/margin.py; fails open)
             rules_dir=settings.data_dir / "rules",  # the trader's MTM limits survive a restart
@@ -564,9 +571,7 @@ def build(settings: ServeSettings) -> Assembly:
         ticks_for=lambda source: recorded.get(id(source)),
         market_alerts=market_alerts,
         starter=starter,
-        spreads=SpreadBook.at(
-            settings.data_dir / "spreads", platform.instruments.get, platform.expiries.expired
-        ),  # each user's spreads (#414)
+        spreads=spreads,
         static_dir=ui,
     )
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)

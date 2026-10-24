@@ -26,6 +26,7 @@ class ParamKind(Enum):
     MONEY = "money"  # paise, shown in rupees (e.g. a limit per order)
     CHOICES = "choices"  # several of `choices` (min/max: how many)
     INSTRUMENTS = "instruments"  # a list of instruments (min/max: how many)
+    SPREAD = "spread"  # one of the trader's spreads (#415): its id
 
 
 @dataclass(frozen=True)
@@ -47,7 +48,9 @@ class AlgoSpec:
     name: str  # "Slicer"
     help: str  # one sentence
     params: tuple[ParamSpec, ...] = field(default_factory=tuple)
-    family: str = "execution"  # how screens group algos: "execution" (work an order), "protection"
+    # how screens group algos: "execution" (work an order), "protection", "spread" (started
+    # from a spread ladder, #416: not offered in the generic algo form)
+    family: str = "execution"
 
 
 def check_params(spec: AlgoSpec, raw: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
@@ -87,7 +90,7 @@ def _coerce(p: ParamSpec, value: Any) -> Any:
         if not isinstance(value, bool):
             raise ValueError("must be yes or no")
         return value
-    if p.kind in (ParamKind.CHOICE, ParamKind.INSTRUMENT):
+    if p.kind in (ParamKind.CHOICE, ParamKind.INSTRUMENT, ParamKind.SPREAD):
         if not isinstance(value, str) or not value:
             raise ValueError("must be chosen")
         if p.kind is ParamKind.CHOICE and value not in p.choices:

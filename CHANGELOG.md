@@ -41,6 +41,7 @@ The production-hardening pass (#257) and the security gate (#279). Each item's P
 - **Workload:** backtests in their own process, reports off the trading loop, scheduler jobs that never hold each other up, and backtests whose results don't depend on the machine (#274).
 - **Free pages (#410):** a page can hold its widgets as windows of any size, anywhere, with gaps, and scroll both ways to reach them; edges snap to neighbours and an 8 px grid (Alt: no snapping). New pages are free; each page switches between free and docked from its tab, and layouts saved before keep opening docked.
 - **Autospreader, part 1 (#414):** multi-leg spread definitions (2 to 6 legs, ratios, price multipliers, a quoting leg, pay-up) and their live implied bid and ask, priced from each trader's own leg prices; the Autospreader widget. Execution (#415) and the spread ladder (#416) follow.
+- **Autospreader, part 2 (#415):** the ASE algo trades any of your spreads: it quotes the quoting leg where the spread equals your price and hedges every other leg the moment it fills (whole lots, each leg's own pay-up), keeps hedges on stop, and names every leg left short. A route takes the spread's side, lots and price; the server works out the legs.
 - **Right-click menus (#412):** the app's own menu everywhere: the page's settings and every widget on empty space, a widget's own settings (and open-for-this-contract, link group, duplicate, pop out, close) on a widget.
 
 ## 1.0.0-rc.1 (16 Oct 2026)

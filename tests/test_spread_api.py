@@ -7,6 +7,7 @@ from datetime import date
 from test_server import ORIGIN, World
 from test_stream import Live, next_of
 
+from mocktrade.algos.autospreader import algo_type as ase_type
 from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
 from mocktrade.domain.ticks import DepthLevel, Tick
 from mocktrade.server.app import ServerSettings, create_app
@@ -137,3 +138,41 @@ async def test_the_owner_streams_the_implied_price_and_no_one_else_can(tmp_path,
         await riya.aclose()
     finally:
         await live.stop()
+
+
+async def test_trading_a_spread_starts_the_ase_algo_on_its_quoting_leg(tmp_path, nifty_fut):
+    w, book = world(tmp_path, nifty_fut)
+    for running in w.platform.accounts.values():  # the servers add it to every account
+        running.algos.types["ASE"] = ase_type(book.get)
+    ayush = await w.logged_in("ayush")
+    quoting_nov = {**CALENDAR, "legs": [{**CALENDAR["legs"][0], "quote": False},
+                                        {**CALENDAR["legs"][1], "quote": True}]}  # fmt: skip
+    sid = (await ayush.post("/api/spreads", json=quoting_nov)).json()["spread_id"]
+    order = {"side": "BUY", "lots": 2, "price_paise": -13000}
+    r = await ayush.post(f"/api/accounts/acc-ayush/spreads/{sid}/orders", json=order)
+    assert r.status_code == 201, r.text
+    algo = r.json()
+    # buying OCT − NOV sells NOV, the quoting leg: 2 spread lots of 1 lot of 75
+    assert (algo["code"], algo["instrument_id"], algo["side"], algo["qty"]) == (
+        "ASE", NOV, "SELL", 150)  # fmt: skip
+    assert algo["params"] == {"spread": sid, "level_paise": -13000}
+
+    ratio_two = {"name": "1:2", "legs": [{**CALENDAR["legs"][0], "quote": False},
+                                         {**CALENDAR["legs"][1], "ratio": -2, "multiplier": -2,
+                                          "quote": True}]}  # fmt: skip
+    two = (await ayush.post("/api/spreads", json=ratio_two)).json()["spread_id"]
+    r = await ayush.post(f"/api/accounts/acc-ayush/spreads/{two}/orders", json={**order, "lots": 1})
+    assert (r.json()["side"], r.json()["qty"]) == ("SELL", 150)  # one spread lot: 2 lots of NOV
+
+    bad = await ayush.post(
+        f"/api/accounts/acc-ayush/spreads/{sid}/orders", json={**order, "lots": 0}
+    )
+    assert bad.status_code == 422
+    riya = await w.logged_in("riya")
+    theirs = await riya.post(f"/api/accounts/acc-riya/spreads/{sid}/orders", json=order)
+    assert theirs.status_code == 404  # not her spread
+    not_hers = await riya.post(f"/api/accounts/acc-ayush/spreads/{sid}/orders", json=order)
+    assert not_hers.status_code in (403, 404)  # not her account
+    await ayush.aclose()
+    await riya.aclose()
+    w.log.close()
