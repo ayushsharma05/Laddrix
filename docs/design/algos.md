@@ -79,6 +79,29 @@ B moves ─► re-quote A (24 modifications, then cancel and re-send)
   that alert, instead of retrying forever.
 - The screen shows legs filled, unhedged quantity, the spread actually traded and the legging time.
 
+## Autospreader (`algos/autospreader.py`, #415)
+The Spreader's rules for any of your spreads of 2 to 6 legs ([spreads.md](spreads.md)). It is
+started from a spread (`POST /api/accounts/{id}/spreads/{spread}/orders`: side, spread lots,
+spread price), never from the generic algo form (its family is "spread").
+
+```
+parent = the quoting leg Q: its side and quantity (spread lots · |Q's ratio| · Q's lot)
+quote Q at (P − Σ others' price× · the price they'd hedge at) / Q's price×, rounded so the
+      spread is never worse than P
+Q fills f lots ─► every other leg: floor(f · |its ratio| / |Q's ratio|) lots at once,
+                  at its best ± its own pay-up ticks
+```
+
+- The definition is copied when the algo starts: editing the spread later never changes a
+  running algo. Only its owner can trade it, and only in whole spread lots.
+- No quote while any leg is short of its hedge, has no price, or is more than 3 s older
+  than the others.
+- The screen shows the legs filled ("NIFTY26OCTFUT bought 75 · NIFTY26NOVFUT sold 150 · …"),
+  the total unhedged and which legs are short, the spread traded and the legging time.
+- Not yet: several quoting legs, a maximum unhedged exposure, timeouts, and restart recovery
+  (#251). Algos don't survive a restart; their children are cancelled at start, as for every
+  algo.
+
 ## Execution algos (K9.1): iceberg, TWAP, VWAP, POV
 Shared parts live in `algos/execution.py`: where to price a child (`touch`: join our side or
 cross to the other, never beyond the limit) and keeping working children at that price

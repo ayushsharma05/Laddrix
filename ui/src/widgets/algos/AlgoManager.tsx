@@ -24,6 +24,7 @@ import {
   byFamily,
   familyLabel,
   familyOf,
+  startable,
   canPause,
   canResume,
   canStop,
@@ -287,8 +288,9 @@ interface StartFormProps {
 }
 
 /** The start form, drawn from the chosen algo's spec. */
-export function StartForm({ accountId, specs, defaultInstrument, defaultSide = "BUY", defaultLots = 1, onStarted, onCancel }: StartFormProps) {
+export function StartForm({ accountId, specs: all, defaultInstrument, defaultSide = "BUY", defaultLots = 1, onStarted, onCancel }: StartFormProps) {
   const { rest, store } = useApp();
+  const specs = startable(all); // what this form offers (a spread's algo starts from its ladder)
   const [code, setCode] = useState<string>(specs[0]!.code);
   const spec = specs.find((s) => s.code === code) ?? specs[0]!;
   const [values, setValues] = useState<FormValues>(() => initialValues(spec));

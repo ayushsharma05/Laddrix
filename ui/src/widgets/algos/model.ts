@@ -187,6 +187,15 @@ export function figures(extra: Record<string, unknown>, labels: Record<string, s
   return out;
 }
 
+/** Algo families started from their own screen, not the "Start an algo" form: the
+ *  Autospreader's algo trades a spread from a spread ladder (#415, #416). */
+const STARTED_ELSEWHERE = new Set(["spread"]);
+
+/** The algos the "Start an algo" form offers. */
+export function startable(specs: AlgoSpec[]): AlgoSpec[] {
+  return specs.filter((s) => !STARTED_ELSEWHERE.has(s.family ?? "execution"));
+}
+
 /** The specs grouped by family, in the order the server lists them ("execution" first). */
 export function byFamily(specs: AlgoSpec[]): [string, AlgoSpec[]][] {
   const groups = new Map<string, AlgoSpec[]>();

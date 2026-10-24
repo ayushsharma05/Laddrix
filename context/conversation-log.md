@@ -678,6 +678,21 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Personal data:** spreads are per user, in the backup, and in export-user and erase-user. The cross-firm leak test covers the new routes.
   - **The widget:** the Autospreader (Widgets ▾ or the right-click "Open widget"). It defines spreads and shows their live bid and ask.
   - **Checks:** 27 + 4 server tests, 12 screen tests; mutation 50/50; browser 11/11. In the browser the spread's mid equalled the legs' own Oct − Nov.
+  - Merged as PR #417.
+- 24 Oct, evening. **The Autospreader, part 2 (#415): multi-leg execution.**
+  - **The ASE algo** (`algos/autospreader.py`) runs on the existing algo engine. Its parent order is the quoting leg. It quotes where the spread equals the price, rounding so the spread is never worse.
+  - **Hedging:** when the quote fills f lots, every other leg goes out at once: floor(f · |ratio| / |quote ratio|) lots, at its best price ± its own pay-up.
+  - **Rules kept from the two-leg spreader:**
+    - hedges are kept on stop or a kill switch;
+    - repeated updates never over-hedge;
+    - no new quote while any leg is short;
+    - legs left short are named in an UNHEDGED alert.
+  - **The definition is copied at start,** so editing a spread never changes a running algo. Only the owner can trade it, and only in whole spread lots.
+  - **The route:** `POST /api/accounts/{id}/spreads/{spread}/orders` takes the spread's side, lots and price; the server works out the legs. The generic algo form doesn't offer ASE (family "spread").
+  - **Checks:**
+    - 16 algo tests, including a butterfly end to end on the paper broker: positions +75 / −150 / +75;
+    - 5 API tests;
+    - mutation 34/34 (after tightening four gaps it found).
 - 24 Oct, evening. **Bug #419, found by the spread ladder's browser check.**
   - **What happened:** after a demo restart, a NIFTY Oct buy at 25,009.60 was "corrected" to 25,145.70, a Nov price.
   - **Why:** the paper broker numbered orders and trades from P1/T1 on every start. The day's adopted trades already held a P1/T1, so the trade check (#352) took that old trade as the new order's.
