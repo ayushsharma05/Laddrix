@@ -94,7 +94,7 @@ export interface Instrument {
   id: string;
   exchange: string;
   symbol: string;
-  kind: "EQ" | "FUT" | "CE" | "PE" | "INDEX";
+  kind: "EQ" | "FUT" | "CE" | "PE" | "INDEX" | "SPREAD";
   tick_paise: number;
   lot_size: number;
   expiry: string | null;
@@ -103,6 +103,27 @@ export interface Instrument {
   tradable: boolean;
   ltp_paise?: number | null;
   expiry_info?: ExpiryInfo | null; // null for shares and indices
+  spread?: { spread_id: string; legs: SpreadLeg[] }; // a spread "instrument" SPREAD:<id> (#414)
+}
+
+/** One leg of a multi-leg spread (#414, server: spreads/model.py). */
+export interface SpreadLeg {
+  instrument_id: string;
+  ratio: number; // lots per spread lot; + bought when the spread is bought
+  multiplier: number; // how much its price counts in the spread's price
+  quote: boolean; // the leg that rests a quote
+  payup_ticks: number; // how far past the best price its hedge may go
+}
+
+/** A user's spread definition. Its live price streams as the instrument `instrument_id`. */
+export interface Spread {
+  spread_id: string;
+  instrument_id: string; // "SPREAD:<id>"
+  name: string;
+  legs: SpreadLeg[];
+  tick_paise: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AccountSummary {

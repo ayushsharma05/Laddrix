@@ -162,6 +162,17 @@ class MarketData:
         for tap in self._taps:
             tap(tick)
 
+    def on_derived(self, tick: Tick) -> None:
+        """A price made here from other prices (a spread's implied price, spreads/pricer.py).
+        Kept and sent to its watchers like any tick, but never to the taps: the recorder,
+        paper fills, charts, time and sales, movers and alerts see only the market's own
+        prices (recording a derived price would replay it twice: once itself, once from
+        its legs). Not counted in `ticks_received`."""
+        self._latest[tick.instrument_id] = tick
+        self._seen_at[tick.instrument_id] = self._clock()
+        for subscription in self._watchers.get(tick.instrument_id, ()):
+            subscription._offer(tick)
+
     def tap(self, listener: Callable[[Tick], None]) -> None:
         """`listener(tick)` for every tick received, watched or not. It must be quick (an
         append): it runs on the trading loop. The tick recorder uses it (research/)."""

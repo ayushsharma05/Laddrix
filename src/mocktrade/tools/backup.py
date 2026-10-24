@@ -45,7 +45,7 @@ from typing import Any
 from mocktrade.store.events import verify_chain
 
 DATABASES = ("users.db", "events.db")
-FOLDERS = ("rules", "reports", "alerts", "candles", "backtests")
+FOLDERS = ("rules", "reports", "alerts", "spreads", "candles", "backtests")
 OPTIONAL = {"ticks": "recorded days (large): --with-ticks"}
 NEVER = ("kite_token_*.json", "*.key", ".env", "*.tmp", "*.part")  # inside the folders, too
 # In the data folder but rebuilt, renewed or kept elsewhere: not state a backup must hold.

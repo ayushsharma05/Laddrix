@@ -52,6 +52,7 @@ from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.ops.fence import DataFence, FenceError
 from mocktrade.server.security import SecretBox
 from mocktrade.server.users import WRONG_KEY, UserStore
+from mocktrade.spreads.store import SpreadBook
 
 
 def ask_password() -> str:
@@ -177,6 +178,9 @@ def export_user(store: UserStore, user_id: str) -> dict:
     found["alerts"] = [alert_to_dict(a) for a in alerts.load_all() if a.user_id == user_id]
     hook = alerts.webhook(user_id)
     found["webhook"] = {"url": hook["url"], "signing_key": "set (not shown)"} if hook else None
+    spreads = SpreadBook(data / "spreads", lambda _i: None).path_of(user_id)  # #414
+    found["spreads"] = (json.loads(spreads.read_text()).get("spreads", [])
+                        if spreads is not None and spreads.exists() else [])  # fmt: skip
     found["backtests"] = sorted(run_id for run_id, owner in _runs(data) if owner == user_id)
     found["audit_trail"] = []
     if (data / "events.db").exists():
@@ -213,11 +217,15 @@ def erase_user(store: UserStore, user_id: str) -> dict[str, int]:
         raise ValueError(f"stop the server first: {exc}") from None
     try:
         store.erase_check(user_id)  # every refusal before anything is touched
-        done = {"alert_files": 0, "backtests": 0}
+        done = {"alert_files": 0, "spread_files": 0, "backtests": 0}
         path = AlertStore(data / "alerts").path_of(user_id)
         if path.exists():
             path.unlink()
             done["alert_files"] = 1
+        spreads = SpreadBook(data / "spreads", lambda _i: None).path_of(user_id)
+        if spreads is not None and spreads.exists():  # their spread definitions (#414)
+            spreads.unlink()
+            done["spread_files"] = 1
         for run_id, owner in _runs(data):
             if owner == user_id:
                 shutil.rmtree(data / "backtests" / run_id)

@@ -17,12 +17,22 @@ from test_server import FUT, ORDER, ORIGIN, PASSWORD, World
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.broker.fake import FakeBroker
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_manage, can_trade, can_view
+from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
 from mocktrade.ops.alerts import Alerts
 from mocktrade.orders.model import ClientIds
 from mocktrade.server.app import ServerSettings, create_app
 
 ACME = "acme"
-THEIRS = ("acc-ravi", "ravi", "tara", "rina", "Ravi", "Tara", "Rina")  # never in our answers
+THEIRS = (
+    "acc-ravi",
+    "ravi",
+    "tara",
+    "rina",
+    "Ravi",
+    "Tara",
+    "Rina",
+    "acme calendar",
+)  # never in our answers (the last: ravi's spread, #414)
 
 
 class TwoFirms(World):
@@ -79,11 +89,19 @@ async def theirs_running(w):
     ravi = await w.logged_in("ravi")
     placed = await ravi.post("/api/accounts/acc-ravi/orders", json=ORDER)
     assert placed.status_code == 201, placed.text
+    w.platform.instruments.add(Instrument(Exchange.NFO, "NIFTY26NOVFUT", InstrumentKind.FUTURE,
+                                          tick_paise=10, lot_size=75))  # fmt: skip
+    legs = [{"instrument_id": FUT, "ratio": 1, "multiplier": 1, "quote": True},
+            {"instrument_id": "NFO:NIFTY26NOVFUT", "ratio": -1, "multiplier": -1}]  # fmt: skip
+    spread = await ravi.post("/api/spreads", json={"name": "acme calendar", "legs": legs})
+    assert spread.status_code == 201, spread.text
+    w.theirs_spread = spread.json()["spread_id"]
     return ravi, placed.json()["request"]["client_order_id"]
 
 
-def fill(path: str, theirs_order: str) -> str:
+def fill(path: str, theirs_order: str, theirs_spread: str = "none") -> str:
     values = {"account_id": "acc-ravi", "user_id": "ravi", "client_order_id": theirs_order,
+              "spread_id": theirs_spread,
               "algo_id": "A1", "gtt_id": "1", "alert_id": "S1", "run_id": "r1",
               "day": "2026-10-14", "name": "Main", "instrument_id": FUT, "underlying": "NIFTY",
               "expiry": "2026-10-27", "session_id": "0" * 16, "action": "stop",
@@ -107,6 +125,7 @@ def every_route(routes, prefix=""):
 
 
 BODIES = {  # a body that passes validation, so the route's own check is what answers
+    ("PUT", "/api/spreads/{spread_id}"): {"name": "taken", "legs": []},
     ("POST", "/api/surveillance/{alert_id}/ack"): {"note": "looked at it closely"},
 }
 
@@ -132,7 +151,7 @@ async def test_every_route_refuses_or_hides_another_firm(firms):
     for who in ("ayush", "risk", "riya"):  # main's admin (also a trader), risk, trader
         client = await w.logged_in(who)
         for method, template in routes:
-            path = fill(template, order)
+            path = fill(template, order, w.theirs_spread)
             body = BODIES.get((method, template), {}) if method != "GET" else None
             r = await client.request(method, path, json=body)
             tried += 1

@@ -669,4 +669,13 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Decided:** the menu is on right-click (plus the Menu key and Shift+F10). A left click already trades on a ladder, so a left-click menu would break click-to-trade. Text boxes keep the browser's copy/paste menu.
   - **#412 built:** `ContextMenu.tsx` (keyboard, submenus, never off screen), `menus.ts` (page menu and widget menu), and a `menu` hook in the widget registry, so the coming spread ladder adds "Autospreader settings…" itself. The ladder and ticket offer lots and confirm-over. Every widget offers open-for-this-contract, link group, duplicate, pop out and close. On a free page, "Open widget" opens where you clicked. It works in pop-out windows.
   - **Checks:** 478 UI tests; mutation 43/43; browser 14/14 (`context/scripts/e2e-context-menu.cjs`).
+  - Merged as PR #413.
+- 24 Oct, evening. **The Autospreader, part 1 (#414).** #250 and #251 were split into three children: #414 (definitions and live prices), #415 (multi-leg execution) and #416 (the spread ladder).
+  - **Built:** `src/mocktrade/spreads/` (model, store, pricer).
+    - A spread is priced from its trader's own leg prices and streamed as the instrument `SPREAD:<id>`. The ask is Σ price× · (ask if + else bid); the bid mirrors it; the size is in spread lots.
+    - Only the top level is implied (no invented depth). Legs more than 3 s apart give no tradable price.
+  - **A design choice:** spread prices are *derived* ticks (`MarketData.on_derived`). Screens see them; the recorder, paper fills, charts, alerts and movers never do. Otherwise a replay would count a spread twice.
+  - **Personal data:** spreads are per user, in the backup, and in export-user and erase-user. The cross-firm leak test covers the new routes.
+  - **The widget:** the Autospreader (Widgets ▾ or the right-click "Open widget"). It defines spreads and shows their live bid and ask.
+  - **Checks:** 27 + 4 server tests, 12 screen tests; mutation 50/50; browser 11/11. In the browser the spread's mid equalled the legs' own Oct − Nov.
 

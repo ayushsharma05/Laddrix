@@ -1893,3 +1893,34 @@ label.algo-field {
   background: var(--bad-fill);
   color: var(--bad-ink);
 }
+
+/* --- Autospreader (#414) -------------------------------------------------------------------- */
+
+.ase-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) 120px 120px 170px;
+  align-items: center;
+}
+.ase-form {
+  padding: 8px;
+}
+.ase-leg {
+  display: grid;
+  grid-template-columns: 34px minmax(150px, 1fr) 64px 64px 48px 64px 24px;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 0;
+}
+.ase-leg input[type="number"] {
+  width: 100%;
+}
+.ase-contract {
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ase-problems {
+  margin: 6px 0;
+  padding-left: 18px;
+}

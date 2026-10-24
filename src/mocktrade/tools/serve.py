@@ -103,6 +103,7 @@ from mocktrade.server.admin import CallbackStarter
 from mocktrade.server.app import ServerSettings, create_app
 from mocktrade.server.security import SecretBox
 from mocktrade.server.users import UserStore
+from mocktrade.spreads.store import SpreadBook
 from mocktrade.store.events import EventLog
 
 log = logging.getLogger("mocktrade.serve")
@@ -563,6 +564,9 @@ def build(settings: ServeSettings) -> Assembly:
         ticks_for=lambda source: recorded.get(id(source)),
         market_alerts=market_alerts,
         starter=starter,
+        spreads=SpreadBook.at(
+            settings.data_dir / "spreads", platform.instruments.get, platform.expiries.expired
+        ),  # each user's spreads (#414)
         static_dir=ui,
     )
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)

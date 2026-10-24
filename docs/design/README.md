@@ -20,6 +20,7 @@ How MockTrade is built. Each doc is checked against the code; the diagrams' sour
 |---|---|
 | [ui.md](ui.md), [stream.md](stream.md) | The screens, widgets, keyboard shortcuts, themes; the browser stream |
 | [algos.md](algos.md), [gtt.md](gtt.md), [options.md](options.md) | Algos, GTT orders, options pricing, chain and strategies |
+| [spreads.md](spreads.md) | Multi-leg spreads and the Autospreader: definitions, live implied prices, quote-and-hedge execution |
 | [portfolio.md](portfolio.md), [charges.md](charges.md), [margin.md](margin.md), [mtm.md](mtm.md), [reports.md](reports.md) | Funds and holdings, charges, margin, MTM limits and square-off, end-of-day reports |
 | [charts.md](charts.md), [research.md](research.md) | Charts and alerts; recorded ticks, replay, backtests |
 | [admin.md](admin.md) | Users, roles, accounts and limits |

@@ -26,10 +26,13 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   `context/images/free-canvas-page.png`.
 - **Right-click menus (#412):** the app's own menu on right-click (Menu key, Shift+F10): the
   page's settings and "Open widget" on empty space, a widget's own settings on a widget.
-- **Autospreader (Ayush's ask, 24 Oct):** only the two-leg spreader exists. Next: multi-leg
-  spread definitions with live spread prices, a spread ladder, and multi-leg execution
-  (#250 and #251, split into children).
-- **Pull requests:** the #412 PR (right-click menus), until it merges.
+- **Right-click menus:** merged (PR #413).
+- **Autospreader (Ayush's ask, 24 Oct), in three parts** ([docs/design/spreads.md](../docs/design/spreads.md)):
+  1. #414 spread definitions (2 to 6 legs) and live implied prices, the Autospreader widget:
+     done, in its PR.
+  2. #415 multi-leg execution (quote one leg, hedge the others): next.
+  3. #416 the spread ladder, with right-click "Autospreader settings…": after #415.
+- **Pull requests:** the #414 PR, until it merges.
 
 ## What's next
 
