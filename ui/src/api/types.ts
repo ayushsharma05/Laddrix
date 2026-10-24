@@ -501,6 +501,7 @@ export interface DayReport {
   generated_at: string;
   final: boolean; // kept after the close (otherwise a preview or a rebuild)
   priced: boolean;
+  prices_as_of: string | null; // the oldest price an open position is valued at (#277)
   notes: string[];
   schedule: string;
   totals: { realised_paise: number; unrealised_paise: number; gross_paise: number; charges_paise: number; net_paise: number; turnover_paise: number; trades: number };
@@ -516,6 +517,7 @@ export interface DayReport {
     sell_value_paise: number;
     closing_qty: number;
     mark_paise: number | null;
+    mark_at: string | null;
     realised_paise: number;
     unrealised_paise: number;
     gross_paise: number;
@@ -655,6 +657,7 @@ export interface BacktestRun {
   run_id: string;
   spec: BacktestSpecView;
   candle_based: boolean;
+  fills_note?: string; // a candle-based run: what its fills are, and aren't (#277)
   state: BacktestState;
   progress: number; // days done
   days: number;
@@ -761,6 +764,7 @@ export interface PrintsAnswer {
   prints: Print[];
   kept: number;
   watched: boolean;
+  epoch: string; // this run of the server: a new one means the numbering started again (#277)
   estimate: string;
 }
 
@@ -779,6 +783,7 @@ export interface MoversAnswer {
   rows: MoverRow[];
   of: number;
   note: string;
+  universe: string; // what was ranked: only contracts with a live price here (#277)
   exchanges: string[];
   kinds: string[];
 }

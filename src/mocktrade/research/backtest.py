@@ -21,7 +21,10 @@ Tests run days in-process (`InProcess`), the same code.
 
 Candles (OHLC rows) become ticks O → the far extreme first → the other extreme → C, each with
 one tick of spread on either side, so market orders pay the spread and resting orders fill
-only when the price trades through them: conservative, and the run says it is candle-based.
+only when the price trades through them. That path is an assumption, not what traded: a fill
+may come out better or worse than the market would have given, and the run says so
+(CANDLE_NOTE, #277). Each day also starts on a fresh platform: nothing is carried overnight,
+and positions are valued at the day's last price.
 """
 
 import asyncio
@@ -69,6 +72,13 @@ MAX_WAITING = 10  # runs queued or running on the server; more are refused (#274
 MAX_PER_USER = 2  # of those, one person's
 DAY_TIMEOUT_S = 900.0  # one day longer than this is stopped (a worker, #274)
 WORKER_MEMORY = 2 << 30  # the worker process's address-space cap, bytes
+
+
+CANDLE_NOTE = (
+    "ticks made from candles: an assumed path (open, the far extreme, the other "
+    "extreme, close) with one tick of spread, not what traded. Fills are an "
+    "estimate, and can be better or worse than the market would have given"
+)
 
 
 class BacktestError(Exception):
@@ -410,6 +420,8 @@ class Run:
                "state": self.state, "progress": self.progress, "days": len(self.spec.days),
                "error": self.error, "created_at": self.created_at,
                "owner": self.owner}  # fmt: skip
+        if self.candles:
+            out["fills_note"] = CANDLE_NOTE
         if self.result is not None:
             out["summary"] = self.result["summary"]
             if full:

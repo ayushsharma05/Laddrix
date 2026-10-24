@@ -174,7 +174,7 @@ function RunList(props: { runs: BacktestRun[]; picked: string | null; onPick: (i
               <span title={r.run_id}>
                 {runName(r)}
                 {r.candle_based && (
-                  <span className="algo-family" title="Ticks made from candles: fills are approximate">
+                  <span className="algo-family" title={r.fills_note ?? "Ticks made from candles: fills are an estimate"}>
                     candles
                   </span>
                 )}
@@ -244,6 +244,7 @@ function RunDetail({ run, publish, onChanged }: { run: BacktestRun; publish: (id
         </div>
       )}
       {run.state === "failed" && <div className="empty-note tone-bad">{run.error}</div>}
+      {run.fills_note && <div className="empty-note dim">Candle-based: {run.fills_note}.</div>}
       {(run.state === "queued" || run.state === "running") && (
         <button
           type="button"
@@ -591,7 +592,7 @@ function NewRun({ defaultInstrument, onStarted }: { defaultInstrument: string | 
         <legend>
           Days{" "}
           {form.candles && (
-            <label title="Ticks made from imported candles (when nothing was recorded); fills are approximate">
+            <label title="Ticks made from imported candles (when nothing was recorded): an assumed path, so fills are an estimate">
               <input type="checkbox" checked={candles} onChange={(e) => setCandles(e.target.checked)} /> from candles
             </label>
           )}

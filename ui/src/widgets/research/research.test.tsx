@@ -15,6 +15,7 @@ const REPORT: DayReport = {
   generated_at: "2026-10-15T10:30:00+00:00",
   final: true,
   priced: true,
+  prices_as_of: null,
   notes: [],
   schedule: "standard",
   totals: { realised_paise: 0, unrealised_paise: 50000, gross_paise: 50000, charges_paise: 10000, net_paise: 40000, turnover_paise: 375000000, trades: 2 },

@@ -29,6 +29,8 @@ audit trail ─► fills before the day ─► positions carried in, valued at t
 - **Downloads match the screen.** CSV and PDF are made from the same report the API sends. The PDF comes from a small built-in writer: Courier text on A4 landscape pages, no extra dependency, and "Rs" in place of the rupee sign, which Courier lacks. Checked by reading it back with a PDF library and in a real browser download.
 - **Files are safe.** One JSON file per account and day, written to a temporary file and then renamed. Account ids are checked before they become folder names.
 
+- **How fresh the marks are (#277).** Each open position carries `mark_at`, the time its price arrived. The report carries `prices_as_of`, the oldest of them. The screen says "Open positions valued at prices as of 15:29:58", so a mark taken from a quiet contract's old price is visible, not hidden.
+
 ## Screens
 
 **Reports** (a tab beside Positions): the Day view and the History view.

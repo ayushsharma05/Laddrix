@@ -160,6 +160,13 @@ Two fixes found while checking these screens in a browser:
 - **Simulator options showed absurd % changes.** Their day started at a placeholder price, and only their trading price came from the option model. They now open and close around the model price.
 
 Checks:
+- **What these screens' numbers are (#277):**
+  - **Time and sales:** every field is an estimate, and the screen says so ("estimated from price snapshots", "Qty ≈", "Side ≈"):
+    - the quantity is the volume traded between two snapshots, so two trades in one show as one;
+    - the time is the snapshot's last-trade time;
+    - the side is inferred from the touch before the trade.
+  - **Restarts:** the numbering starts again at 1 each time the server starts, so each run carries an `epoch`. A screen that sees a new epoch starts its tape again. Before #277, a screen open across a restart asked for "after 500" and stayed empty until 500 new trades had passed.
+  - **Movers** rank only the contracts with a live price on this server (those a screen, an order or an algo watches), never the whole exchange. The answer says so (`universe`), and the screen reads "of N watched here, not the whole market".
 - `tests/test_market_screens.py`: a hand-worked tape (BUY at the ask, SELL at the bid, unknown inside, nothing traded), a new day, unwatched contracts, the size kept; movers' ranking, ties, filters, limits, the OI day baseline; the API.
 - UI tests in `ui/src/widgets/market` and `ui/src/widgets/alerts`, the hook tests in `ui/src/app/context.test.tsx`, and the ticket test above.
 - `context/scripts/mutate-market.py` (39/39 caught: server, simulator, models, widgets, hooks).

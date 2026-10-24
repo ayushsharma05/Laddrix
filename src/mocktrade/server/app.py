@@ -1332,8 +1332,11 @@ def create_app(
                                   limit=max(1, min(limit, 300)))  # fmt: skip
         return {"instrument_id": instrument_id, "prints": [print_to_dict(p) for p in rows],
                 "kept": mine.prints.keep, "watched": mine.prices.is_watched(instrument_id),
-                "estimate": "trades between price snapshots; the side is estimated from the "
-                            "touch before the trade"}  # fmt: skip
+                "epoch": mine.prints.epoch,  # a new one: the numbering started again (#277)
+                "estimate": "estimated from price snapshots: the quantity is the volume traded "
+                            "between two snapshots (two trades in one show as one), the time is "
+                            "the snapshot's last trade, and the side is inferred from the touch "
+                            "before the trade"}  # fmt: skip
 
     @app.get("/api/market/movers")
     async def market_movers(user: Me, by: str = "gainers", limit: int = 10, exchange: str = "",

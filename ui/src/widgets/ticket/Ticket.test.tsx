@@ -154,6 +154,23 @@ describe("Order ticket", () => {
     expect(posts(calls)[0]!.body).toMatchObject({ side: "SELL", price_paise: 2500990 });
   });
 
+  it("a keyboard send goes to the ticket's own account, whichever account is picked elsewhere (#277)", async () => {
+    const two = { ...ME, accounts: [...ME.accounts, { ...ME.accounts[1]!, id: "acc-b" }] };
+    const { calls, app } = setup({ accountId: "acc-b" }, {
+      "POST /api/accounts/acc-b/orders": (body: unknown) => ({ status: 201, body: accepted(body as Record<string, unknown>) }),
+      [`GET /api/accounts/acc-b/instruments/${encodeURIComponent(ID)}/order-spec`]: orderSpec(ID),
+    });
+    act(() => {
+      app.store.setMe(two);
+      app.store.selectAccount("acc-a"); // the account strip says acc-a; this ticket is acc-b's
+    });
+    const price = await ready();
+    fireEvent.keyDown(price, { key: "Enter" });
+    await vi.waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0]!.path).toBe("/api/accounts/acc-b/orders");
+    expect(posts(calls)[0]!.body).toMatchObject({ side: "BUY" });
+  });
+
   it("uses the user's own keys (K13.4): send on Ctrl+Enter instead of Enter, Alt+S for the sell side", async () => {
     const { calls, app } = setup({}, { "PUT /api/me/settings/keys": { name: "keys" } });
     const price = await ready();
