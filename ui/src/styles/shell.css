@@ -460,3 +460,145 @@
 .replay-bar .dim {
   color: var(--replay-dim);
 }
+
+/* --- free pages (#410): windows anywhere on a canvas that scrolls both ways ---------------- */
+
+.dock-host {
+  height: 100%;
+}
+.dock-host[hidden] {
+  display: none;
+}
+.canvas-scroll {
+  position: relative;
+  height: 100%;
+  overflow: auto;
+  background: var(--desktop);
+}
+.canvas {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+.canvas-scroll > .watermark {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.frame {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--body);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 14px var(--shadow-deep);
+}
+.frame:focus-within {
+  border-color: var(--accent);
+}
+.frame.moving {
+  opacity: 0.92;
+  user-select: none;
+}
+.frame-title {
+  flex: 0 0 24px;
+  height: 24px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+  overflow: hidden;
+}
+.frame-title:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.frame.maximized .frame-title {
+  cursor: default;
+}
+.frame-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+/* resize handles: thin strips on the edges, squares on the corners */
+.rz {
+  position: absolute;
+  touch-action: none;
+}
+.rz-n,
+.rz-s {
+  left: 6px;
+  right: 6px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.rz-n {
+  top: -3px;
+}
+.rz-s {
+  bottom: -3px;
+}
+.rz-e,
+.rz-w {
+  top: 6px;
+  bottom: 6px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.rz-e {
+  right: -3px;
+}
+.rz-w {
+  left: -3px;
+}
+.rz-ne,
+.rz-nw,
+.rz-se,
+.rz-sw {
+  width: 10px;
+  height: 10px;
+}
+.rz-ne {
+  top: -4px;
+  right: -4px;
+  cursor: nesw-resize;
+}
+.rz-sw {
+  bottom: -4px;
+  left: -4px;
+  cursor: nesw-resize;
+}
+.rz-nw {
+  top: -4px;
+  left: -4px;
+  cursor: nwse-resize;
+}
+.rz-se {
+  bottom: -4px;
+  right: -4px;
+  cursor: nwse-resize;
+}
+/* a free page's widget in its own window */
+.popout-root,
+.popout-frame {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--body);
+  color: var(--text);
+}
+.page-mode {
+  padding: 0 4px;
+  font-size: 10px;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.page-mode:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}

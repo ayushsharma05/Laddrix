@@ -658,3 +658,8 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Found on the way:**
     - a new undici advisory failed the desktop audit (fixed in PR #405);
     - the workload tests took 13 minutes on CI (now about 20 s, and the CI test job has a 30-minute limit).
+- 24 Oct, afternoon. **#410, free pages.** Ayush asked for widgets that don't fill the screen: "every widget size can be changed and can be placed anywhere on screen… if it is placed below screen then screen can be scrolled (both horizontally or vertically)… There can be empty spaces too." He also asked whether he had ever sent a screenshot of his firm's screen: only in the first claude.ai chat, for reference, never saved or committed (he can attach one again; it would be used only to understand, never saved).
+  - **His choices:** both modes, picked per page tab (free is the new default; old layouts stay docked); snapping to neighbours and a grid, with Alt to turn it off.
+  - **Built:** our own canvas for free pages (`canvas.ts` the rules, `FreeCanvas.tsx` the windows), with dockview kept for docked pages. Windows are dragged by the title bar and resized from any edge or corner; a click brings one to the front, and a double-click fills the visible page. Arrow keys move a focused window; dragging near the edge scrolls the page. Pop-out works too. A page switches free ↔ docked from its tab, keeping its widgets (docked → free keeps each tile where it was).
+  - **Saved:** in the same layout document (`mode`, `canvas.windows`); a page without a mode is docked, so nothing saved before changes.
+  - **Checks:** 459 UI tests; mutation 64/64; a real-browser check on the demo, 16/16 (`context/scripts/e2e-free-canvas.cjs`).

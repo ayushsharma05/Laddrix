@@ -65,9 +65,54 @@ toolbar       Widgets ▾ · Search product (/) · Explore ▾ ······ Pric
               | Day +₹14,812.50 · Layouts ▾ · 10:14:52 · Save · XLS · Lock · STOP
 env strip     LIVE · KITE · orders go to the exchange      (amber PAPER strip for paper)
 band          (only when needed) TRADING STOPPED / AUTO-STOP / PRICES OLD / DISCONNECTED …
-desktop       dockview: widgets docked, tabbed, split or floating
-tabs          Main | Options | Spreads | Algos | +            loss limit used · working count
+desktop       the page: free windows on a scrolling canvas, or docked tiles (dockview)
+tabs          Main FREE | Options DOCKED | Spreads | +        loss limit used · working count
 ```
+
+### Free and docked pages (#410)
+
+Each page tab chooses how its widgets are arranged; the small FREE / DOCKED label on the
+showing tab switches it, keeping its widgets.
+
+| | **Free** (new pages, first-run Main) | **Docked** (pages saved before #410) |
+| --- | --- | --- |
+| place | anywhere, gaps allowed | tiles that always fill the page |
+| size | any (at least 160 × 80 px) | split with the neighbours |
+| past the screen | the page scrolls, down and sideways | never |
+| tabs in one window | no: one widget per window | yes |
+
+```
+free page: a canvas bigger than the screen when windows sit past its edge
+┌ screen ─────────────────────────────────┐
+│ ┌Watch─┐ ┌Ladder┐            ┌Ticket┐   │
+│ │      │ │      │  (empty)   │      │   │
+│ └──────┘ └──────┘            └──────┘   │
+└─────────────────────────────────────────┘ ← scroll
+            ┌Order Book──────────┐
+            └────────────────────┘          canvas = furthest window + 240 px of room
+```
+
+- **Move:** drag the title bar. **Resize:** drag any edge or corner. A click brings a window
+  to the front. A double-click on the title bar fills the visible page; again to put it back.
+- **Snap:** an edge within 8 px of a neighbour's edge sticks to it: lined up with it, or
+  beside it with a 4 px gap. Otherwise the box lands on an 8 px grid. **Hold Alt** for no
+  snapping: the window goes exactly where the mouse is.
+- **Keys:** a focused title bar moves with the arrow keys (8 px, Alt: 1 px); Shift+arrows
+  resize.
+- **New windows** open beside the window in front (ladders and tickets to its right, grids
+  below) if that spot is empty and on screen, else in the first empty spot on screen, else a
+  step down and right of the screen's corner. The page scrolls to a new window it can't see.
+- **Dragging near the page's edge** scrolls it, so a window can be carried anywhere.
+- **Lock** stops moving, resizing, closing and switching the page's mode.
+- **Pop-out** works as on docked pages; a free page's popped-out windows come back onto the
+  page when it is reloaded or another page is shown (browsers block opening them unasked).
+- **Switching:** docked → free keeps each tile where it was on screen (a tab behind another
+  sits a step down and right); free → docked tiles the windows row by row, top to bottom.
+- **Saved** in the same layout document: a free page is `{name, mode: "free", dock: null,
+  canvas: {windows: [{id, kind, params, x, y, w, h, z}]}}`, at most 200 windows a page. A
+  page without `mode` is docked, so every layout saved before #410 opens as it did.
+- Code: `ui/src/workspace/canvas.ts` (the rules, pure functions), `FreeCanvas.tsx` (the
+  windows), `controller.ts` (pages, saving).
 
 - **Widgets** menu adds any widget. **Search product** (`/`) finds an instrument and opens a
   ladder linked to the focused group.
@@ -181,7 +226,7 @@ Watch, cancel, close and stop only; no new trades from a small screen. STOP sits
 where the thumb rests.
 
 ## 7. Build notes
-- React + TypeScript (Vite), dockview for the workspace, one shared WebSocket client
+- React + TypeScript (Vite), dockview for docked pages and our own canvas for free pages, one shared WebSocket client
   (`stream.md`) with reference-counted subscriptions: two widgets on one instrument share one
   subscription.
 - Prices update a ladder at most every 250 ms (the server conflates); order events are applied
