@@ -48,12 +48,17 @@ class Instrument:
     expiry: date | None = None  # futures and options only
     strike_paise: int | None = None  # options only
     underlying: str | None = None  # e.g. "NIFTY" for its futures and options
+    # the exchange's most per order (its "freeze quantity", #424); None: not known. Kite's
+    # instrument list doesn't carry it: it comes from a file (refdata/freeze.py)
+    freeze_qty: int | None = None
 
     def __post_init__(self) -> None:
         if self.tick_paise <= 0:
             raise ValueError(f"{self.symbol}: tick must be positive")
         if self.lot_size <= 0:
             raise ValueError(f"{self.symbol}: lot size must be positive")
+        if self.freeze_qty is not None and self.freeze_qty < self.lot_size:
+            raise ValueError(f"{self.symbol}: freeze quantity must be at least one lot")
 
     @property
     def id(self) -> InstrumentId:
@@ -81,3 +86,20 @@ class Instrument:
             raise ValueError(f"quantity must be positive, got {qty}")
         if qty % self.lot_size != 0:
             raise ValueError(f"{qty} is not a multiple of {self.symbol}'s lot size {self.lot_size}")
+
+    def check_freeze(self, qty: int) -> None:
+        """Raise ValueError if one order of `qty` is above the exchange's freeze quantity
+        (the exchange refuses it; bigger quantities go in several orders)."""
+        if self.freeze_qty is not None and qty > self.freeze_qty:
+            raise ValueError(
+                f"{qty} is more than {self.symbol}'s freeze quantity {self.freeze_qty}, "
+                "the exchange's most per order: split it"
+            )
+
+    @property
+    def max_order_qty(self) -> int | None:
+        """The most one order may carry by the exchange's rule (a whole number of lots), or
+        None when no limit is known."""
+        if self.freeze_qty is None:
+            return None
+        return self.freeze_qty - self.freeze_qty % self.lot_size

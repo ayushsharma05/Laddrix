@@ -1971,6 +1971,7 @@ def _instrument(i: Instrument, expiries: Expiries | None = None) -> dict[str, An
         "strike_paise": i.strike_paise,
         "underlying": i.underlying,
         "tradable": i.tradable,
+        "freeze_qty": i.freeze_qty,
         "expiry_info": expiry_to_dict(expiries.info(i)) if expiries else None,
     }
 
@@ -1988,6 +1989,7 @@ def _spread_instrument(s: SpreadDef, lookup: Callable[[str], Instrument | None])
         "strike_paise": None,
         "underlying": None,
         "tradable": True,  # a spread ladder's click starts the ASE algo (#416)
+        "freeze_qty": None,  # each leg has its own; the ASE splits within them (#424)
         "expiry_info": None,
         "spread": {"spread_id": s.spread_id, "legs": [leg_to_dict(x) for x in s.legs]},
     }

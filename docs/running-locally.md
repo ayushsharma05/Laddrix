@@ -141,7 +141,11 @@ Only with your own Kite Connect app (API key and secret). **Never commit them.**
 2. In `deploy/.env`, add `MOCKTRADE_PRICES=kite`, `KITE_API_KEY=...` and `KITE_API_SECRET=...`.
 3. Add a Kite account (`users add-account acc-me kite <your Zerodha client id> --owner ayush`), plus
    a paper account for the same user. The paper one fills against your live prices.
-4. Restart, sign in, and press **Log in to Kite** on the band. You do this once a day; the
+4. Optional, before real orders: the exchange's freeze quantities (the most one order may carry).
+   Make a file of `underlying,qty` lines (for example `NIFTY,1800`) from NSE's latest freeze
+   list and set `MOCKTRADE_FREEZE_FILE` to it (`deploy/.env.example` shows how). The demo
+   has sample ones built in.
+5. Restart, sign in, and press **Log in to Kite** on the band. You do this once a day; the
    morning routine is in [runbooks/morning.md](runbooks/morning.md).
 
 To watch raw prices in a terminal instead:

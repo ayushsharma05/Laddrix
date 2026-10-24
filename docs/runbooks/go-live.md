@@ -19,6 +19,7 @@ The steps marked "test" point to automated tests that check the same logic again
 | Backups run and a restore works | `server.md` § Restore, step 1 (into `/tmp/check`) succeeds on last night's backup | drill 19/19: `context/evidence/v1-3-backup-restore-drill.txt` | ☐ |
 | A crash loses nothing | `incidents.md` § Crash-and-restart drill | drill 17/17 (#328) | — (never crash a live server on purpose) |
 | Holidays set | `MOCKTRADE_HOLIDAYS` has NSE's list for the year | — | ☐ |
+| Freeze quantities set (#424) | `MOCKTRADE_FREEZE_FILE` names a file made from NSE's latest freeze list (`underlying,qty` lines); the start log says how many underlyings and no warnings; the ticket shows "max … per order" on a NIFTY future | orders above it refused in words, algos and closes split to fit (tests: `test_freeze.py`) | ☐ |
 | Alerts reach your phone | set `MOCKTRADE_ALERT_WEBHOOK`, restart, stop the price feed briefly (or wait for the 08:30 login reminder): the message arrives | private and plain-http addresses refused (paper) | ☐ |
 | Limits are right | Admin → Limits: max order value, max lots, daily loss, OPS ≤ 10/s | — | ☐ |
 | SEBI algo rules re-checked (#291) | `docs/design/compliance.md`: the 10 orders/s line and the static IP still hold; if any algo runs above 10/s, it is registered, `MOCKTRADE_ALGO_IDS` set, and Kite's field name for the algo id confirmed with Zerodha | algos refuse to start above 10/s without an id (tests) | ☐ |

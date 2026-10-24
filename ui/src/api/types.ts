@@ -101,6 +101,7 @@ export interface Instrument {
   strike_paise: number | null;
   underlying: string | null;
   tradable: boolean;
+  freeze_qty?: number | null; // the exchange's freeze quantity (#424)
   ltp_paise?: number | null;
   expiry_info?: ExpiryInfo | null; // null for shares and indices
   spread?: { spread_id: string; legs: SpreadLeg[] }; // a spread "instrument" SPREAD:<id> (#414)
@@ -244,6 +245,7 @@ export interface OrderSpec {
   products: string[];
   auto_protection_pct: string; // decimal text, e.g. "2"
   max_modifications: number;
+  freeze_qty?: number | null; // the exchange's most per order (whole lots), null: not known (#424)
   expiry?: ExpiryInfo | null; // F&O only: expires today? cut-off? (#290)
 }
 
