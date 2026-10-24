@@ -34,6 +34,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from mocktrade.alerts.engine import AlertError
 from mocktrade.alerts.engine import spec as alert_spec
 from mocktrade.alerts.service import MarketAlerts
+from mocktrade.algos.autospreader import SPEC as ASE
 from mocktrade.algos.engine import AlgoError, algo_id_note
 from mocktrade.algos.spec import spec_to_dict as algo_spec_to_dict
 from mocktrade.broker.base import BrokerError
@@ -88,6 +89,7 @@ from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.stream import StreamHub
 from mocktrade.server.users import SESSION_MAX, LoginFailed, UserStore
 from mocktrade.spreads.model import (
+    PREFIX,
     SpreadDef,
     SpreadLeg,
     leg_to_dict,
@@ -369,6 +371,13 @@ class SpreadLegIn(_Strict):
 class SpreadIn(_Strict):
     name: str = Field(max_length=200)
     legs: list[SpreadLegIn] = Field(max_length=20)
+
+
+class SpreadOrderIn(_Strict):
+    side: Side  # of the spread: BUY buys its + legs and sells its − legs
+    lots: int = Field(gt=0, le=1000)  # spread lots
+    price_paise: int  # the spread price (may be negative)
+    product: Product = Product.NRML
 
 
 # --- the app -------------------------------------------------------------------------------
@@ -1356,6 +1365,35 @@ def create_app(
             raise HTTPException(404 if exc.missing else 422, str(exc)) from None
         await book.save(user.id)
         return _spread_out(changed)
+
+    @app.post("/api/accounts/{account_id}/spreads/{spread_id}/orders", status_code=201)
+    async def trade_spread(
+        account_id: str, spread_id: str, body: SpreadOrderIn, user: Me
+    ) -> dict[str, Any]:
+        """Buy or sell spread lots at a spread price: the ASE algo (#415) quotes the quoting
+        leg and hedges the others. The server works out the legs; the screens never do."""
+        running = runtime(account_id, user, trade=True)
+        spread = book.visible(user, PREFIX + spread_id)
+        if spread is None:
+            raise HTTPException(404, f"no spread {spread_id}")
+        q = spread.quote_leg
+        instrument = platform.instruments.get(q.instrument_id)
+        if instrument is None:
+            raise HTTPException(422, f"{q.instrument_id} is not a known contract")
+        buys_q = (q.ratio > 0) == (body.side is Side.BUY)
+        try:
+            view = running.algos.start(
+                ASE.code,
+                user_id=user.id,
+                instrument_id=q.instrument_id,
+                side=Side.BUY if buys_q else Side.SELL,
+                qty=body.lots * abs(q.ratio) * instrument.lot_size,
+                params={"spread": spread.spread_id, "level_paise": body.price_paise},
+                product=body.product,
+            )
+        except AlgoError as exc:
+            raise HTTPException(422, exc.reason) from None
+        return algo_to_dict(view)
 
     @app.delete("/api/spreads/{spread_id}", status_code=204)
     async def delete_spread(spread_id: str, user: Me) -> None:

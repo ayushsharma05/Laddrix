@@ -10,8 +10,8 @@ Ayush asked for this on 24 Oct 2026. It is built in three parts:
 | Part | Issue | What it adds | State |
 | --- | --- | --- | --- |
 | 1 | #414 | spread definitions, their live implied price, the Autospreader widget | done |
-| 2 | #415 | multi-leg execution: quote one leg, hedge every other | next |
-| 3 | #416 | the spread ladder: click to trade a spread; right-click "Autospreader settings…" | after #415 |
+| 2 | #415 | multi-leg execution: quote one leg, hedge every other | done |
+| 3 | #416 | the spread ladder: click to trade a spread; right-click "Autospreader settings…" | next |
 
 Still to come, in #250 and #251:
 - several quoting legs at once;
@@ -94,16 +94,29 @@ a leg ticks ─► SpreadPricer (a tap) ─► implied() ─► MarketData.on_de
   - In the backup (`spreads/`).
   - In `users export-user`, and removed by `users erase-user` ([data.md](data.md)).
 
-## 4. Code
+## 4. Trading a spread (#415)
+
+```
+POST /api/accounts/{account}/spreads/{spread}/orders   {"side": "BUY", "lots": 2, "price_paise": -13000}
+     └─► the ASE algo: parent = the quoting leg (its side and lots · |ratio| · lot size)
+         quote it where the spread = the price, hedge every other leg the moment it fills
+```
+
+The server works out every leg's side and size; the screens send only the spread, its side,
+lots and price. The algo's rules are in [algos.md](algos.md#autospreader-algosautospreaderpy-415).
+
+## 5. Code
 
 - `src/mocktrade/spreads/model.py`: definitions, checks, the implied price.
 - `src/mocktrade/spreads/store.py`: `SpreadBook`, per user, on disk.
 - `src/mocktrade/spreads/pricer.py`: live prices as derived ticks.
+- `src/mocktrade/algos/autospreader.py`: the ASE algo (#415).
 - `ui/src/widgets/ase/`: the Autospreader widget and its form model.
 - Tests:
   - `tests/test_spreads.py` (hand-worked prices, rules, the book, the pricer);
-  - `tests/test_spread_api.py` (routes, ownership, the stream);
+  - `tests/test_spread_api.py` (routes, ownership, the stream, trading a spread);
+  - `tests/test_autospreader.py` (the algo: quotes, hedges, stops, the paper broker);
   - `ui/src/widgets/ase/*.test.ts*`.
 - Checks:
-  - `context/scripts/mutate-spreads.py` (50/50);
+  - `context/scripts/mutate-spreads.py` (50/50), `context/scripts/mutate-autospreader.py` (34/34);
   - `context/scripts/e2e-autospreader.cjs` (real browser, 11/11).

@@ -29,10 +29,10 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
 - **Right-click menus:** merged (PR #413).
 - **Autospreader (Ayush's ask, 24 Oct), in three parts** ([docs/design/spreads.md](../docs/design/spreads.md)):
   1. #414 spread definitions (2 to 6 legs) and live implied prices, the Autospreader widget:
-     done, in its PR.
-  2. #415 multi-leg execution (quote one leg, hedge the others): next.
-  3. #416 the spread ladder, with right-click "Autospreader settings…": after #415.
-- **Pull requests:** the #414 PR, until it merges.
+     merged (PR #417).
+  2. #415 multi-leg execution (the ASE algo: quote one leg, hedge the others): done, in its PR.
+  3. #416 the spread ladder, with right-click "Autospreader settings…": next.
+- **Pull requests:** the #415 PR, until it merges.
 
 ## What's next
 

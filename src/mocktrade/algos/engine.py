@@ -238,6 +238,11 @@ class AlgoContext:
         return self._parent.instrument_id
 
     @property
+    def user_id(self) -> str:
+        """Who started it (an algo acting on something of theirs checks it is theirs)."""
+        return self._parent.user_id
+
+    @property
     def side(self) -> Side:
         return self._parent.side
 
