@@ -41,7 +41,8 @@ function setup(spreads: Spread[], params: Partial<AutospreaderParams> = {}) {
   stream.start();
   socket().open();
   const setParams = vi.fn();
-  const props = { params: { link: "none" as const, ...params }, setParams, setInstrument: vi.fn(), publish: vi.fn(), open: vi.fn() };
+  const open = vi.fn();
+  const props = { params: { link: "none" as const, ...params }, setParams, setInstrument: vi.fn(), publish: vi.fn(), open };
   const view = render(
     <AppProvider app={app}>
       <Autospreader {...props} />
@@ -53,7 +54,7 @@ function setup(spreads: Spread[], params: Partial<AutospreaderParams> = {}) {
         <Autospreader {...props} params={{ ...props.params, ...next }} />
       </AppProvider>,
     );
-  return { setParams, socket, posted, rerender, calls: server.calls };
+  return { setParams, open, socket, posted, rerender, calls: server.calls };
 }
 
 describe("the Autospreader", () => {
@@ -115,6 +116,12 @@ describe("the Autospreader", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
     await waitFor(() => expect(screen.queryByText("NIFTY Nov/Dec")).toBeNull());
     expect(calls.filter((c) => c.method === "DELETE").map((c) => c.path)).toEqual(["/api/spreads/s1"]);
+  });
+
+  it("opens a spread's ladder from its row, to trade it", async () => {
+    const { open } = setup([CAL]);
+    fireEvent.click(await screen.findByRole("button", { name: "Ladder" }));
+    expect(open).toHaveBeenCalledWith("ladder", { instrumentId: "SPREAD:s1", link: "none" });
   });
 
   it("opens a spread to edit from its row", async () => {

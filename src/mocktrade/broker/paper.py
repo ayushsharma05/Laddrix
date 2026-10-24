@@ -151,6 +151,11 @@ class PaperBroker:
         self.starting_paise = starting_paise
         self.margins = margins or PaperMargins()
         self._clock = clock
+        # Ids unique across restarts (#419): a restarted broker is handed the day's earlier
+        # trades (adopt), and a new "P1"/"T1" would be taken for one of them by the trade
+        # check (#352). Each start's ids carry its start time (in seconds, base 36): a replay
+        # with a fixed clock still gives the same ids every run.
+        self.run_id = _base36(int(clock().timestamp()))
         self._market_data = market_data
         self._instruments = instruments
         self._latency_s = latency_s
@@ -193,7 +198,7 @@ class PaperBroker:
             raise BrokerError(str(exc)) from None
         self._check_trigger(request)
         seq = next(self._ids)
-        broker_id = f"P{seq}"
+        broker_id = f"P{self.run_id}-{seq}"
         order = _PaperOrder(
             seq=seq,
             request=request,
@@ -707,8 +712,8 @@ class PaperBroker:
         order.notional += qty * price
         r = order.request
         self._trades.append(
-            Trade(f"T{next(self._trade_ids)}", order.broker_id, r.instrument_id, r.side,
-                  r.product, qty, price, self._clock(), r.client_order_id)
+            Trade(f"T{self.run_id}-{next(self._trade_ids)}", order.broker_id, r.instrument_id,
+                  r.side, r.product, qty, price, self._clock(), r.client_order_id)
         )  # fmt: skip
         self._book.apply_fill(r.instrument_id, r.product, r.side, qty, price)
         order.status = OrderStatus.FILLED if order.leaves == 0 else OrderStatus.PARTIAL
@@ -770,3 +775,14 @@ def _queue_at(order: _PaperOrder, tick: Tick) -> int:
     worst = visible[-1].price_paise
     inside = price > worst if buying else price < worst
     return 0 if inside else UNKNOWN_QUEUE  # a gap inside the depth is empty; beyond it, unknown
+
+
+def _base36(n: int) -> str:
+    """1792834471 -> "tnenxj": short, and in the order of the numbers it came from."""
+    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    out = ""
+    while True:
+        n, d = divmod(n, 36)
+        out = digits[d] + out
+        if n == 0:
+            return out

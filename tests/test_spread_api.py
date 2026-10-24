@@ -92,7 +92,7 @@ async def test_only_the_owner_sees_or_changes_a_spread(tmp_path, nifty_fut):
     assert mine.json() | {"ltp_paise": None} == {
         "id": f"SPREAD:{sid}", "exchange": "SPREAD", "symbol": "NIFTY Oct/Nov", "kind": "SPREAD",
         "tick_paise": 10, "lot_size": 1, "expiry": None, "strike_paise": None,
-        "underlying": None, "tradable": False, "expiry_info": None, "ltp_paise": None,
+        "underlying": None, "tradable": True, "expiry_info": None, "ltp_paise": None,
         "spread": {"spread_id": sid, "legs": spread["legs"]},
     }  # fmt: skip
     await ayush.aclose()

@@ -7,7 +7,7 @@
 //
 // Every price here is whole paise; rows are always multiples of the instrument's tick size.
 
-import type { Instrument, OrderSpec, OrderTypeSpec, OrderView, Side, Tick } from "../../api/types";
+import type { AlgoView, Instrument, OrderSpec, OrderTypeSpec, OrderView, Side, Tick } from "../../api/types";
 
 // --- the price grid ------------------------------------------------------------------------------
 
@@ -353,4 +353,54 @@ export function clickTypes(spec: OrderSpec | null): OrderTypeSpec[] {
 /** Value of an order in paise (for the "confirm over" rule): qty × price, or × last price for MKT. */
 export function orderValue(body: OrderBody, ltp: number | null): number {
   return body.qty * (body.price_paise ?? ltp ?? 0);
+}
+
+// --- a spread ladder (#416) ------------------------------------------------------------------------
+
+export const SPREAD_PREFIX = "SPREAD:"; // a spread's id as an instrument (server: spreads/model.py)
+
+export const isSpread = (instrumentId: string | undefined): boolean => !!instrumentId?.startsWith(SPREAD_PREFIX);
+
+/**
+ * A spread ladder's working orders: each running ASE algo on this spread, at its spread price,
+ * for its spread lots (`lots_done` of them already quoted and filled). Shaped like an order, so
+ * the Work column, cancel and move treat them as one; the "order id" is the algo's id.
+ * A stopping algo shows as being cancelled.
+ */
+export function spreadWorking(algos: Record<string, AlgoView>, instrumentId: string): OrderView[] {
+  const spreadId = instrumentId.slice(SPREAD_PREFIX.length);
+  return Object.values(algos)
+    .filter((a) => a.code === "ASE" && a.params.spread === spreadId && (a.state === "WORKING" || a.state === "PAUSED" || a.state === "STOPPING"))
+    .map((a) => {
+      const lots = Number(a.extra.lots ?? 0);
+      const done = Number(a.extra.lots_done ?? 0);
+      const side: Side = a.extra.spread_side === "SELL" ? "SELL" : "BUY";
+      return {
+        request: {
+          client_order_id: a.algo_id,
+          account_id: a.account_id,
+          user_id: a.user_id,
+          instrument_id: instrumentId,
+          side,
+          qty: lots,
+          order_type: "LIMIT",
+          product: "NRML",
+          validity: "DAY",
+          price_paise: Number(a.params.level_paise),
+          trigger_paise: null,
+          market_protection: null,
+          algo_id: null,
+          parent_id: null,
+        },
+        broker_order_id: null,
+        status: done > 0 ? "PARTIAL" : "OPEN",
+        filled_qty: done,
+        avg_price_paise: 0,
+        reason: a.status,
+        pending: a.state === "STOPPING" ? "CANCEL" : "NONE",
+        created_at: a.created_at,
+        updated_at: a.updated_at,
+      } satisfies OrderView;
+    })
+    .filter((o) => o.request.qty > o.filled_qty);
 }

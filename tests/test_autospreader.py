@@ -212,6 +212,7 @@ async def test_every_other_leg_is_hedged_at_once_within_its_payup(w):
     assert view.extra["legs"] == ("NIFTY26OCTFUT bought 75 · NIFTY26NOVFUT sold 150 · "
                                   "NIFTY26DECFUT bought 75")  # fmt: skip
     assert view.extra["spread_name"] == "fly" and view.extra["spread_side"] == "BUY"
+    assert (view.extra["lots"], view.extra["lots_done"]) == (1, 1)
 
 
 async def test_a_minus_two_quote_leg_hedges_in_whole_lots_only(w):
@@ -237,7 +238,9 @@ async def test_no_new_quote_goes_out_while_a_leg_is_unhedged(w):
     w.engine.on_tick(w.md.latest(NOV))  # the quote is gone (cancelled outside the algo)
     await w.engine.settle()
     assert [r.instrument_id for r in w.broker.placed] == [OCT, NOV]  # no new OCT quote yet
-    assert w.engine.get(algo.algo_id).extra["traded_spread_paise"] is None  # one leg so far
+    extra = w.engine.get(algo.algo_id).extra
+    assert extra["traded_spread_paise"] is None  # one leg so far
+    assert (extra["lots"], extra["lots_done"]) == (2, 1)
     (hedge,) = w.children(algo, NOV)
     w.fill(hedge, 75, 2514000)  # hedged: now the rest is quoted
     w.engine.on_tick(w.md.latest(NOV))

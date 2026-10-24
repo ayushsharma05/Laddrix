@@ -1938,7 +1938,7 @@ def _spread_instrument(s: SpreadDef, lookup: Callable[[str], Instrument | None])
         "expiry": None,
         "strike_paise": None,
         "underlying": None,
-        "tradable": False,  # trading a spread from a ladder comes with #416
+        "tradable": True,  # a spread ladder's click starts the ASE algo (#416)
         "expiry_info": None,
         "spread": {"spread_id": s.spread_id, "legs": [leg_to_dict(x) for x in s.legs]},
     }
