@@ -89,9 +89,12 @@ from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.stream import StreamHub
 from mocktrade.server.users import SESSION_MAX, LoginFailed, UserStore
 from mocktrade.spreads.model import (
+    CONTROLS,
     PREFIX,
+    Controls,
     SpreadDef,
     SpreadLeg,
+    controls_from_dict,
     leg_to_dict,
     spread_tick,
     spread_to_dict,
@@ -371,6 +374,13 @@ class SpreadLegIn(_Strict):
 class SpreadIn(_Strict):
     name: str = Field(max_length=200)
     legs: list[SpreadLegIn] = Field(max_length=20)
+    # how the Autospreader trades it (#425), checked in words against CONTROLS; None: defaults
+    # on a new spread, unchanged on an edit
+    controls: dict[str, Any] | None = None
+
+
+class ActionIn(_Strict):
+    expect: list[str] = Field(max_length=100)  # the preview's lines the trader confirmed
 
 
 class SpreadOrderIn(_Strict):
@@ -1341,8 +1351,22 @@ def create_app(
         return [SpreadLeg(x.instrument_id, x.ratio, x.multiplier, x.quote, x.payup_ticks)
                 for x in body.legs]  # fmt: skip
 
+    def _controls(body: SpreadIn) -> Controls | None:
+        if body.controls is None:
+            return None
+        controls, problems = controls_from_dict(body.controls)
+        if problems:
+            raise HTTPException(422, "; ".join(problems))
+        return controls
+
     def _spread_out(s: SpreadDef) -> dict[str, Any]:
         return {**spread_to_dict(s), "tick_paise": spread_tick(s.legs, platform.instruments.get)}
+
+    @app.get("/api/spreads/spec")
+    async def spread_spec(user: Me) -> dict[str, Any]:
+        """What a spread's controls are (labels, limits, defaults, help): the screens draw
+        their fields from this (#425)."""
+        return {"controls": algo_spec_to_dict(CONTROLS)["params"]}
 
     @app.get("/api/spreads")
     async def list_spreads(user: Me) -> list[dict[str, Any]]:
@@ -1351,7 +1375,7 @@ def create_app(
     @app.post("/api/spreads", status_code=201)
     async def create_spread(body: SpreadIn, user: Me) -> dict[str, Any]:
         try:
-            made = book.create(user, body.name, _legs(body))
+            made = book.create(user, body.name, _legs(body), _controls(body))
         except SpreadError as exc:
             raise HTTPException(422, str(exc)) from None
         await book.save(user.id)
@@ -1360,7 +1384,7 @@ def create_app(
     @app.put("/api/spreads/{spread_id}")
     async def update_spread(spread_id: str, body: SpreadIn, user: Me) -> dict[str, Any]:
         try:
-            changed = book.update(user, spread_id, body.name, _legs(body))
+            changed = book.update(user, spread_id, body.name, _legs(body), _controls(body))
         except SpreadError as exc:
             raise HTTPException(404 if exc.missing else 422, str(exc)) from None
         await book.save(user.id)
@@ -1643,6 +1667,31 @@ def create_app(
             )
         except AlgoError as exc:
             raise HTTPException(422, exc.reason) from None
+        return algo_to_dict(view)
+
+    @app.get("/api/accounts/{account_id}/algos/{algo_id}/actions/{name}")
+    async def preview_algo_action(
+        account_id: str, algo_id: str, name: str, user: Me
+    ) -> dict[str, Any]:
+        """What one of the algo's own actions would do now, in words (#425)."""
+        running = runtime(account_id, user, trade=True)
+        try:
+            p = running.algos.preview(algo_id, name)
+        except AlgoError as exc:
+            raise HTTPException(_action_status(exc), exc.reason) from None
+        return {"name": p.name, "label": p.label, "lines": list(p.lines), "ok": p.ok,
+                "why": p.why}  # fmt: skip
+
+    @app.post("/api/accounts/{account_id}/algos/{algo_id}/actions/{name}")
+    async def do_algo_action(
+        account_id: str, algo_id: str, name: str, body: ActionIn, user: Me
+    ) -> dict[str, Any]:
+        """Do it, only as previewed: if it would do something else now, 409 says what."""
+        running = runtime(account_id, user, trade=True)
+        try:
+            view = running.algos.act(algo_id, name, body.expect)
+        except AlgoError as exc:
+            raise HTTPException(_action_status(exc), exc.reason) from None
         return algo_to_dict(view)
 
     @app.post("/api/accounts/{account_id}/algos/{algo_id}/{action}")
@@ -1942,6 +1991,12 @@ def _spread_instrument(s: SpreadDef, lookup: Callable[[str], Instrument | None])
         "expiry_info": None,
         "spread": {"spread_id": s.spread_id, "legs": [leg_to_dict(x) for x in s.legs]},
     }
+
+
+def _action_status(exc: AlgoError) -> int:
+    """No such algo or action: 404; it can't be done now, or has changed: 409."""
+    missing = exc.reason.startswith("no algo ") or "has no action" in exc.reason
+    return 404 if missing else 409
 
 
 def _risk_or_admin(user: User) -> bool:

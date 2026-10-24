@@ -4,8 +4,11 @@
     strategy ─► ctx.send / ctx.modify / ctx.cancel ─► OrderManager (risk, throttle, broker)
     order events (parent_id = A1) ─► parent's filled/avg from its children ─► strategy.on_child
     prices ─► strategy.on_tick        heartbeat (every 100 ms) ─► strategy.on_timer
+                                      (paused or stopping: strategy.on_watch, e.g. a hedge)
     pause ─► pull working children, stop sending     resume ─► strategy.on_resume
     stop / kill switch ─► pull every child ─► STOPPED once none is working
+    trader ─► an algo's own action (e.g. "Hedge now", #425): preview it in words, then do
+              exactly that (if what it would send has changed since, it is refused)
 
 Rules (each one a real failure professional desks guard against):
 - Children go through the same order manager, risk checks and throttle as manual orders;
@@ -80,6 +83,7 @@ class AlgoView:
     created_at: datetime
     updated_at: datetime
     product: Product = Product.NRML  # the position it works on (with the instrument)
+    actions: tuple["AlgoAction", ...] = ()  # what the trader may ask it to do (#425)
 
 
 @dataclass(frozen=True)
@@ -88,6 +92,26 @@ class AlgoEvent:
     ts: datetime
     algo: AlgoView
     detail: str = ""
+
+
+@dataclass(frozen=True)
+class AlgoAction:
+    """Something the trader may ask a running algo to do (#425), offered on its screen."""
+
+    name: str  # "hedge_now"
+    label: str  # "Hedge now"
+    help: str  # one sentence
+
+
+@dataclass(frozen=True)
+class ActionPreview:
+    """What an action would do now, in words, before the trader confirms it."""
+
+    name: str
+    label: str
+    lines: tuple[str, ...]  # each order it would send or change, in words
+    ok: bool = True
+    why: str = ""  # why it can't be done now (ok False)
 
 
 class Strategy(Protocol):
@@ -133,6 +157,19 @@ class BaseStrategy:
     def on_finish(self, ctx: "AlgoContext") -> str | None:
         """A warning to add when the algo ends (e.g. a spread left unhedged), or None."""
         return None
+
+    def on_watch(self, ctx: "AlgoContext", now: datetime) -> None:
+        """The heartbeat while paused or stopping: only risk-reducing work (a hedge)."""
+
+    actions: tuple[AlgoAction, ...] = ()  # what the trader may ask it to do (#425)
+
+    def preview(self, ctx: "AlgoContext", name: str) -> ActionPreview:
+        """What action `name` would do now, in words."""
+        raise AlgoError(f"no action {name!r}")
+
+    def act(self, ctx: "AlgoContext", name: str) -> None:
+        """Do action `name` (the engine has just checked its preview)."""
+        raise AlgoError(f"no action {name!r}")
 
 
 StrategyFactory = Callable[[dict[str, Any]], Strategy]
@@ -394,6 +431,10 @@ class AlgoContext:
             self._parent.status = status
             self._engine.changed(self._parent, "UPDATED")
 
+    def alert(self, message: str) -> None:
+        """An ALERT on the algo's audit trail and screens (e.g. a leg unhedged too long)."""
+        self._engine.changed(self._parent, "ALERT", message)
+
     def max_order_qty(
         self, instrument_id: str | None = None, price_paise: int | None = None
     ) -> int | None:
@@ -576,6 +617,33 @@ class AlgoEngine:
             self._call(p, lambda ctx: p.strategy.on_resume(ctx))
         return self._view(p)
 
+    def preview(self, algo_id: str, name: str) -> ActionPreview:
+        """What one of the algo's own actions would do now (#425)."""
+        p = self._live(algo_id)
+        self._offered(p, name)
+        return p.strategy.preview(AlgoContext(self, p), name)  # type: ignore[attr-defined]
+
+    def act(self, algo_id: str, name: str, expect: list[str]) -> AlgoView:
+        """Do one of the algo's own actions, but only if it would still do what the trader
+        saw (`expect`: the preview's lines); otherwise refuse, saying what it would do now."""
+        p = self._live(algo_id)
+        self._offered(p, name)
+        ctx = AlgoContext(self, p)
+        now = p.strategy.preview(ctx, name)  # type: ignore[attr-defined]
+        if not now.ok:
+            raise AlgoError(now.why)
+        if list(now.lines) != list(expect):
+            raise AlgoError("what it would do has changed since you looked: "
+                            + "; ".join(now.lines))  # fmt: skip
+        self.changed(p, "ACTION", f"{now.label}: " + "; ".join(now.lines))
+        self._call(p, lambda c: p.strategy.act(c, name))  # type: ignore[attr-defined]
+        return self._view(p)
+
+    @staticmethod
+    def _offered(p: _Parent, name: str) -> None:
+        if name not in {a.name for a in getattr(p.strategy, "actions", ())}:
+            raise AlgoError(f"{p.code} has no action {name!r}")
+
     def stop(self, algo_id: str, reason: str = "stopped by the trader") -> AlgoView:
         p = self._live(algo_id)
         self.stop_parent(p, reason, final=AlgoState.STOPPED)
@@ -645,7 +713,10 @@ class AlgoEngine:
         for p in list(self._parents.values()):
             if p.state is AlgoState.WORKING:
                 self._call(p, lambda ctx, s=p.strategy: s.on_timer(ctx, now))
-            elif p.state is AlgoState.STOPPING:
+            elif p.state in (AlgoState.PAUSED, AlgoState.STOPPING):
+                watch = getattr(p.strategy, "on_watch", None)
+                if watch is not None:
+                    self._call(p, lambda ctx, w=watch: w(ctx, now))
                 self._maybe_stopped(p)
 
     @property
@@ -712,17 +783,19 @@ class AlgoEngine:
             raise AlgoError(f"{algo_id} has already finished ({p.state.value.lower()})")
         return p
 
+    def _keeps(self, p: _Parent, child: OrderView) -> bool:
+        """The strategy keeps this child working through a pause or stop (a hedge)."""
+        try:
+            return bool(p.strategy.keep_on_stop(AlgoContext(self, p), child))
+        except Exception:
+            log.exception("algo %s keep_on_stop failed", p.algo_id)
+            return False
+
     def _pull(self, p: _Parent) -> None:
-        ctx = AlgoContext(self, p)
         for child in self.children(p):
             if child.status.is_final or child.pending is Pending.CANCEL:
                 continue
-            try:
-                keep = p.strategy.keep_on_stop(ctx, child)
-            except Exception:
-                log.exception("algo %s keep_on_stop failed", p.algo_id)
-                keep = False
-            if not keep:
+            if not self._keeps(p, child):
                 cid = child.client_order_id
                 self.spawn(self.quiet(lambda cid=cid: self.manager.cancel(cid)))
 
@@ -762,8 +835,9 @@ class AlgoEngine:
             p.in_flight = max(0, p.in_flight - 1)
             if _main(p, order.request):
                 p.in_flight_qty = max(0, p.in_flight_qty - order.request.qty)
-            if p.state is not AlgoState.WORKING:
-                # sent just before a pause or stop: pull it straight away
+            if p.state is not AlgoState.WORKING and not self._keeps(p, order):
+                # sent just before a pause or stop: pull it straight away (not a hedge sent
+                # on purpose while paused or stopping: it reduces risk, #425)
                 self.spawn(self.quiet(lambda: self.manager.cancel(order.client_order_id)))
         if event.kind is EventKind.REJECTED:
             p.rejects_in_a_row += 1
@@ -836,4 +910,5 @@ class AlgoEngine:
             created_at=p.created_at,
             updated_at=p.updated_at,
             product=p.product,
+            actions=tuple(getattr(p.strategy, "actions", ())),
         )

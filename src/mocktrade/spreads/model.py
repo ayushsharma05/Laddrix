@@ -9,6 +9,15 @@ A spread is 2 to 6 legs traded as one thing. Each leg has:
     quote     the leg that rests a quote (exactly one for now; the others are hedged, #415)
     pay-up    how many ticks worse than the best price its hedge may pay
 
+And the spread has its trading controls (#425), used by the Autospreader algo:
+
+    re-quote threshold   ticks the quote's target must move before the quote is moved
+                         (a move that would make the spread worse than its level is at once)
+    max unhedged         the most spread lots one quote may carry (0: no limit), so one fill
+                         never leaves more than this unhedged
+    chase                ticks a working hedge may follow the market past its first price
+    hedge timeout        seconds a leg may stay unhedged before an ALERT
+
 The spread's price is   Σ price× · leg price.   What it costs to trade it at once:
 
     ask (buy the spread now)  = Σ price× · (the leg's ask if price× > 0, else its bid)
@@ -29,6 +38,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
+from mocktrade.algos.spec import AlgoSpec, ParamKind, ParamSpec, check_params
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.ticks import DepthLevel, Tick
 
@@ -52,6 +62,52 @@ class SpreadLeg:
 
 
 @dataclass(frozen=True)
+class Controls:
+    """How the Autospreader trades this spread (#425); the screens draw them from CONTROLS."""
+
+    requote_ticks: int = 1
+    max_unhedged_lots: int = 0  # spread lots; 0: no limit
+    chase_ticks: int = 0
+    hedge_timeout_s: float = 5.0
+
+
+CONTROLS = AlgoSpec(
+    code="CONTROLS",
+    name="Autospreader controls",
+    help="How the Autospreader trades this spread",
+    params=(
+        ParamSpec("requote_ticks", "Re-quote threshold", ParamKind.TICKS,
+                  "Ticks the quote's target must move before the quote is moved (fewer "
+                  "modifications); a move that would make the spread worse is made at once",
+                  required=False, default=1, min=1, max=50),
+        ParamSpec("max_unhedged_lots", "Max unhedged", ParamKind.COUNT,
+                  "The most spread lots one quote may carry, so one fill never leaves more "
+                  "than this unhedged (0: no limit)", required=False, default=0, min=0, max=1000),
+        ParamSpec("chase_ticks", "Chase", ParamKind.TICKS,
+                  "Ticks a working hedge may follow the market past its first price "
+                  "(0: it stays at its best ± pay-up)", required=False, default=0, min=0, max=50),
+        ParamSpec("hedge_timeout_s", "Hedge timeout", ParamKind.SECONDS,
+                  "Seconds a leg may stay unhedged before an alert; no new quote meanwhile",
+                  required=False, default=5, min=1, max=300),
+    ),
+)  # fmt: skip
+
+
+def controls_from_dict(raw: dict[str, Any] | None) -> tuple[Controls, list[str]]:
+    """Controls from the screens or a file (missing ones: their defaults), with the problems in
+    words."""
+    clean, problems = check_params(CONTROLS, dict(raw or {}))
+    if problems:
+        return Controls(), problems
+    return Controls(**clean), []
+
+
+def controls_to_dict(c: Controls) -> dict[str, Any]:
+    return {"requote_ticks": c.requote_ticks, "max_unhedged_lots": c.max_unhedged_lots,
+            "chase_ticks": c.chase_ticks, "hedge_timeout_s": c.hedge_timeout_s}  # fmt: skip
+
+
+@dataclass(frozen=True)
 class SpreadDef:
     spread_id: str
     user_id: str
@@ -60,6 +116,7 @@ class SpreadDef:
     legs: tuple[SpreadLeg, ...]
     created_at: datetime
     updated_at: datetime
+    controls: Controls = Controls()  # how the Autospreader trades it (#425)
 
     @property
     def instrument_id(self) -> str:
@@ -198,16 +255,21 @@ def spread_to_dict(s: SpreadDef) -> dict[str, Any]:
         "workspace": s.workspace,
         "name": s.name,
         "legs": [leg_to_dict(x) for x in s.legs],
+        "controls": controls_to_dict(s.controls),
         "created_at": s.created_at.isoformat(),
         "updated_at": s.updated_at.isoformat(),
     }
 
 
 def spread_from_dict(d: dict[str, Any]) -> SpreadDef:
+    controls, problems = controls_from_dict(d.get("controls"))  # files from before #425: none
+    if problems:
+        raise ValueError("; ".join(problems))
     return SpreadDef(
         str(d["spread_id"]), str(d["user_id"]), str(d["workspace"]), str(d["name"]),
         tuple(leg_from_dict(x) for x in d["legs"]),
         datetime.fromisoformat(d["created_at"]), datetime.fromisoformat(d["updated_at"]),
+        controls,
     )  # fmt: skip
 
 
