@@ -128,6 +128,44 @@ export interface Spread {
   updated_at: string;
 }
 
+// --- structure positions (GET /api/accounts/{a}/structures, #428) -------------------------------
+// Every figure is the server's: the screen only shows them.
+
+export interface StructureLegView {
+  instrument_id: string;
+  ratio: number;
+  multiplier: number;
+  qty: number; // + long, − short
+  avg_price_paise: number;
+  ltp_paise: number | null;
+  realised_paise: number;
+  unrealised_paise: number;
+  residual_qty: number; // beyond the whole spreads
+}
+
+export interface StructureView {
+  structure_id: string;
+  name: string;
+  spread_id: string | null;
+  created_by: string;
+  created_at: string;
+  lots: number; // whole spreads: + bought, − sold
+  avg_spread_paise: number | null;
+  mark_paise: number | null;
+  realised_paise: number;
+  unrealised_paise: number;
+  pnl_paise: number;
+  note: string;
+  legs: StructureLegView[];
+  allocations: { client_order_id: string; qty: number; instrument_id: string | null; side: Side | null; avg_price_paise: number | null }[];
+}
+
+export interface Structures {
+  structures: StructureView[];
+  unallocated: { instrument_id: string; qty: number }[];
+  free_fills: { client_order_id: string; instrument_id: string; side: Side; filled_qty: number; unallocated_qty: number; avg_price_paise: number }[];
+}
+
 /** GET /api/spreads/spec: what a spread's controls are; the form is drawn from it (#425). */
 export interface SpreadSpec {
   controls: AlgoParamSpec[];

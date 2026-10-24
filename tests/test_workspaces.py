@@ -101,7 +101,7 @@ async def theirs_running(w):
 
 def fill(path: str, theirs_order: str, theirs_spread: str = "none") -> str:
     values = {"account_id": "acc-ravi", "user_id": "ravi", "client_order_id": theirs_order,
-              "spread_id": theirs_spread,
+              "spread_id": theirs_spread, "structure_id": "s1",
               "algo_id": "A1", "gtt_id": "1", "alert_id": "S1", "run_id": "r1",
               "day": "2026-10-14", "name": "Main", "instrument_id": FUT, "underlying": "NIFTY",
               "expiry": "2026-10-27", "session_id": "0" * 16, "action": "stop",

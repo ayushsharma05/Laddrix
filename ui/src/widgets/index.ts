@@ -22,5 +22,6 @@ import "./market/TimeAndSales";
 import "./market/Movers";
 import "./alerts/AlertsManager";
 import "./ase/Autospreader";
+import "./structures/Structures";
 import "./admin/Admin";
 import "./keys/KeysEditor";
