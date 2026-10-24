@@ -7,8 +7,10 @@
 //   desktop      the page: free windows or docked tiles (#410)
 //   page tabs    Main | + ……………………………… working count · layout saved · version
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useApp, useKeyBindings, useNow, useStore } from "../app/context";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
+import { useApp, useKeyBindings, useNow, useStore, useThemeChoice } from "../app/context";
+import { ContextMenu, type MenuItem } from "../components/ContextMenu";
 import { actionFor, chordOf } from "../keys/model";
 import { Menu } from "../components/Menu";
 import { SearchBox } from "../components/SearchBox";
@@ -16,7 +18,9 @@ import { clock, rupees } from "../lib/format";
 import { browserStorage, LayoutStore } from "../workspace/layouts";
 import { WorkspaceController } from "../workspace/controller";
 import { buildDefault, defaultCanvas } from "../workspace/defaults";
+import { pageMenu, widgetMenu } from "../workspace/menus";
 import { widgetsFor } from "../workspace/registry";
+import { THEME_CHOICES, type ThemeChoice } from "../theme/theme";
 import { Workspace } from "../workspace/Workspace";
 import { Bands, PRICES_OLD_MS } from "./Bands";
 import { EnvStrip } from "./EnvStrip";
@@ -85,8 +89,11 @@ export function Shell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [controller, bindings]);
 
+  const menu = useRightClickMenu(controller, roles, () => search.current?.focus());
+
   return (
     <div className="terminal">
+      {menu}
       <MenuBar />
       <div className="toolbar">
         <Menu label="Widgets ▾">
@@ -248,18 +255,88 @@ function Clock() {
   );
 }
 
+/**
+ * The app's own right-click menu (#412), in this window and in every pop-out window: a widget's
+ * menu on a widget, the page's menu anywhere else. Text boxes keep the browser's menu (copy,
+ * paste), and Shift+right-click still gives the browser's own.
+ */
+function useRightClickMenu(controller: WorkspaceController, roles: string[], focusSearch: () => void) {
+  const app = useApp();
+  const theme = useThemeChoice();
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[]; doc: Document } | null>(null);
+  const latest = useRef({ theme, roles, focusSearch });
+  latest.current = { theme, roles, focusSearch };
+
+  const onMenu = useCallback(
+    (e: MouseEvent) => {
+      if (e.shiftKey || e.defaultPrevented) return;
+      const target = e.target as Element | null;
+      if (!target?.closest || target.closest("input, textarea, select, [contenteditable='true']")) return;
+      e.preventDefault();
+      const { roles, focusSearch, theme } = latest.current;
+      const widgets = widgetsFor(roles);
+      const host = target.closest<HTMLElement>("[data-widget-id]");
+      let items = host ? widgetMenu({ controller, id: host.dataset.widgetId!, widgets }) : null;
+      if (!items) {
+        const surface = target.closest(".canvas");
+        const r = surface?.getBoundingClientRect();
+        items = pageMenu({
+          controller,
+          widgets,
+          at: r ? { x: e.clientX - r.left, y: e.clientY - r.top } : undefined,
+          focusSearch,
+          themes: THEME_CHOICES,
+          theme,
+          chooseTheme: (value) => void app.theme.choose(value as ThemeChoice).catch(() => app.store.addMessage("WARN", "", "The theme wasn't saved")),
+        });
+      }
+      // the keyboard's menu key: under the focused element, not at (0, 0)
+      let { clientX: x, clientY: y } = e;
+      if (x === 0 && y === 0 && target.getBoundingClientRect) {
+        const r = target.getBoundingClientRect();
+        [x, y] = [r.left + 8, r.bottom];
+      }
+      setMenu({ x, y, items, doc: target.ownerDocument });
+    },
+    [app, controller],
+  );
+
+  useEffect(() => {
+    document.addEventListener("contextmenu", onMenu);
+    const windows: Window[] = [];
+    const off = controller.onWindow((w) => {
+      windows.push(w);
+      const add = () => w.document.addEventListener("contextmenu", onMenu);
+      add();
+      w.addEventListener("load", add); // the window's page replaces its first blank one
+    });
+    return () => {
+      off();
+      document.removeEventListener("contextmenu", onMenu);
+      for (const w of windows) {
+        try {
+          w.document.removeEventListener("contextmenu", onMenu);
+        } catch {
+          // closed
+        }
+      }
+    };
+  }, [controller, onMenu]);
+
+  if (!menu || !menu.doc.body) return null;
+  return createPortal(<ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />, menu.doc.body);
+}
+
 function LockButton({ controller }: { controller: WorkspaceController }) {
-  const [locked, setLocked] = useState(controller.locked);
+  useSyncExternalStore(controller.subscribe, controller.getVersion);
+  const locked = controller.locked; // the right-click menu can lock it too
   return (
     <button
       type="button"
       className={locked ? "btn on" : "btn"}
       aria-pressed={locked}
       title={locked ? "Layout locked: widgets can't be moved or closed" : "Lock the layout"}
-      onClick={() => {
-        controller.setLocked(!locked);
-        setLocked(!locked);
-      }}
+      onClick={() => controller.setLocked(!locked)}
     >
       {locked ? "Locked" : "Lock"}
     </button>

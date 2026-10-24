@@ -602,3 +602,77 @@
   color: var(--text);
   border-color: var(--accent);
 }
+
+/* --- the right-click menu (#412) ------------------------------------------------------------ */
+
+.context-menu {
+  position: fixed;
+  z-index: 200000;
+  min-width: 220px;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 4px 0;
+  background: var(--body);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 28px var(--shadow);
+  font-size: 13px;
+}
+.cm-item {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 24px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cm-item:hover,
+.cm-item:focus,
+.cm-item.open {
+  background: var(--row-hover);
+  outline: none;
+}
+.cm-item:disabled {
+  color: var(--text-2);
+  cursor: default;
+  background: none;
+}
+.cm-check {
+  color: var(--accent);
+}
+.cm-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cm-hint {
+  color: var(--text-2);
+  font-size: 11px;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cm-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+.cm-header {
+  padding: 2px 10px 4px 28px;
+  color: var(--text-2);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -3,7 +3,7 @@
 // terminal's workspace tabs. Dockview stays mounted, hidden, while a free page shows.
 
 import { DockviewReact, type DockviewReadyEvent, type DockviewTheme } from "dockview-react";
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { useStore } from "../app/context";
 import type { WorkspaceController } from "./controller";
 import { FreeCanvas } from "./FreeCanvas";
@@ -53,7 +53,8 @@ function EmptyPage() {
 }
 
 function PageTabs({ controller, children }: { controller: WorkspaceController; children?: ReactNode }) {
-  const [editing, setEditing] = useState<number | null>(null);
+  const editing = controller.renaming; // a double-click or the right-click "Rename…"
+  const setEditing = (index: number | null) => controller.requestRename(index);
   const working = useStore((s) => (s.accountId ? s.books[s.accountId]?.orders : undefined));
   const workingCount = useMemo(
     () => Object.values(working ?? {}).filter((o) => o.status === "OPEN" || o.status === "PARTIAL" || o.status === "PENDING").length,

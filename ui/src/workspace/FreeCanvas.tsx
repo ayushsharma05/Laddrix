@@ -121,7 +121,7 @@ export function FreeCanvas({ controller, empty }: { controller: WorkspaceControl
         .filter((w) => controller.popoutOf(w.id))
         .map((w) => (
           <PopoutPortal key={w.id} target={controller.popoutOf(w.id)!} title={titleOf(w)} onClosed={() => controller.dockBack(w.id)}>
-            <div className="popout-frame">
+            <div className="popout-frame" data-widget-id={w.id}>
               <TitleBar win={w} controller={controller} popped />
               <div className="frame-body">
                 <FrameBody win={w} controller={controller} />
@@ -204,6 +204,7 @@ const CanvasFrame = memo(function CanvasFrame({ win, controller, locked, live, s
       className={maxBox ? "frame maximized" : live ? "frame moving" : "frame"}
       style={{ left: box.x, top: box.y, width: box.w, height: box.h, zIndex: maxBox ? 100000 : win.z }}
       aria-label={titleOf(win)}
+      data-widget-id={win.id}
       onPointerDownCapture={() => controller.focusWindow(win.id)}
     >
       <TitleBar
@@ -227,7 +228,7 @@ const CanvasFrame = memo(function CanvasFrame({ win, controller, locked, live, s
 /** The widget itself: kept apart so moving the window doesn't redraw it. */
 const FrameBody = memo(function FrameBody({ win, controller }: { win: CanvasWindow; controller: WorkspaceController }) {
   const update = useCallback((next: BaseParams) => controller.setWindowParams(win.id, next as CanvasWindow["params"]), [controller, win.id]);
-  return <WidgetBody kind={win.kind} params={win.params} update={update} />;
+  return <WidgetBody id={win.id} kind={win.kind} params={win.params} update={update} />;
 }, (a, b) => a.win.params === b.win.params && a.win.kind === b.win.kind && a.win.id === b.win.id && a.controller === b.controller);
 
 interface TitleBarProps {

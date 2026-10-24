@@ -3,6 +3,7 @@
 // Widgets never reach into the workspace: that keeps them movable to their own window later.
 
 import type { FunctionComponent } from "react";
+import type { MenuItem } from "../components/ContextMenu";
 import type { LinkGroup } from "./links";
 
 export interface BaseParams {
@@ -30,6 +31,14 @@ export interface WidgetProps<P extends BaseParams = BaseParams> {
  */
 export type LinkRole = "follows" | "drives" | "none";
 
+/** What a widget's own right-click items can do (#412). */
+export interface MenuActions<P extends BaseParams = BaseParams> {
+  /** Change this widget's saved settings. */
+  setParams: (change: Partial<P>) => void;
+  /** Open another widget beside this one. */
+  open: (kind: string, params: Partial<BaseParams> & Record<string, unknown>) => void;
+}
+
 export interface WidgetDef<P extends BaseParams = BaseParams> {
   kind: string;
   title: string; // shown in the Widgets menu and the tab
@@ -42,6 +51,8 @@ export interface WidgetDef<P extends BaseParams = BaseParams> {
   size?: { width?: number; height?: number };
   /** Offered in Widgets ▾ only to users with one of these roles (the server checks too). */
   roles?: string[];
+  /** The widget's own items at the top of its right-click menu (e.g. a ladder's lots). */
+  menu?: (params: P, act: MenuActions<P>) => MenuItem[];
 }
 
 const widgets = new Map<string, WidgetDef<BaseParams>>();

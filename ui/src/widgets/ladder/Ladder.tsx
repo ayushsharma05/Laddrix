@@ -19,6 +19,7 @@ import { SearchBox } from "../../components/SearchBox";
 import { change, price, qty as fmtQty, rupees, shortName, shortVolume } from "../../lib/format";
 import { cancelBlock, tradingBlock } from "../../state/gate";
 import type { Message } from "../../state/store";
+import type { MenuItem } from "../../components/ContextMenu";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
 import {
   buildOrder,
@@ -563,4 +564,13 @@ registerWidget<LadderParams>({
   link: "follows",
   tabTitle: (p) => (p.instrumentId ? shortName(p.instrumentId) : undefined),
   size: { width: 470 },
+  menu: (p, act) => [
+    { label: "Lots per click", items: LOT_PRESETS.map((n) => ({ label: String(n), checked: p.lots === n, onSelect: () => act.setParams({ lots: n }) })) },
+    { label: "Confirm orders over", items: confirmItems(p.confirmOverPaise, (v) => act.setParams({ confirmOverPaise: v })) },
+  ],
 });
+
+/** "Confirm orders over" as right-click items (the ladder and the ticket share them). */
+export function confirmItems(now: number, pick: (paise: number) => void): MenuItem[] {
+  return CONFIRM_CHOICES.map(([v, label]) => ({ label, checked: now === v, onSelect: () => pick(v) }));
+}
