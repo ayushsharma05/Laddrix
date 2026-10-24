@@ -155,6 +155,12 @@ describe("the Autospreader", () => {
     expect(open).toHaveBeenCalledWith("ladder", { instrumentId: "SPREAD:s1", link: "none" });
   });
 
+  it("opens a spread's chart from its row (#429)", async () => {
+    const { open } = setup([CAL]);
+    fireEvent.click(await screen.findByRole("button", { name: "Chart" }));
+    expect(open).toHaveBeenCalledWith("chart", { instrumentId: "SPREAD:s1", link: "none" });
+  });
+
   it("opens a spread to edit from its row", async () => {
     const { setParams } = setup([CAL]);
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));

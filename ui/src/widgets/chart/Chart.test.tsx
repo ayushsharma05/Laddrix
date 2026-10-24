@@ -4,7 +4,8 @@ import { Rest } from "../../api/rest";
 import { AppProvider, createApp } from "../../app/context";
 import { fakeRest, fakeStream } from "../../test/fakes";
 import { ME } from "../../test/fixtures";
-import { Chart, resetChartSpec } from "./Chart";
+import { widget } from "../../workspace/registry";
+import { Chart, resetChartSpec, type ChartParams } from "./Chart";
 import { candle } from "./testdata";
 
 const FUT = "NFO:NIFTY26OCTFUT";
@@ -240,6 +241,38 @@ describe("Chart", () => {
   it("history the server couldn't get is said, and a missing contract asks for one", async () => {
     setup({ [`GET /api/charts/${ENC}/candles?interval=5m`]: { ...TODAY, note: "Kite history: TokenException" } });
     expect((await screen.findByText("history unavailable")).getAttribute("title")).toBe("Kite history: TokenException");
+  });
+
+  it("a spread's chart says it is a mark from its legs, and how many gaps (#429)", async () => {
+    const label = "spread mark from leg prices, not traded prices; gaps where a leg had no data";
+    setup({ [`GET /api/charts/${ENC}/candles?interval=5m`]: { ...TODAY, kind: "spread mark", label, gaps: 2 } });
+    const note = await screen.findByRole("note");
+    expect(note.textContent).toBe("spread mark, not traded prices · 2 gaps");
+    expect(note.getAttribute("title")).toBe(label);
+  });
+
+  it("a spread's chart is titled with the spread's name, not its id (#429)", async () => {
+    const SP = "SPREAD:sp1";
+    const enc = encodeURIComponent(SP);
+    const { setParams } = setup(
+      {
+        [`GET /api/instruments/${enc}`]: { ...NIFTY, id: SP, exchange: "SPREAD", symbol: "NIFTY Oct/Nov", kind: "SPREAD" },
+        [`GET /api/charts/${enc}/candles?interval=5m`]: { ...TODAY, instrument_id: SP, kind: "spread mark", label: "spread mark", gaps: 0 },
+        [`GET /api/charts/${enc}/candles`]: { ...OLDER, candles: [] },
+        [`GET /api/accounts/acc-a/charts/${enc}/marks`]: { account_id: "acc-a", instrument_id: SP, marks: [] },
+      },
+      { instrumentId: SP, label: "old name" }, // renamed since the window was saved
+    );
+    await vi.waitFor(() => expect(setParams).toHaveBeenCalledWith({ label: "NIFTY Oct/Nov" }));
+    const title = widget("chart")!.tabTitle!;
+    expect(title({ link: "none", instrumentId: SP, interval: "5m", label: "NIFTY Oct/Nov" } as ChartParams)).toBe("NIFTY Oct/Nov 5m");
+    expect(title({ link: "none", instrumentId: FUT, interval: "5m", label: "stale" } as ChartParams)).toBe("NIFTY26OCTFUT 5m"); // only a spread's
+  });
+
+  it("a contract's chart keeps its own title: no label is set", async () => {
+    const { setParams } = setup({}, { label: "stale" }); // only a spread's name is kept
+    await vi.waitFor(() => expect(readout().textContent).toContain("C 25,015.00"));
+    expect(setParams.mock.calls.filter(([p]) => "label" in (p as object))).toEqual([]);
   });
 
   it("without a contract, a search to pick one", () => {

@@ -19,10 +19,12 @@ import { SearchBox } from "../../components/SearchBox";
 import { clock, price, shortName, shortVolume } from "../../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
 import { AXIS_W, drawChart, priceAtY, readColours } from "./draw";
+import { isSpread } from "../ladder/model";
 import { DEFAULT_VIEW, indexAt, indiaParts, marksByCandle, mergeForming, mergeOlder, needsOlder, pan, snapTick, visible, zoom, type View } from "./model";
 
 export interface ChartParams extends BaseParams {
   interval?: string;
+  label?: string; // a spread chart's title: the spread's name (its id says nothing)
 }
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -46,11 +48,16 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
   const theme = useTheme(); // a switch redraws the canvas with the new colours
   const { rest, stream, links } = useApp();
   const instrument = useInstrument(id);
+  // a spread's chart (#429): the window shows the spread's name, kept in step when it is renamed
+  const name = isSpread(id) ? instrument?.symbol : undefined;
+  useEffect(() => {
+    if (name && params.label !== name) setParams({ label: name });
+  }, [name, params.label, setParams]);
   const accountId = useStore((s) => s.accountId);
   const turnover = useStore((s) => (s.accountId ? (s.books[s.accountId]?.charges?.turnover_paise ?? 0) : 0)); // changes with every fill
   const [spec, setSpec] = useState<ChartSpec | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
-  const [answer, setAnswer] = useState<Pick<CandlesAnswer, "live_from" | "note"> | null>(null);
+  const [answer, setAnswer] = useState<Pick<CandlesAnswer, "live_from" | "note" | "label" | "gaps"> | null>(null);
   const [marks, setMarks] = useState<ChartMark[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>(DEFAULT_VIEW);
@@ -95,7 +102,7 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
         if (!live) return;
         setCandles((now) => mergeOlder(a.candles, now)); // a stream candle may have come first
         setOlderState("idle");
-        setAnswer({ live_from: a.live_from, note: a.note });
+        setAnswer({ live_from: a.live_from, note: a.note, label: a.label, gaps: a.gaps });
         setError(null);
       })
       .catch((e: unknown) => live && setError(errorText(e)));
@@ -253,6 +260,11 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
           )}
         </span>
         <span className="book-spacer" />
+        {answer?.label && (
+          <span className="dim" role="note" title={answer.label}>
+            spread mark, not traded prices{answer.gaps ? ` · ${answer.gaps} gaps` : ""}
+          </span>
+        )}
         {answer?.note && (
           <span className="tone-bad" title={answer.note}>
             history unavailable
@@ -303,7 +315,7 @@ registerWidget<ChartParams>({
   component: Chart,
   defaults: () => ({ link: "pink", interval: "5m" }),
   link: "follows",
-  tabTitle: (p) => (p.instrumentId ? `${shortName(p.instrumentId)} ${p.interval ?? ""}` : undefined),
+  tabTitle: (p) => (p.instrumentId ? `${isSpread(p.instrumentId) && p.label ? p.label : shortName(p.instrumentId)} ${p.interval ?? ""}` : undefined),
 });
 
 /** Forget the cached spec (tests). */

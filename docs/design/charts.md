@@ -92,6 +92,11 @@ Checks:
   - a drag panning back 5 minutes;
   - no page errors.
 
+**A spread's chart (#429).** A spread (`SPREAD:…`) charts too: its candles are worked out
+from its legs' candles, with gaps where a leg had none and high/low only approximate, and the
+chart says "spread mark, not traded prices". See
+[spreads.md](spreads.md#7-spread-charts-429).
+
 
 ## K12.3 Market alerts and webhooks (#233)
 

@@ -76,6 +76,7 @@ export function Autospreader({ params, setParams, open }: WidgetProps<Autospread
           <SpreadList
             spreads={spreads}
             onLadder={(s) => open("ladder", { instrumentId: s.instrument_id, link: "none" })}
+            onChart={(s) => open("chart", { instrumentId: s.instrument_id, link: "none" })}
             onEdit={(s) => setParams({ mode: "edit", spreadId: s.spread_id })}
             onGone={(id) => setSpreads((l) => (l ?? []).filter((s) => s.spread_id !== id))}
           />
@@ -97,7 +98,19 @@ export function Autospreader({ params, setParams, open }: WidgetProps<Autospread
   );
 }
 
-function SpreadList({ spreads, onLadder, onEdit, onGone }: { spreads: Spread[]; onLadder: (s: Spread) => void; onEdit: (s: Spread) => void; onGone: (id: string) => void }) {
+function SpreadList({
+  spreads,
+  onLadder,
+  onChart,
+  onEdit,
+  onGone,
+}: {
+  spreads: Spread[];
+  onLadder: (s: Spread) => void;
+  onChart: (s: Spread) => void;
+  onEdit: (s: Spread) => void;
+  onGone: (id: string) => void;
+}) {
   const { rest } = useApp();
   const [armed, setArmed] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -131,6 +144,9 @@ function SpreadList({ spreads, onLadder, onEdit, onGone }: { spreads: Spread[]; 
             <span className="alert-actions">
               <button type="button" className="btn small" title="Trade it: a ladder of its implied prices" onClick={() => onLadder(s)}>
                 Ladder
+              </button>
+              <button type="button" className="btn small" title="Its history: candles of its mark from its legs" onClick={() => onChart(s)}>
+                Chart
               </button>
               <button type="button" className="btn small" onClick={() => onEdit(s)}>
                 Edit

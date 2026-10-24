@@ -47,9 +47,10 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   3. #426 algos survive a restart (reconcile first, come back paused, hedges kept): merged
      (PR #432);
   4. #427 several quoting legs at once: merged (PR #433);
-  5. #428 structure positions (spreads held, their P&L, the unallocated rest): in its PR;
-  6. #429 spread charts (history from the legs, gaps shown).
-- **Pull requests:** the #428 PR.
+  5. #428 structure positions (spreads held, their P&L, the unallocated rest): merged (PR #434);
+  6. #429 spread charts (candles of the spread's mark from its legs, gaps shown): in its PR.
+  With #429, nothing is left in #250/#251.
+- **Pull requests:** the #429 PR.
 
 ## What's next
 
