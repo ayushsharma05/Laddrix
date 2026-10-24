@@ -1898,7 +1898,7 @@ label.algo-field {
 
 .ase-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) 120px 120px 170px;
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) 120px 120px 230px;
   align-items: center;
 }
 .ase-form {
@@ -1923,4 +1923,9 @@ label.algo-field {
 .ase-problems {
   margin: 6px 0;
   padding-left: 18px;
+}
+.ladder-spread-note {
+  font-size: 11px;
+  color: var(--text-2);
+  line-height: 1.3;
 }

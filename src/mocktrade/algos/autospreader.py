@@ -260,8 +260,12 @@ class AutoSpreader(BaseStrategy):
             verb = "bought" if side is Side.BUY else "sold"
             done.append(f"{_symbol(leg.instrument_id)} {verb} {filled}")
         short = self._short(ctx)
+        per_lot = abs(self.q.ratio) * ctx.instrument().lot_size  # of Q in one spread lot
         ctx.report(
             spread_name=self.spread.name,
+            # in spread lots, for the spread ladder (#416): all, and those whose quote filled
+            lots=ctx.qty // per_lot,
+            lots_done=ctx.filled(ctx.instrument_id, ctx.side) // per_lot,
             spread_side="BUY" if self.buying else "SELL",
             level_paise=self.level,
             legs=" · ".join(done),

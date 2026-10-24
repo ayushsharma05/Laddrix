@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/rest";
-import type { Instrument, OrderView, Side, Tick } from "../../api/types";
+import type { AlgoView, Instrument, OrderView, Side, Tick } from "../../api/types";
 import { useApp, useInstrument, useKeyAction, useOrderSpec, useStore } from "../../app/context";
 import { ExpiryNote } from "../../components/ExpiryBadge";
 import { SearchBox } from "../../components/SearchBox";
@@ -24,6 +24,7 @@ import { registerWidget, type BaseParams, type WidgetProps } from "../../workspa
 import {
   buildOrder,
   buildRows,
+  isSpread,
   needsRecentre,
   orderValue,
   priceOf,
@@ -31,6 +32,8 @@ import {
   QueueTracker,
   rowPrices,
   snap,
+  SPREAD_PREFIX,
+  spreadWorking,
   unconfirmed,
   VapCounter,
   workingOrders,
@@ -83,12 +86,16 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
   const { rest, stream, store } = app;
   const id = instrument.id;
   const tickSize = instrument.tick_paise;
+  // a spread ladder (#416): its prices are the spread's implied ones; a click starts the ASE
+  // algo; the Work column shows those algos. The server works out every leg.
+  const spread = isSpread(id);
 
   // --- which account ------------------------------------------------------------------------
   const me = useStore((s) => s.me);
   const globalAccount = useStore((s) => s.accountId);
   const accountId = params.accountId && me?.accounts.some((a) => a.id === params.accountId) ? params.accountId : globalAccount;
   const orders = useStore((s) => (accountId ? s.books[accountId]?.orders : undefined));
+  const algos = useStore((s) => (accountId ? s.books[accountId]?.algos : undefined));
   const positions = useStore((s) => (accountId ? s.books[accountId]?.positions : undefined));
   const blocked = useStore((s) => tradingBlock(s, accountId));
   const messages = useStore((s) => s.messages);
@@ -112,8 +119,9 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
     });
   }, [stream, store, id, accountId, queue, vap]);
 
-  // the day's volume at price from the server, again after every reconnect
+  // the day's volume at price from the server, again after every reconnect (a spread has none)
   useEffect(() => {
+    if (spread) return;
     let live = true;
     const load = () => {
       rest
@@ -133,7 +141,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
       live = false;
       stop();
     };
-  }, [rest, stream, id, vap]);
+  }, [rest, stream, id, vap, spread]);
 
   // --- rows and centring ------------------------------------------------------------------------
   const gridRef = useRef<HTMLDivElement>(null);
@@ -157,7 +165,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
     if (centre === null || (auto && needsRecentre(centre, ltp, rowCount, tickSize))) setCentre(snap(ltp, tickSize));
   }, [ltp, centre, auto, rowCount, tickSize]);
 
-  const working = useMemo(() => workingOrders(orders ?? {}, id), [orders, id]);
+  const working = useMemo(() => (spread ? spreadWorking(algos ?? {}, id) : workingOrders(orders ?? {}, id)), [spread, algos, orders, id]);
   const rows = useMemo(
     () =>
       centre === null ? [] : buildRows({ prices: rowPrices(centre, rowCount, tickSize), tick, working, queue, vap }),
@@ -183,7 +191,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
 
   // --- the trading actions -----------------------------------------------------------------------
   // what a click can place, from the server's order spec (nothing hard-coded here)
-  const spec = useOrderSpec(accountId, id);
+  const spec = useOrderSpec(accountId, spread ? undefined : id); // a spread's legs are the server's
   const types = clickTypes(spec);
   const orderType = types.find((t) => t.code === params.type || t.label === params.type) ?? types[0] ?? null;
   const tifs = orderType?.validities ?? [];
@@ -199,6 +207,24 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
     if (selected !== null && !working.some((o) => priceOf(o) === selected)) setSelected(null);
   }, [selected, working]);
 
+  /** A spread: buy or sell `lots` spread lots at `at` (the ASE algo quotes and hedges). */
+  const sendSpread = useCallback(
+    (side: Side, at: number, lotsNow: number) => {
+      if (!accountId) return;
+      const what = `${side === "BUY" ? "Buy" : "Sell"} ${lotsNow} ${instrument.symbol} @ ${price(at)}`;
+      info(`${what} sent`);
+      rest
+        .post<AlgoView>(`/api/accounts/${encodeURIComponent(accountId)}/spreads/${encodeURIComponent(id.slice(SPREAD_PREFIX.length))}/orders`, {
+          side,
+          lots: lotsNow,
+          price_paise: at,
+        })
+        .then((view) => store.applyAlgos(accountId, [view]))
+        .catch((e: unknown) => warn(`${what} refused: ${e instanceof Error ? e.message : String(e)}`));
+    },
+    [accountId, instrument.symbol, id, rest, store, info, warn],
+  );
+
   const send = useCallback(
     (side: Side, at: number, ctrl: boolean) => {
       const state = store.getState();
@@ -206,6 +232,12 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
       if (why) return warn(`not sent: ${why}`);
       if (!accountId) return;
       if (!instrument.tradable) return warn(`not sent: ${instrument.symbol} can't be traded`);
+      if (spread) {
+        if (lots <= 0) return warn("not sent: quantity is 0, click a lot button first");
+        const best = side === "BUY" ? tick?.bids.find((l) => l[1] > 0)?.[0] : tick?.asks.find((l) => l[1] > 0)?.[0];
+        if (ctrl && best === undefined) return warn("not sent: no best price to join");
+        return sendSpread(side, ctrl ? best! : at, lots);
+      }
       if (!orderType || !product) return warn("not sent: what can be ordered here hasn't loaded yet");
       if (lots <= 0) return warn("not sent: quantity is 0, click a lot button first");
       if (unconfirmed(state.books[accountId]?.orders ?? {}, id).length) {
@@ -244,7 +276,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
           }
         });
     },
-    [store, accountId, warn, info, instrument, lots, id, tick, orderType, tif, params.confirmOverPaise, product, ltp, armed, queue, rest],
+    [store, accountId, warn, info, instrument, lots, id, tick, orderType, tif, params.confirmOverPaise, product, ltp, armed, queue, rest, spread, sendSpread],
   );
 
   const cancelOrders = useCallback(
@@ -253,6 +285,16 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
       if (why) return warn(`not cancelled: ${why}`);
       if (!accountId || !list.length) return;
       info(`Cancelling ${label}`);
+      if (spread) {
+        // each is an ASE algo: stopping it pulls its quote (its hedges still finish)
+        for (const o of list) {
+          rest
+            .post<AlgoView>(`/api/accounts/${encodeURIComponent(accountId)}/algos/${o.request.client_order_id}/stop`, {})
+            .then((view) => store.applyAlgos(accountId, [view]))
+            .catch((e: unknown) => warn(`cancel ${o.request.client_order_id}: ${e instanceof Error ? e.message : String(e)}`));
+        }
+        return;
+      }
       for (const o of list) {
         rest
           .delete<OrderView>(`/api/accounts/${encodeURIComponent(accountId)}/orders/${o.request.client_order_id}`)
@@ -260,7 +302,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
           .catch((e: unknown) => warn(`cancel ${o.request.client_order_id}: ${e instanceof Error ? e.message : String(e)}`));
       }
     },
-    [store, accountId, rest, info, warn],
+    [store, accountId, rest, info, warn, spread],
   );
 
   const moveOrders = useCallback(
@@ -271,6 +313,20 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
       const list = working.filter((o) => priceOf(o) === from && o.pending === "NONE");
       if (!list.length) return warn("nothing to move: those orders are being cancelled or checked");
       info(`Moving ${list.length} order(s) ${price(from)} → ${price(to)} (back of the queue)`);
+      if (spread) {
+        // an algo's level doesn't change in place: stop it, then start the rest at the new price
+        for (const o of list) {
+          const rest_lots = o.request.qty - o.filled_qty;
+          rest
+            .post<AlgoView>(`/api/accounts/${encodeURIComponent(accountId)}/algos/${o.request.client_order_id}/stop`, {})
+            .then((view) => {
+              store.applyAlgos(accountId, [view]);
+              sendSpread(o.request.side, to, rest_lots);
+            })
+            .catch((e: unknown) => warn(`move refused: ${e instanceof Error ? e.message : String(e)}`));
+        }
+        return;
+      }
       for (const o of list) {
         rest
           .patch<OrderView>(`/api/accounts/${encodeURIComponent(accountId)}/orders/${o.request.client_order_id}`, {
@@ -280,7 +336,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
           .catch((e: unknown) => warn(`move refused: ${e instanceof Error ? e.message : String(e)}`));
       }
     },
-    [store, accountId, rest, working, info, warn],
+    [store, accountId, rest, working, info, warn, spread, sendSpread],
   );
 
   const workClick = (at: number) => {
@@ -360,8 +416,8 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
         <span className="ladder-spacer" />
         <div className="ladder-pos" aria-label="Position and P&L">
           <span className="dim">Pos</span>
-          <b className={pos.qty > 0 ? "buy-text" : pos.qty < 0 ? "sell-text" : ""}>
-            {pos.qty > 0 ? `+${fmtQty(pos.qty)}` : fmtQty(pos.qty)}
+          <b className={pos.qty > 0 ? "buy-text" : pos.qty < 0 ? "sell-text" : ""} title={spread ? "A spread's position is in its legs (Positions)" : undefined}>
+            {spread ? "–" : pos.qty > 0 ? `+${fmtQty(pos.qty)}` : fmtQty(pos.qty)}
           </b>
           <span className="dim">P&amp;L</span>
           <span className={pos.pnl > 0 ? "good" : pos.pnl < 0 ? "bad" : ""}>{rupees(pos.pnl, { sign: true })}</span>
@@ -385,45 +441,53 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
               ))}
             </select>
           </label>
-          <label>
-            Type
-            <select value={orderType?.code ?? ""} title={orderType?.help} onChange={(e) => setParams({ type: e.target.value })}>
-              {types.map((t) => (
-                <option key={t.code} value={t.code} title={t.help}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            TIF
-            <select value={tif} onChange={(e) => setParams({ tif: e.target.value })}>
-              {tifs.map((v) => (
-                <option key={v}>{v}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Prod
-            <select value={product} onChange={(e) => setParams({ product: e.target.value })}>
-              {products.map((p) => (
-                <option key={p}>{p}</option>
-              ))}
-            </select>
-          </label>
-          <label title="Orders worth more than this need a second click">
-            Cfm
-            <select
-              value={params.confirmOverPaise ?? 0}
-              onChange={(e) => setParams({ confirmOverPaise: Number(e.target.value) })}
-            >
-              {CONFIRM_CHOICES.map(([v, label]) => (
-                <option key={v} value={v}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {spread ? (
+            <span className="ladder-spread-note" title="Buying the spread buys its + legs and sells its − legs; the Autospreader quotes one leg and hedges the others">
+              Spread: the server trades each leg
+            </span>
+          ) : (
+            <>
+            <label>
+              Type
+              <select value={orderType?.code ?? ""} title={orderType?.help} onChange={(e) => setParams({ type: e.target.value })}>
+                {types.map((t) => (
+                  <option key={t.code} value={t.code} title={t.help}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              TIF
+              <select value={tif} onChange={(e) => setParams({ tif: e.target.value })}>
+                {tifs.map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Prod
+              <select value={product} onChange={(e) => setParams({ product: e.target.value })}>
+                {products.map((p) => (
+                  <option key={p}>{p}</option>
+                ))}
+              </select>
+            </label>
+            <label title="Orders worth more than this need a second click">
+              Cfm
+              <select
+                value={params.confirmOverPaise ?? 0}
+                onChange={(e) => setParams({ confirmOverPaise: Number(e.target.value) })}
+              >
+                {CONFIRM_CHOICES.map(([v, label]) => (
+                  <option key={v} value={v}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            </>
+          )}
           <span className="ladder-side-label">Lots</span>
           <output
             className="ladder-lots"
@@ -433,7 +497,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
           >
             {lots}
           </output>
-          <span className="ladder-qty">= {fmtQty(lots * instrument.lot_size)} qty</span>
+          <span className="ladder-qty">{spread ? `spread lot${lots === 1 ? "" : "s"}` : `= ${fmtQty(lots * instrument.lot_size)} qty`}</span>
           <div className="ladder-presets">
             {LOT_PRESETS.map((n) => (
               <button key={n} type="button" onClick={() => setParams({ lots: lots + n })}>
@@ -545,7 +609,12 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
       <div className="ladder-status" role="status">
         <span className={`dot ${status?.level ?? "INFO"}`} />
         <span className="text" title={blocked ?? status?.text}>
-          {blocked ? `Trading paused: ${blocked}` : (status?.text ?? "Bids = buy · Asks = sell · Work: select / again = cancel / other row = move")}
+          {blocked
+            ? `Trading paused: ${blocked}`
+            : (status?.text ??
+              (spread
+                ? "Bids = buy the spread · Asks = sell it · Work: select / again = cancel / other row = move"
+                : "Bids = buy · Asks = sell · Work: select / again = cancel / other row = move"))}
         </span>
         <span className="dim" title="Kite sends 5 levels of depth, about once a second">
           5 lvl · Wkg {fmtQty(workingQty)}
@@ -565,6 +634,10 @@ registerWidget<LadderParams>({
   tabTitle: (p) => (p.instrumentId ? shortName(p.instrumentId) : undefined),
   size: { width: 470 },
   menu: (p, act) => [
+    // a spread ladder (#416): its definition, in the Autospreader, ready to edit
+    ...(isSpread(p.instrumentId)
+      ? [{ label: "Autospreader settings…", onSelect: () => act.open("ase", { mode: "edit", spreadId: p.instrumentId!.slice(SPREAD_PREFIX.length) }) }, "separator" as const]
+      : []),
     { label: "Lots per click", items: LOT_PRESETS.map((n) => ({ label: String(n), checked: p.lots === n, onSelect: () => act.setParams({ lots: n }) })) },
     { label: "Confirm orders over", items: confirmItems(p.confirmOverPaise, (v) => act.setParams({ confirmOverPaise: v })) },
   ],
