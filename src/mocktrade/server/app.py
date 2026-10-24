@@ -102,6 +102,7 @@ from mocktrade.spreads.model import (
 from mocktrade.spreads.pricer import SpreadPricer
 from mocktrade.spreads.store import SpreadBook, SpreadError
 from mocktrade.store.events import StoredEvent
+from mocktrade.structures.book import StructureBook, StructureError, StructureLeg
 from mocktrade.version import BUILD, VERSION
 
 log = logging.getLogger(__name__)
@@ -377,6 +378,20 @@ class SpreadIn(_Strict):
     # how the Autospreader trades it (#425), checked in words against CONTROLS; None: defaults
     # on a new spread, unchanged on an edit
     controls: dict[str, Any] | None = None
+
+
+class StructureIn(_Strict):
+    spread_id: str = Field(min_length=1, max_length=40)  # its legs come from this spread
+    name: str | None = Field(default=None, max_length=200)  # None: the spread's name
+
+
+class AllocationIn(_Strict):
+    client_order_id: str = Field(min_length=1, max_length=40)
+    qty: int = Field(gt=0, le=10**7)
+
+
+class MoveIn(AllocationIn):
+    to: str = Field(min_length=1, max_length=40)  # the structure it moves to
 
 
 class ActionIn(_Strict):
@@ -1668,6 +1683,71 @@ def create_app(
         except AlgoError as exc:
             raise HTTPException(422, exc.reason) from None
         return algo_to_dict(view)
+
+    # --- structure positions (#428) ------------------------------------------------------------
+
+    def structures_of(account_id: str, user: User, *, trade: bool = False) -> StructureBook:
+        running = runtime(account_id, user, trade=trade)
+        if running.structures is None:
+            raise HTTPException(404, "this account has no structures")
+        return running.structures
+
+    def structure_call(fn: Callable[[], Any]) -> Any:
+        try:
+            return fn()
+        except StructureError as exc:
+            raise HTTPException(404 if exc.missing else 422, exc.reason) from None
+
+    @app.get("/api/accounts/{account_id}/structures")
+    async def list_structures(account_id: str, user: Me) -> dict[str, Any]:
+        """Each structure's spread lots, legs and P&L; what is unallocated per instrument; and
+        the fills not yet in a structure. Worked out on the server; the screens show it."""
+        book_ = structures_of(account_id, user)
+        return {"structures": book_.structures(), "unallocated": book_.unallocated(),
+                "free_fills": book_.free_fills()}  # fmt: skip
+
+    @app.post("/api/accounts/{account_id}/structures", status_code=201)
+    async def create_structure(account_id: str, body: StructureIn, user: Me) -> dict[str, Any]:
+        book_ = structures_of(account_id, user, trade=True)
+        spread = book.visible(user, PREFIX + body.spread_id)
+        if spread is None:
+            raise HTTPException(404, f"no spread {body.spread_id}")
+        legs = [StructureLeg(g.instrument_id, g.ratio, g.multiplier) for g in spread.legs]
+        made = structure_call(lambda: book_.create(body.name or spread.name, legs, user.id,
+                                                   spread.spread_id))  # fmt: skip
+        return book_.get(made.structure_id)
+
+    @app.delete("/api/accounts/{account_id}/structures/{structure_id}", status_code=204)
+    async def delete_structure(account_id: str, structure_id: str, user: Me) -> None:
+        book_ = structures_of(account_id, user, trade=True)
+        structure_call(lambda: book_.delete(structure_id, user.id))
+
+    @app.post("/api/accounts/{account_id}/structures/{structure_id}/allocations")
+    async def allocate_fill(
+        account_id: str, structure_id: str, body: AllocationIn, user: Me
+    ) -> dict[str, Any]:
+        book_ = structures_of(account_id, user, trade=True)
+        structure_call(lambda: book_.allocate(structure_id, body.client_order_id, body.qty,
+                                              user.id))  # fmt: skip
+        return book_.get(structure_id)
+
+    @app.post("/api/accounts/{account_id}/structures/{structure_id}/allocations/remove")
+    async def remove_fill(
+        account_id: str, structure_id: str, body: AllocationIn, user: Me
+    ) -> dict[str, Any]:
+        book_ = structures_of(account_id, user, trade=True)
+        structure_call(lambda: book_.remove(structure_id, body.client_order_id, body.qty,
+                                            user.id))  # fmt: skip
+        return book_.get(structure_id)
+
+    @app.post("/api/accounts/{account_id}/structures/{structure_id}/move")
+    async def move_fill(
+        account_id: str, structure_id: str, body: MoveIn, user: Me
+    ) -> dict[str, Any]:
+        book_ = structures_of(account_id, user, trade=True)
+        structure_call(lambda: book_.move(structure_id, body.to, body.client_order_id,
+                                          body.qty, user.id))  # fmt: skip
+        return {"from": book_.get(structure_id), "to": book_.get(body.to)}
 
     @app.get("/api/accounts/{account_id}/algos/{algo_id}/actions/{name}")
     async def preview_algo_action(

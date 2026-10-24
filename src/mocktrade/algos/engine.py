@@ -711,6 +711,11 @@ class AlgoEngine:
             self._call(p, lambda ctx: p.strategy.on_resume(ctx))
         return self._view(p)
 
+    def spread_of(self, algo_id: str) -> Any:
+        """The spread an algo works (an Autospreader's copy), or None (#428)."""
+        p = self._parents.get(algo_id)
+        return getattr(p.strategy, "spread", None) if p is not None else None
+
     def preview(self, algo_id: str, name: str) -> ActionPreview:
         """What one of the algo's own actions would do now (#425)."""
         p = self._live(algo_id)

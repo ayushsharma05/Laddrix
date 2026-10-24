@@ -60,6 +60,8 @@ from mocktrade.risk.squareoff import SquareOff
 from mocktrade.risk.surveillance import Surveillance
 from mocktrade.risk.throttle import OrderThrottle
 from mocktrade.store.events import EventLog
+from mocktrade.structures.book import NOTES as STRUCTURE_NOTES
+from mocktrade.structures.book import StructureBook
 
 
 def unknown_size(reconciler: PositionReconciler) -> Callable[[str, Product], str | None]:
@@ -118,6 +120,7 @@ class AccountRuntime:
     trade_check: TradeCheck | None = None  # orders against the broker's trade list (#352)
     external: ExternalTrades | None = None  # trades made outside MockTrade (#355)
     session_day: date | None = None  # the trading day its positions and limits are for (#266)
+    structures: StructureBook | None = None  # spreads held: fills allocated to them (#428)
 
     def apply_limits(self, limits: RiskLimits) -> None:
         """An admin's new limits, from the next order on. Everything that copied a limit at
@@ -381,6 +384,27 @@ class Platform:
             note=lambda k, d, x: log_.record_note(k, account_id, d, x),
             adopted_ids=adopted_ids, recheck=reconciler.check,
         )  # fmt: skip
+
+    def _structures(self, account_id: str, orders, book: PositionBook,
+                    algos: AlgoEngine) -> StructureBook:  # fmt: skip
+        """The account's structure positions (#428): an Autospreader's fills go to its spread's
+        structure; every change is a note in the audit trail, read back here at start."""
+        log_ = self.event_log
+        note = None if log_ is None else (lambda k, d, x: log_.record_note(k, account_id, d, x))
+
+        def lot(instrument_id: str) -> int:
+            found = self.instruments.get(instrument_id)
+            return found.lot_size if found is not None else 1
+
+        structures = StructureBook(
+            account_id, order=orders.get, orders=orders.orders, net_qty=book.net_qty,
+            lot_size=lot, ltp=lambda i: self.last_price(i, account_id),
+            spread_of=algos.spread_of, note=note,
+        )  # fmt: skip
+        if log_ is not None:
+            structures.load(log_.notes(account_id, list(STRUCTURE_NOTES)))
+        orders.subscribe(structures.on_order_event)
+        return structures
 
     def last_price(self, instrument_id: str, account_id: str | None = None) -> int | None:
         """The last traded price, from this account's own prices (#395)."""
@@ -841,6 +865,7 @@ class Platform:
             external=self._external(account.id, book, broker, reconciler, portfolio),
         )
         self.accounts[account.id] = runtime
+        runtime.structures = self._structures(account.id, orders, book, algos)
         runtime.session_day = clock().astimezone(IST).date()  # a start rebuilds today (recovery)
         runtime.set_active(account.active)
         self._start_late(runtime)
