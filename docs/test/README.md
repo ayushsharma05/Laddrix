@@ -6,13 +6,13 @@ What each layer of checks proves, how to run it, and what must pass before a rel
 
 | Layer | What it proves | How to run | Runs in CI |
 |---|---|---|---|
-| **Python tests** (`tests/`, about 1,150) | Each part's rules on its own and wired together: domain rules, the order manager, risk, recovery, the paper and Kite adapters (against a fake Kite), the REST API, backups | `pytest` (all), `pytest tests/test_x.py -k name` | yes (`test`) |
-| **UI tests** (`ui/src/**/*.test.ts(x)`, about 390) | Widgets and models: what the screen shows for given data, what a click sends, keyboard shortcuts, themes and contrast | `cd ui && npm test` | yes (`ui`) |
+| **Python tests** (`tests/`, about 1,450) | Each part's rules on its own and wired together: domain rules, the order manager, risk, recovery, the paper and Kite adapters (against a fake Kite), the REST API, backups | `pytest` (all), `pytest tests/test_x.py -k name` | yes (`test`) |
+| **UI tests** (`ui/src/**/*.test.ts(x)`, about 420) | Widgets and models: what the screen shows for given data, what a click sends, keyboard shortcuts, themes and contrast | `cd ui && npm test` | yes (`ui`) |
 | **Lint, format, types** | Style, and types across the UI | `ruff check .` · `ruff format --check .` · `cd ui && npm run typecheck` | yes |
 | **Build and image** | The UI builds; the Docker image builds and passes its smoke test (health, a clean stop) | `cd ui && npm run build` · `deploy/smoke.sh` | yes (`ui`, `image`) |
 | **Desktop shell** | The desktop app's pop-out windows | `cd ui/desktop && npm test` | yes (`desktop`) |
-| **Mutation scripts** (`mutate-*.py`, 38) | That the tests notice when a rule is broken. Each breaks one rule at a time, runs the tests and restores the file; a surviving mutant is a missing test | `python3 context/scripts/mutate-<area>.py` (alone) | no: run for each change in its area |
-| **Browser checks** (`e2e-*.cjs`, 28) | The real screens in Chromium against the demo: clicks, bands, pop-outs, screenshots | `python3 -m mocktrade.tools.demo --ui ui/dist`, then `node context/scripts/e2e-<area>.cjs` | no: run for each UI change in its area |
+| **Mutation scripts** (`mutate-*.py`, 60+) | That the tests notice when a rule is broken. Each breaks one rule at a time, runs the tests and restores the file; a surviving mutant is a missing test | `python3 context/scripts/mutate-<area>.py` (alone) | no: run for each change in its area |
+| **Browser checks** (`e2e-*.cjs`, 34) | The real screens in Chromium against the demo: clicks, bands, pop-outs, screenshots | `python3 -m mocktrade.tools.demo --ui ui/dist`, then `node context/scripts/e2e-<area>.cjs` | no: run for each UI change in its area |
 | **Demo checks** (`check-*.py`) | A feature end to end over the real API on the demo | `python3 context/scripts/check-<area>.py` | no |
 | **Drills** | What must survive a bad day: a crash (`drill-restart.py`, plus `e2e-restart-bands.cjs`) and a backup restored into a fresh folder (`drill-backup-restore.py`) | each runs its own demo | no: before a release |
 | **Go-live, paper** | Every go-live step that can be shown on paper (`golive-paper.py`). Never evidence about Kite | `python3 context/scripts/golive-paper.py` | no: before a release |

@@ -6,7 +6,7 @@
 //      "Confirm it's you" dialog asks; a wrong code is said; the right code turns it on;
 //   3. a second browser signs in as the same user; Sessions lists both; the first ends the
 //      second, whose next request is refused (401).
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execSync, spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -28,7 +28,7 @@ const freshWindow = async () => {
   for (let i = 0; i < 60; i++) {
     try { execSync('curl -sf http://127.0.0.1:8766/api/health >/dev/null'); break; } catch { await sleep(500); }
   }
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   const results = [];
   const check = (ok, what) => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${what}`); };
   try {

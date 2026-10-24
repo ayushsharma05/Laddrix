@@ -43,7 +43,7 @@
 
 ## 9.3 How it was built, step by step
 
-![The build map](../../context/images/mocktrade-build-map.png)
+![The build map](../archive/history/mocktrade-build-map.png)
 
 Milestones K0 to K13 built the platform, piece by piece: foundations, live prices, the paper
 broker, orders and risk, positions, server and screens, algos, deployment, options, more order

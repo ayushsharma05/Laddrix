@@ -1,0 +1,30 @@
+# MockTrade documentation
+
+Everything about how MockTrade works, how to run it and where it is going. The code is in
+[`src/`](../src) (server) and [`ui/`](../ui) (screens); this folder explains it.
+
+## Start here
+
+| If you want to… | Read |
+| --- | --- |
+| run everything on your own computer, and test it | **[running-locally.md](running-locally.md)** |
+| understand the whole system from zero, with pictures | [the guide](guide/README.md) (nine chapters) or [GUIDE.md](GUIDE.md) (one page) |
+| read the code in a sensible order | [guide/reading-order.md](guide/reading-order.md) |
+| know what MockTrade is for and its rules | [design/product-vision.md](design/product-vision.md) |
+| see the architecture | [design/kite-architecture.md](design/kite-architecture.md) |
+
+## By kind
+
+| Folder | What is in it |
+| --- | --- |
+| [design/](design/README.md) | How each part is built and why: orders, risk, algos, options, charts, research, security, several firms on one server, performance |
+| [runbooks/](runbooks/README.md) | What the operator does: the morning, incidents, the server, releases, patching, go-live, hosting several firms |
+| [test/](test/README.md) | What each layer of checks proves, and what must pass before a release |
+| [roadmap/](roadmap/README.md) | Where it is going: the feature issues, and the research behind the later ones |
+| [releases/](releases/) | Release notes, one per version (and the [changelog](../CHANGELOG.md)) |
+| [adr/](adr/README.md) | Where decisions are recorded |
+| [archive/](archive/README.md) | The paused COMEX/CME track and project history: kept, not current |
+
+## Words
+
+New to a term? [design/glossary.md](design/glossary.md) explains each one in plain words.

@@ -30,7 +30,7 @@ rm -rf data/demo
 python3 -m mocktrade.tools.demo --ui ui/dist      # background; http://localhost:8000, demo / demo-password-123
 ```
 
-The scripts assume the cloud container's paths (`/home/user/MockTrade`, Playwright at `/opt/node22/lib/node_modules/playwright`, Chromium at `/opt/pw-browsers/chromium-1194`); adjust elsewhere. Stop the demo with `pkill -f "^python3 -m mocktrade.tools.demo"` (the `^` stops it matching the shell's own command line, which killed the shell twice).
+Run every script from the repo's root folder. The browser checks (`e2e-*.cjs`) need Playwright: run `npm install --no-save playwright` and `npx playwright install chromium` once, or point `PLAYWRIGHT_MODULE` at an installed copy and `CHROMIUM_PATH` at a Chromium (as in the cloud container: `PLAYWRIGHT_MODULE=/opt/node22/lib/node_modules/playwright CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`). See [docs/running-locally.md](../../docs/running-locally.md). Stop the demo with `pkill -f "^python3 -m mocktrade.tools.demo"` (the `^` stops it matching the shell's own command line, which killed the shell twice).
 
 TOTP codes work only once (replay protection) and 5 failures lock the user for 15 minutes:
 scripts must use a fresh code each login, and `python -m mocktrade.tools.demo --code` must run

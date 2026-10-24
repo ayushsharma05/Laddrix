@@ -1,207 +1,36 @@
-# MockTrade status and next steps
+# MockTrade status
 
-## Research backlog update — 16 Oct 2026
+As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full history up to
+23 Oct (every milestone's PRs and checks) is kept in
+[docs/archive/history/status-to-2026-10-23.md](../docs/archive/history/status-to-2026-10-23.md).
 
-Later-stage expansion #297 now tracks 25 detailed packages (#298–#322), linked from #241. See [feature-expansion-2026-10-16.md](feature-expansion-2026-10-16.md) for coverage, dependencies and evidence limits. This does not change active core priorities: complete #240, then hardening #257; retain security #279 and data decision #278. No application code changed. Decision-gated features need explicit approval before implementation. GitHub main already includes K13.2 via PR #296 at the inspected baseline; older handoff text below is historical and should be reconciled with live issues before continuing.
+## Where things are
 
+- **The platform:** complete for paper trading on NSE/BSE through Zerodha Kite. This covers
+  the terminal, orders, risk, algos, options, charts, alerts, research, reports, admin, the
+  desktop app and deployment.
+- **Hardening (#257) and security (#279):** every child issue is done. Live trading still waits
+  on the steps only Ayush can do: the go-live run, Zerodha's answers, and the independent
+  security review (#369).
+- **Several firms on one server (#368):** workspaces (#394), each trader's own prices (#395),
+  files and jobs per firm (#396), and the two-firm browser drill (#397).
+- **Bug issues:** none open. The last ones fixed:
+  - #271: webhooks connect only to the address they checked;
+  - #274: research and reports never hold up trading; a backtest's results no longer depend
+    on the machine;
+  - #277: honest labels for estimated data, and the combined fault drills.
+- **Pull requests:** none open.
 
-As of 16 Oct 2026 (India time). GitHub issues are the source of truth; the "Next" section below is the current plan.
+## What's next
 
-**Ayush's decisions (23 Oct, evening):** MockTrade **will be offered to other firms too** (#278, partly decided): multi-tenant isolation #368 is unblocked and needed before any other firm uses it; who pays for market data and what Zerodha allows stays open in #278. Go-live steps: later, by Ayush. Kite's algo-id field: not now. Independent security review #369: Ayush will arrange it before a public launch.
+1. **Ayush's to-do list** (one GitHub issue): the steps only he can do, in order.
+2. **The feature issues**, smallest dependency first:
+   - operations: #287;
+   - phone screens: #283;
+   - Post-v1: #242–#255;
+   - decisions: #292, #278;
+   - Later: #297–#322.
 
-**Ayush's instruction (16 Oct, evening):** he trusts Claude to finish everything that can be finished, then learn the project from a plain-language guide that Claude writes at the end. Don't stop to ask him things he can't yet judge; leave the steps only he can do (the live go-live run, his v1 acceptance on #240, the v1.0.0 tag) for that guide. The hardening gate #257 is in progress: #259 merged (PR #337); #260 merged (PR #338); #261 merged (PR #339); #262 merged (PR #340); #263 merged (PR #341). **Paused until Wed 21 Oct** at Ayush's request (to save weekly usage while he reads [docs/GUIDE.md](../docs/GUIDE.md)): #264 merged (PR #343). #265 merged (PR #346). #267 merged (PR #347). #270 merged (PR #348): all P0s of #257 done. Ayush (23 Oct) asked for the 9 issues that affect trading, in this order: #266 (done, PR #349), #290 (done, PR #350), #275 (done: PRs #353, #354), #276 (done: PRs #356, #357), #291 (done: PRs #358, #359), #268 (done: PR #360), #272 (done: PR #361), #273 (done: PR #362), #279 (security gate: first part PR open; children #363-#369; parent stays open until the evidence is reviewed). The 9 trading issues are done apart from #279's children. Done: #372 (IP per account, PR #373 merged); #366 (rights re-checked when delayed actions happen: PR #374 merged); #364 (key rotation, revoke sessions, credential playbook + drill: PR #375 merged); #363 (step-up for privileged changes + own session list: PR #376 merged); #365 (supply chain: PR #377 merged); #367 (data classes, logs without secrets, retention, export/erase, tamper-evident audit trail: PR #391 merged); #392 (Dependabot grouped, no majors: PR #393 merged). Next: #368 (multi-tenant) in steps: design `docs/design/tenancy.md` (PR #398), then #394 (368a workspaces + every check: PR open), #395 (368b prices per subscription: first half PR #401 merged; second half PR open), #396 (368c files and jobs), #397 (368d two-firm drill), #365, #367, #368 (multi-tenant), then #279's other children, the smaller #271, #274, #277, #287, decisions #278, #292, then #276 (depends on #275), #276, #291, #275, #268, #273, #272, #279; then the smaller #271, #274, #277, #287; decisions #278, #292; everything titled 'Later:' or 'Post-v1' is feature work.
+## How to run and test it
 
-**Current handoff:** K13 is done (#284 PR #325, #285 PR #326; #283 phone after v1). The core v1 gate #240 is split into #327 (merged, PR #331), #328 (merged, PR #332), #329 (merged, PR #333), #330 (merged, PR #334; its live boxes are Ayush's), #288 (merged, PR #335), #289 (release process: PR open), plus #288 docs and #289 release. Then the hardening gate #257 (#258–#277 plus #287, #290, #291; security #279; data discussion #278), then the post-v1 roadmap #241 (#242–#255, #283 phone, #292 decision). The historical table below records each original PR's checks.
-
-**Outside review (16 Oct).** While Claude's limit was used up, Ayush had another AI tool review the code and the design. It changed no code. It opened #240–#279 and the docs PR #256; that PR's notes are folded in here, and it was closed. Its findings separate behaviour confirmed in the source from design gaps. Two were reproduced in a throwaway folder:
-- reconciliation overwrote one product's position with another's (#258);
-- a candle path escaped its folder (#269, fixed).
-
-Each finding must be rechecked against the code before work starts, and fixed defects are not reopened without new evidence.
-
-Ladder (K5.4) as built: ![K5.4 ladder](images/k5-4-ladder.png)
-
-Order book, positions, audit trail (K5.5) as built: ![K5.5 screens](images/k5-5-screens.png)
-
-Bands after the crash drill (V1.2): ![unprotected](images/v1-2-unprotected-band.png) ![prices old](images/v1-2-prices-old-band.png)
-
-Themes (K13.5): ![light](images/k13-5-theme-light.png) ![colour-blind safe](images/k13-5-theme-colour-blind.png)
-
-## Active track: Kite Connect (NSE/BSE)
-Decided 14 Oct 2026. MockTrade connects to the real Indian market through Zerodha Kite Connect. A paper broker fills orders against live Kite prices for testing without money. Design: `docs/design/kite-architecture.md` (diagrams in `context/images/kite-*.png`).
-
-| Milestone | Issues | Outcome |
-| --- | --- | --- |
-| K0 · Foundations | #124–#127 | package, money in paise, instruments, order types, broker interface |
-| K1 · Live prices | #128–#132 | Kite login, instrument list, binary tick decoder, WebSocket client, live terminal ladder |
-| K2 · Paper broker | #133–#135 | fills vs live depth, queue position, latency, Kite-like rejects |
-| K3 · Orders & risk | #136–#140 | order manager, throttle 8/s · 350/min · 4500/day, risk + kill switch, SQLite event log, real Kite adapter |
-| K4 · Positions & P&L | #141–#142 | P&L from fills, reconcile with Kite |
-| K5 · Server & screens | #143–#147, #156 | FastAPI + password/TOTP, browser WebSocket, **widget workspace** (dockview), ladder, blotter/positions/audit, **Electron desktop app** |
-| K6 · Algos | #148–#151 | parent/child engine, slicer, two-leg spread, algo screen |
-| K7 · Deploy & operate | #152–#155 | Docker Compose + Caddy, Lightsail Mumbai + static IP, latency measurement, runbooks |
-
-Issue bodies were created by `context/backlog-scripts/kite_backlog.py` (+ `create_kite.py`). #145 was later rewritten (widget workspace) and #156 added (Electron) after Ayush asked for a desktop, widget-based front end.
-
-## Build progress (Claude now writes the code, at Ayush's request on 14 Oct)
-Ayush asked Claude to code the whole project professionally (extensive tests, careful code) while he follows along; he types "continue" when usage limits reset. The original PRs were stacked: each milestone's branch built on the previous one. New work starts from main, with context in the same PR.
-
-| Milestone | PR | Status |
-| --- | --- | --- |
-| K0 Foundations (#124–#127) | #158 (base main) | ✅ CI green, 50 tests |
-| K1 Live prices (#128–#132) | #159 (base k0-foundations) | ✅ CI green, 117 tests |
-| K2 Paper broker (#133–#135) | #160 (base k1-live-prices) | ✅ 167 tests; each fill rule mutation-checked |
-| K3.1 Order manager (#136) | #161 (base k2-paper-broker) | ✅ CI green, 52 tests, 15 mutations caught |
-| K3.2 Throttle (#137) | #162 (base k3-1-order-manager) | ✅ CI green, 23 tests |
-| K3.3 Risk checks + kill switch (#138) | #163 (base k3-2-throttle) | ✅ CI green, 48 tests |
-| K3.4 Event log (#139) | #164 (base k3-3-risk) | ✅ CI green, 16 tests |
-| K3.5 Kite order adapter (#140) | #165 (base k3-4-event-log) | ✅ CI green, 370 tests in total. Manual step left: AMO check on the server |
-| K4.1 Positions & P&L + auto kill on daily loss (#141) | #166 (base k3-5-kite-orders) | ✅ CI green, 43 tests |
-| K4.2 Reconcile positions with the broker (#142) | #167 (base k4-1-positions) | ✅ 424 tests in total |
-| K5.1 Server + password/TOTP login + API (#143) | #168 (base k4-2-reconcile) | ✅ CI green; 21 security mutations checked |
-| K5.2 Browser stream (#144) | #169 (base k5-1-server) | ✅ CI green, 490 tests; contract in docs/design/stream.md |
-| UI design pass (mockups) | canvas "MockTrade UI design" (claude.ai artifact) | ✅ dense trading terminal; ladder (board 0, interactive) + workspace (board 2) redone; other boards still "old style" |
-| K5.3 UI skeleton: workspace, login, watch list (#145) | #170 (base k5-2-stream) | ✅ CI green after a fix: `ui/src/lib/format.ts` had never been pushed (the Python `.gitignore` ignored every `lib/` folder); rebuilt with tests, `.gitignore` now ignores only `/lib/` |
-| K5.4 Ladder (#146) | #171 (base k5-3-ui) | ✅ CI green; 112 UI + 509 Python tests, 13/13 mutations caught, paper trading checked end to end in a real browser |
-| K5.5 Order book, positions, audit trail, messages (#147) | #172 (base k5-4-ladder) | ✅ CI green; 143 UI + 511 Python tests, 13/13 mutations caught, checked end to end in a real browser |
-| Order ticket + **order spec** (#173) | #175 (base k5-5-screens, branch k5-5b-ticket) | ✅ 179 UI + 529 Python tests; all order types checked in a real browser |
-| K5.6 Desktop app + pop-out windows (#156) | #176 (base k5-5b-ticket, branch k5-6-desktop) | ✅ 181 UI + 12 desktop + 529 Python tests; real Electron run under xvfb (pop-out live, pages can't reach Node, ~600 MB app, ~20–25 MB per pop-out). Ayush: build the installer on Windows (`ui/desktop/README.md`) |
-| Stream sends changes at once (#177) | #178 (base k5-6-desktop, branch k5-7-fast-stream) | ✅ tick → browser ~200 ms → **1–6 ms**; the new latency test fails on the old code |
-| K6.1 Algo engine (#148) | #179 (base k5-7-fast-stream, branch k6-1-algo-engine) | ✅ 545 Python tests, 12/12 mutations, paper-broker integration test |
-| K6.2 Slicer (#149) | #180 (base k6-1-algo-engine, branch k6-2-slicer) | ✅ 555 Python tests, 8/8 mutations, 750 parent completed on paper |
-| K6.3 Spreader (#150) | #181 (base k6-2-slicer, branch k6-3-spreader) | ✅ 567 Python tests, 11/12 mutations, NIFTY calendar spread on paper |
-| K6.4 Algo screen (#151) | #182 (base k6-3-spreader, branch k6-4-algo-screen) | ✅ 572 Python + 197 UI tests, 12/12 UI mutations, slicer and spreader started from the browser and run to Done on paper |
-| K7.1 Docker + Caddy (#152) | #184 (base k6-4-algo-screen, branch k7-1-docker) | ✅ 583 Python tests; real `docker compose up`: HTTPS via Caddy, login + ladder fill over proxied WebSocket, clean SIGTERM exit 0 |
-| K7.1b Live Kite in serve (#183) | #185 (base k7-1-docker, branch k7-1b-live-kite) | ✅ 596 Python + 201 UI tests, fake-Kite tests 9, 12/12 mutations; real kite-mode run: strip + "Log in to Kite" to Zerodha with api_key/state |
-| K7.2 Server set-up (#153) | #186 (base k7-1b-live-kite, branch k7-2-server) | ✅ 600 Python tests; backup + restore checked in real Docker; `deploy/server-setup.sh` (shellcheck clean); runbook `docs/runbooks/server.md`. **Ayush closes #153 after the AMO IP check (§5)** |
-| K7.3 Metrics + load (#154) | #187 (base k7-2-server, branch k7-3-metrics) | ✅ 612 Python tests; `/api/metrics`; two-process load test with fake Kite; tick path 62→21 µs/tick, GC pauses 100→15 ms; results in `docs/design/performance.md` |
-| K7.4 Ops: scheduler, alerts, runbooks (#155) | #188 (base k7-3-metrics, branch k7-4-ops) | ✅ 627 Python + 202 UI tests; whole simulated trading day test; runbooks `morning.md`, `incidents.md` |
-| K8.1 Option pricing (#189) | #194 (base k7-4-ops, branch k8-1-pricing) | ✅ 813 Python tests, 16/16 mutations; Black-76 on the future, IV, Greeks in traders' units; `docs/design/options.md` |
-| K8.2 Option chain (#190) | #195 (base k8-1-pricing, branch k8-2-chain) | ✅ 822 Python tests; REST + throttled stream `{"op":"chain"}`; simulator prices options by Black-76 + smile; checked live on the demo |
-| K8.3 Chain widget (#191) | #196 (base k8-2-chain, branch k8-3-chain-widget) | ✅ 214 UI tests; real browser: live chain, click drives the ticket, maximize (double-click a tab) |
-| K8.4 Strategy builder (#192) | #197 (base k8-3-chain-widget, branch k8-4-strategy) | ✅ 835 Python + 222 UI tests, 13/13 mutations; real browser: iron condor payoff, Alt-click legs from the chain |
-| K8.5 Baskets (#193) | #198 (base k8-4-strategy, branch k8-5-baskets) | ✅ 844 Python + 224 UI tests; covered-short risk rule; real browser: iron condor checked and sent as one basket |
-| K9.1 Execution algos (#199) | #203 (base k8-5-baskets, branch k9-1-exec-algos) | ✅ 867 Python + 225 UI; 17/17 mutations; real browser: TWAP, iceberg and POV run to Done |
-| Fix: basket cover must be filled (#207) | #208 merged | ✅ 873 Python; 9/9 mutations (`context/scripts/mutate-basket-cover.py`) |
-| Fix: rebuild state after a restart (#206) | #209 merged | ✅ 878 Python; 12/12 mutations (`context/scripts/mutate-recovery.py`); real demo restart: position, P&L and orders back, resting paper order closed with the reason |
-| K9.2 Protection: trailing stop, OCO, bracket (#200) | #210 merged | ✅ 15 new tests; mutation check `context/scripts/mutate-protect.py`; real browser: bracket entered at market with target and stop, trailing stop following the highs (`context/scripts/e2e-protect.cjs`) |
-| K9.3 GTT at the broker (#201) | #211 merged | ✅ 914 Python; GTT spec + risk at the trigger; Kite /gtt/triggers; paper simulation; fired orders adopted; design `docs/design/gtt.md` |
-| K9.4 Orders+ screens (#202) | #212 merged | ✅ 239 UI tests; real browser: GTT OCO from the book, trailing stop and GTT from the ticket tabs, algos grouped by family (`context/scripts/e2e-orders-plus.cjs`) |
-| K10.1 Funds, holdings, tradebook (#213) | #218 merged | ✅ 930 Python + 247 UI tests; optional broker ports (Kite `/portfolio/holdings`, `/user/margins`, `/trades`; paper cash model `broker/paper_funds.py`); `PortfolioService`; Funds + Holdings widgets, Trades tab; mutations 25/27 (2 equivalent); real browser on the demo (`context/scripts/e2e-portfolio.cjs`); design `docs/design/portfolio.md` |
-| K10.2 Charges, P&L gross and net (#214) | #219 merged | ✅ 943 Python + 248 UI tests; `charges/` (model, schedule as data checked 15 Oct 2026 incl. Budget 2026 STT, service); Positions gross/charges/net; ticket estimate; mutations 20/20; real browser (`context/scripts/e2e-charges.cjs`); design `docs/design/charges.md` |
-| K10.3 End-of-day report, P&L history, CSV/PDF (#215) | #220 merged | ✅ 949 Python + 253 UI tests; `reports/` (build from the audit trail, kept JSON at 16:00 IST, history by day/instrument/strategy, CSV, PDF writer with no dependency); Reports widget; mutations 20/20; real browser with downloads (`context/scripts/e2e-reports.cjs`); design `docs/design/reports.md` |
-| K10.4 Pre-trade margin check (#216) | #221 merged | ✅ 961 Python + 256 UI tests; `risk/margin.py` `MarginGate` (exits never checked, fails open with `MARGIN_UNCHECKED`), paper margin quote, `POST …/margin`, ticket margin line; mutations 15/15; real browser (`context/scripts/e2e-margin.cjs`); design `docs/design/margin.md` |
-| K10.5 MTM limits, square-off assistant (#217) | #222 merged | ✅ 971 Python + 260 UI tests; `risk/mtm.py`, `risk/squareoff.py`, `risk/closing.py`, `ops/guards.py`; MTM Limits widget, Square off MIS button; mutations 18/18; real browser (`context/scripts/e2e-mtm.cjs`); design `docs/design/mtm.md` |
-| K11.1 Tick recorder (#223) | #227 merged | ✅ 983 Python tests; `MarketData.tap`, `research/ticks.py` (`TickRecorder`, `FileTickStore`), REST recordings, `MOCKTRADE_RECORD_DAYS`; 86.6 bytes/tick measured on the demo; mutations 14/14; design `docs/design/research.md` |
-| K11.2 Replay into paper (#224) | #228 merged | ✅ 988 Python + 262 UI tests; `research/replay.py` (`ReplayFeed`, `ReplayClock`), `demo --replay <day>` (own data folder, every part on the replayed time), `PaperBroker(every_tick=True)`, `/api/replay`, replay bar + band; same fills as live (tested); mutations 11/11; real browser (`context/scripts/e2e-replay.cjs`) |
-| K11.3 Backtest runner (#225) | branch k11-3-backtest | ✅ 996 Python tests; `research/backtest.py` (`run_day` deterministic on a fresh platform, drain between ticks, candles, `Backtests` kept runs, `CandleStore`), REST; hand-worked day; mutations 12/12; real run on the demo recording 0.3 s |
-
-K3 flow: ![K3 orders and risk](images/k3-orders-and-risk.png)
-
-Historical stack order (integrated by the recovery PR; do not replay these merges): #123 → #157 → #158 → #159 → #160 → #161 → #162 → #163 → #164 → #165 → #166 → #167 → #168 → #169 → #170 → #171 → #172 → #175 → #176 → #178 → #179 → #180 → #181 → #182 → #184 → #185 → #186 → #187 → #188 → #194 → #195 → #196 → #197 → #198 → #203 → … (GitHub retargets stacked PRs automatically when their base merges).
-
-**Design changes made while coding:**
-- Kite REST uses **our own async httpx client** (not the synchronous SDK); the SDK stays only as a test reference (decoder equivalence test).
-- `.gitignore` ignores only the top-level `/data/` (it had hidden `tests/data/`).
-- CI uses actions/checkout@v5 and setup-python@v6 (Node 20 deprecation).
-- Decoder measured at ~17 µs per full packet (≈1 % of a CPU at 750 ticks/s).
-- Paper broker is conservative on purpose: fills at shown depth only, queue position from depth, volume counts only after we join, no price improvement for resting orders, triggered stops arrive as new orders. Shared rules (market protection, 25-modify cap) live in `broker/rules.py` so paper can't be more lenient than Kite.
-- K3 is **one PR per issue** (stacked), not one per milestone: smaller reviews.
-- Throttle uses **sliding windows**, not token buckets (a bucket of 8/s can let 15 out in one second). Cancels get 10/s reserved room; manual clicks are refused with "try again in X s" (rounded up); algos wait in order.
-- Error meaning: BrokerError = clear refusal; any other exception = **unknown outcome** → UNCONFIRMED → reconcile. Kite's NetworkException/DataException/GeneralException/5xx/timeouts are unknown. Places are never retried automatically.
-- Event log uses Python's built-in **sqlite3** (WAL, writer thread), not SQLAlchemy/Postgres yet: no dependency, fast enough; Postgres later = one new class.
-- Money shown in lakh/crore grouping (`format_rupees`: ₹56,27,250.00).
-- Positions: weighted average cost with **exact fractions** (no paise leak); applied by cumulative filled qty (replays never double count); carried positions seeded at the previous close (today's P&L starts at 0). P&L is gross (charges estimator later).
-- Auto kill switch on the daily loss (`DailyLossWatch`), once per day so a reset lets you close.
-- Position reconcile alerts only after **two checks in a row** (re-check in 10 s), so in-flight fills don't cause false alarms; never auto-corrects.
-- Server security: Argon2id (not bcrypt) + TOTP once-only codes; lockout 5/15 min; per-IP limit; __Host- cookie (HttpOnly, Secure, SameSite=Strict), only the token's hash stored; Origin check + JSON-only for changes; security headers; no /docs. User/accounts/sessions in SQLite (`server/users.py`); TOTP secrets encrypted with `MOCKTRADE_SECRET_KEY`.
-- `platform.py` wires each account (risk → throttle → manager → book → kill/loss watch → reconciler → event log).
-- Stream: prices/positions conflated (250 ms, newest wins), orders never; slow browser closed with 4408 (never silent gaps); reconnect = hello → snapshots → merge by updated_at.
-- Mutation testing now uses `scratchpad/mutate.py`-style harness that always restores files (a killed run once left a mutated line; the suite caught it).
-- Ladder (K5.4): PIQ is estimated in the browser with the paper broker's own queue rule (Kite doesn't report it), so paper and live agree; VAP is counted on the server from every tick (`marketdata/vap.py`, `GET /api/instruments/{id}/vap`) and continued from the stream. The browser makes client order ids (a lost "place" answer can't double-place). Cancels are allowed while trading is stopped (`cancelBlock` vs `tradingBlock` in `ui/src/state/gate.ts`). Optional confirm-over (Cfm) per ladder.
-- K5.5: `GET /api/accounts/{a}/events` = the account's audit trail newest first (`EventLog.page`), including its kill switch (`account <id>`) and the firm's. Audit exec types: SUBMITTED=Pending new, SENT=New, FILL=Fill/Partial fill, UPDATED=the new state (Working/Partial/Filled/Cancelled/Rejected), CANCEL_SENT=Pending cancel, MODIFY_SENT=Pending replace, KILL_SWITCH=STOP/Resume. Live audit catches up from the log 300 ms and 2 s after each order event and every 5 s (the log writes in a background thread). Order book and positions "drive" the link group (click = linked ladder switches). Grids scroll sideways in narrow windows. CSV export guards against spreadsheet formulas.
-- **Order spec (#175): backend provides, frontend displays.** `GET /api/accounts/{a}/instruments/{id}/order-spec` (`domain/order_spec.py`) lists the broker's order types by what they need (price/trigger: required|none, market protection: auto|none), validities, named rules (`stop_trigger`, `stop_limit`), `priced_by_click`, plus products, tick, lot, auto protection %. Broker adapters publish `order_spec()` (Kite and paper share `broker/rules.order_spec`); the order manager enforces it. Ticket and ladder draw from it (`useOrderSpec`), nothing hard-coded. Apply the same pattern to everything new (algo parameters, products, limits, permissions).
-- **Pop-outs (#176):** a widget's window loads `/popout.html` and is drawn by the main page (dockview `addPopoutGroup`), so it shares the one WebSocket/store/link groups: zero sync delay. `/popout.html` has its own CSP (inline styles yes, scripts never). Desktop app = `ui/desktop/` (Electron 44, opens the server, https only; `src/security.ts` rules tested). Electron's binary download fails through Node here: fetch the zip with curl and unpack into `node_modules/electron/dist` + `path.txt` (see how it was done in the #176 session); CI skips the binary (`ELECTRON_SKIP_BINARY_DOWNLOAD=1`).
-- **Speed (Ayush, 14 Oct): "ensure syncing and latency are very fast from our side".** Measure every hop (K7.3) and remove waits we add: first change goes out at once, conflation only during bursts.
-- **Algo engine (K6.1):** `algos/engine.py` + `algos/spec.py`, design `docs/design/algos.md`. Children marked by `parent_id` (`OrderRequest.from_algo`); `algo_id` = exchange-issued id only (none yet). In-flight children count against the parent; a parent isn't final while one is in flight. `AccountRuntime.algos`; `Platform.add_account(algo_types=...)`.
-- **Spreader (#181):** hedges on every child update; keeps hedges on pause/stop; done only when both legs complete; UNHEDGED → ALERT event; 3 refusals in a row while stopping → give up (FAILED). Engine hooks `done()`, `keep_on_stop()`, `on_finish()`, `ctx.report()`, `ctx.send(hedge=True)`.
-- Stream (#178): wait for a change → send at once if nothing went out in the last 250 ms, else wait the rest and send the newest. Measured 1–6 ms tick → browser (was ~200 ms).
-- Paper refuses stops whose trigger the market already passed (Kite does too); SL trigger vs limit checked in `OrderRequest.validate`.
-- Ticket "confirm" is derived from the exact order (`armedFor === signature`), not reset by an effect: an effect-based reset caused a timing-dependent test failure.
-- Lesson (K5.3): before pushing, check `git status --ignored` for source files hidden by `.gitignore`.
-- Risk: reducing a position is always allowed (even past limits or the daily loss); worst-case position counts working orders; option selling to open is off by default.
-
-**UI direction (Ayush, 14 Oct, after the first mockups):** the first mockups looked like an AI-designed website. The UI must look and work like a professional trading terminal: dense multi-window workspace, many small click-to-trade ladders (Work | Bids | Price | Asks | LTQ | VAP, qty preset buttons, L/M and TIF on the side; click bid = buy, ask = sell, Work = cancel), compact grids (orders, positions, audit trail), tiny window chrome, 11–12 px type. Ladders follow common professional patterns; never copy or name any other vendor's product (Ayush plans to deploy MockTrade commercially in India later). Very convenient for the user above all.
-
-**UI plan (promised 14 Oct):** before any UI code, a UI design pass with mockups for approval: dark-first design system, workspace model (dock/tab/pop-out/linked widgets), every screen (ladder, ticket, blotter, positions, audit, algo manager, admin, morning login), interaction and safety rules.
-
-## Next
-**Where we are (16 Oct 2026):** K0–K10 are merged on `main` (K10: PRs #218–#222). K11 and K12 are complete (K12.4 in its PR). Safety fixes #206 and #207 are merged. Main CI is green. **Claude merges its own PRs once CI is green** (Ayush, 15 Oct). K10 issues exist: #213 (K10.1), #214 (K10.2), #215 (K10.3), #216 (K10.4), #217 (K10.5).
-
-1. **K10.1 (#213) is merged** (PR #218). See `docs/design/portfolio.md`: optional ports `FundsSource`/`HoldingsSource`/`TradesSource`; `PortfolioService` (`AccountRuntime.portfolio`: cached, one read per kind, stale-not-empty with `as_of`/`error`, refresh 0.5 s after fills, holdings live-marked); REST `GET /api/accounts/{a}/funds|holdings|trades[?fresh=true]`; stream type `portfolio`; paper money in `broker/paper_funds.py` (`PaperMargins`, `MOCKTRADE_PAPER_FUNDS`); recovery hands paper CNC over as holdings; UI `ui/src/widgets/portfolio/` (Funds, Holdings, TradesTable in the order book).
-2. **K10.2 (#214) is merged** (PR #219). See `docs/design/charges.md`.
-3. **K10.3 (#215) is merged** (PR #220). See `docs/design/reports.md`.
-4. **K10.4 (#216) is merged** (PR #221). See `docs/design/margin.md`.
-5. **K10.5 (#217) is merged** (PR #222). **K10 is complete.**
-6. **K11 research is complete** (#223–#226, #235; PRs #227–#230, #236). **K12 issues (label `track: kite`):**
-   - #231 K12.1 candles and chart data API: merged (PR #237).
-   - #232 K12.2 chart widget: merged (PR #238).
-   - #233 K12.3 alerts engine and webhooks: merged (PR #239).
-   - #234 K12.4 alerts manager, time & sales, depth, movers: **done** on branch `k12-4-market-screens` (PR "Closes #234"; merge on green CI if still open). See `docs/design/charts.md` § K12.4. It also fixed a ticket that kept the previous contract's price after a switch, and simulator option prices.
-
-   Known gaps: replaying a live Kite server's recordings needs that day's instrument list (also in #240); webhook DNS rebinding (#271, fixed 23 Oct); an outside webhook not yet tried (do it once deployed).
-7. **Issue clean-up (16 Oct, Ayush's request).** The ~98 issues from the paused COMEX track (#17–#121) were compared with the code and each one closed with a note:
-   - done on the Kite track (completed);
-   - not relevant to it (not planned);
-   - or carried on into a current issue.
-
-   What NG taught that is still missing is now in #287 (operations), #288 (design docs), #289 (release process), #290 (F&O expiry day), #291 (compliance) and #292 (a decision: user-written strategies). The old milestones (Phase 0–8, v0.1–v1.0) can now be closed by Ayush; Claude's tools can't close milestones.
-
-   **Confirmed defects fixed ahead of hardening:**
-   - #269 (candle paths could escape their folder): merged (PR #293);
-   - #258 (positions in different products overwrite each other during reconciliation): done on branch `fix-258-products` (PR #294).
-8. **K13 admin & phone** (issues #281–#285, label `track: kite`):
-   - #281 K13.1 admin API (users, roles, accounts, per-account limits): merged (PR #286). See `docs/design/admin.md`.
-   - #282 K13.2 admin screen and the first-login password page: merged (PR #296). See `docs/design/admin.md` § K13.2.
-   - #282 merged (PR #296).
-   - #284 K13.4 keyboard shortcut editor: merged (PR #325). See `docs/design/ui.md` § Keyboard shortcuts.
-   - #285 K13.5 themes (dark, light, colour-blind safe): merged (PR #326). See `docs/design/ui.md` § Themes.
-9. **Core v1 gate #240** (Ayush records acceptance at the end):
-   - #327 V1.1 each recorded day keeps its instrument list, so a real day replays on its own: merged (PR #331). See `docs/design/research.md` § V1.1.
-   - #328 V1.2 crash-and-restart drill, and an "unprotected position" warning on screen: merged (PR #332). See `docs/runbooks/incidents.md` § Position UNPROTECTED and § Crash-and-restart drill.
-   - #329 V1.3 back up all state, and a tested restore drill: merged (PR #333). See `docs/runbooks/server.md` § What a backup holds, § Restore. Evidence: `context/evidence/v1-3-backup-restore-drill.txt`.
-   - #330 V1.4 go-live checklist: merged (PR #334): `docs/runbooks/go-live.md`; paper steps 19/19 (`context/evidence/v1-4-golive-paper.txt`). **Its 28 live boxes are Ayush's to run and tick; no live order without his go-ahead.**
-   - #288 design docs: merged (PR #335): glossary, domain model, order life story and seven journeys, test plan, index; 8 diagrams in `context/images/v1-*.png`.
-   - #289 release process: **done** on branch `v1-6-release` (PR "Closes #289"). Version `1.0.0-rc.1` in `/api/health` and the status bar; `docs/releases/v1.0.0.md`, `CHANGELOG.md`; `deploy/deploy.sh` (refuses 09:00–15:45 IST on trading days unless `--emergency "reason"`, logged), `rollback.sh`; `docs/runbooks/release.md`. Rehearsed with real Docker 15/15 (`context/evidence/v1-6-deploy-rollback-rehearsal.txt`).
-   - **Then, Ayush:** run the live boxes of `docs/runbooks/go-live.md`, record v1 acceptance on #240; then tag `v1.0.0` (release.md step 5). After that: the hardening gate #257.
-   - #283 K13.3 phone screens: **moved after core v1** (Ayush, 16 Oct; they don't change the core design).
-   **Then, in this order (issues Ayush added on 16 Oct from an outside review; no code was changed):**
-   1. #240 core v1 completion gate: restart/reconnect drills, backup and restore, recordings with their instrument list, a live-session checklist, docs matching code.
-   2. #257 post-core hardening gate: #258–#277 (positions, uncertain orders, exits, MTM, durability, session rollover, freshness, ownership, webhooks, backups, supervision, economics), suggested order in #257; plus the production security gate #279 and the discussion #278 (who pays for data, multi-user Kite).
-   3. #241 post-v1 features: #242–#255 (v1.1 to v1.7).
-   Recheck each finding against the code before coding; don't reopen fixed defects without evidence.
-9. Ayush's own steps (not code): `docs/runbooks/server.md` (AWS Mumbai, static IP, Kite app ₹500/month, AMO check), then a real trading day; before selling to others: the broker's multi-user arrangement, exchange algo empanelment, licensed market data, legal review.
-
-**How each piece is built (keep the quality):** brainstorm the traps → code with the "backend provides, frontend displays" rule (specs from the server, no market rules in the UI) → Python tests + UI tests → a mutation script in `context/scripts/mutate-*.py` (restores files in `finally`, a hang counts as caught; **run one at a time, never kill one mid-run**: it can leave a mutant in the source) → real browser or real server check against the demo (`context/scripts/e2e-*.cjs`) → docs in `docs/design/` → context files → PR → green CI → merge.
-
-**Session lessons:** after merging, check `main`'s CI too, not only the PR's (16 Oct: two merges left main red because of a test that read the audit trail before it was written; fixed in #295 with `await log.flush()`). Every widget must work at any size (Ayush's workspace rule): test it in a narrow pane too. Anchor `pkill -f` patterns with `^` (an unanchored pattern matches the calling shell and kills it); TOTP codes are single-use: wait for the next 30 s window before logging in again; `rm -rf data/demo` for a fresh demo; rebuild `ui/dist` before browser checks; positions add up across demo runs (±1500 limit).
-
-## Earlier notes
-- K6 algo engine: new algos need only a strategy + `AlgoSpec` registered in `algos/builtin.py`; the screen draws them. Live Kite: `broker/kite/live.py`; server entry `python -m mocktrade.tools.serve`; Docker in a cloud session: start `dockerd`, pull from `mirror.gcr.io/library/<image>`, proxy CA only in local base images.
-
-## Key facts the design depends on (checked 14 Oct 2026, re-check before going live)
-- Data ₹500/month per app; order APIs free.
-- About 1 tick per second per instrument (sometimes 2); full mode 184 bytes with 5 bid + 5 ask depth; big-endian; prices in paise.
-- 3000 instruments per WebSocket, 3 connections per API key.
-- Orders 10/s, 400/min, 5000/day per user; 25 modifications per order; quote API 1/s.
-- Access token expires 6 AM next day; manual login daily.
-- Static IP required for order endpoints only (1 primary + 1 backup), set in developer console → IP Whitelist.
-- MARKET and SL-M orders need market_protection −1 or 1–100 (0 rejected).
-- SEBI: ≤ 10 orders/s per segment without exchange registration; personal use only; no open APIs.
-
-## Paused: COMEX/MockCME track
-Old milestones Phase 0–8 and v0.1–v1.0 belong to the paused track. Its issues were closed on 16 Oct with notes (done, not relevant, or carried on into #287–#292 and the hardening issues). The milestones themselves can be closed by Ayush. The build map (`context/build-map/`) describes that track.
-
-## Tool limits seen in Claude's GitHub access
-- GraphQL blocked: no Projects boards or issue transfers from Claude; Ayush does those.
-- Repo settings and new repos: Ayush does those.
+[docs/running-locally.md](../docs/running-locally.md).

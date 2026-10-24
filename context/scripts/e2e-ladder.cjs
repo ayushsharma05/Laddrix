@@ -1,8 +1,8 @@
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execSync } = require('child_process');
 const out = process.argv[2];
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }).catch(() => chromium.launch());
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }).catch(() => chromium.launch());
   const page = await browser.newPage({ viewport: { width: 1600, height: 950 } });
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -10,7 +10,7 @@ const out = process.argv[2];
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  const code = execSync('cd /home/user/MockTrade && python3 -m mocktrade.tools.demo --code').toString().trim();
+  const code = execSync('python3 -m mocktrade.tools.demo --code').toString().trim();
   await page.getByLabel('Authenticator code').fill(code);
   await page.keyboard.press('Enter');
   const ladder = page.locator('.ladder').first();

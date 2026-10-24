@@ -2,13 +2,13 @@
 // widget after its confirmation (the files go, the audit trail says who); today's day offers no
 // delete; the replay command shown can be copied. Before running: the demo up with ui/dist
 // rebuilt, and an older day present (cp -r data/demo/ticks/<today> data/demo/ticks/<older>).
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const flat = (s) => s.replace(/\s+/g, ' ').trim();
 const older = process.argv[2] || '2026-10-15';
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://localhost:8000' });
   const page = await context.newPage();
@@ -17,7 +17,7 @@ const older = process.argv[2] || '2026-10-15';
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByLabel('Authenticator code').fill(execSync('cd /home/user/MockTrade && python3 -m mocktrade.tools.demo --code').toString().trim());
+  await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
   await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
   await page.evaluate(async () => {
