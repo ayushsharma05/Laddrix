@@ -749,3 +749,4 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - Only the spread's owner can chart it (others get 404). The live candle comes from the legs' live candles.
     - **Found by the browser check:** a new chart window was titled with the spread's id; it now shows the name, kept in step on a rename. The first load on a cold demo took over 10 s (each leg's recorded day is read in full), so the legs are now fetched at the same time.
     - **Checks:** 6 server tests (a calendar worked by hand: −140.00 to −120.00; a −2 leg; the legs fetched together; the API and stream owner-only); 4 screen tests; mutation 17/17 (one gap closed: a plain contract's chart must keep its title); browser 4/4 (`e2e-spread-chart.cjs`, screenshot `context/images/spread-chart.png`).
+  - Merged as PR #435. With it every child of #250 and #251 was done, so both were closed.
