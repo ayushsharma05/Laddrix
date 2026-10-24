@@ -7,8 +7,8 @@
 //
 //   New / Edit:   Name [NIFTY Nov/Dec]
 //                 Leg  Contract         Ratio  Price ×  Quote  Pay-up
-//                 1    NIFTY26NOVFUT     +1      +1       ●      2      ×
-//                 2    NIFTY26DECFUT     −1      −1       ○      2      ×
+//                 1    NIFTY26NOVFUT     +1      +1       ☑      2      ×
+//                 2    NIFTY26DECFUT     −1      −1       ☐      2      ×   (one or more quote)
 //                 + Add leg                       price = NIFTY26NOVFUT − NIFTY26DECFUT
 //                 Controls: Re-quote threshold [1] ticks  Max unhedged [0]  Chase [0] ticks
 //                           Hedge timeout [5] s           (drawn from GET /api/spreads/spec)
@@ -206,7 +206,7 @@ function SpreadForm({ spread, controls, onSaved, onCancel }: { spread?: Spread; 
         <span>Contract</span>
         <span title="Lots of this leg per spread lot: + is bought when you buy the spread, − is sold">Ratio</span>
         <span title="How much this leg's price counts in the spread's price (usually the ratio)">Price ×</span>
-        <span title="The leg that rests a quote; the others are hedged at once when it fills">Quote</span>
+        <span title="Legs that rest a quote (one or more); a fill on any is hedged at once on every other leg">Quote</span>
         <span title="How many ticks worse than the best price this leg's hedge may pay">Pay-up</span>
         <span />
       </div>
@@ -222,7 +222,7 @@ function SpreadForm({ spread, controls, onSaved, onCancel }: { spread?: Spread; 
           )}
           <input type="number" step={1} value={leg.ratio} aria-label={`Leg ${i + 1} ratio`} onChange={(e) => setDraft(setLeg(draft, i, { ratio: Math.trunc(Number(e.target.value)) }))} />
           <input type="number" step={1} value={leg.multiplier} aria-label={`Leg ${i + 1} price multiplier`} onChange={(e) => setDraft(setLeg(draft, i, { multiplier: Math.trunc(Number(e.target.value)) }))} />
-          <input type="radio" name="ase-quote" checked={leg.quote} aria-label={`Quote leg ${i + 1}`} onChange={() => setDraft(quoteLeg(draft, i))} />
+          <input type="checkbox" checked={leg.quote} aria-label={`Quote leg ${i + 1}`} onChange={() => setDraft(quoteLeg(draft, i))} />
           <input type="number" min={0} max={50} step={1} value={leg.payupTicks} aria-label={`Leg ${i + 1} pay-up ticks`} onChange={(e) => setDraft(setLeg(draft, i, { payupTicks: Math.trunc(Number(e.target.value)) }))} />
           <button type="button" className="tab-close" aria-label={`Remove leg ${i + 1}`} title="Remove this leg" disabled={draft.legs.length <= 2} onClick={() => setDraft(removeLeg(draft, i))}>
             ×

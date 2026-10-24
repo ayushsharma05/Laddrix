@@ -36,9 +36,11 @@ describe("the Autospreader's form", () => {
     expect(d.legs[1]).toMatchObject({ ratio: -1, multiplier: -5 });
   });
 
-  it("quotes exactly one leg", () => {
+  it("quotes one or more legs, never none (#427)", () => {
     const d = quoteLeg(draftOf(FLY), 2);
-    expect(d.legs.map((l) => l.quote)).toEqual([false, false, true]);
+    expect(d.legs.map((l) => l.quote)).toEqual([true, false, true]);
+    expect(quoteLeg(d, 0).legs.map((l) => l.quote)).toEqual([false, false, true]);
+    expect(quoteLeg(quoteLeg(d, 0), 2).legs.map((l) => l.quote)).toEqual([false, false, true]); // the last stays
   });
 
   it("adds legs up to six and removes down to two, keeping a quoting leg", () => {

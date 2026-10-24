@@ -16,6 +16,14 @@ definition later never changes an algo already running.
                            piece (whole spread lots) at a time, the next once all is hedged
     every leg complete  ─► DONE; the spread actually traded (Σ price× · average) is reported
 
+Several quoting legs (#427): every quoting leg rests a quote at the price that makes the spread
+= P against all the other legs; a fill on any of them commits spread lots, and every other
+leg (quoting ones too) is hedged for them. All quotes together never carry more spread lots
+than are still to do (filled + working + on their way ≤ the order), so two quotes filling at
+the same moment can't overfill: the lots left are shared out among the quoting legs (2 lots
+over 2 legs: 1 + 1; 1 lot: one leg quotes). Each order says what it is (`algo_role`: quote,
+hedge, flatten), as a leg can carry a quote and a hedge on the same side.
+
 The spread's own controls (#425):
 
     re-quote threshold   the quote moves only when its target has moved this many ticks;
@@ -54,7 +62,7 @@ Rules (the two-leg spreader's, for N legs):
 """
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import datetime
 from decimal import Decimal
 from fractions import Fraction
@@ -131,15 +139,18 @@ class AutoSpreader(BaseStrategy):
         self.spread = spread  # a copy: the definition can change, this algo doesn't
         self.controls = spread.controls
         self.level: int = params["level_paise"]
-        self.q: SpreadLeg = spread.quote_leg
-        self.others: tuple[SpreadLeg, ...] = tuple(x for x in spread.legs if not x.quote)
+        self.q: SpreadLeg = spread.quote_leg  # the parent order's leg (the first quoting one)
+        self.quoting: tuple[SpreadLeg, ...] = spread.quote_legs
+        self.legs: tuple[SpreadLeg, ...] = spread.legs
+        self.others: tuple[SpreadLeg, ...] = tuple(x for x in spread.legs if x is not self.q)
         self.buying = True  # buying the spread (set at start, from the parent's side)
         self.modifies: dict[str, int] = {}
         # orders asked to change whose answer hasn't come yet: ctx.modify only sends later, so
         # two ticks in a row would both see nothing pending and ask twice. A change refused
         # quietly brings no answer, so the mark lapses after CHANGE_WAIT_S.
         self.changing: dict[str, datetime] = {}
-        self.in_flight: dict[str, int] = {leg.instrument_id: 0 for leg in spread.legs}
+        self.in_flight: dict[str, int] = {leg.instrument_id: 0 for leg in spread.legs}  # hedges
+        self.quote_in_flight: dict[str, int] = {leg.instrument_id: 0 for leg in spread.legs}
         self.seen: set[str] = set()  # children already counted out of `in_flight`
         self.hedge_first: dict[str, int] = {}  # each hedge's first price (the chase's anchor)
         self.first_unhedged_at: datetime | None = None
@@ -224,12 +235,11 @@ class AutoSpreader(BaseStrategy):
         self._timeout(ctx)
 
     def done(self, ctx: AlgoContext) -> bool:
-        return self._net(ctx, self.q) >= ctx.qty and not self._short(ctx)
+        return self._lots_done(ctx) >= self._lots(ctx) and not self._short(ctx)
 
     def keep_on_stop(self, ctx: AlgoContext, child: OrderView) -> bool:
-        # only the quote is pulled: hedges (and a flatten's closing orders) reduce risk
-        r = child.request
-        return not (r.instrument_id == self.q.instrument_id and r.side is ctx.side)
+        # only quotes are pulled: hedges (and a flatten's closing orders) reduce risk
+        return not self._is_quote(child)
 
     def on_finish(self, ctx: AlgoContext) -> str | None:
         short = self._short(ctx)
@@ -237,7 +247,7 @@ class AutoSpreader(BaseStrategy):
             return None
         legs = ", ".join(f"{need} on {leg}" for leg, need in short.items())
         return (f"UNHEDGED {self.spread.name}: {legs} (quoting leg filled "
-                f"{self._net(ctx, self.q)}): hedge it by hand")  # fmt: skip
+                f"{self._quoted(ctx, self.q)}): hedge it by hand")  # fmt: skip
 
     # --- the trader's actions (#425) ---
 
@@ -285,44 +295,85 @@ class AutoSpreader(BaseStrategy):
             return None
         return protected_limit(ctx.instrument(leg.instrument_id), side, level.price_paise, AUTO)
 
+    def _is_quote(self, c: OrderView) -> bool:
+        """One of our quotes (orders kept from before #427 carry no role: then a quote is
+        the parent leg's own side)."""
+        r = c.request
+        if r.algo_role:
+            return r.algo_role == "quote"
+        return r.instrument_id == self.q.instrument_id and r.side is self._side(self.q)
+
+    def _quotes_on(self, ctx: AlgoContext, leg: SpreadLeg) -> list[OrderView]:
+        return [c for c in ctx.working()
+                if c.request.instrument_id == leg.instrument_id and self._is_quote(c)]  # fmt: skip
+
+    def _lot(self, ctx: AlgoContext, leg: SpreadLeg) -> int:
+        return ctx.instrument(leg.instrument_id).lot_size
+
+    def _quoted(self, ctx: AlgoContext, leg: SpreadLeg) -> int:
+        """What this leg's quotes have filled, less what a flatten closed on it."""
+        mine = (c for c in ctx.children() if c.request.instrument_id == leg.instrument_id)
+        filled = sum(c.filled_qty for c in mine if self._is_quote(c))
+        return filled - ctx.filled(leg.instrument_id, _other_side(self._side(leg)))
+
+    def _lots(self, ctx: AlgoContext) -> int:
+        """The spread lots asked (the parent's quantity is on the first quoting leg)."""
+        return ctx.qty // (abs(self.q.ratio) * self._lot(ctx, self.q))
+
+    def _lots_done(self, ctx: AlgoContext) -> Fraction:
+        """Spread lots the quotes' fills have committed (a part of one: a fraction)."""
+        return sum((Fraction(self._quoted(ctx, x), abs(x.ratio) * self._lot(ctx, x))
+                    for x in self.quoting), Fraction(0))  # fmt: skip
+
     def _target(self, ctx: AlgoContext, leg: SpreadLeg) -> int:
-        """What this hedge leg must have filled for what the quoting leg has filled."""
-        q_lots = self._net(ctx, self.q) // ctx.instrument().lot_size
-        lots = q_lots * abs(leg.ratio) // abs(self.q.ratio)
-        return lots * ctx.instrument(leg.instrument_id).lot_size
+        """What this leg must have filled for what the quotes have filled: its own quote fills,
+        and for each other quoting leg's fills its share in whole lots."""
+        lot = self._lot(ctx, leg)
+        target = 0
+        for q in self.quoting:
+            if q is leg:
+                target += self._quoted(ctx, q)
+            else:
+                q_lots = self._quoted(ctx, q) // self._lot(ctx, q)
+                target += q_lots * abs(leg.ratio) // abs(q.ratio) * lot
+        return target
 
     def _short(self, ctx: AlgoContext) -> dict[str, int]:
-        """Each hedge leg still short of what the quoting leg's fills need (empty: hedged)."""
+        """Each leg still short of what the quotes' fills need (empty: hedged)."""
         out = {}
-        for leg in self.others:
+        for leg in self.legs:
             need = self._target(ctx, leg) - self._net(ctx, leg)
             if need > 0:
                 out[leg.instrument_id] = need
         return out
 
-    def _quote_price(self, ctx: AlgoContext) -> int | None:
-        legs = (self.q, *self.others)
-        ages = [a for a in (ctx.age_s(x.instrument_id) for x in legs) if a is not None]
+    def _quote_price(self, ctx: AlgoContext, quote: SpreadLeg | None = None) -> int | None:
+        """Where this quoting leg's quote makes the spread = P against every other leg's
+        price now (the price it would be hedged at)."""
+        quote = quote or self.q
+        ages = [a for a in (ctx.age_s(x.instrument_id) for x in self.legs) if a is not None]
         if ages and max(ages) - min(ages) > MAX_LEG_SKEW_S:
             self.stale = f"leg prices {max(ages) - min(ages):.0f} s apart"  # #267
             return None
         self.stale = ""
         rest = 0
-        for leg in self.others:
+        for leg in self.legs:
+            if leg is quote:
+                continue
             level = self._best(ctx, leg)
             if level is None:
                 return None
             rest += leg.multiplier * level.price_paise
-        tick_size = ctx.instrument().tick_paise
-        exact = Fraction(self.level - rest, self.q.multiplier * tick_size)  # in Q's ticks
-        price = (math.floor(exact) if self._down() else math.ceil(exact)) * tick_size
+        tick_size = ctx.instrument(quote.instrument_id).tick_paise
+        exact = Fraction(self.level - rest, quote.multiplier * tick_size)  # in its ticks
+        price = (math.floor(exact) if self._down(quote) else math.ceil(exact)) * tick_size
         return price if price > 0 else None
 
-    def _down(self) -> bool:
-        """Buying the spread wants it at or below the level, selling at or above: Q's price
-        rounds down for that when its multiplier helps (+ while buying), up otherwise. A
-        resting quote above (down) or below (up) its target would trade the spread worse."""
-        return self.buying == (self.q.multiplier > 0)
+    def _down(self, quote: SpreadLeg | None = None) -> bool:
+        """Buying the spread wants it at or below the level, selling at or above: a quote's
+        price rounds down for that when its multiplier helps (+ while buying), up otherwise.
+        A resting quote above (down) or below (up) its target would trade the spread worse."""
+        return self.buying == ((quote or self.q).multiplier > 0)
 
     def _changing(self, ctx: AlgoContext, client_order_id: str) -> bool:
         """A change to this order was asked a moment ago and not yet answered."""
@@ -334,11 +385,14 @@ class AutoSpreader(BaseStrategy):
         Asked each time: the account's limits can change while the algo works."""
         return ctx.max_order_qty(instrument_id, price)
 
-    def _piece(self, ctx: AlgoContext, price: int | None) -> int | None:
-        """The biggest quote allowed: it fits one order and the spread's max unhedged, in
-        whole spread lots (0: not even one; None: no limit)."""
-        unit = abs(self.q.ratio) * ctx.instrument().lot_size
-        caps = [self._cap(ctx, ctx.instrument_id, price)]
+    def _piece(
+        self, ctx: AlgoContext, price: int | None, quote: SpreadLeg | None = None
+    ) -> int | None:
+        """The biggest quote allowed on this quoting leg: it fits one order and the spread's
+        max unhedged, in whole spread lots (0: not even one; None: no limit)."""
+        quote = quote or self.q
+        unit = abs(quote.ratio) * self._lot(ctx, quote)
+        caps = [self._cap(ctx, quote.instrument_id, price)]
         if self.controls.max_unhedged_lots:
             caps.append(self.controls.max_unhedged_lots * unit)
         known = [c for c in caps if c is not None]
@@ -348,9 +402,10 @@ class AutoSpreader(BaseStrategy):
 
     def _too_big(self, ctx: AlgoContext) -> str | None:
         """Why a leg can't trade even its smallest piece in one order at its price now."""
-        if self._piece(ctx, self._quote_price(ctx)) == 0:
-            return (f"one spread lot ({abs(self.q.ratio)} lots of {self.q.instrument_id}) "
-                    f"is over this account's per-order limit")  # fmt: skip
+        for q in self.quoting:
+            if self._piece(ctx, self._quote_price(ctx, q), q) == 0:
+                return (f"one spread lot ({abs(q.ratio)} lots of {q.instrument_id}) "
+                        f"is over this account's per-order limit")  # fmt: skip
         for leg in self.others:
             level = self._best(ctx, leg)
             if self._cap(ctx, leg.instrument_id, level.price_paise if level else None) == 0:
@@ -360,19 +415,30 @@ class AutoSpreader(BaseStrategy):
     def _quote(self, ctx: AlgoContext) -> None:
         if self.flattening:
             return
-        price = self._quote_price(ctx)
-        quotes = [
-            c for c in ctx.working()
-            if c.request.instrument_id == ctx.instrument_id and c.request.side is ctx.side
-        ]  # fmt: skip
-        if price is None:
-            for c in quotes:
-                ctx.cancel(c.client_order_id)  # no hedge price: no quote left out
-            ctx.say(f"waiting: {self.stale}" if self.stale
-                    else "waiting: a leg has no price to hedge against")  # fmt: skip
-            return
-        piece = self._piece(ctx, price)
-        tick = ctx.instrument().tick_paise
+        self._sync(ctx)  # quotes the order manager has registered are no longer on their way
+        idle: list[tuple[SpreadLeg, int, int | None]] = []  # quoting legs with no quote
+        waiting = ""
+        for q in self.quoting:
+            price = self._quote_price(ctx, q)
+            quotes = self._quotes_on(ctx, q)
+            if price is None:
+                for c in quotes:
+                    ctx.cancel(c.client_order_id)  # no hedge price: no quote left out
+                waiting = (f"waiting: {self.stale}" if self.stale
+                           else "waiting: a leg has no price to hedge against")  # fmt: skip
+                continue
+            piece = self._piece(ctx, price, q)
+            self._requote(ctx, q, quotes, price, piece)
+            if not quotes and not self.quote_in_flight[q.instrument_id]:
+                idle.append((q, price, piece))
+        if waiting:
+            ctx.say(waiting)
+        if idle and not self._short(ctx):
+            self._new_quotes(ctx, idle)
+
+    def _requote(self, ctx: AlgoContext, q: SpreadLeg, quotes: list[OrderView], price: int,
+                 piece: int | None) -> None:  # fmt: skip
+        tick = ctx.instrument(q.instrument_id).tick_paise
         for c in quotes:
             current = c.request.price_paise
             if current == price or current is None or c.pending is not Pending.NONE:
@@ -382,7 +448,7 @@ class AutoSpreader(BaseStrategy):
             if piece is not None and c.leaves_qty > piece:
                 ctx.cancel(c.client_order_id)  # too big at the new price: re-quote smaller
                 continue
-            worse = current > price if self._down() else current < price
+            worse = current > price if self._down(q) else current < price
             if not worse and abs(price - current) < self.controls.requote_ticks * tick:
                 continue  # a better chance, but under the threshold: keep the modifications
             done = self.modifies.get(c.client_order_id, 0)
@@ -392,19 +458,48 @@ class AutoSpreader(BaseStrategy):
             self.modifies[c.client_order_id] = done + 1
             self.changing[c.client_order_id] = ctx.now()
             ctx.modify(c.client_order_id, price_paise=price)
-        if not quotes:
-            want = ctx.remaining() if piece is None else min(ctx.remaining(), piece)
-            if piece == 0 and ctx.remaining():
+
+    def _committed(self, ctx: AlgoContext) -> Fraction:
+        """Spread lots the quotes have taken: filled, working and on their way."""
+        self._sync(ctx)
+        total = Fraction(0)
+        for q in self.quoting:
+            working = sum(c.leaves_qty for c in self._quotes_on(ctx, q))
+            qty = self._quoted(ctx, q) + working + self.quote_in_flight[q.instrument_id]
+            total += Fraction(qty, abs(q.ratio) * self._lot(ctx, q))
+        return total
+
+    def _new_quotes(self, ctx: AlgoContext, idle: Iterable[tuple[SpreadLeg, int, int | None]]):
+        """Share the spread lots left among the quoting legs with no quote: together the quotes
+        never carry more than is still to do (#427)."""
+        free = self._lots(ctx) - self._committed(ctx)
+        idle = list(idle)
+        for n, (q, price, piece) in enumerate(idle):
+            if free <= 0:
+                return
+            lot = self._lot(ctx, q)
+            share = free / (len(idle) - n)
+            lots = math.floor(share * abs(q.ratio))
+            if not lots and free * abs(q.ratio) >= 1:
+                lots = 1  # less than a lot each: the first legs take what there is
+            want = lots * lot if piece is None else min(lots * lot, piece)
+            if piece == 0:
                 ctx.say(f"waiting: one spread lot at {price / 100:.2f} is over the per-order limit")
-            elif want > 0 and not self._short(ctx) and ctx.send(want, price):
-                ctx.say(f"quoting {want} of {ctx.instrument_id} at {price / 100:.2f} "
+            elif want > 0 and ctx.send(want, price, side=self._side(q),
+                                       instrument_id=q.instrument_id, check_remaining=False,
+                                       role="quote"):  # fmt: skip
+                self.quote_in_flight[q.instrument_id] += want
+                free -= Fraction(want, abs(q.ratio) * lot)
+                ctx.say(f"quoting {want} of {q.instrument_id} at {price / 100:.2f} "
                         f"(spread {self.level / 100:.2f})")  # fmt: skip
 
     def _covering(self, ctx: AlgoContext, leg: SpreadLeg, side: Side) -> int:
-        """What working orders and orders on their way will still add on this leg and side."""
+        """What working orders and orders on their way will still add on this leg and side
+        (not quotes: they may never fill)."""
         return self.in_flight[leg.instrument_id] + sum(
             c.leaves_qty for c in ctx.working()
             if c.request.instrument_id == leg.instrument_id and c.request.side is side
+            and not self._is_quote(c)
         )  # fmt: skip
 
     def _hedge(self, ctx: AlgoContext) -> None:
@@ -417,7 +512,7 @@ class AutoSpreader(BaseStrategy):
         if self.first_unhedged_at is None:
             self.first_unhedged_at = ctx.now()
         self._sync(ctx)
-        for leg in self.others:
+        for leg in self.legs:
             side = self._side(leg)
             need = short.get(leg.instrument_id, 0) - self._covering(ctx, leg, side)
             if need <= 0:
@@ -431,7 +526,7 @@ class AutoSpreader(BaseStrategy):
             self._send(ctx, leg, side, need, price, "hedging")
 
     def _send(self, ctx: AlgoContext, leg: SpreadLeg, side: Side, need: int, price: int,
-              verb: str) -> None:  # fmt: skip
+              verb: str, role: str = "hedge") -> None:  # fmt: skip
         """Send `need` on a leg (never the quote), in pieces that each fit one order (#422),
         all at once."""
         cap = self._cap(ctx, leg.instrument_id, price)
@@ -442,7 +537,7 @@ class AutoSpreader(BaseStrategy):
         while need > 0:
             piece = need if cap is None else min(need, cap)
             if not ctx.send(piece, price, side=side, instrument_id=leg.instrument_id,
-                            check_remaining=False, hedge=True):  # fmt: skip
+                            check_remaining=False, hedge=True, role=role):  # fmt: skip
                 break
             self.in_flight[leg.instrument_id] += piece
             need -= piece
@@ -453,14 +548,15 @@ class AutoSpreader(BaseStrategy):
         first price is kept (the chase's anchor)."""
         for c in ctx.children():
             leg = c.request.instrument_id
-            if c.client_order_id in self.seen:
+            if c.client_order_id in self.seen or leg not in self.in_flight:
                 continue
-            quote = leg == self.q.instrument_id and c.request.side is ctx.side
-            if not quote and leg in self.in_flight:
-                self.seen.add(c.client_order_id)
-                self.in_flight[leg] = max(0, self.in_flight[leg] - c.request.qty)
-                if c.request.price_paise is not None:
-                    self.hedge_first[c.client_order_id] = c.request.price_paise
+            self.seen.add(c.client_order_id)
+            if self._is_quote(c):
+                self.quote_in_flight[leg] = max(0, self.quote_in_flight[leg] - c.request.qty)
+                continue
+            self.in_flight[leg] = max(0, self.in_flight[leg] - c.request.qty)
+            if c.request.price_paise is not None:
+                self.hedge_first[c.client_order_id] = c.request.price_paise
 
     def _chase(self, ctx: AlgoContext) -> None:
         """Working hedges follow the market to its best ± pay-up, never more than `chase`
@@ -468,7 +564,7 @@ class AutoSpreader(BaseStrategy):
         if self.flattening or self.restored or not self.controls.chase_ticks:
             return
         self._sync(ctx)
-        for leg in self.others:
+        for leg in self.legs:
             side = self._side(leg)
             level = self._best(ctx, leg)
             if level is None:
@@ -520,7 +616,7 @@ class AutoSpreader(BaseStrategy):
             return ActionPreview(HEDGE_NOW.name, HEDGE_NOW.label, (), False, "nothing is unhedged")
         self._sync(ctx)
         lines: list[str] = []
-        for leg in self.others:
+        for leg in self.legs:
             need = short.get(leg.instrument_id, 0)
             if not need:
                 continue
@@ -532,6 +628,7 @@ class AutoSpreader(BaseStrategy):
             working = [
                 c for c in ctx.working()
                 if c.request.instrument_id == leg.instrument_id and c.request.side is side
+                and not self._is_quote(c)
             ]  # fmt: skip
             for c in working:
                 lines.append(f"move {side.value} {c.leaves_qty} {_symbol(leg.instrument_id)} "
@@ -598,7 +695,7 @@ class AutoSpreader(BaseStrategy):
             if price is None:
                 ctx.say(f"flattening: {_symbol(leg.instrument_id)} has no price yet")
                 continue
-            self._send(ctx, leg, side, need, price, "flattening")
+            self._send(ctx, leg, side, need, price, "flattening", role="flatten")
 
     def _leg(self, instrument_id: str) -> SpreadLeg:
         return next(x for x in self.spread.legs if x.instrument_id == instrument_id)
@@ -619,13 +716,12 @@ class AutoSpreader(BaseStrategy):
             verb = "bought" if side is Side.BUY else "sold"
             done.append(f"{_symbol(leg.instrument_id)} {verb} {filled}")
         short = self._short(ctx)
-        per_lot = abs(self.q.ratio) * ctx.instrument().lot_size
         ctx.report(
             spread_name=self.spread.name,
             spread_side="BUY" if self.buying else "SELL",
             level_paise=self.level,
-            lots=ctx.qty // per_lot,
-            lots_done=self._net(ctx, self.q) // per_lot,
+            lots=self._lots(ctx),
+            lots_done=math.floor(self._lots_done(ctx)),
             legs=" · ".join(done),
             unhedged=sum(short.values()),
             short=", ".join(f"{n} on {_symbol(i)}" for i, n in short.items()),

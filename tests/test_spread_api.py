@@ -69,7 +69,7 @@ async def test_problems_are_said_in_words(tmp_path, nifty_fut):
     bad = {"name": "", "legs": [{**CALENDAR["legs"][0], "quote": False}, CALENDAR["legs"][1]]}
     r = await c.post("/api/spreads", json=bad)
     assert r.status_code == 422
-    one_leg = "choose exactly one leg to quote (quoting several legs at once comes with #251)"
+    one_leg = "choose at least one leg to quote"
     assert r.json()["detail"] == f"the name must be 1 to 40 characters; {one_leg}"
     extra = await c.post("/api/spreads", json={**CALENDAR, "owner": "riya"})
     assert extra.status_code == 422  # unknown fields are refused, never ignored

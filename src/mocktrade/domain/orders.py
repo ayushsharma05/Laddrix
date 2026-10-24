@@ -83,6 +83,10 @@ class OrderRequest:
     # sent by the exit desk (risk/closing.py) to close a position: the one order a kill
     # switch lets through, and only when it is also reduce-only (#262). Never from the API.
     forced_close: bool = False
+    # what this order is to the algo that sent it (#427), e.g. an Autospreader's "quote",
+    # "hedge" or "flatten": two kinds can share a leg and a side. Ours alone: brokers aren't
+    # told. Empty for orders sent by hand (and algo orders kept from before #427).
+    algo_role: str = ""
 
     @property
     def from_algo(self) -> bool:

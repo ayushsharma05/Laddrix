@@ -148,8 +148,7 @@ WHOLE = "the ratio must be a whole number from 1 to 50"
     ("mult", [leg(NOV, 1, 0, quote=True), leg(DEC, -1, -1)], "leg 1: the price multiplier must"),
     ("sign", [Q, leg(DEC, -1, 1)], "leg 2: the price multiplier must have the ratio's sign"),
     ("payup", [Q, leg(DEC, -1, -1, payup_ticks=51)], "leg 2: pay-up must be 0 to 50 ticks"),
-    ("none", [leg(NOV, 1, 1), leg(DEC, -1, -1)], "choose exactly one leg to quote"),
-    ("two", [Q, leg(DEC, -1, -1, quote=True)], "choose exactly one leg to quote"),
+    ("none", [leg(NOV, 1, 1), leg(DEC, -1, -1)], "choose at least one leg to quote"),
 ])  # fmt: skip
 def test_every_problem_is_said_in_words(name, legs, problem):
     found = check(name, legs, lookup)
@@ -158,6 +157,7 @@ def test_every_problem_is_said_in_words(name, legs, problem):
 
 def test_a_good_definition_has_no_problems_and_an_expired_leg_does():
     assert check("NIFTY Nov/Dec", calendar(), lookup) == []
+    assert check("both", [Q, leg(DEC, -1, -1, quote=True)], lookup) == []  # #427
     assert check("cal", calendar(), lookup, expired=lambda i: i.symbol == "NIFTY26DECFUT") == [
         "leg 2: NFO:NIFTY26DECFUT has expired"
     ]
@@ -190,7 +190,7 @@ def test_changes_are_checked_and_only_the_owner_changes_them(tmp_path):
     made = book.create(AYUSH, "cal", calendar())
     with pytest.raises(SpreadError) as bad:
         book.update(AYUSH, made.spread_id, "cal", [SpreadLeg(NOV, 1, 1), SpreadLeg(DEC, -1, -1)])
-    assert bad.value.problems[0].startswith("choose exactly one leg") and not bad.value.missing
+    assert bad.value.problems[0] == "choose at least one leg to quote" and not bad.value.missing
     with pytest.raises(SpreadError) as other:
         book.update(User("ravi", "Ravi"), made.spread_id, "mine now", calendar())
     assert other.value.missing

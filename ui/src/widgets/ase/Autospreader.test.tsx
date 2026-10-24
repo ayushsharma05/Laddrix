@@ -34,7 +34,7 @@ function setup(spreads: Spread[], params: Partial<AutospreaderParams> = {}, rout
     "POST /api/spreads": (body: unknown) => {
       posted.push(body);
       const b = body as { name: string };
-      if (!b.name) return { status: 422, body: { detail: "the name must be 1 to 40 characters; choose exactly one leg to quote" } };
+      if (!b.name) return { status: 422, body: { detail: "the name must be 1 to 40 characters; choose at least one leg to quote" } };
       return { status: 201, body: { ...CAL, spread_id: "s2", instrument_id: "SPREAD:s2", name: b.name } };
     },
     "PUT /api/spreads/s1": (body: unknown) => {
@@ -89,7 +89,7 @@ describe("the Autospreader", () => {
     fireEvent.mouseDown(await screen.findByRole("option", { name: /NIFTY26DECFUT/ }));
     fireEvent.click(screen.getByRole("button", { name: "Create spread" }));
     expect(await screen.findByText("the name must be 1 to 40 characters")).toBeTruthy(); // the server's words
-    expect(screen.getByText("choose exactly one leg to quote")).toBeTruthy(); // each problem on its own line
+    expect(screen.getByText("choose at least one leg to quote")).toBeTruthy(); // each problem on its own line
     fireEvent.change(screen.getByLabelText("Spread name"), { target: { value: "NIFTY Nov/Dec" } });
     expect(screen.getByText("price = NIFTY26NOVFUT − NIFTY26DECFUT")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Leg 2 pay-up ticks"), { target: { value: "4" } });
@@ -127,7 +127,8 @@ describe("the Autospreader", () => {
     await screen.findByLabelText("Edit NIFTY Nov/Dec");
     fireEvent.click(screen.getByRole("button", { name: "+ Add leg" }));
     fireEvent.change(screen.getByLabelText("Leg 2 ratio"), { target: { value: "-2" } });
-    fireEvent.click(screen.getByLabelText("Quote leg 2"));
+    fireEvent.click(screen.getByLabelText("Quote leg 2")); // leg 2 quotes too…
+    fireEvent.click(screen.getByLabelText("Quote leg 1")); // …and leg 1 no longer
     fireEvent.change(screen.getByLabelText("Leg 3 contract"), { target: { value: "nov" } });
     fireEvent.mouseDown(await screen.findByRole("option", { name: /NIFTY26NOVFUT/ }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
