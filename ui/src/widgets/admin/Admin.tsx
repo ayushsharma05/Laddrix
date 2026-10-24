@@ -3,7 +3,7 @@
 // rule (the last admin, nobody turns themselves off, ranges, what loosens a limit) is the
 // server's: this screen shows its answers in its own words.
 //
-//   [Users] Accounts  Limits                                      + New user
+//   [Users] Accounts  Limits  Status                              + New user
 //   ayush   Ayush Sharma   admin trader   on · 1 signed in   Roles…  Turn off…  Reset password…
 //   ┌ shown once ─────────────────────────┐
 //   │ temporary password  ▒▒▒▒  [QR]       │ give both to the user; they set their own at the
@@ -12,18 +12,21 @@
 //
 // Dangerous changes take a second click: turning a user or an account off, a new password or
 // authenticator, and any limit change the server marks as looser.
+//
+// Status (#287): each part of the server as the server says it (ops/status.py), refreshed
+// every 10 s: ready, starting, degraded or down, why, and since when.
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import type { AdminAccount, AdminAccounts, AdminUser, AlgoParamSpec, LimitsAnswer, LimitsSaved, LimitsSpec, RoleName, UserCreated } from "../../api/types";
+import type { AdminAccount, AdminAccounts, AdminUser, AlgoParamSpec, LimitsAnswer, LimitsSaved, LimitsSpec, RoleName, ServerStatus, StatusPart, UserCreated } from "../../api/types";
 import { useApp, useNow, useStore } from "../../app/context";
 import { QrCode } from "../../components/QrCode";
 import { SearchBox } from "../../components/SearchBox";
-import { shortName } from "../../lib/format";
+import { clock, shortName } from "../../lib/format";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
 import { accountState, limitGroups, limitInputs, parseLimits, totpParts, userState, type LimitInput, type LimitInputs } from "./model";
 
 export interface AdminParams extends BaseParams {
-  tab?: "users" | "accounts" | "limits";
+  tab?: "users" | "accounts" | "limits" | "status";
   accountId?: string; // the Limits tab's account
 }
 
@@ -45,6 +48,7 @@ const TABS: [NonNullable<AdminParams["tab"]>, string][] = [
   ["users", "Users"],
   ["accounts", "Accounts"],
   ["limits", "Limits"],
+  ["status", "Status"],
 ];
 
 export function Admin({ params, setParams }: WidgetProps<AdminParams>) {
@@ -67,6 +71,7 @@ export function Admin({ params, setParams }: WidgetProps<AdminParams>) {
       {tab === "users" && <Users canChange={canChange} />}
       {tab === "accounts" && <Accounts canChange={canChange} onLimits={(id) => setParams({ tab: "limits", accountId: id })} />}
       {tab === "limits" && <Limits canChange={canChange} accountId={params.accountId} pick={(id) => setParams({ accountId: id })} />}
+      {tab === "status" && <Status />}
     </div>
   );
 }
@@ -685,13 +690,72 @@ function LimitField({ param: p, value, onChange, disabled, short }: { param: Alg
   );
 }
 
+// --- status (#287) -----------------------------------------------------------------------------
+
+const REFRESH_MS = 10_000;
+const TONE: Record<StatusPart["state"], string> = { ready: "tone-good", starting: "tone-pending", degraded: "tone-warn", down: "tone-bad" };
+
+function Status() {
+  const { rest } = useApp();
+  const [status, setStatus] = useState<ServerStatus | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      rest
+        .get<ServerStatus>("/api/status")
+        .then((s) => {
+          if (!live) return;
+          setStatus(s);
+          setProblem(null);
+        })
+        .catch((e: unknown) => live && setProblem(errorText(e)));
+    load();
+    const timer = setInterval(load, REFRESH_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [rest]);
+
+  if (!status) return problem ? <div className="empty-note tone-bad">{problem}</div> : <div className="empty-note">loading…</div>;
+  const others = status.other_firms_not_ready;
+  return (
+    <>
+      <div className="admin-actions" role="status" aria-label="Server status">
+        <span className={`strong ${TONE[status.state]}`}>{status.state}</span>
+        <span>{status.ready ? "ready: Docker and the monitor see it healthy" : "not ready: Docker and the monitor see it unhealthy"}</span>
+        {others > 0 && <span className="dim">({others} of another firm's parts not ready)</span>}
+        <span className="book-spacer" />
+        <span className="dim">as of {clock(status.at, false)}</span>
+      </div>
+      {problem && (
+        <div className="empty-note tone-bad" role="alert">
+          {problem}
+        </div>
+      )}
+      <div className="book-scroll">
+        {status.parts.map((p) => (
+          <div key={p.name} className="row book-row admin-status-row" aria-label={p.name}>
+            <span className="strong">{p.name}</span>
+            <span className={TONE[p.state]}>{p.state}</span>
+            <span>{p.reason}</span>
+            <span className="dim">{p.since ? `since ${clock(p.since, false)}` : ""}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 registerWidget<AdminParams>({
   kind: "admin",
   title: "Admin",
-  description: "Users, roles, broker accounts and each account's risk limits",
+  description: "Users, roles, broker accounts, each account's risk limits, and the server's status",
   component: Admin,
   defaults: () => ({ link: "none", tab: "users" }),
   link: "none",
   roles: ["admin", "risk"],
-  size: { width: 900, height: 520 }, // three tabs of forms: room to read them (or pop it out)
+  size: { width: 900, height: 520 }, // four tabs, mostly forms: room to read them (or pop it out)
 });

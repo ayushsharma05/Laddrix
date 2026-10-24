@@ -1,0 +1,17 @@
+# Prometheus for MockTrade (#287): reads the app's metrics every 15 s on the private network.
+# The app answers only with its key (MOCKTRADE_METRICS_TOKEN in deploy/.env), handed to
+# Prometheus as a Compose secret, never written into this file.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: mocktrade
+    metrics_path: /api/metrics
+    params:
+      format: [prometheus]
+    authorization:
+      type: Bearer
+      credentials_file: /run/secrets/metrics_token
+    static_configs:
+      - targets: ["app:8000"]

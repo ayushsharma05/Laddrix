@@ -50,13 +50,17 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   5. #428 structure positions (spreads held, their P&L, the unallocated rest): merged (PR #434);
   6. #429 spread charts (candles of the spread's mark from its legs, gaps shown): merged (PR #435).
   All six are done; the parent issues #250 and #251 are closed.
-- **Pull requests:** none open.
+- **Ayush asked (24 Oct, late) for #287, then a file-by-file review of the whole repo.**
+  1. #287 operations: JSON logs with ids, one status of every part (readiness, Docker's
+     health, the Admin screen's Status tab), Prometheus's own key, an optional Prometheus +
+     Grafana dashboard ([docs/runbooks/monitoring.md](../docs/runbooks/monitoring.md)): in its PR.
+  2. The repo review: next, in its own issue and PR.
+- **Pull requests:** the #287 PR.
 
 ## What's next
 
 1. **Ayush's to-do list** (one GitHub issue): the steps only he can do, in order.
 2. **The feature issues**, smallest dependency first:
-   - operations: #287;
    - phone screens: #283;
    - Post-v1: #242–#255;
    - decisions: #292, #278;

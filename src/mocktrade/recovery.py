@@ -26,7 +26,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 from fractions import Fraction
 from zoneinfo import ZoneInfo
 
@@ -57,6 +57,7 @@ class RecoveryGate:
     def __init__(self) -> None:
         self.state = "recovering"  # "recovering" | "ok" | "failed"
         self.reason = "rebuilding orders and positions after a restart"
+        self.since = datetime.now(UTC)  # when it entered its state (the status page, #287)
         self.finished = asyncio.Event()
         self._listeners: list[Callable[[str, str], None]] = []
 
@@ -64,7 +65,7 @@ class RecoveryGate:
         self._listeners.append(listener)
 
     def set(self, state: str, reason: str = "") -> None:
-        self.state, self.reason = state, reason
+        self.state, self.reason, self.since = state, reason, datetime.now(UTC)
         if state != "recovering":
             self.finished.set()
         for listener in list(self._listeners):

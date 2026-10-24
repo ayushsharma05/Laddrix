@@ -39,6 +39,12 @@ Settings (environment; secrets never on the command line):
     MOCKTRADE_TRUSTED_PROXIES  (none)     the reverse proxy's addresses: only its
                                           X-Forwarded-For is believed, so login limits
                                           see the real client
+    MOCKTRADE_LOG_FORMAT       json       json: one JSON object a line, with the request,
+                                          user, account and order ids (ops/logs.py);
+                                          text: plain lines, for reading by eye
+    MOCKTRADE_METRICS_TOKEN    (none)     a monitoring system's own key for
+                                          GET /api/metrics?format=prometheus (sent as
+                                          "Authorization: Bearer ..."; 32+ characters)
 
 In Kite's developer console, the app's redirect URL is <MOCKTRADE_ORIGIN>/kite/callback.
 
@@ -88,6 +94,7 @@ from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.marketdata.sources import PriceSources
 from mocktrade.metrics import freeze_heap, watch_loop_lag
+from mocktrade.ops import logs
 from mocktrade.ops.alerts import Alerts
 from mocktrade.ops.checks import Checks, PriceFeed, PriceOverload, audit_log
 from mocktrade.ops.fence import DataFence, FenceError
@@ -120,6 +127,7 @@ LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 EGRESS_SCHEMES = ("http", "https")  # a proxy giving an account its own IP (#372)
+MIN_METRICS_TOKEN = 32  # a key, not a password: long and random
 
 
 @dataclass(frozen=True)
@@ -140,6 +148,8 @@ class ServeSettings:
     record_days: int = 30  # keep this many days of recorded ticks (0: don't record)
     algo_ids: tuple[tuple[str, str], ...] = ()  # exchange algo ids per algo code (#291)
     freeze_file: Path | None = None  # freeze quantities per underlying (#424)
+    log_format: str = "json"  # json or text (#287)
+    metrics_token: str = field(default="", repr=False)  # Prometheus's key (#287)
 
     def kite_url(self, name: str, default: str) -> str:
         """KITE_API_URL / KITE_WS_URL: only to point at a Kite simulator (load tests)."""
@@ -243,6 +253,13 @@ class ServeSettings:
         unknown = sorted(set(algo_ids) - {t.spec.code for t in BUILTIN} - {ASE.code})
         if unknown:
             problems.append(f"MOCKTRADE_ALGO_IDS: no algo called {', '.join(unknown)}")
+        log_format = env.get("MOCKTRADE_LOG_FORMAT", "json")
+        if log_format not in logs.FORMATS:
+            problems.append(f"MOCKTRADE_LOG_FORMAT must be json or text, got {log_format!r}")
+        metrics_token = env.get("MOCKTRADE_METRICS_TOKEN", "")
+        if metrics_token and len(metrics_token) < MIN_METRICS_TOKEN:
+            problems.append(f"MOCKTRADE_METRICS_TOKEN must be at least {MIN_METRICS_TOKEN} "
+                            "characters (make one: openssl rand -hex 32)")  # fmt: skip
         if problems:
             raise ConfigError("; ".join(problems))
         return cls(
@@ -262,6 +279,8 @@ class ServeSettings:
             record_days=int(record_text) if record_text.isdigit() else 30,
             algo_ids=tuple(sorted(algo_ids.items())),
             freeze_file=Path(freeze_text) if freeze_text else None,
+            log_format=log_format,
+            metrics_token=metrics_token,
         )
 
 
@@ -573,7 +592,11 @@ def build(settings: ServeSettings) -> Assembly:
     app = create_app(
         platform,
         users,
-        ServerSettings(origin=settings.origin, cookie_secure=settings.cookie_secure),
+        ServerSettings(
+            origin=settings.origin,
+            cookie_secure=settings.cookie_secure,
+            metrics_token=settings.metrics_token,
+        ),  # fmt: skip
         broker_login=kite.login if kite else None,
         broker_status=kite.status if kite else None,
         alerts=alerts,
@@ -591,6 +614,7 @@ def build(settings: ServeSettings) -> Assembly:
         spreads=spreads,
         static_dir=ui,
     )
+    jobs.append(app.state.status.watch)  # "since when" on the status page (#287)
     built = Assembly(app, platform, users, events, jobs, brokers, running, not_running, kite)
     built.fence = fence
     built.alerts, built.notifier = alerts, notifier
@@ -653,6 +677,7 @@ async def run(settings: ServeSettings) -> None:
         proxy_headers=bool(settings.trusted_proxies),
         forwarded_allow_ips=settings.trusted_proxies or None,
         server_header=False,
+        log_config=None,  # its lines go to our handler (ops/logs.py): JSON like the rest
         log_level="info",
         ws_ping_interval=20,
         ws_ping_timeout=20,
@@ -690,7 +715,8 @@ def main(argv: list[str], env: Mapping[str, str]) -> int:
     parser = argparse.ArgumentParser(prog="mocktrade.tools.serve")
     parser.add_argument("--check", action="store_true", help="check the settings and exit")
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    fmt = env.get("MOCKTRADE_LOG_FORMAT", "json")
+    logs.setup(fmt if fmt in logs.FORMATS else "text")  # a wrong value is said below, readably
     try:
         settings = ServeSettings.from_env(env)
     except ConfigError as exc:

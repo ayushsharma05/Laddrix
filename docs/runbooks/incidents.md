@@ -359,12 +359,13 @@ updates, recovery, GTT watch, position reconciling and algos, plus marking posit
   wait, and say why. **Cancels still go.**
 - **After 5 failures in 5 minutes** it stops trying, and new orders stay paused until the
   server restarts.
-- **`GET /api/ready`** answers 503 meanwhile. `GET /api/health` still says alive: the web
-  server is fine, trading isn't.
+- **`GET /api/ready`** answers 503 meanwhile, and Docker shows the app `unhealthy`.
+  `GET /api/health` still says alive: the web server is fine, trading isn't. The Admin
+  screen's **Status** tab shows the loop, its error and since when ([monitoring.md](monitoring.md)).
 
 **Steps:**
 1. Read the error in the alert and in the server log (`docker compose -f deploy/compose.yaml
-   logs app --since 10m`).
+   logs app --since 10m`; searching it with jq: [monitoring.md](monitoring.md#the-log)).
 2. Fix the cause: the broker down, the disk full, the network.
 3. A loop that recovered needs nothing more: the band clears by itself. One that was stopped
    needs a restart (`docker compose -f deploy/compose.yaml restart app`). Recovery then

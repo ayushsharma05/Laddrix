@@ -137,6 +137,15 @@ An older `users.db` gets the new column (`must_change`) and table when the serve
 - **Save** sends exactly what was checked. Editing after a check removes the preview, so a new check is needed.
 - A change marked **looser** takes a second click ("Confirm: loosen and save").
 
+**Status tab (#287)** ![Status tab](../../context/images/status-page.png)
+- Each part of the server as `GET /api/status` says it: the server, the supervisor's watchdog,
+  each background loop, each account's recovery, the audit log, and a row for each kind of ops
+  alert (prices, broker login, disk, price load, and any other active alert).
+- Each part is ready, starting, degraded or down, with why and since when. It refreshes every 10 s.
+- The header shows the worst state and whether Docker sees the server healthy (= ready).
+- Admin and risk only, and only their own firm's accounts. How the states are decided, and
+  what to do about each: [runbooks/monitoring.md](../runbooks/monitoring.md).
+
 **Second clicks** also guard: turning a user or an account off, a new password, and a new authenticator.
 
 **First sign-in.** A user with a one-time password sees only **Set your password**:

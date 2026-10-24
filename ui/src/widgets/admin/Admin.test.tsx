@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { AdminAccount, AdminUser, LimitsSaved } from "../../api/types";
 import { AppProvider, createApp } from "../../app/context";
 import { fakeRest, fakeStream } from "../../test/fakes";
@@ -259,5 +259,51 @@ describe("Admin: limits", () => {
     await screen.findByRole("group", { name: "Limits of acc-a" });
     expect(field("Most lots per order").disabled).toBe(true);
     expect(screen.queryByRole("button", { name: "Check changes" })).toBeNull();
+  });
+});
+
+describe("Admin: status (#287)", () => {
+  const STATUS = {
+    state: "down",
+    ready: false,
+    other_firms_not_ready: 1,
+    at: "2026-10-24T04:00:00+00:00",
+    parts: [
+      { name: "server", state: "ready", reason: "answering", since: "2026-10-24T03:45:00+00:00", account_id: null },
+      { name: "recovery acc-a", state: "starting", reason: "rebuilding orders and positions after a restart", since: null, account_id: "acc-a" },
+      { name: "broker login acc-a", state: "degraded", reason: "Log in to Kite for acc-a (AB1234): the market opens in 5 min", since: "2026-10-24T03:40:00+00:00", account_id: "acc-a" },
+      { name: "prices", state: "down", reason: "No prices for over a minute during market hours", since: "2026-10-24T03:59:00+00:00", account_id: null },
+    ],
+  };
+
+  it("shows each part as the server says it, the worst first in the header, and asks again every 10 s", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const w = world();
+    w.routes["GET /api/status"] = STATUS;
+    show(w, { tab: "status" });
+    const header = await screen.findByRole("status", { name: "Server status" });
+    expect(header.textContent).toContain("down");
+    expect(header.textContent).toContain("not ready: Docker and the monitor see it unhealthy");
+    expect(header.textContent).toContain("(1 of another firm's parts not ready)"); // never whose
+    const prices = screen.getByLabelText("prices");
+    expect(prices.textContent).toBe("pricesdownNo prices for over a minute during market hourssince 09:29:00");
+    expect(within(prices).getByText("down").className).toBe("tone-bad");
+    expect(within(screen.getByLabelText("broker login acc-a")).getByText("degraded").className).toBe("tone-warn");
+    expect(within(screen.getByLabelText("recovery acc-a")).getByText("starting").className).toBe("tone-pending");
+    expect(screen.getByLabelText("server").textContent).toContain("since 09:15:00");
+    const asked = () => sent(w, "GET", "/api/status").length;
+    expect(asked()).toBe(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(asked()).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it("a refusal is said in the server's words", async () => {
+    const w = world(["risk"]);
+    w.routes["GET /api/status"] = () => ({ status: 403, body: { detail: "the status page is for admin and risk users" } });
+    show(w, { tab: "status" });
+    expect((await screen.findByText("the status page is for admin and risk users")).className).toContain("tone-bad");
   });
 });

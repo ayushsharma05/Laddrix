@@ -22,6 +22,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class LoopState:
     state: str = "starting"  # starting | running | restarting | quarantined | done
     failures: list[float] = field(default_factory=list)  # monotonic times of failures
     last_error: str = ""
+    since: datetime | None = None  # when it entered its state (the status page, #287)
 
     @property
     def down(self) -> bool:
@@ -53,9 +55,11 @@ class Supervisor:
         alert: Callable[[str, str, str, str | None], None] = lambda _k, _l, _t, _a: None,
         monotonic: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._alert = alert  # (key, level, text, account_id): ops alerts
         self._now = monotonic
+        self._clock = clock
         self._sleep = sleep
         self.loops: dict[str, LoopState] = {}
         self._beat: float | None = None
@@ -70,8 +74,12 @@ class Supervisor:
                    critical: bool = True, account_id: str | None = None) -> None:  # fmt: skip
         """Run `factory()` and keep it running (see the module notes). Cancelling this ends it."""
         loop = self.loops[name] = LoopState(name, critical, account_id)
+
+        def enter(state: str) -> None:
+            loop.state, loop.since = state, self._clock()
+
         while True:
-            loop.state = "running"
+            enter("running")
             try:
                 await factory()
             except asyncio.CancelledError:
@@ -83,14 +91,14 @@ class Supervisor:
                 loop.last_error = f"{type(exc).__name__}: {exc}"
                 log.exception("%s failed", name)
                 if len(loop.failures) >= QUARANTINE_AFTER:
-                    loop.state = "quarantined"
+                    enter("quarantined")
                     self._alert(f"loop:{name}", "ERROR",
                                 f"{name} keeps failing ({loop.last_error}): stopped trying"
                                 f"{'; new orders paused' if critical else ''}. Restart the "
                                 "server once the cause is fixed", account_id)  # fmt: skip
                     return
                 wait = BACKOFF_S[min(len(loop.failures) - 1, len(BACKOFF_S) - 1)]
-                loop.state = "restarting"
+                enter("restarting")
                 self._alert(f"loop:{name}", "ERROR" if critical else "WARN",
                             f"{name} failed ({loop.last_error}): restarting in {wait:g} s"
                             f"{'; new orders paused until it runs' if critical else ''}",
@@ -98,7 +106,7 @@ class Supervisor:
                 await self._sleep(wait)
                 self._alert(f"loop:{name}", "OK", f"{name} restarted", account_id)
                 continue
-            loop.state = "done"
+            enter("done")
             return
 
     async def watchdog(self) -> None:

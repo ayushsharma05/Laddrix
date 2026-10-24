@@ -616,6 +616,9 @@ button.lc:disabled {
 .tone-pending {
   color: var(--pending);
 }
+.tone-warn {
+  color: var(--pending); /* worth a look: a residual, a degraded part */
+}
 .tone-dim {
   color: var(--text-2);
 }
@@ -1960,4 +1963,16 @@ label.algo-field {
   display: flex;
   gap: 12px;
   padding: 4px 8px;
+}
+
+/* the Admin screen's Status tab (#287): one row a part */
+.admin-status-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) 80px minmax(200px, 3fr) 120px;
+  gap: 8px;
+  align-items: baseline;
+}
+.admin-status-row > span {
+  white-space: normal; /* a loop's name and a reason are read whole, never cut */
+  overflow-wrap: anywhere;
 }

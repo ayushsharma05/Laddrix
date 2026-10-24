@@ -140,9 +140,18 @@ class Metrics:
     def prometheus(self) -> str:
         """The Prometheus text format, for a monitoring system."""
         lines = []
+        typed: set[str] = set()
+
+        def kind(metric: str, of: str) -> None:
+            """One TYPE line per metric, before its first sample: Prometheus refuses a
+            second one (http_us{route=...} has a sample for every route)."""
+            if metric not in typed:
+                typed.add(metric)
+                lines.append(f"# TYPE {metric} {of}")
+
         for name, h in sorted(self._histograms.items()):
             metric, labels = _split(name)
-            lines.append(f"# TYPE mocktrade_{metric} histogram")
+            kind(f"mocktrade_{metric}", "histogram")
             cumulative = 0
             for bound, n in zip(BOUNDS, h.counts, strict=False):
                 cumulative += n
@@ -154,12 +163,12 @@ class Metrics:
             lines.append(f"mocktrade_{metric}_count{_labels(labels)} {h.count}")
         for name, value in sorted(self._counters.items()):
             metric, labels = _split(name)
-            lines.append(f"# TYPE mocktrade_{metric}_total counter")
+            kind(f"mocktrade_{metric}_total", "counter")
             lines.append(f"mocktrade_{metric}_total{_labels(labels)} {value}")
         for name, value in self.snapshot()["gauges"].items():
             if value is not None:
                 metric, labels = _split(name)
-                lines.append(f"# TYPE mocktrade_{metric} gauge")
+                kind(f"mocktrade_{metric}", "gauge")
                 lines.append(f"mocktrade_{metric}{_labels(labels)} {value}")
         return "\n".join(lines) + "\n"
 
