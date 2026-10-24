@@ -169,6 +169,9 @@ Tip: tick each file off as you read it. A file that feels hard: read its test fi
 72. [ ] `src/mocktrade/alerts/engine.py` — Market alerts: price, % move, day volume, open interest and spread, checked on every tick.
 73. [ ] `src/mocktrade/alerts/service.py` — Market alerts for the server: the engine, kept per user, told to the screens, the audit
 74. [ ] `src/mocktrade/alerts/store.py` — Alerts kept across restarts: one JSON file per user (their alerts and their webhook).
+74a. [ ] `src/mocktrade/spreads/model.py` — A multi-leg spread and its live implied price (#414).
+74b. [ ] `src/mocktrade/spreads/store.py` — Each user's spread definitions, kept across restarts (#414).
+74c. [ ] `src/mocktrade/spreads/pricer.py` — Live implied spread prices, as ticks of "SPREAD:<id>" (#414).
 75. [ ] `src/mocktrade/alerts/webhook.py` — Alerts sent to a user's webhook: signed, retried, never on the trading loop's time.
 
 **options/**
@@ -331,6 +334,8 @@ Tip: tick each file off as you read it. A file that feels hard: read its test fi
 50. [ ] `ui/src/widgets/alerts/AlertsManager.tsx` — Alerts: your price, % move, volume, OI and spread alerts (K12.4; the engine is K12.3,
 51. [ ] `ui/src/widgets/alerts/model.ts` — Alerts manager logic (K12.4): the create request from the server's alert spec, what an
 52. [ ] `ui/src/widgets/alerts/testdata.ts` — Alerts test data, shared by the model and widget tests.
+52a. [ ] `ui/src/widgets/ase/model.ts` — The Autospreader's form, as pure functions (#414).
+52b. [ ] `ui/src/widgets/ase/Autospreader.tsx` — The Autospreader (#414): define spreads of 2 to 6 legs and see each one's live implied price.
 
 **widgets/algos/**
 

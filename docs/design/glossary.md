@@ -92,6 +92,9 @@ Every term a trader or a developer meets in MockTrade, in plain words. Code name
 | Term | Meaning |
 |---|---|
 | **Algo, parent order** | An order MockTrade works for you over time by sending **child** orders. |
+| **Spread, leg** | Several contracts traded as one: each contract is a leg, bought or sold in a fixed ratio (a calendar: buy November, sell December). |
+| **Implied price** | A spread's price worked out from its legs' prices now: what buying (or selling) every leg at once would cost. |
+| **Autospreader** | Trades a spread by quoting one leg and hedging the other legs the moment it fills ([spreads.md](spreads.md)). |
 | **Slicer, TWAP, VWAP, POV, Iceberg, Spreader** | Execution algos: equal slices; even over time; in step with the day's volume; a share of volume; only a small slice showing; two legs at a spread. |
 | **Trailing stop, OCO, Bracket** | Protection algos: a stop that follows the price; a target and a stop; an entry with both. **Held by MockTrade**, so they work only while the server runs. |
 | **Algo id (SEBI)** | The exchange-issued id an approved algo must carry. |

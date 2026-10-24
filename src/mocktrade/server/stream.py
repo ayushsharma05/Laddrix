@@ -114,7 +114,10 @@ class StreamHub:
         alerts: Alerts | None = None,
         market: Callable[[User], Market] | None = None,  # the person's own prices' (#395)
         market_alerts: MarketAlerts | None = None,
+        # a spread's implied price "SPREAD:<id>" is known to its owner only (#414)
+        spread_visible: Callable[[User, str], bool] = lambda _user, _id: False,
     ) -> None:
+        self._spread_visible = spread_visible
         self._clock = clock
         self._platform = platform
         self._users = users
@@ -352,7 +355,8 @@ class StreamHub:
         if op == "unsubscribe":
             connection.ticks.remove(ids)
             return
-        known = [i for i in ids if self._platform.instruments.get(i) is not None]
+        known = [i for i in ids if self._platform.instruments.get(i) is not None
+                 or self._spread_visible(connection.user, i)]  # fmt: skip
         unknown = sorted(set(ids) - set(known))
         if unknown:
             connection.put({"type": "error", "message": f"unknown instruments: {unknown}"})

@@ -64,6 +64,7 @@ from mocktrade.server.admin import CallbackStarter
 from mocktrade.server.app import ServerSettings, create_app
 from mocktrade.server.security import SecretBox
 from mocktrade.server.users import UserStore
+from mocktrade.spreads.store import SpreadBook
 from mocktrade.store.events import EventLog
 
 DATA = Path("data/demo")
@@ -216,6 +217,8 @@ async def main(
                                               f"--port {port + 1}",
                      backtests=backtests, candles_for=candle_stores.of, charts=charts,
                      market_alerts=market_alerts,
+                     spreads=SpreadBook.at(data / "spreads", platform.instruments.get,
+                                           platform.expiries.expired),
                      starter=CallbackStarter(("paper",), start))  # fmt: skip
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info"))
     logsafe.install()  # the same filter as the real server: no secret in a log line (#367)

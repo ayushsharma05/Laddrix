@@ -36,7 +36,7 @@ holds is listed here with its class, where it lives, who can read it, and how lo
 | --- | --- | --- | --- |
 | Audit trail (every order event, fill, STOP, admin change, login) | `events.db` | **at least 5 years; never deleted by MockTrade** | SEBI requires stock brokers to preserve their books and records for at least five years, and longer while any investigation or case about them is open (SEBI (Stock Brokers) Regulations, reg. 18; SEBI circular MRD/DoP/SE/Cir-21/2009). MockTrade is not the broker, but the firm using it must be able to show what it did. **The firm's compliance officer confirms the period** before going live. |
 | End-of-day reports | `reports/` | as the audit trail | they are built from it, and are what an auditor reads first |
-| Risk limits, MTM rules, alerts, users and accounts | `users.db`, `rules/`, `alerts/` | while in use | current configuration; every change is in the audit trail |
+| Risk limits, MTM rules, alerts, spreads, users and accounts | `users.db`, `rules/`, `alerts/`, `spreads/` | while in use | current configuration; every change is in the audit trail |
 | Sessions | `users.db` | 2 h idle, 12 h at most; ended by logout, password change, disabling, revoke | access, not records |
 | Backups | the volume / `/var/backups/mocktrade` | 14 days / 30 days | recovery, not archiving: for older history, the audit trail itself is kept |
 | Broker tokens | `kite_token_*.json` | until 6 AM the next day (they expire) | never backed up |
@@ -51,15 +51,15 @@ MockTrade itself never deletes from it.
 
 - **Export:** `python -m mocktrade.tools.users export-user <id> > <id>.json`.
   - It contains their profile, their accounts (as owner or trader), settings, layouts and
-    sessions, their alerts and webhook address, their backtests, and every audit entry that
-    names them.
+    sessions, their alerts and webhook address, their spread definitions, their backtests,
+    and every audit entry that names them.
   - It never contains a secret: the password hash, the authenticator secret and the webhook's
     signing key are named as held, not given.
 - **Erase:** `python -m mocktrade.tools.users erase-user <id> --confirm <id>`, with the server
   stopped.
   - **Refused** if they own an account (give it another owner first), if they are the last
     admin, or while a server holds the data folder.
-  - **Removes:** their alerts and webhook, their backtests, their sessions, settings and
+  - **Removes:** their alerts and webhook, their spreads, their backtests, their sessions, settings and
     layouts, and them from every account's traders. Their name, password and authenticator
     are replaced, and they can't log in.
   - **Kept:** their id and their entries in the audit trail. The trail must be kept (§3) and

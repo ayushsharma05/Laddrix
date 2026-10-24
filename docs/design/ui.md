@@ -236,6 +236,12 @@ Instrument, LTP, change %; click opens or links a ladder.
 Toolbar: pause, resume, cancel, Backoff, Payup, All ▾, OCO; grid: instrument, algo, side,
 price, qty, filled, state.
 
+### Autospreader (#414)
+Your spreads of 2 to 6 legs: each one's legs ("+1 NIFTY26NOVFUT −1 NIFTY26DECFUT") and its
+live implied bid and ask with their size in spread lots. **New** / **Edit** define the legs:
+contract (search), ratio, price ×, which leg quotes, pay-up. The server checks the rules and
+says what's wrong in words. Design: [spreads.md](spreads.md).
+
 ## 5. Safety interactions
 
 - **STOP** (toolbar or Ctrl+Shift+K) opens a small dialog: what will be cancelled, what is

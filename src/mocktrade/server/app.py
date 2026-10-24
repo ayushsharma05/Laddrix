@@ -87,6 +87,15 @@ from mocktrade.server.admin import AccountStarter, admin_router
 from mocktrade.server.formats import algo_to_dict, position_to_dict
 from mocktrade.server.stream import StreamHub
 from mocktrade.server.users import SESSION_MAX, LoginFailed, UserStore
+from mocktrade.spreads.model import (
+    SpreadDef,
+    SpreadLeg,
+    leg_to_dict,
+    spread_tick,
+    spread_to_dict,
+)
+from mocktrade.spreads.pricer import SpreadPricer
+from mocktrade.spreads.store import SpreadBook, SpreadError
 from mocktrade.store.events import StoredEvent
 from mocktrade.version import BUILD, VERSION
 
@@ -349,6 +358,19 @@ class LayoutIn(_Strict):
     layout: dict[str, Any]  # the screens' own description of their widgets
 
 
+class SpreadLegIn(_Strict):
+    instrument_id: str = Field(min_length=3, max_length=64)
+    ratio: int  # the rules (range, sign, one quoting leg) are checked in words: spreads/model.py
+    multiplier: int
+    quote: bool = False
+    payup_ticks: int = 2
+
+
+class SpreadIn(_Strict):
+    name: str = Field(max_length=200)
+    legs: list[SpreadLegIn] = Field(max_length=20)
+
+
 # --- the app -------------------------------------------------------------------------------
 
 
@@ -377,6 +399,7 @@ def create_app(
     market_alerts: MarketAlerts | None = None,
     starter: AccountStarter | None = None,
     protection: ProtectionGuard | None = None,
+    spreads: SpreadBook | None = None,  # each user's spread definitions (#414)
     monotonic: Callable[[], float] = time.monotonic,
     static_dir: Path | None = None,
 ) -> FastAPI:
@@ -390,6 +413,12 @@ def create_app(
     no_prices = MarketData()  # someone with no subscription of their own: nothing ticks
     for source in platform.prices.all():  # from the start: no tick is missed before a screen asks
         markets.of(source)
+    # spreads (#414): priced on every price source, from that source's own leg prices
+    book = spreads if spreads is not None else SpreadBook(
+        None, platform.instruments.get, platform.expiries.expired)  # fmt: skip
+    app.state.spreads = book
+    app.state.pricers = [SpreadPricer(md, book, platform.instruments.get)
+                         for md in [*platform.prices.all(), no_prices]]  # fmt: skip
 
     def market(user: User) -> Market:
         found = platform.prices.for_user(user, users.accounts())
@@ -403,6 +432,7 @@ def create_app(
         alerts=alerts,
         market=market,
         market_alerts=market_alerts,
+        spread_visible=lambda user, i: book.visible(user, i) is not None,
     )
     app.state.hub = hub
     METRICS.gauge("stream_connections", lambda: hub.connections)
@@ -1296,6 +1326,45 @@ def create_app(
     app.include_router(admin_router(platform, users, current_user, audit, starter,
                                     require_step_up))  # fmt: skip
 
+    # --- spreads (#414): each user's own multi-leg definitions --------------------------------
+
+    def _legs(body: SpreadIn) -> list[SpreadLeg]:
+        return [SpreadLeg(x.instrument_id, x.ratio, x.multiplier, x.quote, x.payup_ticks)
+                for x in body.legs]  # fmt: skip
+
+    def _spread_out(s: SpreadDef) -> dict[str, Any]:
+        return {**spread_to_dict(s), "tick_paise": spread_tick(s.legs, platform.instruments.get)}
+
+    @app.get("/api/spreads")
+    async def list_spreads(user: Me) -> list[dict[str, Any]]:
+        return [_spread_out(s) for s in book.mine(user)]
+
+    @app.post("/api/spreads", status_code=201)
+    async def create_spread(body: SpreadIn, user: Me) -> dict[str, Any]:
+        try:
+            made = book.create(user, body.name, _legs(body))
+        except SpreadError as exc:
+            raise HTTPException(422, str(exc)) from None
+        await book.save(user.id)
+        return _spread_out(made)
+
+    @app.put("/api/spreads/{spread_id}")
+    async def update_spread(spread_id: str, body: SpreadIn, user: Me) -> dict[str, Any]:
+        try:
+            changed = book.update(user, spread_id, body.name, _legs(body))
+        except SpreadError as exc:
+            raise HTTPException(404 if exc.missing else 422, str(exc)) from None
+        await book.save(user.id)
+        return _spread_out(changed)
+
+    @app.delete("/api/spreads/{spread_id}", status_code=204)
+    async def delete_spread(spread_id: str, user: Me) -> None:
+        try:
+            book.delete(user, spread_id)
+        except SpreadError as exc:
+            raise HTTPException(404, str(exc)) from None
+        await book.save(user.id)
+
     # --- instruments and layouts -------------------------------------------------------------
 
     @app.get("/api/instruments")
@@ -1308,6 +1377,10 @@ def create_app(
     @app.get("/api/instruments/{instrument_id}")
     async def get_instrument(instrument_id: str, user: Me) -> dict[str, Any]:
         instrument = platform.instruments.get(instrument_id)
+        if instrument is None and (spread := book.visible(user, instrument_id)) is not None:
+            tick = market(user).prices.latest(instrument_id)  # its implied price, if watched
+            found = _spread_instrument(spread, platform.instruments.get)
+            return {**found, "ltp_paise": tick.ltp_paise if tick else None}
         if instrument is None:
             raise HTTPException(404, "no such instrument")
         tick = market(user).prices.latest(instrument_id)  # the asker's own price (#395)
@@ -1812,6 +1885,24 @@ def _instrument(i: Instrument, expiries: Expiries | None = None) -> dict[str, An
         "underlying": i.underlying,
         "tradable": i.tradable,
         "expiry_info": expiry_to_dict(expiries.info(i)) if expiries else None,
+    }
+
+
+def _spread_instrument(s: SpreadDef, lookup: Callable[[str], Instrument | None]) -> dict[str, Any]:
+    """A spread as an instrument, for the screens: one spread lot is one "lot" (#414)."""
+    return {
+        "id": s.instrument_id,
+        "exchange": "SPREAD",
+        "symbol": s.name,
+        "kind": "SPREAD",
+        "tick_paise": spread_tick(s.legs, lookup),
+        "lot_size": 1,
+        "expiry": None,
+        "strike_paise": None,
+        "underlying": None,
+        "tradable": False,  # trading a spread from a ladder comes with #416
+        "expiry_info": None,
+        "spread": {"spread_id": s.spread_id, "legs": [leg_to_dict(x) for x in s.legs]},
     }
 
 

@@ -1,6 +1,6 @@
 """One person's data: exported for them, erased on request (#367).
 
-export-user ─► profile, accounts, settings, layouts, sessions, alerts, webhook (its key
+export-user ─► profile, accounts, settings, layouts, sessions, alerts, spreads, webhook (its key
                named, not given), backtests, every audit entry naming them
 erase-user  ─► refused while a server runs, if they own an account, if they are the last
                admin, or without --confirm; else everything above goes except the audit
@@ -19,6 +19,7 @@ from mocktrade.ops.fence import DataFence
 from mocktrade.server import security
 from mocktrade.server.security import SecretBox
 from mocktrade.server.users import LastAdmin, LoginFailed, UserStore
+from mocktrade.spreads.store import SpreadBook
 from mocktrade.store.events import EventLog, verify_chain
 from mocktrade.tools import users as users_tool
 
@@ -40,6 +41,10 @@ async def world(tmp_path):
     hooks = AlertStore(tmp_path / "alerts")
     hooks.set_webhook("riya", {"url": "https://hooks.example.com/r", "secret": "whsec-riya-1"})
     hooks.set_webhook("ayush", {"url": "https://hooks.example.com/a", "secret": "whsec-ayush"})
+    for user in ("riya", "ayush"):  # their spread definitions (#414)
+        path = SpreadBook(tmp_path / "spreads", lambda _i: None).path_of(user)
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(json.dumps({"user": user, "spreads": [{"name": f"{user}'s calendar"}]}))
     for run_id, owner in (("bt-1", "riya"), ("bt-2", "ayush")):
         (tmp_path / "backtests" / run_id).mkdir(parents=True)
         (tmp_path / "backtests" / run_id / "run.json").write_text(json.dumps({"owner": owner}))
@@ -73,6 +78,7 @@ async def test_an_export_holds_their_data_and_no_secret(tmp_path, capsys):
         "signing_key": "set (not shown)",
     }
     assert data["backtests"] == ["bt-1"]
+    assert data["spreads"] == [{"name": "riya's calendar"}]
     assert [e["detail"] for e in data["audit_trail"]] == [
         "ayush changed riya",
         "riya confirmed",
@@ -115,8 +121,8 @@ async def test_an_erase_removes_everything_but_the_audit_trail(tmp_path, capsys)
     store, env, secrets = await world(tmp_path)
     assert users_tool.main(["erase-user", "riya", "--confirm", "riya"], env) == 0
     said = capsys.readouterr().out
-    assert "Erased riya: alert_files 1, backtests 1, traders_of 1, sessions 1, user_settings 1, " \
-           "layouts 1" in said  # fmt: skip
+    assert "Erased riya: alert_files 1, spread_files 1, backtests 1, traders_of 1, sessions 1, " \
+           "user_settings 1, layouts 1" in said  # fmt: skip
     assert "Kept: their entries in the audit trail" in said
 
     gone = store.get_user("riya")
@@ -128,6 +134,8 @@ async def test_an_erase_removes_everything_but_the_audit_trail(tmp_path, capsys)
         store.verify_login("riya", PASSWORD, security.totp_code(secrets["riya"], NOW.timestamp()))
     assert not AlertStore(tmp_path / "alerts").path_of("riya").exists()
     assert AlertStore(tmp_path / "alerts").path_of("ayush").exists()  # someone else's: kept
+    spreads = SpreadBook(tmp_path / "spreads", lambda _i: None)
+    assert not spreads.path_of("riya").exists() and spreads.path_of("ayush").exists()
     assert not (tmp_path / "backtests" / "bt-1").exists()
     assert (tmp_path / "backtests" / "bt-2").exists()
     # the audit trail is untouched: still whole, still naming riya by id
