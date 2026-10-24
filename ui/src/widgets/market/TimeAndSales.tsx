@@ -43,6 +43,7 @@ function Tape({ params, setParams, instrumentId: id }: WidgetProps<TapeParams> &
   const [round, setRound] = useState(0); // each answered poll starts the next one
   const newest = useRef(0);
   newest.current = tape[0]?.seq ?? 0;
+  const epoch = useRef<string | null>(null); // the server's run: its numbering is its own
 
   useEffect(() => {
     let live = true;
@@ -52,6 +53,14 @@ function Tape({ params, setParams, instrumentId: id }: WidgetProps<TapeParams> &
           .get<PrintsAnswer>(`/api/instruments/${encodeURIComponent(id)}/prints?after=${newest.current}&limit=300`)
           .then((a) => {
             if (!live) return;
+            if (epoch.current !== null && a.epoch !== epoch.current) {
+              // the server restarted: its numbers began again, so start the tape again (#277)
+              epoch.current = a.epoch;
+              newest.current = 0;
+              setTape([]);
+              return;
+            }
+            epoch.current = a.epoch;
             setTape((old) => joinTape(old, a.prints));
             setEstimate(a.estimate);
             setError(null);
@@ -82,7 +91,7 @@ function Tape({ params, setParams, instrumentId: id }: WidgetProps<TapeParams> &
         </span>
         <span className="book-spacer" />
         <span className="dim" title={estimate}>
-          sides estimated
+          estimated from price snapshots
         </span>
       </div>
       {error && (
@@ -91,10 +100,12 @@ function Tape({ params, setParams, instrumentId: id }: WidgetProps<TapeParams> &
         </div>
       )}
       <div className="grid-head book-row tape-row" role="row">
-        <span>Time</span>
+        <span title="The snapshot's last-trade time">Time</span>
         <span className="num">Price</span>
-        <span className="num">Qty</span>
-        <span>Side</span>
+        <span className="num" title="The volume traded between two snapshots: two trades in one show as one">
+          Qty ≈
+        </span>
+        <span title="Inferred from the best bid and ask before the trade">Side ≈</span>
       </div>
       <div className="grid-body book-scroll" role="grid" aria-label="Time and sales">
         {!rows.length && <div className="empty-note">{tape.length ? "No trades this size yet." : "Waiting for trades…"}</div>}

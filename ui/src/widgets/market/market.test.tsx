@@ -56,7 +56,7 @@ describe("Depth", () => {
 describe("Time & sales", () => {
   it("polls the server's prints after the newest it has, newest first, filtered by size", async () => {
     let n = 0;
-    const answer = (prints: PrintsAnswer["prints"]): PrintsAnswer => ({ instrument_id: FUT, prints, kept: 300, watched: true, estimate: "estimated from the touch" });
+    const answer = (prints: PrintsAnswer["prints"]): PrintsAnswer => ({ instrument_id: FUT, prints, kept: 300, watched: true, epoch: "e1", estimate: "estimated from the touch" });
     const { calls, setParams, socket } = mount((p) => <TimeAndSales {...p} />, {
       [`GET /api/instruments/${ENC}/prints`]: () => {
         n += 1;
@@ -78,9 +78,28 @@ describe("Time & sales", () => {
     await vi.waitFor(() => expect(within(grid).getAllByRole("row")).toHaveLength(3), { timeout: 2500 });
     expect(within(grid).getAllByRole("row")[0]!.textContent).toBe("–25,010.0075–");
     expect(calls.filter((c) => c.path.includes("/prints")).map((c) => c.path.split("?")[1]).slice(0, 2)).toEqual(["after=0&limit=300", "after=2&limit=300"]);
-    expect(screen.getByText("sides estimated").getAttribute("title")).toBe("estimated from the touch");
+    expect(screen.getByText("estimated from price snapshots").getAttribute("title")).toBe("estimated from the touch");
     fireEvent.change(screen.getByLabelText("Min qty"), { target: { value: "1,000" } });
     expect(setParams).toHaveBeenCalledWith({ minQty: 1000 });
+  }, 10_000);
+
+  it("after a server restart (a new epoch) the tape starts again instead of waiting for the old numbers", async () => {
+    let n = 0;
+    const answer = (epoch: string, prints: PrintsAnswer["prints"]): PrintsAnswer => ({ instrument_id: FUT, prints, kept: 300, watched: true, epoch, estimate: "" });
+    const { calls } = mount((p) => <TimeAndSales {...p} />, {
+      [`GET /api/instruments/${ENC}/prints`]: () => {
+        n += 1;
+        if (n === 1) return { status: 200, body: answer("before", [{ seq: 500, t: null, price_paise: 2501000, qty: 75, side: "BUY" }]) };
+        if (n === 2) return { status: 200, body: answer("after", []) }; // restarted: seq began again at 1
+        return { status: 200, body: answer("after", [{ seq: 1, t: null, price_paise: 2502000, qty: 150, side: "SELL" }]) };
+      },
+    });
+    const grid = await screen.findByRole("grid", { name: "Time and sales" });
+    await vi.waitFor(() => expect(within(grid).getAllByRole("row")[0]!.textContent).toContain("25,010.00"));
+    await vi.waitFor(() => expect(within(grid).getAllByRole("row")[0]!.textContent).toContain("25,020.00"), { timeout: 4000 });
+    expect(within(grid).getAllByRole("row")).toHaveLength(1); // the old run's trade is gone, not mixed in
+    const asked = calls.filter((c) => c.path.includes("/prints")).map((c) => c.path.split("?")[1]);
+    expect(asked.slice(0, 3)).toEqual(["after=0&limit=300", "after=500&limit=300", "after=0&limit=300"]);
   }, 10_000);
 
   it("the size filter hides small trades and the totals follow", async () => {
@@ -93,6 +112,7 @@ describe("Time & sales", () => {
         ],
         kept: 300,
         watched: true,
+        epoch: "e1",
         estimate: "",
       },
     }, { minQty: 1000 });
@@ -111,6 +131,7 @@ describe("Movers", () => {
     ],
     of: 72,
     note: by === "oi" ? "OI change since the first open interest seen today" : "",
+    universe: "ranked among the 72 contracts with a live price on this server",
     exchanges: ["NFO", "NSE"],
     kinds: ["EQ", "FUT"],
   });
@@ -122,7 +143,7 @@ describe("Movers", () => {
     expect(within(grid).getAllByRole("row")[0]!.textContent).toBe("RELIANCE1,402.00+2.10%51L");
     expect(within(grid).getAllByRole("row")[1]!.textContent).toBe("NIFTY26OCTFUT25,010.00−0.50%21K");
     expect(calls[calls.length - 1]!.path).toBe("/api/market/movers?by=gainers&limit=20&exchange=&kind=");
-    expect(screen.getByText("of 72 with prices")).toBeTruthy();
+    expect(screen.getByText("of 72 watched here, not the whole market").getAttribute("title")).toBe("ranked among the 72 contracts with a live price on this server");
     expect(within(screen.getByLabelText("Exchange")).getAllByRole("option").map((o) => o.textContent)).toEqual(["all exchanges", "NFO", "NSE"]);
     fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "FUT" } });
     expect(setParams).toHaveBeenCalledWith({ kind: "FUT" });
@@ -138,7 +159,7 @@ describe("Movers", () => {
     await vi.waitFor(() => expect(calls.some((c) => c.path.includes("by=losers"))).toBe(true));
     await act(async () => {});
     expect(within(grid).queryAllByRole("row")).toHaveLength(0);
-    expect(screen.queryByText("of 72 with prices")).toBeNull();
+    expect(screen.queryByText("of 72 watched here, not the whole market")).toBeNull();
   });
 
   it("the OI tab shows the change and says what it is measured from", async () => {

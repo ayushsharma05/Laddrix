@@ -13,6 +13,7 @@ const TUE: DayReport = {
   generated_at: "2026-10-13T10:30:00+00:00",
   final: true,
   priced: true,
+  prices_as_of: "2026-10-15T09:59:58+00:00",
   notes: [],
   schedule: "Kite standard plan (rates checked 2026-10-15)",
   totals: { realised_paise: 750000, unrealised_paise: 0, gross_paise: 750000, charges_paise: 111152, net_paise: 638848, turnover_paise: 376500000, trades: 2 },
@@ -32,6 +33,7 @@ const TUE: DayReport = {
       sell_value_paise: 376500000,
       closing_qty: 0,
       mark_paise: 2510000,
+      mark_at: "2026-10-15T09:59:58+00:00",
       realised_paise: 750000,
       unrealised_paise: 0,
       gross_paise: 750000,
@@ -106,6 +108,7 @@ describe("Reports", () => {
     expect(totals).toContain("Gross +₹7,500.00");
     expect(totals).toContain("Charges ₹1,111.52");
     expect(totals).toContain("Net +₹6,388.48");
+    expect(screen.getByText("Open positions valued at prices as of 15:29:58")).toBeTruthy(); // #277: how fresh
     const row = within(screen.getByRole("grid", { name: "Report positions" })).getAllByRole("row")[0]!;
     expect(row.textContent).toContain("NIFTY26OCTFUT");
     expect(row.textContent).toContain("+₹6,388.48");

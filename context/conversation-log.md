@@ -627,3 +627,9 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Reports** (16:00 job, a day's report, P&L, CSV/PDF) are built in a worker thread: the loop was 10.5 ms late while reports were built on it, now about 1 ms.
   - **Scheduler:** each job runs in its own task, so a slow 16:00 report can't delay the 5 s protection guard; a job still running when due again is skipped, never doubled.
   - **Tests:** 11 in `tests/test_workload.py` plus a UI test for Cancel.
+- 24 Oct, early. **#277 fixed:** data that says what it is, and a combined fault drill.
+  - **A real bug:** time and sales numbered its trades from 1 on every server start. A screen open across a restart asked for "after 500" and showed nothing until 500 new trades had passed. Now each run has an epoch, and a new one starts the tape again.
+  - **Honest labels:** the tape says every field is estimated ("Qty ≈", "Side ≈"); movers say they rank only contracts watched here; reports say "prices as of" (the oldest mark); candle-based backtests say their fills are an estimate, not a guarantee.
+  - **The bad-morning drill** (`tests/test_truthful_data.py`): a lost answer, a full disk, a quiet feed and a crash, one after another. Nothing was placed twice, nothing was sent while the disk failed, nothing was added on a stale price, and after the restart the position is exactly the exchange's.
+  - **Keyboard:** a keyboard send goes to the ticket's own account, whatever the account strip says (UI test).
+  - **Mutation:** 11/11.

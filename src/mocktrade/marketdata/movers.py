@@ -102,6 +102,10 @@ class Movers:
             "rows": have[:limit],
             "of": len(rows),
             "note": note,
+            # what was ranked (#277): only contracts with a live price here, never the exchange
+            "universe": f"ranked among the {len(rows)} contracts with a live price on this "
+            "server (those a screen, an order or an algo watches), not the whole "
+            "exchange",  # fmt: skip
             "exchanges": sorted(exchanges),
             "kinds": sorted(kinds),
         }  # what can be filtered

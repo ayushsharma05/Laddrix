@@ -146,6 +146,11 @@ POST /api/research/candles {instrument_id, day, rows: [{time, open, high, low, c
 - **Hand-worked** (`tests/test_backtest.py`): SLICER buys 2 × 75 crossing the spread on a tiny day.
   Fills at 25,000.10 and 25,002.10 at the times of their ticks; ₹585.00 unrealised at the last
   price; charges equal to the K10.2 bill for those two orders.
+- **What a backtest assumes (#277):**
+  - **Each day stands alone:** a fresh platform; nothing is carried overnight, and open positions are valued at the day's last price, not closed.
+  - **Recorded ticks** exist only for the instruments a screen, order or algo watched that day.
+  - **The paper broker's fill model** is used (queue position, latency), as in paper trading.
+  - **Candle-based runs** are an assumed path, so their fills are an estimate: better or worse than the market might have given. The run says so (`fills_note`, shown on the Research screen).
 - **Candles** (when no ticks were recorded) become ticks: open, then the adverse extreme first
   (the low of a rising candle, the high of a falling one), the other extreme, then the close.
   Each has one tick of spread, so market orders pay it and resting orders fill only when the price
