@@ -633,3 +633,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **The bad-morning drill** (`tests/test_truthful_data.py`): a lost answer, a full disk, a quiet feed and a crash, one after another. Nothing was placed twice, nothing was sent while the disk failed, nothing was added on a stale price, and after the restart the position is exactly the exchange's.
   - **Keyboard:** a keyboard send goes to the ticket's own account, whatever the account strip says (UI test).
   - **Mutation:** 11/11.
+- 24 Oct, early. **#397 (368d), the two-firm drill:** 16/16 in a real browser on the demo (`context/scripts/drill-two-firms.cjs`).
+  - The operator added acme from the terminal, as the runbook says. Each firm saw only its own accounts and users. An acme order was invisible to main, and each firm's request for the other's account was answered "not found".
+  - Acme's STOP showed on acme's screens only and cancelled acme's resting order; main kept trading.
+  - With this, #368 (multi-tenant) is done. What remains before an outside firm trades is Zerodha's answer (#278), on Ayush's to-do list.

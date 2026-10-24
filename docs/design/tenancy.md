@@ -126,6 +126,15 @@ A new firm is created with
   - end-of-day reports value open positions at the account's own prices;
   - each subscription is checked for silence on its own, with a band for its viewers only.
 
+- **368d (#397), done:** the two-firm drill in a real browser (`context/scripts/drill-two-firms.cjs`; evidence `context/evidence/h-397-two-firm-drill.txt`; screenshots `context/images/h-397-*.png`), 16/16:
+  - the operator adds firm acme from the terminal, exactly as the runbook says;
+  - each firm sees only its own accounts and users, on the API and on the Admin screen;
+  - an acme order is invisible to main, and each firm asking for the other's account is answered "not found";
+  - acme's firm STOP shows on acme's screens only and cancels acme's resting order, while main keeps trading;
+  - no page errors.
+
+![acme's screen after its STOP](../../context/images/h-397-acme.png)
+
 | Step | What | Done when |
 | --- | --- | --- |
 | **368a** (#394) | Workspaces in the data, the rule in every access check, STOP per workspace, the operator only on the terminal | the two-workspace route sweep and stream tests pass |

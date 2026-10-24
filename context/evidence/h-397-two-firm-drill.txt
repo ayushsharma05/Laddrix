@@ -1,0 +1,18 @@
+# The two-firm drill (#397), run on 2026-10-24T00:42Z in the cloud container: node context/scripts/drill-two-firms.cjs
+PASS 1. main sees only its own account (acc-paper)
+PASS 1. acme's trader sees only acme's account (acc-acme)
+PASS 1. acme's admin lists only acme's users (ravi,tara)
+PASS 1. main's admin lists none of acme's (demo)
+PASS 2. tara's order rests at acme (201 PENDING )
+PASS 2. main asking for acme's orders: not found
+PASS 2. acme's order is not in main's book
+PASS 2. acme asking for main's orders: not found
+PASS 3. acme's Admin screen shows no main user
+PASS 4. acme's admin stops acme (200)
+PASS 4. acme's trader sees the firm STOP band
+PASS 4. main sees no STOP band
+PASS 4. acme's resting order was cancelled (CANCELLED)
+PASS 4. acme can't trade while stopped (trading is stopped (firm acme kill switch: two-firm drill))
+PASS 4. main still trades (PENDING)
+PASS 5. no page errors ()
+all 16 passed
