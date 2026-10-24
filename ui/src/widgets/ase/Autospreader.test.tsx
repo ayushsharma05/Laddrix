@@ -19,7 +19,14 @@ const CAL: Spread = {
   ],
 };
 
-function setup(spreads: Spread[], params: Partial<AutospreaderParams> = {}) {
+const CONTROLS = {
+  controls: [
+    { name: "requote_ticks", label: "Re-quote threshold", kind: "ticks", help: "", required: false, default: 1, min: 1, max: 50, choices: [] },
+    { name: "hedge_timeout_s", label: "Hedge timeout", kind: "seconds", help: "", required: false, default: 5, min: 1, max: 300, choices: [] },
+  ],
+};
+
+function setup(spreads: Spread[], params: Partial<AutospreaderParams> = {}, routes: Record<string, unknown> = {}) {
   const posted: unknown[] = [];
   const server = fakeRest({
     "GET /api/spreads": spreads,
@@ -35,6 +42,7 @@ function setup(spreads: Spread[], params: Partial<AutospreaderParams> = {}) {
       return { status: 200, body: { ...CAL, name: (body as { name: string }).name } };
     },
     "DELETE /api/spreads/s1": () => ({ status: 204 }),
+    ...routes,
   });
   const { stream, socket } = fakeStream();
   const app = createApp({ rest: server.rest, stream });
@@ -90,6 +98,28 @@ describe("the Autospreader", () => {
     expect(posted.at(-1)).toEqual({ name: "NIFTY Nov/Dec", legs: [CAL.legs[0], { ...CAL.legs[1], payup_ticks: 4 }] });
     rerender({ mode: "list" });
     expect(await screen.findByText("NIFTY Nov/Dec")).toBeTruthy(); // in the list now
+  });
+
+  it("draws the spread's controls from the server and sends them; a bad one is said here", async () => {
+    const tuned = { ...CAL, controls: { requote_ticks: 2, hedge_timeout_s: 5 } };
+    const { posted } = setup([tuned], { mode: "edit", spreadId: "s1" }, { "GET /api/spreads/spec": CONTROLS });
+    const box = (await screen.findByLabelText("Re-quote threshold")) as HTMLInputElement;
+    expect(box.value).toBe("2"); // the spread's own
+    expect((screen.getByLabelText("Hedge timeout") as HTMLInputElement).value).toBe("5");
+    fireEvent.change(box, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByText("Re-quote threshold must be at least 1")).toBeTruthy();
+    expect(posted).toEqual([]); // nothing sent
+    fireEvent.change(box, { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Hedge timeout"), { target: { value: "8.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(posted.length).toBe(1));
+    expect((posted[0] as { controls: unknown }).controls).toEqual({ requote_ticks: 3, hedge_timeout_s: 8.5 });
+  });
+
+  it("a new spread shows the server's defaults", async () => {
+    setup([], { mode: "edit" }, { "GET /api/spreads/spec": CONTROLS });
+    expect(((await screen.findByLabelText("Re-quote threshold")) as HTMLInputElement).value).toBe("1");
   });
 
   it("adds a third leg for a butterfly and moves the quote", async () => {

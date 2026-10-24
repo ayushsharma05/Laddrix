@@ -208,8 +208,8 @@ async def test_an_algos_actions_are_previewed_then_done_as_previewed(tmp_path, n
         running.algos.types["ASE"] = ase_type(book.get)
     ayush = await w.logged_in("ayush")
     sid = (await ayush.post("/api/spreads", json=CALENDAR)).json()["spread_id"]
-    algo = (await ayush.post(f"/api/accounts/acc-ayush/spreads/{sid}/orders",
-                             json={"side": "BUY", "lots": 1, "price_paise": -13000})).json()  # fmt: skip
+    order = {"side": "BUY", "lots": 1, "price_paise": -13000}
+    algo = (await ayush.post(f"/api/accounts/acc-ayush/spreads/{sid}/orders", json=order)).json()
     assert [a["label"] for a in algo["actions"]] == ["Hedge now", "Flatten"]
     url = f"/api/accounts/acc-ayush/algos/{algo['algo_id']}/actions"
     preview = (await ayush.get(f"{url}/flatten")).json()
@@ -218,7 +218,8 @@ async def test_an_algos_actions_are_previewed_then_done_as_previewed(tmp_path, n
     refused = await ayush.post(f"{url}/flatten", json={"expect": []})
     assert (refused.status_code, refused.json()["detail"]) == (409, "nothing is unhedged: use Stop")
     assert (await ayush.get(f"{url}/dance")).status_code == 404
-    assert (await ayush.get("/api/accounts/acc-ayush/algos/A999/actions/flatten")).status_code == 404
+    missing = await ayush.get("/api/accounts/acc-ayush/algos/A999/actions/flatten")
+    assert missing.status_code == 404
     riya = await w.logged_in("riya")
     assert (await riya.get(f"{url}/flatten")).status_code in (403, 404)  # not her account
     await ayush.aclose()

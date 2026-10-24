@@ -190,4 +190,50 @@ describe("Algo manager", () => {
     await vi.waitFor(() => expect(rows().find((r) => r.textContent!.includes("A0001"))!.textContent).toContain("TRAILING_STOPheld"));
     expect(rows().find((r) => r.textContent!.includes("A0002"))!.textContent).not.toContain("held");
   });
+
+  describe("an algo's own actions (#425)", () => {
+    const ACTIONS = [
+      { name: "hedge_now", label: "Hedge now", help: "cross the market" },
+      { name: "flatten", label: "Flatten", help: "undo" },
+    ];
+    const url = "/api/accounts/acc-a/algos/A0001/actions";
+
+    it("shows what it would do in the server's words, and Confirm sends exactly that", async () => {
+      const lines = ["move SELL 75 NIFTY26NOVFUT to cross the market"];
+      const { app, calls } = setup({
+        [`GET ${url}/hedge_now`]: { name: "hedge_now", label: "Hedge now", lines, ok: true, why: "" },
+        [`POST ${url}/hedge_now`]: () => ({ status: 200, body: algo("A0001", { actions: ACTIONS, status: "hedging now" }) }),
+      });
+      act(() => app.store.applyAlgos("acc-a", [algo("A0001", { actions: ACTIONS })]));
+      fireEvent.click(rows()[0]!);
+      fireEvent.click(screen.getByRole("button", { name: "Hedge now…" }));
+      const dialog = await screen.findByRole("dialog", { name: "Hedge now A0001" });
+      expect(dialog.textContent).toContain("move SELL 75 NIFTY26NOVFUT to cross the market");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+      await screen.findByText("hedging now");
+      expect(posts(calls).at(-1)).toMatchObject({ path: `${url}/hedge_now`, body: { expect: lines } });
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("says why it can't be done, with nothing to confirm", async () => {
+      const { app, calls } = setup({ [`GET ${url}/flatten`]: { name: "flatten", label: "Flatten", lines: [], ok: false, why: "nothing is unhedged: use Stop" } });
+      act(() => app.store.applyAlgos("acc-a", [algo("A0001", { actions: ACTIONS })]));
+      fireEvent.click(rows()[0]!);
+      fireEvent.click(screen.getByRole("button", { name: "Flatten…" }));
+      const dialog = await screen.findByRole("dialog", { name: "Flatten A0001" });
+      expect(dialog.textContent).toContain("nothing is unhedged: use Stop");
+      expect(within(dialog).queryByRole("button", { name: "Confirm" })).toBeNull();
+      fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+      expect(posts(calls)).toEqual([]);
+    });
+
+    it("offers no actions on an algo that has none or has ended", () => {
+      const { app } = setup();
+      act(() => app.store.applyAlgos("acc-a", [algo("A0001"), algo("A0002", { actions: ACTIONS, state: "DONE" })]));
+      for (const r of rows()) {
+        fireEvent.click(r);
+        expect(screen.queryByRole("button", { name: "Hedge now…" })).toBeNull();
+      }
+    });
+  });
 });

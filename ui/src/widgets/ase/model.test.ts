@@ -1,5 +1,5 @@
 import type { Spread } from "../../api/types";
-import { addLeg, bodyOf, draftOf, emptyDraft, formula, legSummary, MAX_LEGS, missing, quoteLeg, removeLeg, setLeg } from "./model";
+import { addLeg, bodyOf, controlsBody, controlText, draftOf, emptyDraft, formula, legSummary, MAX_LEGS, missing, quoteLeg, removeLeg, setLeg } from "./model";
 
 const name = (id: string) => id.split(":")[1]!;
 const FLY: Spread = {
@@ -62,5 +62,23 @@ describe("the Autospreader's form", () => {
     expect(legSummary(FLY.legs, name)).toBe("+1 A −2 B +1 C");
     expect(formula(FLY.legs, name)).toBe("A − 2×B + C");
     expect(formula([{ ...FLY.legs[1]! }, { ...FLY.legs[0]! }], name)).toBe("−2×B + A");
+  });
+});
+
+describe("the spread's controls (#425)", () => {
+  const SPECS = [
+    { name: "chase_ticks", label: "Chase", kind: "ticks", help: "", required: false, default: 0, min: 0, max: 50, choices: [] },
+    { name: "hedge_timeout_s", label: "Hedge timeout", kind: "seconds", help: "", required: false, default: 5, min: 1, max: 300, choices: [] },
+  ];
+  it("show what was typed, else the spread's own, else the server's default", () => {
+    const d = emptyDraft();
+    expect(controlText(d, SPECS[0]!)).toBe("0");
+    expect(controlText({ ...d, controls: { chase_ticks: "" } }, SPECS[0]!)).toBe("");
+    expect(controlText(draftOf({ ...FLY, controls: { chase_ticks: 3 } }), SPECS[0]!)).toBe("3");
+  });
+  it("are sent as numbers, or each problem in words", () => {
+    expect(controlsBody(SPECS, { ...emptyDraft(), controls: { chase_ticks: "2", hedge_timeout_s: "7.5" } })).toEqual({ controls: { chase_ticks: 2, hedge_timeout_s: 7.5 }, problems: [] });
+    expect(controlsBody(SPECS, { ...emptyDraft(), controls: { chase_ticks: "60", hedge_timeout_s: "x" } }).problems).toEqual(["Chase must be at most 50", "Hedge timeout must be a number"]);
+    expect(controlsBody(SPECS, { ...emptyDraft(), controls: { chase_ticks: "" } })).toEqual({ controls: { hedge_timeout_s: 5 }, problems: [] }); // empty: left to the server
   });
 });

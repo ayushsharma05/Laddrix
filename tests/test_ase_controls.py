@@ -60,7 +60,8 @@ def test_controls_are_checked_in_words_and_default_when_missing():
     old = {"spread_id": "s1", "user_id": "ayush", "workspace": "", "name": "n",
            "legs": [{"instrument_id": OCT, "ratio": 1, "multiplier": 1, "quote": True},
                     {"instrument_id": NOV, "ratio": -1, "multiplier": -1}],
-           "created_at": "2026-10-24T10:00:00+00:00", "updated_at": "2026-10-24T10:00:00+00:00"}  # fmt: skip
+           "created_at": "2026-10-24T10:00:00+00:00",
+           "updated_at": "2026-10-24T10:00:00+00:00"}  # fmt: skip
     assert spread_from_dict(old).controls == Controls()  # saved before #425
 
 
@@ -174,10 +175,9 @@ async def test_hedge_now_moves_working_hedges_and_sends_what_nothing_covers(w):
     assert preview.ok and preview.lines == ("move SELL 75 NIFTY26NOVFUT to cross the market",)
     view = w.engine.act(algo.algo_id, "hedge_now", list(preview.lines))
     await w.engine.settle()
-    assert w.broker.modified == [(w.om.get(h1).broker_order_id,
-                                  {"qty": None, "price_paise": cross, "trigger_paise": None})]  # fmt: skip
+    moved = {"qty": None, "price_paise": cross, "trigger_paise": None}
+    assert w.broker.modified == [(w.om.get(h1).broker_order_id, moved)]
     assert [a["name"] for a in algo_to_dict(view)["actions"]] == ["hedge_now", "flatten"]
-
 
 
 async def test_hedge_now_sends_what_nothing_covers(nifty_fut):
@@ -230,8 +230,7 @@ async def test_flatten_cancels_then_undoes_only_the_unhedged_part(w):
     preview = w.engine.preview(algo.algo_id, "flatten")
     assert preview.lines == (
         "cancel SELL 75 NIFTY26NOVFUT",
-        "SELL 75 NIFTY26OCTFUT, crossing the market (if still unhedged once the cancels are "
-        "done)",
+        "SELL 75 NIFTY26OCTFUT, crossing the market (if still unhedged once the cancels are done)",
     )
     w.engine.act(algo.algo_id, "flatten", list(preview.lines))
     await w.engine.settle()
