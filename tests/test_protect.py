@@ -299,8 +299,8 @@ async def test_protection_running_at_a_restart_is_reported_once(tmp_path, nifty_
         return p, rt, log
 
     p, rt, log = platform()
-    rt.algos.start("TRAILING_STOP", user_id="ayush", instrument_id=FUT, side=Side.SELL,
-                   qty=75, params={"trail_paise": 2000})  # fmt: skip
+    stop = rt.algos.start("TRAILING_STOP", user_id="ayush", instrument_id=FUT, side=Side.SELL,
+                          qty=75, params={"trail_paise": 2000})  # fmt: skip
     slicer = rt.algos.start("SLICER", user_id="ayush", instrument_id=FUT, side=Side.BUY,
                             qty=75, params={"slices": 1, "interval_s": 60})  # fmt: skip
     await asyncio.sleep(0)
@@ -311,7 +311,7 @@ async def test_protection_running_at_a_restart_is_reported_once(tmp_path, nifty_
     p, rt, log = platform()  # the restart
     (lost,) = p.lost_protection("acc")
     assert lost.instrument_id == FUT
-    assert lost.words.startswith("TRAILING_STOP SELL 75 NFO:NIFTY26OCTFUT (A1, ayush)")
+    assert lost.words.startswith(f"TRAILING_STOP SELL 75 NFO:NIFTY26OCTFUT ({stop.algo_id}, ayush)")
     await log.flush()
     assert p.lost_protection("acc") == []  # reported once
     await log.aclose()

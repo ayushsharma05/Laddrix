@@ -19,7 +19,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from mocktrade.algos.engine import AlgoEngine, AlgoEvent, AlgoType
+from mocktrade.algos.engine import AlgoEngine, AlgoError, AlgoEvent, AlgoRecord, AlgoType
 from mocktrade.broker.base import Broker, GttBook
 from mocktrade.broker.rules import order_spec
 from mocktrade.charges.model import ChargesModel, ScheduleCharges
@@ -29,7 +29,7 @@ from mocktrade.domain.accounts import MAIN, BrokerAccount
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.money import format_rupees
 from mocktrade.domain.order_spec import OrderSpec
-from mocktrade.domain.orders import Product
+from mocktrade.domain.orders import Product, Side
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
 from mocktrade.marketdata.sources import PriceSources
@@ -446,12 +446,54 @@ class Platform:
             log.record_note("ALGO_LOST", account_id, f"not running after a restart: {words}", a)
         return lost
 
-    @staticmethod
-    async def _run_algos(runtime: AccountRuntime) -> None:
-        """Algos don't survive a restart: once the broker has said what happened to every
-        order (recovery), cancel their leftover children, then run."""
+    def restore_algos(self, account_id: str, runtime: AccountRuntime) -> list[str]:
+        """At start, once the broker has said what happened to every order (#426): every
+        algo that hadn't ended and whose type can be rebuilt comes back PAUSED with its
+        children. One that can't is noted as lost, in words (its children are then cancelled
+        as orphans). Returns what was restored or lost, in words."""
+        if self.event_log is None:
+            return []
+        log_ = self.event_log
+        restorable = {code for code, t in runtime.algos.types.items() if t.restore is not None}
+        open_: dict[str, Any] = {}
+        for e in log_.notes(account_id, [f"ALGO_{k}" for k in ALGO_ENDS + ("STARTED",)]):
+            algo_id = e.extra.get("algo_id", "")
+            if e.kind == "ALGO_STARTED":
+                # rebuildable now, or when it started (its type gone since: noted as lost)
+                if e.extra.get("code") in restorable or "snapshot" in e.extra:
+                    open_[algo_id] = e
+            else:
+                open_.pop(algo_id, None)
+        said = []
+        for algo_id, e in open_.items():
+            a = e.extra
+            words = (f"{a.get('code')} {a.get('side')} {a.get('qty')} {a.get('instrument_id')} "
+                     f"({algo_id})")  # fmt: skip
+            try:
+                record = AlgoRecord(
+                    algo_id=algo_id, code=str(a["code"]), user_id=str(a["user_id"]),
+                    instrument_id=str(a["instrument_id"]), side=Side(a["side"]),
+                    qty=int(a["qty"]), params=dict(a["params"]),
+                    product=Product(a.get("product", "NRML")), created_at=e.ts,
+                    snapshot=a.get("snapshot"),
+                )  # fmt: skip
+                runtime.algos.restore(record)
+                said.append(f"restored, paused: {words}")
+            except (AlgoError, KeyError, ValueError, TypeError) as exc:
+                why = (exc.reason if isinstance(exc, AlgoError)
+                       else f"its record is incomplete ({exc!r})")  # fmt: skip
+                text = f"not restored after a restart: {words}: {why}; its orders are cancelled"
+                log_.record_note("ALGO_LOST", account_id, text, a)
+                log.warning("%s: %s", account_id, text)
+                said.append(text)
+        return said
+
+    async def _run_algos(self, runtime: AccountRuntime) -> None:
+        """Once the broker has said what happened to every order (recovery): restore the
+        algos that can be (#426), cancel the other algos' leftover children, then run."""
         if runtime.recovery is not None:
             await runtime.recovery.finished.wait()
+        self.restore_algos(runtime.account.id, runtime)
         await runtime.algos.cancel_orphans()
         await runtime.algos.run()
 
@@ -531,6 +573,8 @@ class Platform:
                         "params": a.params,
                         "user_id": a.user_id,
                         "product": a.product.value,
+                        # what a restart needs to rebuild it (#426): STARTED only
+                        **({"snapshot": event.snapshot} if event.snapshot is not None else {}),
                     },
                     ts=event.ts,
                 )

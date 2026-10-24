@@ -1,0 +1,10 @@
+#426 crash drill on the demo, 24 Oct 2026 (python3 context/scripts/drill-algo-restart.py)
+
+PASS  before: the ASE quotes  (Amvmpf6li-1 75)
+PASS  the demo starts again
+PASS  after: the same algo is back, PAUSED, saying so  (PAUSED: restored after a restart: check it, then resume or stop)
+PASS  its old quote is closed (paper orders don't survive) and nothing new was sent  (CANCELLED the paper broker restarted: paper orders don't survive a restart)
+PASS  resume: it quotes again  (SELL 75)
+PASS  stop: it ends
+
+6/6 passed

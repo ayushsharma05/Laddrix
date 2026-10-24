@@ -127,6 +127,16 @@ Paper accounts: the paper broker keeps its orders in memory, so working paper or
 closed at a restart ("the paper broker restarted: paper orders don't survive a restart");
 positions and today's P&L come back from the audit trail.
 
+**Autospreaders after a restart (#426):** each one that was working comes back on the Algos
+screen **PAUSED**, saying "restored after a restart: check it, then resume or stop". Its
+quote was cancelled; its hedges at the broker keep working. Look at its legs and what is
+unhedged, then:
+- **Resume:** it hedges what is short now, then quotes again;
+- **Hedge now** or **Flatten:** to settle a short leg at once;
+- **Stop:** it ends (an UNHEDGED alert names any leg left short).
+One that couldn't be rebuilt is in the audit trail as ALGO_LOST, in words; its orders were
+cancelled. Check its legs by hand.
+
 
 ## Position UNPROTECTED
 

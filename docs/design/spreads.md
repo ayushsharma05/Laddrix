@@ -14,9 +14,12 @@ Ayush asked for this on 24 Oct 2026. It is built in three parts:
 | 3 | #416 | the spread ladder: click to trade a spread; right-click "Autospreader settings…" | done |
 | – | #424 | freeze quantities: every order fits the exchange's most per order | done |
 | – | #425 | each spread's controls; "Hedge now" and "Flatten" on a running ASE | done |
+| – | #426 | after a restart a working ASE comes back paused, with its orders | done |
+
+Recovery after a restart (#426): a working Autospreader comes back paused, with its orders
+([algos.md](algos.md#after-a-restart-426)).
 
 Still to come, in #250 and #251 (one issue each, in this order):
-- #426 recovery after a restart;
 - #427 several quoting legs at once;
 - #428 positions grouped by structure;
 - #429 historical spread charts.

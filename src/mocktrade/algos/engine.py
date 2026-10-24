@@ -19,7 +19,11 @@ Rules (each one a real failure professional desks guard against):
 - A child whose outcome is unknown holds the algo: nothing more is sent until it's answered.
 - Strategy code that raises fails only its own algo; its children are pulled.
 - A kill switch stops every algo of its account (the firm switch: every algo).
-- Algos don't survive a restart: their leftover children are cancelled at start.
+- After a restart (#426) an algo whose type can be restored comes back PAUSED with its
+  children, once the broker has said what happened to every order; the trader checks it and
+  resumes or stops it. Others don't survive: their leftover children are cancelled at start.
+- Algo ids carry the engine's start time (A<base36 milliseconds>-1): a new algo never takes
+  the id of one from an earlier run, whose late order events would otherwise reach it.
 Every state change is audited in the event log and pushed to listeners (the screens).
 """
 
@@ -88,10 +92,27 @@ class AlgoView:
 
 @dataclass(frozen=True)
 class AlgoEvent:
-    kind: str  # STARTED, UPDATED, PAUSED, RESUMED, STOPPING, DONE, STOPPED, FAILED
+    kind: str  # STARTED, UPDATED, PAUSED, RESUMED, STOPPING, DONE, STOPPED, FAILED, RESTORED
     ts: datetime
     algo: AlgoView
     detail: str = ""
+    snapshot: dict[str, Any] | None = None  # STARTED: what a restart needs to rebuild it (#426)
+
+
+@dataclass(frozen=True)
+class AlgoRecord:
+    """An algo that was running when the server stopped, from the audit trail (#426)."""
+
+    algo_id: str
+    code: str
+    user_id: str
+    instrument_id: str
+    side: Side
+    qty: int
+    params: dict[str, Any]
+    product: Product
+    created_at: datetime
+    snapshot: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -171,6 +192,14 @@ class BaseStrategy:
         """Do action `name` (the engine has just checked its preview)."""
         raise AlgoError(f"no action {name!r}")
 
+    def snapshot(self) -> dict[str, Any] | None:
+        """What a restart needs to rebuild this algo besides its parameters (#426), kept in
+        the audit trail when it starts; None: nothing more."""
+        return None
+
+    def on_restore(self, ctx: "AlgoContext") -> None:
+        """Rebuilt after a restart, paused, with its children: rebuild what it works from."""
+
 
 StrategyFactory = Callable[[dict[str, Any]], Strategy]
 
@@ -182,6 +211,8 @@ class AlgoType:
     spec: AlgoSpec
     make: StrategyFactory
     exchange_algo_id: str | None = None  # the exchange's id once empanelled (SEBI framework)
+    # rebuild one after a restart from its parameters and snapshot (#426); None: it can't be
+    restore: Callable[[dict[str, Any], dict[str, Any] | None], Strategy] | None = None
 
 
 OPS_WITHOUT_ALGO_ID = 10  # SEBI: orders a second an unregistered algo may send (#291)
@@ -211,6 +242,16 @@ def parse_algo_ids(text: str) -> dict[str, str]:
             raise ValueError(f"MOCKTRADE_ALGO_IDS: {part!r} is not CODE=ID")
         ids[code.strip().upper()] = value.strip()
     return ids
+
+
+def _base36(n: int) -> str:
+    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    out = ""
+    while True:
+        n, r = divmod(n, 36)
+        out = digits[r] + out
+        if not n:
+            return out
 
 
 class AlgoError(Exception):
@@ -505,7 +546,9 @@ class AlgoEngine:
         self.clock = clock
         self._blocked = blocked
         self._audit = audit
-        self._prefix = id_prefix
+        # this run's ids (#426): its start time in milliseconds, so even a quick restart's
+        # ids differ from the run before
+        self._prefix = f"{id_prefix}{_base36(int(clock().timestamp() * 1000))}-"
         self._next = 0
         self._parents: dict[str, _Parent] = {}
         self._listeners: list[Callable[[AlgoEvent], None]] = []
@@ -576,7 +619,7 @@ class AlgoEngine:
         self._next += 1
         now = self.clock()
         parent = _Parent(
-            algo_id=f"{self._prefix}{self._next}",
+            algo_id=f"{self._prefix}{self._next}",  # A<run>-n
             code=code,
             account_id=self.account_id,
             user_id=user_id,
@@ -593,8 +636,57 @@ class AlgoEngine:
         )
         self._parents[parent.algo_id] = parent
         self.watch([instrument_id])
-        self.changed(parent, "STARTED", f"{side.value} {qty} {instrument_id} {clean}")
+        snapshot = getattr(strategy, "snapshot", lambda: None)()
+        self.changed(parent, "STARTED", f"{side.value} {qty} {instrument_id} {clean}",
+                     snapshot=snapshot)  # fmt: skip
         self._call(parent, lambda ctx: parent.strategy.start(ctx))
+        return self._view(parent)
+
+    def restore(self, record: AlgoRecord) -> AlgoView:
+        """Rebuild an algo that was running when the server stopped (#426): PAUSED, with
+        the children the order manager knows (reconciled with the broker first); what the
+        strategy doesn't keep through a pause (its quotes) is cancelled. AlgoError if it
+        can't be rebuilt."""
+        kind = self.types.get(record.code)
+        if kind is None:
+            raise AlgoError(f"no algo called {record.code} any more")
+        if kind.restore is None:
+            raise AlgoError(f"{kind.spec.name} algos can't be restored after a restart")
+        if record.algo_id in self._parents:
+            raise AlgoError(f"{record.algo_id} is already running")
+        clean, problems = check_params(kind.spec, record.params)
+        if problems:
+            raise AlgoError("; ".join(problems))
+        try:
+            strategy = kind.restore(clean, record.snapshot)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise AlgoError(f"its saved state can't be read: {exc}") from None
+        children = [o for o in self.manager.orders() if o.request.parent_id == record.algo_id]
+        children.sort(key=lambda o: o.created_at)
+        parent = _Parent(
+            algo_id=record.algo_id,
+            code=record.code,
+            account_id=self.account_id,
+            user_id=record.user_id,
+            instrument_id=record.instrument_id,
+            side=record.side,
+            qty=record.qty,
+            params=clean,
+            product=record.product,
+            strategy=strategy,
+            exchange_algo_id=kind.exchange_algo_id,
+            created_at=record.created_at,
+            updated_at=self.clock(),
+            state=AlgoState.PAUSED,
+            status="restored after a restart: check it, then resume or stop",
+            children=[o.client_order_id for o in children],
+            instruments={record.instrument_id},
+        )
+        self._parents[parent.algo_id] = parent
+        self.watch([record.instrument_id])
+        self._call(parent, lambda ctx: parent.strategy.on_restore(ctx))  # type: ignore[attr-defined]
+        self._pull(parent)  # its quotes; hedges stay
+        self.changed(parent, "RESTORED", f"{len(children)} child orders: paused until resumed")
         return self._view(parent)
 
     def pause(self, algo_id: str) -> AlgoView:
@@ -751,9 +843,11 @@ class AlgoEngine:
     def children(self, p: _Parent) -> list[OrderView]:
         return [v for cid in p.children if (v := self.manager.get(cid)) is not None]
 
-    def changed(self, p: _Parent, kind: str, detail: str = "") -> None:
+    def changed(
+        self, p: _Parent, kind: str, detail: str = "", snapshot: dict[str, Any] | None = None
+    ) -> None:
         p.updated_at = self.clock()
-        event = AlgoEvent(kind, p.updated_at, self._view(p), detail)
+        event = AlgoEvent(kind, p.updated_at, self._view(p), detail, snapshot)
         if self._audit is not None and kind != "UPDATED":
             self._audit(event)
         for listener in list(self._listeners):

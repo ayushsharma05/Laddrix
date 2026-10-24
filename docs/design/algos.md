@@ -114,8 +114,34 @@ Q fills f lots ─► every other leg: floor(f · |its ratio| / |Q's ratio|) lot
   `act`; the engine checks that the preview still holds before acting.
 - **Paused or stopping:** the heartbeat calls the strategy's `on_watch`, so hedges are still
   retried and timed; a hedge sent then stays working (`keep_on_stop`).
-- Not yet: several quoting legs (#427) and restart recovery (#426). Algos don't survive a
-  restart; their children are cancelled at start, as for every algo.
+- **After a restart (#426)** it comes back, see below. Not yet: several quoting legs (#427).
+
+## After a restart (#426)
+
+```
+algo starts ─► ALGO_STARTED in the audit trail, with its snapshot (ASE: the spread it copied)
+server dies … starts again ─► orders rebuilt and checked with the broker (recovery, #206)
+   └─► every ALGO_STARTED with no end (DONE, STOPPED, FAILED, LOST) whose type can be
+       restored ─► AlgoEngine.restore: PAUSED, "restored after a restart: check it, then
+       resume or stop", with its children; its quotes are cancelled, hedges keep working
+   └─► one that can't be rebuilt (its type gone, its record broken) ─► ALGO_LOST, in words;
+       its children are cancelled as orphans, as every other algo's are
+trader resumes ─► it hedges what is short (a fill while we were down is hedged now, not
+                  before), then quotes afresh;  or stops it (the unhedged alert if short)
+```
+
+- **Nothing is sent by itself after a restart.** A fill that came while the server was
+  down is hedged only when the trader resumes (or uses Hedge now / Flatten, which work at
+  once). Hedges working at the broker keep working; paper orders don't survive a restart.
+- It works the spread it copied when it started, even if the spread was edited or deleted
+  since. It comes back after every restart until it ends.
+- An algo type is restorable when it says how (`AlgoType.restore`, from its parameters and
+  `snapshot()`); today the ASE. Other algos don't survive a restart, as before (protection
+  algos are flagged by the guard, #264).
+- **Algo ids carry the run's start time** (`A<base36 ms>-1`): a new algo never takes the id
+  of one from an earlier run, whose late order events would otherwise reach it.
+- Checks: `tests/test_algo_restore.py`, `context/scripts/mutate-algo-restore.py`, and the
+  crash drill `context/scripts/drill-algo-restart.py` on the demo.
 
 ## Execution algos (K9.1): iceberg, TWAP, VWAP, POV
 Shared parts live in `algos/execution.py`: where to price a child (`touch`: join our side or
