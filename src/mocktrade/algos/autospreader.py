@@ -36,6 +36,11 @@ The trader's actions on a running ASE, each previewed in words and done only as 
 
 Buying the spread buys the + legs and sells the − legs; selling it mirrors that.
 
+After a restart (#426) it comes back PAUSED with its children, from the spread copied when it
+started (kept in the audit trail): working hedges keep working, its quote is cancelled, and
+nothing new is sent (no hedge either) until the trader resumes it, after checking what
+happened while the server was down. "Hedge now" and "Flatten" work at once.
+
 Rules (the two-leg spreader's, for N legs):
 - Pause and stop pull the quote but keep hedges working: they reduce risk. A hedge sent
   while paused or stopping stays working too.
@@ -60,7 +65,13 @@ from mocktrade.broker.rules import protected_limit
 from mocktrade.domain.orders import Side
 from mocktrade.domain.ticks import DepthLevel, Tick
 from mocktrade.orders.model import OrderEvent, OrderView, Pending
-from mocktrade.spreads.model import MAX_LEG_SKEW_S, SpreadDef, SpreadLeg
+from mocktrade.spreads.model import (
+    MAX_LEG_SKEW_S,
+    SpreadDef,
+    SpreadLeg,
+    spread_from_dict,
+    spread_to_dict,
+)
 
 MODIFY_BUDGET = 24  # brokers allow 25 modifications per order
 AUTO = Decimal(-1)  # the broker's automatic market protection
@@ -94,8 +105,16 @@ FLATTEN = AlgoAction("flatten", "Flatten",
 
 
 def algo_type(lookup: Callable[[str], SpreadDef | None]) -> AlgoType:
-    """The ASE algo, finding spreads with `lookup` (the server's SpreadBook.get)."""
-    return AlgoType(SPEC, lambda params: AutoSpreader(params, lookup))
+    """The ASE algo, finding spreads with `lookup` (the server's SpreadBook.get); after a
+    restart, rebuilt from the spread it copied when it started."""
+    return AlgoType(SPEC, lambda params: AutoSpreader(params, lookup), restore=_restore)
+
+
+def _restore(params: dict, snapshot: dict | None) -> "AutoSpreader":
+    if not snapshot or "spread" not in snapshot:
+        raise ValueError("the spread it was trading was not saved")
+    spread = spread_from_dict(snapshot["spread"])
+    return AutoSpreader(params, lambda _id: spread)
 
 
 def _other_side(side: Side) -> Side:
@@ -128,6 +147,7 @@ class AutoSpreader(BaseStrategy):
         self.legging_ms: list[float] = []
         self.stale = ""
         self.flattening = False
+        self.restored = False  # rebuilt after a restart: nothing new is sent until resumed
 
     # --- the engine's calls ---
 
@@ -157,7 +177,27 @@ class AutoSpreader(BaseStrategy):
         self._chase(ctx)
 
     def on_resume(self, ctx: AlgoContext) -> None:
+        self.restored = False  # the trader has looked: hedge what is short, then quote
+        self._hedge(ctx)
         self._quote(ctx)
+
+    def snapshot(self) -> dict:
+        return {"spread": spread_to_dict(self.spread)}
+
+    def on_restore(self, ctx: AlgoContext) -> None:
+        """Back after a restart, paused: every child is known (none in flight), each hedge's
+        price is its chase anchor, and a leg short now counts as unhedged from now."""
+        self.restored = True
+        self.buying = (ctx.side is Side.BUY) == (self.q.ratio > 0)
+        for c in ctx.children():
+            self.seen.add(c.client_order_id)
+            quote = c.request.instrument_id == self.q.instrument_id and c.request.side is ctx.side
+            if not quote and c.request.price_paise is not None:
+                self.hedge_first[c.client_order_id] = c.request.price_paise
+        ctx.watch(*(leg.instrument_id for leg in self.others))
+        if self._short(ctx):
+            self.first_unhedged_at = ctx.now()
+        self._report(ctx)
 
     def on_child(self, ctx: AlgoContext, child: OrderView, event: OrderEvent) -> None:
         self.changing.pop(child.client_order_id, None)  # the broker answered (or it ended)
@@ -373,7 +413,7 @@ class AutoSpreader(BaseStrategy):
 
     def _hedge(self, ctx: AlgoContext) -> None:
         """Send each leg whatever the quoting leg's fills need that nothing covers yet."""
-        if self.flattening:
+        if self.flattening or self.restored:  # restored: the trader decides first (#426)
             return
         short = self._short(ctx)
         if not short:
@@ -429,7 +469,7 @@ class AutoSpreader(BaseStrategy):
     def _chase(self, ctx: AlgoContext) -> None:
         """Working hedges follow the market to its best ± pay-up, never more than `chase`
         ticks past their first price; they never move back."""
-        if self.flattening or not self.controls.chase_ticks:
+        if self.flattening or self.restored or not self.controls.chase_ticks:
             return
         self._sync(ctx)
         for leg in self.others:
