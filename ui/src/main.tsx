@@ -1,3 +1,4 @@
+// The entry point: loads the styles and every widget, then draws the app into the page's #root.
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "dockview-react/dist/styles/dockview.css";

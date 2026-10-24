@@ -1,4 +1,4 @@
-# Chapter 10 · Build it yourself (plan; to be written from Wed 21 Oct)
+# Chapter 10 · Build it yourself (a plan)
 
 **Goal (Ayush, 16 Oct):** understand every code file well enough to write MockTrade from scratch.
 Chapters 1–9 explain *what* each part does; this chapter will explain *how to build* each file,

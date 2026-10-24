@@ -1,3 +1,7 @@
+"""Loading Kite's instrument list (broker/kite/instruments.py): paise, our ids, both-way token
+maps.
+"""
+
 from datetime import date
 from pathlib import Path
 

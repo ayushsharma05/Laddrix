@@ -1,3 +1,7 @@
+"""Instruments (domain/instruments.py): ids, the tick grid, whole lots, indices not tradable,
+rules refused.
+"""
+
 import pytest
 
 from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind, make_instrument_id

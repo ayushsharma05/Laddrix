@@ -1,3 +1,7 @@
+"""An order checked against its instrument (domain/orders.py): limits, market protection, stop
+triggers.
+"""
+
 from dataclasses import replace
 from decimal import Decimal
 

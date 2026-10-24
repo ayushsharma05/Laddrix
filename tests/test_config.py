@@ -1,3 +1,7 @@
+"""Settings from the environment and a local .env file (config.py): parsing, which wins, missing
+ones named.
+"""
+
 import pytest
 
 from mocktrade.config import ConfigError, KiteSettings, environment, read_dotenv

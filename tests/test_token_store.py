@@ -1,3 +1,5 @@
+"""Today's Kite token kept privately on disk until 6 AM (broker/kite/token_store.py)."""
+
 import os
 import stat
 from datetime import datetime

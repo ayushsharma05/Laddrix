@@ -1,3 +1,7 @@
+"""Who may trade, manage or view an account (domain/accounts.py): the owner, allowed traders,
+risk.
+"""
+
 from dataclasses import replace
 
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_view

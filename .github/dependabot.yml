@@ -7,6 +7,8 @@
 #   us: pip-audit and npm audit fail CI, and patching.md sets how fast it is fixed.
 # - Base images and CI actions: the same rule. The language images (Python, Node) also stay on
 #   their minor line: a new Python or Node release is an upgrade, not a weekly bump.
+# - The images Compose runs beside the app (Caddy, and Prometheus and Grafana for monitoring):
+#   minor and patch updates, like the packages.
 version: 2
 updates:
   - package-ecosystem: pip
@@ -47,3 +49,11 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: [version-update:semver-major, version-update:semver-minor]
+  - package-ecosystem: docker-compose
+    directory: "/deploy"
+    schedule: { interval: weekly }
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]

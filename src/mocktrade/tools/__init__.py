@@ -1,1 +1,3 @@
-"""Small command-line tools for developers: login, watch prices."""
+"""Command-line tools: run the server or the demo, manage users, back up and restore, read the
+audit trail, load tests.
+"""

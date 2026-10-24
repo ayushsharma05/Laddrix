@@ -30,4 +30,4 @@ How MockTrade is built. Each doc is checked against the code; the diagrams' sour
 | [expiry.md](expiry.md) | F&O expiry day: warnings, cut-offs, refusals, settlement, restarts |
 | [performance.md](performance.md) | Measured speed |
 
-Operations are in [`../runbooks/`](../runbooks/README.md), the test plan is in [`../test/`](../test/README.md), and decisions are in [`../adr/`](../adr/README.md).
+Operations are in [`../runbooks/`](../runbooks/README.md), the test plan is in [`../test/`](../test/README.md), and decisions are in [`../../context/conversation-log.md`](../../context/conversation-log.md) (why and when) and in these docs (what the design is now).

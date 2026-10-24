@@ -1,28 +1,10 @@
-# MockTrade: the guide (start here)
+# The guide on one page
 
-> **Want it slower, with pictures and from zero?** Read the full guide in
-> [docs/guide/](guide/README.md): nine short chapters, starting with "what is a market?".
-> This page is the one-page summary.
+The whole guide in one page: what MockTrade is, how the parts fit, how one order travels
+through the code, how each safety system works. Read it with the code open beside you. For
+the slower version, with pictures and from zero, read the [chapters](README.md).
 
-Written for Ayush on 16 Oct 2026. Plain words, no assumed knowledge. It explains what the
-project is, how the parts fit, how one order travels through the code, how each safety system
-works, and what is left. Read it with the code open beside you.
-
-If a word is new, look it up in [design/glossary.md](design/glossary.md).
-
----
-
-## 0. A five-day plan (Fri to Tue, before we restart on Wednesday)
-
-One hour a day is enough. Each day has something to read and something to do.
-
-| Day | Read | Do |
-| --- | --- | --- |
-| **1 · Fri** | Sections 1–3 of this guide | Run the demo (section 12). Log in, open a ladder, buy 75 NIFTY futures, watch the order book and positions change. |
-| **2 · Sat** | Section 4 (one order's life), then `src/mocktrade/orders/manager.py`, only `submit` and `apply` | Place an order, then open its audit trail (double-click it in the order book). Match each line with section 4. |
-| **3 · Sun** | Section 5 (safety), then [design/order-life.md](design/order-life.md) | Press STOP, then Flatten in the red band. Set an MTM loss limit of ₹1 with auto-close and watch it close the position. |
-| **4 · Mon** | Sections 6–8 (screens, data, tests) | Run the tests (section 12). Break one line in `risk/checks.py` on purpose, run the tests, and see them fail. Then undo it. |
-| **5 · Tue** | Sections 9–11 (how we work, what's left, your steps) and [runbooks/go-live.md](runbooks/go-live.md) | Write down your questions. We start Wednesday with them. |
+If a word is new, look it up in [the glossary](../design/glossary.md).
 
 ---
 
@@ -491,7 +473,7 @@ Used by MTM auto-close, square-off and Flatten (`risk/closing.py`).
 the watchlist, and the pink ladder, chart and ticket all switch to it.
 
 The design rules for the screens (colours, keys, every widget at any size) are in
-[design/ui.md](design/ui.md).
+[design/ui.md](../design/ui.md).
 
 ---
 
@@ -583,65 +565,39 @@ an issue (what and why) ─► a branch from main ─► code + tests + docs + c
 
 ---
 
-## 10. Where things stand (16 Oct 2026)
+## 10. Where things stand, and what is next
 
-**Done:**
-- Everything up to v1.0.0-rc.1 (the release candidate).
-- From the outside review's core list, six safety fixes:
-  - **#258:** positions kept separately per product;
-  - **#259:** unanswered orders;
-  - **#260:** changes and cancels in doubt;
-  - **#261:** coordinated exits;
-  - **#262:** STOP / cancel / flatten;
-  - **#263:** loss-limit closes survive restarts.
-- **#269:** a path fix.
-
-**Paused until Wednesday** (nothing runs with real money before then, so waiting is safe):
-
-| Issue | What | Why it matters |
-| --- | --- | --- |
-| #264 | Lost stops: a flag that survives every restart, and a guarded "Restore stop" | Half done, saved on branch `h-264-protection` (not merged). |
-| #265 | Order intents written to disk before sending; stop safely if the disk fails | A crash at the wrong moment must not lose what was sent. |
-| #267 | Never trade on old prices; keep execution prices separate from screen updates | Old prices mean wrong fills and wrong risk. |
-| #270 | One user must never see another user's alerts or research files | Privacy between users. |
-| #266, #268, #271–#277 | Day rollover, screens waiting for a full sync, webhook checks, backups, task supervision, capacity, exact charges, broker-held triggers, data labels | Important, less urgent. |
-| #287, #290, #291 | Logs and status page, F&O expiry day, compliance (SEBI algo id) | Before real use. |
-| #279, #278 | Security review; the decision on who pays for live data | Need your decisions. |
-| #241 (#242–#255), #297–#322 | New features | After all of the above. |
+These change every week, so they live where they are kept up to date:
+- **Where things are, and the next piece of work:** [context/status.md](../../context/status.md).
+- **What changed, version by version:** the [changelog](../../CHANGELOG.md).
+- **What is planned:** the [roadmap](../roadmap/README.md) and the feature issues on GitHub.
 
 ---
 
-## 11. The steps only you can do (slowly, when you're ready)
+## 11. The steps only you can do
 
-None of these is urgent, and none happens without you.
-
-1. **Your v1 acceptance on issue #240:** you try the platform (the demo is enough) and say on
-   #240 whether it does what you wanted. It's just your opinion, written down.
-2. **The live go-live run** ([runbooks/go-live.md](runbooks/go-live.md)): 28 boxes, done with
-   your own Zerodha login and the smallest possible quantity. It needs your Kite API key and the
-   server's static IP. **No live order is ever placed without you saying so.**
-3. **Tagging v1.0.0** ([runbooks/release.md](runbooks/release.md)): one command, after the
-   two steps above.
+They are one GitHub issue, "Ayush's to-do list", in order: learn it, run it, accept v1, ask
+Zerodha, set up the live server, the go-live run, an independent security review. Chapter 9
+explains each: [09-work-next-your-steps.md](09-work-next-your-steps.md). **No live order is
+ever placed without you saying so.**
 
 ---
 
 ## 12. Running it yourself
 
 ```bash
-# the demo: a paper account on simulated prices, everything on your machine
-cd ui && npm install && npm run build && cd ..
-python3 -m mocktrade.tools.demo --ui ui/dist          # then open http://localhost:8000
-python3 -m mocktrade.tools.demo --code                # in another terminal: the login code
-#   username demo, password demo-password-123, the code from the line above
-
-# the tests
-python3 -m pytest -q tests
-cd ui && npx vitest run
+make setup     # once
+make demo      # http://localhost:8000: user demo, password demo-password-123
+make code      # in a second terminal: the login code
+make check     # everything CI checks
 ```
 
+Every command, one by one, and what to do when something goes wrong:
+[running-locally.md](../running-locally.md).
+
 **Where to look next:**
-- [design/README.md](design/README.md) lists every design document.
-- [design/domain-model.md](design/domain-model.md) explains the main objects and how they
+- [design/README.md](../design/README.md) lists every design document.
+- [design/domain-model.md](../design/domain-model.md) explains the main objects and how they
   relate.
-- [design/order-life.md](design/order-life.md) has the order journeys with diagrams.
-- [runbooks/README.md](runbooks/README.md) has what to do when.
+- [design/order-life.md](../design/order-life.md) has the order journeys with diagrams.
+- [runbooks/README.md](../runbooks/README.md) has what to do when.

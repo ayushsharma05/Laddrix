@@ -26,12 +26,13 @@ On Windows, use WSL (Ubuntu) and run everything inside it; the commands below ar
 git clone https://github.com/ayushsharma05/MockTrade.git
 cd MockTrade
 python3 -m venv .venv && source .venv/bin/activate   # a private Python for this project
-pip install -r requirements-dev.txt                   # the server, its tools and the test tools
-cd ui && npm ci && npm run build && cd ..             # the screens, built into ui/dist
+make setup                                            # the server, its tools, the test tools and the screens
 ```
 
 - **`source .venv/bin/activate`:** run it again in every new terminal. Your prompt shows `(.venv)` when it is on.
-- **`npm ci`:** installs exactly the versions in `package-lock.json`.
+- **`make setup`** runs `pip install -r requirements-dev.txt`, then `npm ci && npm run build` in
+  `ui/` and `npm ci` in `ui/desktop/`. `npm ci` installs exactly the versions in `package-lock.json`.
+  Every `make` command is listed at the top of the [Makefile](../Makefile).
 
 ## 2. The demo: the whole platform with simulated prices
 
@@ -69,9 +70,11 @@ cd ui/desktop && npm ci && npm start          # opens http://localhost:8000 in a
 ## 3. The tests: what CI runs on every pull request
 
 Run all of these before trusting a change. The same five jobs run on GitHub for every PR.
+`make check` runs them all in one go (`make test` only the tests, `make lint` only the style
+and types); the commands one by one:
 
 ```bash
-# the server: about 1,500 tests, about 1.5 minutes
+# the server: about 1,600 tests, about 2 minutes
 python3 -m pytest -q tests
 python3 -m pytest -q tests/test_orders.py -k cancel   # one file, only tests whose names match
 
@@ -79,7 +82,7 @@ python3 -m pytest -q tests/test_orders.py -k cancel   # one file, only tests who
 ruff check .
 ruff format --check .
 
-# the screens: about 420 tests, types, and the production build
+# the screens: about 520 tests, types, and the production build
 cd ui && npm run typecheck && npm test && npm run build && cd ..
 
 # the desktop shell

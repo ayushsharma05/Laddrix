@@ -1,3 +1,7 @@
+"""The scripted test broker (broker/fake.py) keeps to the broker interface and replays what it is
+told.
+"""
+
 import pytest
 
 from mocktrade.broker.base import Broker, BrokerError

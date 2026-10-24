@@ -53,9 +53,14 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
 - **Ayush asked (24 Oct, late) for #287, then a file-by-file review of the whole repo.**
   1. #287 operations: JSON logs with ids, one status of every part (readiness, Docker's
      health, the Admin screen's Status tab), Prometheus's own key, an optional Prometheus +
-     Grafana dashboard ([docs/runbooks/monitoring.md](../docs/runbooks/monitoring.md)): in its PR.
-  2. The repo review: next, in its own issue and PR.
-- **Pull requests:** the #287 PR.
+     Grafana dashboard ([docs/runbooks/monitoring.md](../docs/runbooks/monitoring.md)): merged (PR #437).
+  2. The repo review, #438, in four parts, one PR each:
+     - #439 setup (accurate facts, project files, a contributor guide, one guide, the reading
+       order kept complete by a test): in its PR;
+     - #440 types (mypy clean, in CI): next;
+     - #441 routes (`server/app.py` split by area);
+     - #442 screens lint (ESLint with the React hooks rules).
+- **Pull requests:** the #439 PR.
 
 ## What's next
 

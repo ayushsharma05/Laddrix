@@ -1,3 +1,5 @@
+"""Volume at price for the ladder (marketdata/vap.py): volume between ticks on the newer price."""
+
 from mocktrade.domain.ticks import Tick
 from mocktrade.marketdata.service import MarketData
 from mocktrade.marketdata.vap import VolumeAtPrice

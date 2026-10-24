@@ -229,8 +229,8 @@ a restart), that stop stops too, and nothing at the exchange stands in for it.
 ![The UNPROTECTED band](../../context/images/v1-2-unprotected-band.png)
 
 **The rule to remember:** for a stop that must survive anything, use a **stop-loss order or a GTT
-held by Zerodha**, not a MockTrade algo. Making this flag survive every restart, and a safe
-"Restore stop" button, is issue #264 (half done; continues Wednesday).
+held by Zerodha**, not a MockTrade algo. The UNPROTECTED flag survives every restart, and a
+guarded "Restore stop" button puts the stop back (#264).
 
 ## 5.13 The whole safety net on one page
 

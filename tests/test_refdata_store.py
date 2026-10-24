@@ -1,3 +1,5 @@
+"""The instrument master (refdata/store.py): each broker's id for an instrument, and search."""
+
 import pytest
 
 from mocktrade.refdata.store import InstrumentStore

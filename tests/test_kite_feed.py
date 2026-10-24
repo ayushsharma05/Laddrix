@@ -1,3 +1,7 @@
+"""Kite's tokens turned into our instrument ids (broker/kite/feed.py); unknown tokens counted,
+never a crash.
+"""
+
 import pytest
 
 from mocktrade.broker.kite.decoder import KiteTick

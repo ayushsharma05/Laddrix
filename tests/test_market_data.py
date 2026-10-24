@@ -1,3 +1,5 @@
+"""The latest tick of every instrument, told to whoever watches it (marketdata/service.py)."""
+
 import asyncio
 
 from mocktrade.domain.ticks import Tick

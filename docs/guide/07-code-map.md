@@ -34,7 +34,7 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 **A tip for big files:** don't read top to bottom. Search for the method you care about
 (`def submit`) and read that one.
 
-## 7.2 The server: `src/mocktrade/`, every file
+## 7.2 The server: `src/mocktrade/`, every folder
 
 ### The building plan and the base
 
@@ -45,6 +45,7 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 | `config.py` | Reads settings from the environment (and a local `.env` file). |
 | `metrics.py` | Measures how long each step takes, so speed is a number, not a guess. |
 | `version.py` | The version number (1.0.0-rc.1) and which commit it was built from. |
+| `logsafe.py` | Hides secrets in every log line before it is written. |
 
 ### `domain/`: the words, no logic
 
@@ -58,6 +59,14 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 | `accounts.py` | Users, roles (trader, risk, admin), broker accounts, who may see or trade what. |
 | `gtt.py`, `portfolio.py` | Shapes for GTT triggers, funds, holdings and trades. |
 
+### `refdata/`: the list of what can be traded
+
+| File | Its job |
+| --- | --- |
+| `store.py` | Every instrument by our id, plus each broker's id for it. |
+| `expiry.py` | Expiry day: when a contract ends, how it settles, what may still be ordered. |
+| `freeze.py` | The exchange's freeze quantity: the most one order may carry. |
+
 ### `orders/`: the kitchen manager
 
 | File | Its job |
@@ -68,6 +77,7 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 | `codec.py` | Turns orders into plain text (JSON) for the ledger and the API, and back. |
 | `basket.py` | Several orders sent together after one check of them all. |
 | `gtt.py` | GTTs: placed at Zerodha, watched, and adopted when they fire. |
+| `trade_check.py` | Checks our fills against the broker's own trade list. |
 
 ### `risk/`: the safety inspector
 
@@ -83,6 +93,8 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 | `flatten.py` | Flatten, and the STOP report. |
 | `mtm.py` | Your own loss limits, and what each did (the breach record). |
 | `squareoff.py` | The square-off warning and the one-click close. |
+| `access.py` | Who may act on an account right now (re-checked when a delayed action runs). |
+| `surveillance.py` | Patterns worth a look: self-trades, large orders, cancel ratios, bursts. |
 
 ### `broker/`: the supplier's phone
 
@@ -111,6 +123,7 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 | `prints.py` | Time and sales: the individual trades. |
 | `movers.py` | Biggest gainers and losers. |
 | `ladder.py` | A text ladder for the terminal. |
+| `sources.py`, `markets.py` | Whose prices each account uses (each trader's own Zerodha prices), and what the screens read from them. |
 
 ### `positions/`: the accountant
 
@@ -118,6 +131,7 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 | --- | --- |
 | `book.py` | Positions from fills: quantity, average price, realised and unrealised P&L, per product. |
 | `reconcile.py` | Compares our positions with Zerodha's; raises a band on a real difference. |
+| `external.py` | Trades made outside MockTrade (in Zerodha's own app), and the mismatch they cause. |
 
 ### `algos/`: the robot helpers
 
@@ -132,6 +146,7 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 | `spreader.py` | Trade a two-leg spread as one order. |
 | `execution.py` | What these execution algos share. |
 | `protect.py` | Protection: trailing stop, OCO (target or stop, one cancels the other), bracket. |
+| `autospreader.py` | The Autospreader (ASE): quotes a spread's legs and hedges every other leg the moment one fills. |
 
 ### The rest
 
@@ -141,13 +156,15 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 | `charges/` | Brokerage, taxes and fees per fill, from published schedules. |
 | `charts/` | Candles, and where past candles come from. |
 | `alerts/` | Price alerts per user, saved to disk; signed webhooks. |
+| `spreads/` | Spread definitions of 2 to 6 legs (`model.py`), saved per user (`store.py`), priced live from their legs (`pricer.py`). |
+| `structures/` | The spreads an account holds (`book.py`): fills allocated to them, their P&L, what is left over. |
 | `portfolio/` | Funds, holdings and tradebook, as the broker reports them. |
 | `reports/` | End-of-day reports, history over many days, CSV and PDF. |
 | `research/` | Recording ticks, replaying a day, backtests on recorded days. |
-| `ops/` | Alerts (the bands), the scheduler (jobs at India times), operational checks, the day guards, lost stops, sending alerts off the machine. |
+| `ops/` | Alerts (the bands), the scheduler (jobs at India times), operational checks, the day guards, lost stops, sending alerts off the machine; the supervisor that restarts failed loops, one server per data folder (`fence.py`), the status of every part (`status.py`) and JSON logs (`logs.py`). |
 | `store/events.py` | The ledger: every event into SQLite (`events.db`), written in the background so trading never waits for the disk. |
 | `server/` | `app.py` the API, `stream.py` the live line, `security.py` passwords and codes, `users.py` the users database, `admin.py` the admin API, `formats.py` shared JSON shapes. |
-| `tools/` | Programs you run: `serve` (real), `demo`, `users` (add users), `backup`, `restore`, `login` (Kite), `watch` (a terminal ladder), `amo_check` (one go-live test order), `loadtest`. |
+| `tools/` | Programs you run: `serve` (real), `demo`, `users` (add users), `backup`, `restore`, `login` (Kite), `watch` (a terminal ladder), `amo_check` (one go-live test order), `loadtest`, `audit` (read and check the audit trail). |
 
 ## 7.3 The screens: `ui/src/`
 
