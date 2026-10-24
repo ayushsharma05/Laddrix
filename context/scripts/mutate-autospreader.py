@@ -24,7 +24,7 @@ MUTANTS = [
  (A, "            if c.request.price_paise == price or c.pending is not Pending.NONE:", "            if c.pending is not Pending.NONE:", PY),
  (A, "            if done >= MODIFY_BUDGET:", "            if done > MODIFY_BUDGET:", PY),
  (A, "            for c in quotes:\n                ctx.cancel(c.client_order_id)  # no hedge price", "            for c in []:\n                ctx.cancel(c.client_order_id)  # no hedge price", PY),
- (A, "            if want > 0 and not self._short(ctx) and ctx.send(want, price):", "            if want > 0 and ctx.send(want, price):", PY),
+ (A, "            elif want > 0 and not self._short(ctx) and ctx.send(want, price):", "            elif want > 0 and ctx.send(want, price):", PY),
  # hedging
  (A, "        lots = q_lots * abs(leg.ratio) // abs(self.q.ratio)", "        lots = q_lots * abs(leg.ratio)", PY),
  (A, "        lots = q_lots * abs(leg.ratio) // abs(self.q.ratio)", "        lots = -(-q_lots * abs(leg.ratio) // abs(self.q.ratio))", PY),
