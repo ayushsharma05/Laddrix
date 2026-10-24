@@ -678,4 +678,9 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Personal data:** spreads are per user, in the backup, and in export-user and erase-user. The cross-firm leak test covers the new routes.
   - **The widget:** the Autospreader (Widgets ▾ or the right-click "Open widget"). It defines spreads and shows their live bid and ask.
   - **Checks:** 27 + 4 server tests, 12 screen tests; mutation 50/50; browser 11/11. In the browser the spread's mid equalled the legs' own Oct − Nov.
+- 24 Oct, evening. **Bug #419, found by the spread ladder's browser check.**
+  - **What happened:** after a demo restart, a NIFTY Oct buy at 25,009.60 was "corrected" to 25,145.70, a Nov price.
+  - **Why:** the paper broker numbered orders and trades from P1/T1 on every start. The day's adopted trades already held a P1/T1, so the trade check (#352) took that old trade as the new order's.
+  - **Fix:** each start's ids carry its start time (`P<base36 seconds>-1`). A replay with a fixed clock keeps the same ids.
+  - **Checks:** a regression test with a real morning run, a restart, and a new fill at its own price; mutation 5/5.
 
