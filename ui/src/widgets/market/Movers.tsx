@@ -83,7 +83,11 @@ export function Movers({ params, setParams, publish }: WidgetProps<MoversParams>
           ))}
         </select>
         <span className="book-spacer" />
-        {shown && <span className="dim">of {shown.of} with prices</span>}
+        {shown && (
+          <span className="dim" title={shown.universe}>
+            of {shown.of} watched here, not the whole market
+          </span>
+        )}
       </div>
       {error && (
         <div className="empty-note tone-bad" role="alert">

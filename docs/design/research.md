@@ -119,9 +119,38 @@ POST /api/research/candles {instrument_id, day, rows: [{time, open, high, low, c
   A backtest can't be kinder than the platform would have been that day.
 - **Deterministic:** nothing sleeps or reads the wall clock. The same days and spec give the same
   report, byte for byte (tested).
+  - **Fixed in #274:** the order rate (8/s, Kite's) was counted in real time. A day replayed in
+    seconds made orders wait real milliseconds while replayed ticks ran on, so the result
+    depended on the computer's speed and on whatever else ran on the loop. A run with other
+    work beside it gave different fills (net −₹1,975.50 instead of −₹2,095.51 on the same day).
+  - Now a backtest's throttle counts and waits in replayed time, and the between-ticks drain
+    lets replayed time move on while an order waits its turn. With or without other work on
+    the loop, the same fills (`tests/test_workload.py`).
+- **Where a backtest runs (#274):**
+
+  ```
+  POST /api/research/backtests ─► at most 10 waiting on the server, 2 per person (429 beyond)
+    ─► one run at a time ─► each day in the worker process (Worker), never on the trading loop
+         the worker:  memory capped at 2 GB, 15 min per day, then killed and the day failed
+                      killed (e.g. out of memory): that run fails, the next starts a fresh one
+         what it gets: a description of the day (RecordedDay: the folder and date; CandleDay:
+                       the rows) and opens it there; the trading loop never reads the files
+  POST /api/research/backtests/{run}/cancel ─► queued: never starts; running: its worker killed
+                                               (the owner, or their firm's admin)
+  ```
+
+  On the trading loop the run costs only waiting for the worker's answer. Measured with
+  `context/scripts/measure-workload.py` (40,000 ticks, 4 vCPU cloud VM): the loop's lateness
+  while a backtest runs has a p99 of 0.4 ms and a max of 1.9 ms (idle: 0.7 / 2.0 ms). On the
+  loop it was a max of 7.0 ms, and it gave different results with other work beside it.
 - **Hand-worked** (`tests/test_backtest.py`): SLICER buys 2 × 75 crossing the spread on a tiny day.
   Fills at 25,000.10 and 25,002.10 at the times of their ticks; ₹585.00 unrealised at the last
   price; charges equal to the K10.2 bill for those two orders.
+- **What a backtest assumes (#277):**
+  - **Each day stands alone:** a fresh platform; nothing is carried overnight, and open positions are valued at the day's last price, not closed.
+  - **Recorded ticks** exist only for the instruments a screen, order or algo watched that day.
+  - **The paper broker's fill model** is used (queue position, latency), as in paper trading.
+  - **Candle-based runs** are an assumed path, so their fills are an estimate: better or worse than the market might have given. The run says so (`fills_note`, shown on the Research screen).
 - **Candles** (when no ticks were recorded) become ticks: open, then the adverse extreme first
   (the low of a rising candle, the high of a falling one), the other extreme, then the close.
   Each has one tick of spread, so market orders pay it and resting orders fill only when the price

@@ -158,6 +158,11 @@ function DayView({ report: r, publish }: { report: DayReport; publish: (id: stri
           Trades <b>{t.trades}</b>
         </span>
       </div>
+      {r.prices_as_of && (
+        <div className="empty-note dim" title="Open positions are valued at the last price received for each; this is the oldest of them">
+          Open positions valued at prices as of {clock(r.prices_as_of, false)}
+        </div>
+      )}
       {r.notes.map((n) => (
         <div key={n} className="empty-note tone-bad">
           {n}

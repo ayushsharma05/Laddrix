@@ -83,6 +83,7 @@ class PositionRow:
     realised_paise: int
     unrealised_paise: int
     charges_paise: int
+    mark_at: datetime | None = None  # when the mark's price arrived (#277): how fresh it is
 
     @property
     def gross_paise(self) -> int:
@@ -227,10 +228,12 @@ def build_day(
     # marks
     priced = True
     marks: dict[str, int] = {}
+    marked_at: dict[str, datetime | None] = {}
     for p in book.positions():
         tick = prices(p.instrument_id) if prices else None
         if tick is not None and tick.ltp_paise > 0:
             marks[p.instrument_id] = tick.ltp_paise
+            marked_at[p.instrument_id] = tick.received_at
         elif p.qty:
             priced = False
     for b in (book, *books.values()):
@@ -264,6 +267,7 @@ def build_day(
                 sell_value_paise=p.sell_value_paise,
                 closing_qty=p.qty,
                 mark_paise=marks.get(p.instrument_id),
+                mark_at=marked_at.get(p.instrument_id),
                 realised_paise=p.realised_paise,
                 unrealised_paise=p.unrealised_paise,
                 charges_paise=bill.by_position.get(position_key(p.instrument_id, p.product), 0),
@@ -312,6 +316,11 @@ def _notes(
 # --- what the API sends, what is kept ------------------------------------------------------------
 
 
+def _oldest_mark(r: DayReport) -> str | None:
+    marked = [p.mark_at for p in r.positions if p.mark_at is not None and p.closing_qty]
+    return min(marked).isoformat() if marked else None
+
+
 def report_to_dict(r: DayReport) -> dict[str, Any]:
     return {
         "account_id": r.account_id,
@@ -319,6 +328,8 @@ def report_to_dict(r: DayReport) -> dict[str, Any]:
         "generated_at": r.generated_at.isoformat(),
         "final": r.final,
         "priced": r.priced,
+        # the oldest price an open position is valued at (#277): the report is "as of" it
+        "prices_as_of": _oldest_mark(r),
         "notes": list(r.notes),
         "schedule": r.schedule,
         "totals": {
@@ -343,6 +354,7 @@ def report_to_dict(r: DayReport) -> dict[str, Any]:
                 "sell_value_paise": p.sell_value_paise,
                 "closing_qty": p.closing_qty,
                 "mark_paise": p.mark_paise,
+                "mark_at": p.mark_at.isoformat() if p.mark_at else None,
                 "realised_paise": p.realised_paise,
                 "unrealised_paise": p.unrealised_paise,
                 "gross_paise": p.gross_paise,

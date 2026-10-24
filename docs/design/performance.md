@@ -62,6 +62,35 @@ tick of 65 ms is far fresher than the next one.
 | Longest event-loop stall | 136 ms | 30–50 ms | GC freeze, plus the decoder yields every 250 ticks: a big frame never holds up an order click |
 | A frame reaching the screens | in up to 4 parts, the later ones up to 250 ms late | in one part | decoded in chunks, but handed on whole |
 
+## Research and reports beside trading (#274)
+
+Measured with `context/scripts/measure-workload.py`. It uses a probe that asks the trading loop
+to wake every 5 ms and records how late each wake is. That lateness is the delay every price,
+risk check, order and screen update sees at that moment. The VM is the same 4 vCPU one, with
+Python 3.13 and 40,000 recorded ticks.
+
+| While… | p50 | p95 | p99 | max |
+|---|---|---|---|---|
+| nothing else | 0.3 ms | 0.4 ms | 0.7 ms | 2.0 ms |
+| a backtest on the loop (before) | 0.1 ms | 0.1 ms | 0.5 ms | 7.0 ms |
+| **a backtest in its worker process (now)** | 0.2 ms | 0.3 ms | 0.4 ms | 1.9 ms |
+| 20 day reports built on the loop (before) | 10.5 ms | 11.0 ms | 11.0 ms | 11.0 ms |
+| **20 day reports built in a thread (now)** | 0.9 ms | 1.3 ms | 1.4 ms | 1.3 ms |
+
+- **Backtests** run in a worker process. There, a backtest's own lag never adds to the loop's,
+  and its results no longer depend on the loop (see research.md, #274).
+- **Reports** (the 16:00 job, a day's report, P&L history, CSV and PDF) are read and built in a
+  worker thread. Each read opens its own database connection.
+- **Scheduler jobs** each run as a task of their own. A slow one (the reports) never delays
+  the 5-second protection guard, and a job still running when due again is skipped, not
+  started twice.
+- **The budgets** (what a release must not exceed, on the VM above):
+  - the loop is at most 10 ms late at p99 while a backtest and the day's reports run;
+  - at most 10 backtests wait, 2 per person;
+  - each day stops after 15 minutes; the worker is capped at 2 GB of memory.
+- **Not measured here:** the production server (the AWS Lightsail Mumbai plan). Run the script
+  there once deployed and record the numbers.
+
 ## Known limits and next steps
 
 - Python does about 21 µs of work per tick. At 3,000 contracts × 2 ticks/s that is about 13%

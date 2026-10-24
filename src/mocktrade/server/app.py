@@ -70,6 +70,7 @@ from mocktrade.reports.export import report_csv, report_pdf
 from mocktrade.reports.service import ReportError, Reports
 from mocktrade.research.backtest import (
     MAX_DAYS,
+    BacktestBusy,
     BacktestError,
     Backtests,
     BacktestSpec,
@@ -684,6 +685,8 @@ def create_app(
                             body.capital_paise, body.name)  # fmt: skip
         try:
             run = runs.start(spec, candles=body.candles, owner=user.id)
+        except BacktestBusy as exc:  # a bounded queue (#274): later, not never
+            raise HTTPException(429, str(exc)) from None
         except BacktestError as exc:
             raise HTTPException(422, str(exc)) from None
         audit("BACKTEST", f"{user.id} started {run.run_id}: {body.algo} {body.side.value} "
@@ -729,13 +732,23 @@ def create_app(
         name = f"mocktrade-backtest-{run_id}-{data['day']}"
         disposition = {"Content-Disposition": f'attachment; filename="{name}.{format}"'}
         if format == "csv":
-            return Response(report_csv(data), media_type="text/csv; charset=utf-8",
-                            headers=disposition)  # fmt: skip
-        return Response(report_pdf(data), media_type="application/pdf", headers=disposition)
+            return Response(await asyncio.to_thread(report_csv, data),
+                            media_type="text/csv; charset=utf-8", headers=disposition)  # fmt: skip
+        return Response(await asyncio.to_thread(report_pdf, data), media_type="application/pdf",
+                        headers=disposition)  # fmt: skip
 
     @app.get("/api/research/backtests/{run_id}")
     async def backtest_get(run_id: str, user: Me) -> dict[str, Any]:
         return own_run(run_id, user).to_dict()
+
+    @app.post("/api/research/backtests/{run_id}/cancel")
+    async def backtest_cancel(run_id: str, user: Me) -> dict[str, Any]:
+        """Stop a queued or running backtest (#274): its owner or their firm's admin."""
+        run = own_run(run_id, user)
+        if not await backtest_runs().cancel(run_id):
+            raise HTTPException(409, f"backtest {run_id} has already ended ({run.state})")
+        audit("BACKTEST", f"{user.id} cancelled {run_id}", {})
+        return run.to_dict(full=False)
 
     def candle_store(user: User) -> CandleStore | None:
         """The candles the asker's backtests read: their own firm's (#396)."""
@@ -1069,8 +1082,9 @@ def create_app(
         runtime(account_id, user)
         if format not in ("json", "csv", "pdf"):
             raise HTTPException(422, "format must be json, csv or pdf")
-        try:
-            data = day_reports.day(account_id, report_day(day))
+        when = report_day(day)
+        try:  # read and built off the trading loop (#274): a long day never stalls it
+            data = await asyncio.to_thread(day_reports.day, account_id, when)
         except ReportError as exc:
             raise HTTPException(422, str(exc)) from None
         if format == "json":
@@ -1078,9 +1092,10 @@ def create_app(
         name = f"mocktrade-{account_id}-{data['day']}{'' if data['final'] else '-preview'}"
         disposition = {"Content-Disposition": f'attachment; filename="{name}.{format}"'}
         if format == "csv":
-            return Response(report_csv(data), media_type="text/csv; charset=utf-8",
-                            headers=disposition)  # fmt: skip
-        return Response(report_pdf(data), media_type="application/pdf", headers=disposition)
+            return Response(await asyncio.to_thread(report_csv, data),
+                            media_type="text/csv; charset=utf-8", headers=disposition)  # fmt: skip
+        return Response(await asyncio.to_thread(report_pdf, data), media_type="application/pdf",
+                        headers=disposition)  # fmt: skip
 
     @app.get("/api/accounts/{account_id}/pnl")
     async def pnl(account_id: str, user: Me, by: str = "day", start: str = "",
@@ -1089,7 +1104,8 @@ def create_app(
         last = report_day(end) if end else day_reports.today()
         first = report_day(start) if start else last - timedelta(days=30)
         try:
-            return {"account_id": account_id, **day_reports.history(account_id, by, first, last)}
+            found = await asyncio.to_thread(day_reports.history, account_id, by, first, last)
+            return {"account_id": account_id, **found}
         except ReportError as exc:
             raise HTTPException(422, str(exc)) from None
 
@@ -1316,8 +1332,11 @@ def create_app(
                                   limit=max(1, min(limit, 300)))  # fmt: skip
         return {"instrument_id": instrument_id, "prints": [print_to_dict(p) for p in rows],
                 "kept": mine.prints.keep, "watched": mine.prices.is_watched(instrument_id),
-                "estimate": "trades between price snapshots; the side is estimated from the "
-                            "touch before the trade"}  # fmt: skip
+                "epoch": mine.prints.epoch,  # a new one: the numbering started again (#277)
+                "estimate": "estimated from price snapshots: the quantity is the volume traded "
+                            "between two snapshots (two trades in one show as one), the time is "
+                            "the snapshot's last trade, and the side is inferred from the touch "
+                            "before the trade"}  # fmt: skip
 
     @app.get("/api/market/movers")
     async def market_movers(user: Me, by: str = "gainers", limit: int = 10, exchange: str = "",

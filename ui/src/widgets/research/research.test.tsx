@@ -15,6 +15,7 @@ const REPORT: DayReport = {
   generated_at: "2026-10-15T10:30:00+00:00",
   final: true,
   priced: true,
+  prices_as_of: null,
   notes: [],
   schedule: "standard",
   totals: { realised_paise: 0, unrealised_paise: 50000, gross_paise: 50000, charges_paise: 10000, net_paise: 40000, turnover_paise: 375000000, trades: 2 },
@@ -233,6 +234,26 @@ describe("Backtests", () => {
     const detail = await screen.findByRole("region", { name: "Backtest BT1" });
     expect(within(detail).getByText("2026-10-15: the algo couldn't start: slices must be at least 1")).toBeTruthy();
     expect(within(detail).queryByLabelText("Run totals")).toBeNull();
+  });
+
+  it("a waiting or running run can be cancelled; a finished one can't", async () => {
+    let cancelled = false;
+    const going = () => run("BT1", cancelled ? { state: "cancelled", error: "cancelled", summary: undefined } : { state: "running", progress: 0, summary: undefined });
+    const server = mount(<Backtests {...props()} />, {
+      "GET /api/research/backtests": () => ({ status: 200, body: [going()] }),
+      "GET /api/research/backtests/BT1": () => ({ status: 200, body: going() }),
+      "POST /api/research/backtests/BT1/cancel": () => {
+        cancelled = true;
+        return { status: 200, body: going() };
+      },
+    });
+    fireEvent.click(await screen.findByText("SLICER BUY 150 NIFTY26OCTFUT"));
+    const detail = await screen.findByRole("region", { name: "Backtest BT1" });
+    fireEvent.click(within(detail).getByRole("button", { name: "Cancel this run" }));
+    const grid = screen.getByRole("grid", { name: "Backtest runs" });
+    await within(grid).findByText("Cancelled");
+    expect(server.calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/research/backtests/BT1/cancel"]);
+    await vi.waitFor(() => expect(within(detail).queryByRole("button", { name: "Cancel this run" })).toBeNull());
   });
 
   it("compare: two to four finished runs side by side, each keeping its colour", async () => {

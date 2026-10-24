@@ -2,7 +2,8 @@
 
 **When:** you (the operator) host another trading firm on the same MockTrade server.
 **Design:** [tenancy.md](../design/tenancy.md). **Before the first outside firm trades:** Zerodha's
-answer on shared IPs and platform-held keys (#278) and the two-firm drill (#397).
+answer on shared IPs and platform-held keys (#278). The two-firm drill (#397) passed: run it again after
+any change to access checks (`node context/scripts/drill-two-firms.cjs`).
 
 ```
 operator (server terminal)                 the firm's own admin (Admin screen)

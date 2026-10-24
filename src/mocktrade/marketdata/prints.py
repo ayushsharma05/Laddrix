@@ -10,8 +10,14 @@ buyer lifted the offer (BUY); at or below the previous best bid, a seller hit th
 in between, unknown (""). Screens label it as an estimate.
 
 Kept only for instruments a screen watches (`wanted`), the newest `keep` prints each.
+
+Every field of a print is an estimate, and the screens say so (#277): the quantity is a volume
+difference, the time is the snapshot's last-trade time, the side is inferred. The numbering
+(`seq`) starts again at 1 each time the server starts; `epoch` names the run, so a screen that
+sees a new epoch starts its tape again instead of waiting for the new numbers to pass the old.
 """
 
+import secrets
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -48,6 +54,7 @@ class TimeAndSales:
         self, *, keep: int = 300, wanted: Callable[[InstrumentId], bool] = lambda i: True
     ) -> None:
         self.keep = keep
+        self.epoch = secrets.token_hex(4)  # this run of the server: `seq` starts again with it
         self._wanted = wanted
         self._last: dict[InstrumentId, _Last] = {}
         self._prints: dict[InstrumentId, deque[Print]] = {}

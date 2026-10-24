@@ -94,7 +94,7 @@ from mocktrade.platform import Platform
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.reports.service import Reports
 from mocktrade.reports.store import ReportStore
-from mocktrade.research.backtest import Backtests, CandleStores
+from mocktrade.research.backtest import Backtests, CandleStores, RecordedDay, Worker
 from mocktrade.research.ticks import FileTickStore, TickRecorder
 from mocktrade.risk.access import trading_rights
 from mocktrade.risk.kill_switch import KillSwitch
@@ -269,6 +269,8 @@ class Assembly:
     backtests: Backtests | None = None
 
     async def close(self) -> None:
+        if self.backtests is not None:
+            self.backtests.close()  # its worker process (#274)
         if self.notifier is not None:
             await self.notifier.aclose()
         if self.kite is not None:
@@ -475,13 +477,14 @@ def build(settings: ServeSettings) -> Assembly:
         store = recorded.get(id(source)) if source is not None else None
 
         def days(d):
-            return store.read_timed(d) if store is not None and d in store.days() else None
+            return RecordedDay(store.root, d) if store is not None and d in store.days() else None
 
         return days, candle_stores.of(user.workspace).rows
 
     backtests = Backtests(
         settings.data_dir / "backtests", instruments, platform.charges_model,
         ticks=lambda _day: None, sources_of=sources_of,
+        runner=Worker(),  # never on the trading loop (#274)
     )  # fmt: skip
     # charts: live candles from every tick; history from Kite (or the recordings on paper)
     builder = CandleBuilder()
