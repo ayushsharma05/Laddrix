@@ -298,3 +298,40 @@ async def test_a_start_record_without_its_spread_is_not_rebuilt(tmp_path, nifty_
         "(KeyError('user_id')); its orders are cancelled",
     ]
     await again.stop()
+
+
+async def test_a_hedge_cancelled_while_down_is_sent_once_on_resume(tmp_path, nifty_fut):
+    s, algo, q, hedge = await legging(tmp_path, nifty_fut)
+    broker = as_broker_lists(s)
+    broker.broker_orders = [replace(u, status=OrderStatus.CANCELLED) if u.client_order_id == hedge
+                            else u for u in broker.broker_orders]  # fmt: skip
+    book = s.book
+    await s.stop()
+    again = Server(tmp_path, nifty_fut, broker, book=book)
+    await again.ready()
+    again.algos.resume(algo.algo_id)
+    again.algos.heartbeat()  # before the new hedge is registered: the old one is no news
+    await again.algos.settle()
+    assert [(r.instrument_id, r.qty) for r in broker.placed] == [(NOV, 75)]
+    await again.stop()
+
+
+def test_the_engine_refuses_to_restore_what_cant_be(nifty_fut):
+    from datetime import UTC, datetime
+
+    import pytest
+
+    from mocktrade.algos.engine import AlgoEngine, AlgoError, AlgoRecord
+    from mocktrade.orders.manager import OrderManager
+
+    store = InstrumentStore()
+    store.add(nifty_fut)
+    engine = AlgoEngine("acc", OrderManager("acc", FakeBroker(), store.get, ids=ClientIds("MT")),
+                        MarketData(), store.get, BUILTIN)  # fmt: skip
+    slicer = {"slices": 1, "interval_s": 60}
+    record = AlgoRecord("Aold-1", "SLICER", "ayush", OCT, Side.BUY, 75, slicer, Product.NRML,
+                        datetime.now(UTC))  # fmt: skip
+    with pytest.raises(AlgoError, match="Slicer algos can't be restored after a restart"):
+        engine.restore(record)
+    with pytest.raises(AlgoError, match="no algo called NOPE any more"):
+        engine.restore(replace(record, code="NOPE"))

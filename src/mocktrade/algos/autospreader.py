@@ -185,15 +185,11 @@ class AutoSpreader(BaseStrategy):
         return {"spread": spread_to_dict(self.spread)}
 
     def on_restore(self, ctx: AlgoContext) -> None:
-        """Back after a restart, paused: every child is known (none in flight), each hedge's
-        price is its chase anchor, and a leg short now counts as unhedged from now."""
+        """Back after a restart, paused: none of its children is in flight (each is counted,
+        and a hedge's price kept as its chase anchor, the first time `_sync` sees it), and a
+        leg short now counts as unhedged from now."""
         self.restored = True
         self.buying = (ctx.side is Side.BUY) == (self.q.ratio > 0)
-        for c in ctx.children():
-            self.seen.add(c.client_order_id)
-            quote = c.request.instrument_id == self.q.instrument_id and c.request.side is ctx.side
-            if not quote and c.request.price_paise is not None:
-                self.hedge_first[c.client_order_id] = c.request.price_paise
         ctx.watch(*(leg.instrument_id for leg in self.others))
         if self._short(ctx):
             self.first_unhedged_at = ctx.now()
