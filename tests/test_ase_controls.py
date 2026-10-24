@@ -17,7 +17,13 @@ from mocktrade.broker.rules import protected_limit
 from mocktrade.domain.orders import OrderStatus, OrderUpdate, Side
 from mocktrade.domain.ticks import Tick
 from mocktrade.server.formats import algo_to_dict
-from mocktrade.spreads.model import Controls, SpreadLeg, controls_from_dict, spread_from_dict
+from mocktrade.spreads.model import (
+    Controls,
+    SpreadLeg,
+    controls_from_dict,
+    spread_from_dict,
+    spread_to_dict,
+)
 
 
 @pytest.fixture
@@ -63,6 +69,14 @@ def test_controls_are_checked_in_words_and_default_when_missing():
            "created_at": "2026-10-24T10:00:00+00:00",
            "updated_at": "2026-10-24T10:00:00+00:00"}  # fmt: skip
     assert spread_from_dict(old).controls == Controls()  # saved before #425
+
+
+def test_a_spreads_controls_are_kept_on_disk(w):
+    tuned = calendar(w, chase_ticks=3, hedge_timeout_s=8)
+    again = spread_from_dict(spread_to_dict(tuned))
+    assert again.controls == Controls(chase_ticks=3, hedge_timeout_s=8.0)
+    with pytest.raises(ValueError, match="Chase must be at most 50"):
+        spread_from_dict({**spread_to_dict(tuned), "controls": {"chase_ticks": 99}})
 
 
 # --- the re-quote threshold and max unhedged --------------------------------------------------
@@ -306,3 +320,25 @@ async def test_the_timeout_and_a_retried_hedge_still_run_while_paused(w):
     w.engine.heartbeat()
     await w.engine.settle()
     assert len(w.children(algo, NOV)) == 1
+
+
+async def test_a_flatten_while_paused_keeps_its_closing_order_working(w):
+    algo = w.start(calendar(w), -13000, lots=1)
+    await w.engine.settle()
+    (q,) = w.children(algo)
+    w.fill(q, 75, 2501000)
+    await w.engine.settle()
+    (hedge,) = w.children(algo, NOV)
+    w.engine.pause(algo.algo_id)
+    preview = w.engine.preview(algo.algo_id, "flatten")
+    w.engine.act(algo.algo_id, "flatten", list(preview.lines))
+    await w.engine.settle()
+    cancelled(w, hedge)
+    await w.engine.settle()
+    (close,) = [c for c in w.children(algo, OCT) if c != q]
+    assert w.om.get(close).request.side is Side.SELL
+    assert w.om.get(close).broker_order_id not in w.broker.cancelled  # kept: it reduces risk
+    w.fill(close, 75, 2501000)
+    w.engine.heartbeat()
+    view = w.engine.get(algo.algo_id)
+    assert view.state is AlgoState.STOPPED and view.reason.startswith("flattened")

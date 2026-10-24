@@ -107,9 +107,15 @@ Q fills f lots ─► every other leg: floor(f · |its ratio| / |Q's ratio|) lot
   per-order limit" and the unhedged alert follows.
 - The screen shows the legs filled ("NIFTY26OCTFUT bought 75 · NIFTY26NOVFUT sold 150 · …"),
   the total unhedged and which legs are short, the spread traded and the legging time.
-- Not yet: several quoting legs, a maximum unhedged exposure, timeouts, and restart recovery
-  (#251). Algos don't survive a restart; their children are cancelled at start, as for every
-  algo.
+- **The spread's controls (#425):** a re-quote threshold, a maximum unhedged size, a hedge
+  chase with its cap, and a hedge timeout with one ALERT ([spreads.md](spreads.md)).
+- **Its actions:** "Hedge now" and "Flatten", previewed in words and done only as previewed.
+  Any algo can offer actions: a strategy lists them (`actions`) and gives `preview` and
+  `act`; the engine checks that the preview still holds before acting.
+- **Paused or stopping:** the heartbeat calls the strategy's `on_watch`, so hedges are still
+  retried and timed; a hedge sent then stays working (`keep_on_stop`).
+- Not yet: several quoting legs (#427) and restart recovery (#426). Algos don't survive a
+  restart; their children are cancelled at start, as for every algo.
 
 ## Execution algos (K9.1): iceberg, TWAP, VWAP, POV
 Shared parts live in `algos/execution.py`: where to price a child (`touch`: join our side or
