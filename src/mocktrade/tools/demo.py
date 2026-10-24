@@ -35,7 +35,7 @@ from mocktrade.charts.history import RecordedHistory
 from mocktrade.charts.service import Charts
 from mocktrade.domain.accounts import BrokerAccount, Role
 from mocktrade.marketdata.service import MarketData
-from mocktrade.marketdata.sim_universe import INSTRUMENTS
+from mocktrade.marketdata.sim_universe import FREEZE, INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.ops.alerts import Alerts
 from mocktrade.ops.checks import PriceOverload, audit_log
@@ -110,6 +110,7 @@ async def main(
     if replay_day is None:
         for instrument, _ in INSTRUMENTS:
             instruments.add(instrument)
+        instruments.set_freeze(FREEZE)  # sample freeze quantities (#424)
     else:  # the day's own instruments, as they were that day (an old demo day: the demo's)
         recorded = FileTickStore(ticks_dir)
         if replay_day not in recorded.days():

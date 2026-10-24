@@ -72,7 +72,8 @@ class RiskGate:
 
     def max_order_qty(self, instrument_id: str, price_paise: int | None) -> int:
         """The most one order on this instrument may carry now, in whole lots (0: not even one
-        lot): the lots limit, and the value limit at `price_paise` (#422). An algo splits a
+        lot): the lots limit, the value limit at `price_paise` (#422) and the exchange's
+        freeze quantity (#424). An algo splits a
         bigger quantity into pieces that each pass; the checks below still decide each one."""
         instrument = self._instrument(instrument_id)
         if instrument is None:
@@ -81,7 +82,9 @@ class RiskGate:
         if price_paise is not None and price_paise > 0:
             one_lot = price_paise * instrument.lot_size
             lots = min(lots, self.limits.max_order_value_paise // one_lot)
-        return max(0, lots) * instrument.lot_size
+        qty = max(0, lots) * instrument.lot_size
+        freeze = instrument.max_order_qty  # the exchange's own most per order (#424)
+        return qty if freeze is None else min(qty, freeze)
 
     # --- the gate -------------------------------------------------------------------------
 

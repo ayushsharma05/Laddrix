@@ -6,6 +6,7 @@ ever sees our ids ("NSE:RELIANCE").
 """
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -21,15 +22,39 @@ class InstrumentStore:
         self._to_broker: dict[tuple[str, InstrumentId], str] = {}  # (broker, our id) -> broker ref
         # underlying -> its futures and options (the option chain reads these, not a full scan)
         self._derivatives: dict[str, dict[InstrumentId, Instrument]] = {}
+        self._freeze: dict[str, int] = {}  # underlying -> freeze quantity (#424)
 
     def __len__(self) -> int:
         return len(self._by_id)
 
     def add(self, instrument: Instrument) -> None:
-        """Add or replace an instrument (the daily refresh replaces yesterday's)."""
+        """Add or replace an instrument (the daily refresh replaces yesterday's). A future or
+        option takes its underlying's freeze quantity, when one is set (#424)."""
+        freeze = self._freeze.get(instrument.underlying or "")
+        if freeze and instrument.kind in _DERIVATIVES and instrument.freeze_qty is None:
+            if freeze >= instrument.lot_size:  # below one lot: a mistake, left unset
+                instrument = replace(instrument, freeze_qty=freeze)
         self._by_id[instrument.id] = instrument
         if instrument.underlying and instrument.kind in _DERIVATIVES:
             self._derivatives.setdefault(instrument.underlying, {})[instrument.id] = instrument
+
+    def set_freeze(self, by_underlying: dict[str, int]) -> list[str]:
+        """Each underlying's freeze quantity, for the instruments here now and those added
+        later (the daily refresh). Returns what couldn't be applied, in words."""
+        changed = set(self._freeze) | set(by_underlying)  # a removed one is cleared too
+        self._freeze = dict(by_underlying)
+        problems = []
+        for underlying in sorted(changed):
+            items = self._derivatives.get(underlying, {})
+            freeze = self._freeze.get(underlying)
+            lots = {i.lot_size for i in items.values()}
+            too_small = sorted(lot for lot in lots if freeze and freeze < lot)
+            if too_small:
+                problems.append(f"{underlying}: freeze quantity {freeze} is below one lot "
+                                f"({too_small[0]}): not applied")  # fmt: skip
+            for instrument in list(items.values()):
+                self.add(replace(instrument, freeze_qty=None))
+        return problems
 
     def get(self, instrument_id: InstrumentId) -> Instrument | None:
         return self._by_id.get(instrument_id)
@@ -91,6 +116,7 @@ def instrument_record(instrument: Instrument) -> dict[str, Any]:
         "expiry": instrument.expiry.isoformat() if instrument.expiry else None,
         "strike_paise": instrument.strike_paise,
         "underlying": instrument.underlying,
+        "freeze_qty": instrument.freeze_qty,
     }
 
 
@@ -107,6 +133,7 @@ def instrument_from_record(record: dict[str, Any]) -> Instrument:
             date.fromisoformat(expiry) if expiry else None,
             None if record.get("strike_paise") is None else int(record["strike_paise"]),
             record.get("underlying"),
+            None if record.get("freeze_qty") is None else int(record["freeze_qty"]),
         )
     except KeyError as exc:
         raise ValueError(f"instrument record without {exc.args[0]!r}") from None

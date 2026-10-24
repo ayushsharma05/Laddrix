@@ -98,6 +98,7 @@ class OrderRequest:
         if not instrument.tradable:
             raise ValueError(f"{instrument.id} can't be traded")
         instrument.check_quantity(self.qty)
+        instrument.check_freeze(self.qty)
 
         needs_price = self.order_type in (OrderType.LIMIT, OrderType.SL)
         needs_trigger = self.order_type in (OrderType.SL, OrderType.SL_M)
