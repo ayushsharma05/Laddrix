@@ -24,7 +24,7 @@ import type { PricePick } from "../../workspace/links";
 import { registerWidget, type BaseParams, type WidgetProps } from "../../workspace/registry";
 import { StartForm, useAlgoSpecs } from "../algos/AlgoManager";
 import { GttForm, useGttSpec } from "../gtt/GttBook";
-import { CONFIRM_CHOICES } from "../ladder/Ladder";
+import { CONFIRM_CHOICES, LOT_PRESETS, confirmItems } from "../ladder/Ladder";
 import { leaves, snap, unconfirmed, workingOrders } from "../ladder/model";
 import {
   buildTicketOrder,
@@ -503,4 +503,18 @@ registerWidget<TicketParams>({
   link: "follows",
   tabTitle: (p) => (p.instrumentId ? `Ticket · ${shortName(p.instrumentId)}` : undefined),
   size: { width: 420 },
+  menu: (p, act) => [
+    {
+      label: "Show",
+      items: (
+        [
+          ["order", "Order"],
+          ["algo", "Algo"],
+          ["gtt", "GTT"],
+        ] as const
+      ).map(([mode, label]) => ({ label, checked: (p.mode ?? "order") === mode, onSelect: () => act.setParams({ mode }) })),
+    },
+    { label: "Lots", items: LOT_PRESETS.map((n) => ({ label: String(n), checked: p.lots === n, onSelect: () => act.setParams({ lots: n }) })) },
+    { label: "Confirm orders over", items: confirmItems(p.confirmOverPaise, (v) => act.setParams({ confirmOverPaise: v })) },
+  ],
 });

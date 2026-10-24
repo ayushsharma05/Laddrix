@@ -48,14 +48,14 @@ function PanelBody({ kind, params, api }: IDockviewPanelProps<BaseParams> & { ki
     if (api.title !== title) api.setTitle(title);
   }, [api, title]);
 
-  return <WidgetBody kind={kind} params={params} update={update} />;
+  return <WidgetBody id={api.id} kind={kind} params={params} update={update} />;
 }
 
 /**
  * A widget with its settings: hands it its saved params, saves changes (through `update`),
  * and follows its link group. Used by docked tiles and free windows alike.
  */
-export function WidgetBody({ kind, params, update }: { kind: string; params: BaseParams; update: (next: BaseParams) => void }) {
+export function WidgetBody({ id, kind, params, update }: { id: string; kind: string; params: BaseParams; update: (next: BaseParams) => void }) {
   const def = widget(kind);
   const { links } = useApp();
   const controller = useController();
@@ -98,10 +98,11 @@ export function WidgetBody({ kind, params, update }: { kind: string; params: Bas
     });
   }, [def, link, links, setParams]);
 
-  if (!def) return <div className="empty-note">This widget ({kind}) isn't available in this version.</div>;
+  // data-widget-id: a right-click inside finds its widget (#412)
+  if (!def) return <div className="empty-note" data-widget-id={id}>This widget ({kind}) isn't available in this version.</div>;
   const Component = def.component;
   return (
-    <div className="widget" data-link={link}>
+    <div className="widget" data-link={link} data-widget-id={id}>
       <Component params={params} setParams={setParams} setInstrument={setInstrument} publish={publish} open={open} />
     </div>
   );
@@ -149,7 +150,7 @@ export function WidgetTab({ api, params }: IDockviewPanelHeaderProps<BaseParams>
     else api.maximize();
   };
   return (
-    <div className="tab" onDoubleClick={toggleMaximized} title="Double-click to maximize or restore">
+    <div className="tab" data-widget-id={api.id} onDoubleClick={toggleMaximized} title="Double-click to maximize or restore">
       {def && def.link !== "none" && (
         <button
           type="button"

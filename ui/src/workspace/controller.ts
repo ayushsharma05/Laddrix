@@ -12,7 +12,7 @@
 
 import type { DockviewApi } from "dockview-react";
 import { ApiError } from "../api/rest";
-import { DEFAULT_SIZE, MAX_WINDOWS, placeNew, tidy, toFront, topZ, type Box, type Canvas, type CanvasWindow } from "./canvas";
+import { DEFAULT_SIZE, MAX_WINDOWS, placeNew, snapMove, tidy, toFront, topZ, type Box, type Canvas, type CanvasWindow } from "./canvas";
 import { CURRENT, MAX_PAGES, modeOf, type LayoutStore, type PageMode, type WorkspaceDoc } from "./layouts";
 import { widget, type BaseParams } from "./registry";
 
@@ -87,6 +87,8 @@ export class WorkspaceController {
   canvas: Canvas | null = null;
   /** A window just added: the canvas scrolls to it once. */
   reveal: string | null = null;
+  /** The page tab being renamed (a right-click "Rename" starts it), or null. */
+  renaming: number | null = null;
   locked = false;
   saveState: "saved" | "saving" | "unsaved" | "browser-only" = "saved";
   private api: DockviewApi | null = null;
@@ -97,6 +99,7 @@ export class WorkspaceController {
   private warnedSave = false;
   private viewport: () => Box = () => ({ x: 0, y: 0, w: 1200, h: 800 });
   private popouts = new Map<string, Window>();
+  private windowListeners = new Set<(w: Window) => void>();
 
   constructor(private readonly opts: ControllerOptions) {}
 
@@ -339,7 +342,7 @@ export class WorkspaceController {
   // --- widgets ------------------------------------------------------------------------------
 
   /** Open a widget next to the active one (ladders to the right, grids below). */
-  addWidget(kind: string, params: Partial<BaseParams> & Record<string, unknown> = {}): void {
+  addWidget(kind: string, params: Partial<BaseParams> & Record<string, unknown> = {}, at?: { x: number; y: number }): void {
     const api = this.api;
     const def = widget(kind);
     if (!api || !def) return;
@@ -356,7 +359,10 @@ export class WorkspaceController {
       }
       const from = windows.reduce<CanvasWindow | undefined>((top, w) => (!top || w.z > top.z ? w : top), undefined);
       const size = { w: def.size?.width ?? DEFAULT_SIZE.w, h: def.size?.height ?? DEFAULT_SIZE.h };
-      const box = placeNew(windows, size, this.viewport(), from, def.link === "follows" ? "right" : "below");
+      // `at`: a point on the canvas (a right-click there): the window's corner goes there
+      const box = at
+        ? snapMove({ x: at.x, y: at.y, ...size }, [])
+        : placeNew(windows, size, this.viewport(), from, def.link === "follows" ? "right" : "below");
       const added: CanvasWindow = { id: newPanelId(kind), kind, params: merged, ...box, z: topZ(windows) };
       this.reveal = added.id;
       this.setWindows([...windows, added]);
@@ -396,7 +402,19 @@ export class WorkspaceController {
       return false;
     }
     this.changed();
+    const location = api.getPanel(panelId)?.group.api.location;
+    if (location?.type === "popout") this.windowOpened(location.getWindow());
     return true;
+  }
+
+  /** Be told of every pop-out window opened (the shell adds its right-click menu to it). */
+  onWindow(listener: (w: Window) => void): () => void {
+    this.windowListeners.add(listener);
+    return () => this.windowListeners.delete(listener);
+  }
+
+  private windowOpened(w: Window): void {
+    for (const listener of this.windowListeners) listener(w);
   }
 
   /** Put a popped-out widget back into the workspace (closing its window does the same). */
@@ -477,6 +495,7 @@ export class WorkspaceController {
     }
     this.popouts.set(id, opened);
     this.emit();
+    this.windowOpened(opened);
     return true;
   }
 
@@ -491,6 +510,80 @@ export class WorkspaceController {
         // already gone
       }
     }
+  }
+
+  // --- any widget, free or docked (for the right-click menu, #412) ---------------------------
+
+  /** A widget's kind and settings, or null if it isn't on the showing page. */
+  widgetAt(id: string): { kind: string; params: BaseParams & Record<string, unknown>; popped: boolean } | null {
+    if (this.canvas) {
+      const w = this.canvas.windows.find((x) => x.id === id);
+      return w ? { kind: w.kind, params: w.params, popped: this.popouts.has(id) } : null;
+    }
+    const panel = this.api?.getPanel(id);
+    if (!panel) return null;
+    return {
+      kind: panel.api.component,
+      params: (panel.params ?? {}) as BaseParams & Record<string, unknown>,
+      popped: panel.group.api.location.type === "popout",
+    };
+  }
+
+  /** Change some of a widget's settings. */
+  updateWidget(id: string, change: Partial<BaseParams> & Record<string, unknown>): void {
+    const now = this.widgetAt(id);
+    if (!now) return;
+    const params = { ...now.params, ...change };
+    if (this.canvas) {
+      this.setWindowParams(id, params);
+      return;
+    }
+    this.api?.getPanel(id)?.api.updateParameters(params);
+    this.changed();
+  }
+
+  /** Close a widget (not while locked). */
+  closeWidget(id: string): void {
+    if (this.locked) return;
+    if (this.canvas) this.closeWindow(id);
+    else this.api?.getPanel(id)?.api.close();
+  }
+
+  /** A second copy of a widget, with the same settings, beside it. */
+  duplicateWidget(id: string): void {
+    const now = this.widgetAt(id);
+    const def = now ? widget(now.kind) : undefined;
+    if (!now || !def) return;
+    if (this.locked) {
+      this.opts.notify("INFO", "The layout is locked: unlock it to add widgets");
+      return;
+    }
+    if (this.canvas) {
+      const windows = this.canvas.windows;
+      const from = windows.find((w) => w.id === id)!;
+      if (windows.length >= MAX_WINDOWS) {
+        this.opts.notify("WARN", `At most ${MAX_WINDOWS} widgets on one page: open another page`);
+        return;
+      }
+      const box = placeNew(windows, { w: from.w, h: from.h }, this.viewport(), from, "right");
+      const copy: CanvasWindow = { id: newPanelId(now.kind), kind: now.kind, params: { ...now.params }, ...box, z: topZ(windows) };
+      this.reveal = copy.id;
+      this.setWindows([...windows, copy]);
+      return;
+    }
+    this.api?.addPanel({
+      id: newPanelId(now.kind),
+      component: now.kind,
+      params: { ...now.params },
+      title: def.tabTitle?.(now.params) ?? def.title,
+      position: { referencePanel: id, direction: def.link === "follows" ? "right" : "below" },
+    });
+  }
+
+  /** Start renaming a page tab (null: stop). */
+  requestRename(index: number | null): void {
+    this.renaming = index;
+    this.emit();
   }
 
   setLocked(locked: boolean): void {

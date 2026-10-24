@@ -114,6 +114,33 @@ free page: a canvas bigger than the screen when windows sit past its edge
 - Code: `ui/src/workspace/canvas.ts` (the rules, pure functions), `FreeCanvas.tsx` (the
   windows), `controller.ts` (pages, saving).
 
+### The right-click menu (#412)
+
+The browser's own menu never shows in MockTrade (except in text boxes, which keep copy and
+paste, and on Shift+right-click). A left click stays for trading: a click on a ladder price
+sends an order, so menus are on the right button, the keyboard's Menu key and Shift+F10.
+
+```
+right-click on …                       menu
+───────────────────────────            ─────────────────────────────────────────────────
+empty space, toolbar, page tabs        Open widget ▸ (on a free page: opens where clicked)
+                                       Search product… · This page ▸ (Free / Docked,
+                                       Rename…, Close page) · New page ▸ (Free / Docked)
+                                       Save layout now · Lock layout · Theme ▸
+a widget (its body or title bar)       its own settings (ladder: Lots per click ▸,
+                                       Confirm orders over ▸; ticket: Show ▸, Lots ▸, …)
+                                       Open for this contract ▸ · Link group ▸
+                                       Duplicate · Pop out (or Put back) · Close
+```
+
+- A widget's own items come from its registration (`menu` in `registerWidget`), so a new
+  widget, such as the spread ladder, adds its own (e.g. "Autospreader settings…") without
+  touching the menu code.
+- Keys: ↑ ↓ move, → opens a submenu, ← goes back, Enter chooses, Esc closes.
+- The menu works in pop-out windows too, and is never drawn off screen.
+- Code: `ui/src/components/ContextMenu.tsx` (the menu), `ui/src/workspace/menus.ts` (what
+  each menu offers), `useRightClickMenu` in `ui/src/shell/Shell.tsx` (which menu to show).
+
 - **Widgets** menu adds any widget. **Search product** (`/`) finds an instrument and opens a
   ladder linked to the focused group.
 - **Link groups:** pink, amber, blue or none. Widgets with the same colour follow each other's
