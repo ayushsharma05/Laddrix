@@ -22,7 +22,7 @@ MUTANTS = [
  # the re-quote threshold, max unhedged
  (A, "            if not worse and abs(price - current) < self.controls.requote_ticks * tick:", "            if abs(price - current) < self.controls.requote_ticks * tick:", PY),
  (A, "            if not worse and abs(price - current) < self.controls.requote_ticks * tick:", "            if False:", PY),
- (A, "            worse = current > price if self._down() else current < price", "            worse = current < price if self._down() else current > price", PY),
+ (A, "            worse = current > price if self._down(q) else current < price", "            worse = current < price if self._down(q) else current > price", PY),
  (A, "        if self.controls.max_unhedged_lots:\n            caps.append", "        if False:\n            caps.append", PY),
  # the chase
  (A, "                    target = max(level.price_paise - step, first - reach)", "                    target = level.price_paise - step", PY),
@@ -41,7 +41,7 @@ MUTANTS = [
  (A, "            extra = self._net(ctx, leg) - complete * abs(leg.ratio) * lots[leg.instrument_id]", "            extra = self._net(ctx, leg)", PY),
  (A, "        return ctx.filled(leg.instrument_id, side) - ctx.filled(\n            leg.instrument_id, _other_side(side)\n        )", "        return ctx.filled(leg.instrument_id, side)", PY),
  (A, "        if not excess and not self._short(ctx):\n            return ActionPreview(FLATTEN", "        if False:\n            return ActionPreview(FLATTEN", PY),
- (A, "        return not (r.instrument_id == self.q.instrument_id and r.side is ctx.side)", "        return r.instrument_id != self.q.instrument_id", PY),
+ (A, "        return not self._is_quote(child)", "        return child.request.instrument_id != self.q.instrument_id", PY),
  # the engine
  (E, "        if list(now.lines) != list(expect):", "        if False:", PY),
  (E, "        if not now.ok:\n            raise AlgoError(now.why)", "        if False:\n            raise AlgoError(now.why)", PY),

@@ -201,3 +201,30 @@ async def test_both_legs_quoting_on_the_paper_broker(nifty_fut):
         running.cancel()
         await asyncio.gather(running, return_exceptions=True)
         await paper.aclose()
+
+
+def test_an_orders_role_is_kept_with_it_and_absent_in_older_records():
+    from mocktrade.orders.codec import request_from_dict, request_to_dict
+
+    r = OrderRequest("MT1", "acc-1", "ayush", OCT, Side.BUY, 75, OrderType.LIMIT, Product.NRML,
+                     price_paise=2501000, parent_id="A1-1", algo_role="hedge")  # fmt: skip
+    assert request_from_dict(request_to_dict(r)) == r
+    old = {k: v for k, v in request_to_dict(r).items() if k != "algo_role"}
+    assert request_from_dict(old).algo_role == ""
+
+
+async def test_a_quote_on_its_way_counts_before_it_is_registered(w):
+    algo = w.start(both(w), -13000, lots=1)  # OCT quotes the one lot…
+    for _ in range(2):  # …and ticks come before the order manager has registered it
+        w.engine.on_tick(w.md.latest(NOV))
+    await w.engine.settle()
+    assert by_role(w, algo) == {"quote": [("NIFTY26OC", "BUY", 75, 2501000)]}  # nothing more
+
+
+async def test_each_quoting_leg_rounds_its_own_way_so_the_spread_is_never_worse(w):
+    algo = w.start(both(w), -12995, lots=2)
+    await w.engine.settle()
+    # buying OCT − NOV at −129.95: OCT ≤ 25,140.00 − 129.95 = 25,010.05 → 25,010.00 (down);
+    # NOV ≥ 25,010.10 + 129.95 = 25,140.05 → 25,140.10 (up: selling NOV, a higher price helps)
+    assert by_role(w, algo)["quote"] == [("NIFTY26OC", "BUY", 75, 2501000),
+                                         ("NIFTY26NO", "SELL", 75, 2514010)]  # fmt: skip

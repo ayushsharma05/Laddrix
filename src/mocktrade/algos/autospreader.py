@@ -429,7 +429,7 @@ class AutoSpreader(BaseStrategy):
                 continue
             piece = self._piece(ctx, price, q)
             self._requote(ctx, q, quotes, price, piece)
-            if not quotes and not self.quote_in_flight[q.instrument_id]:
+            if not quotes:  # one on its way counts in what is committed: no second one
                 idle.append((q, price, piece))
         if waiting:
             ctx.say(waiting)

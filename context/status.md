@@ -44,11 +44,12 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   1. #424 freeze quantities (the exchange's most per order): merged (PR #430);
   2. #425 Autospreader controls (re-quote threshold, max unhedged, hedge chase and timeout,
      hedge-now and flatten actions): merged (PR #431);
-  3. #426 algos survive a restart (reconcile first, come back paused, hedges kept): in its PR;
-  4. #427 several quoting legs at once;
+  3. #426 algos survive a restart (reconcile first, come back paused, hedges kept): merged
+     (PR #432);
+  4. #427 several quoting legs at once: in its PR;
   5. #428 structure positions (spreads held, their P&L, the unallocated rest);
   6. #429 spread charts (history from the legs, gaps shown).
-- **Pull requests:** the #426 PR.
+- **Pull requests:** the #427 PR.
 
 ## What's next
 
