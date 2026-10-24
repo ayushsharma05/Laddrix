@@ -96,6 +96,15 @@ Q fills f lots ─► every other leg: floor(f · |its ratio| / |Q's ratio|) lot
   running algo. Only its owner can trade it, and only in whole spread lots.
 - No quote while any leg is short of its hedge, has no price, or is more than 3 s older
   than the others.
+- **Every order fits the account's per-order limits (#422)**: the lots limit and the value
+  limit at that order's price (`RiskGate.max_order_qty`, given to every algo as
+  `ctx.max_order_qty`, read again each time). A hedge bigger than that goes out at once in
+  pieces (12 lots with a 10-lot limit: 10 + 2). The quote rests one piece at a time, in whole
+  spread lots; the next piece is quoted once everything is hedged. A resting quote too big at
+  its new price is pulled and quoted smaller, never modified into a refusal. If a leg can't
+  fit even its smallest piece at its price, the algo fails at start and says why; if that
+  happens to a hedge later (the limits changed), it says "UNHEDGED … one lot is over the
+  per-order limit" and the unhedged alert follows.
 - The screen shows the legs filled ("NIFTY26OCTFUT bought 75 · NIFTY26NOVFUT sold 150 · …"),
   the total unhedged and which legs are short, the spread traded and the legging time.
 - Not yet: several quoting legs, a maximum unhedged exposure, timeouts, and restart recovery

@@ -707,4 +707,8 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - the menu opened the settings. 9/9. Mutation 22/22 (one gap tightened: a move must restart the lots left, not the lots box).
   - **Found on the way:** bug #419 (fixed separately in PR #420).
   - **Also seen:** a ticket test failed once and passed in 18 reruns. It is noted as a possible flake, not caused by this change.
-
+- 24 Oct, night. **Bug #422: the Autospreader and per-order limits.** Reviewing the Autospreader against the archived design brief (Ayush asked to use what we learnt from it), one gap showed: the risk gate allows at most 10 lots and ₹50 lakh in one order, so a hedge bigger than that was refused whole and the spread stayed unhedged.
+  - **Decided:** the algo asks the account's own limits (`RiskGate.max_order_qty`, passed to every algo as `ctx.max_order_qty`) each time, so a limit change applies at once. Hedges go out at once in pieces (12 lots: 10 + 2). The quote rests one piece of whole spread lots at a time, the next once all is hedged; a resting quote too big at a new price is pulled, not modified into a refusal. A leg that can't fit one lot fails the algo at start, in words.
+  - **Why pieces and not one big order:** the gate is the safety net; asking it first means no order is ever sent just to be refused.
+  - **Checks:** 7 new tests (one on the paper broker with the default limits: 3 calendars go 2 + 1); mutation 18/18 (`mutate-ase-pieces.py`, after adding a test for a hedge that stops fitting).
+- 24 Oct, night. **The Autospreader is complete for now.** PRs #420 (#419), #421 (#416) and #423 (#422) merged, each after green CI. What is left is in #250/#251: several quoting legs at once, a maximum unhedged exposure, timeouts, restart recovery, structure positions, historical spread charts, and freeze quantity (not yet on Instrument).

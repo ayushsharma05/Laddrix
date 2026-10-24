@@ -497,6 +497,7 @@ class Platform:
         throttle: OrderThrottle | None = None,
         firm: KillSwitch | None = None,
         prices: MarketData | None = None,
+        order_cap: Callable[[str, int | None], int | None] | None = None,
     ) -> AlgoEngine:
         """The account's algos: blocked while a kill switch is on, stopped when one engages,
         every state change audited."""
@@ -546,6 +547,7 @@ class Platform:
             position=None if book is None else position_of(book),
             **({"orders_per_second": lambda: throttle.per_second} if throttle else {}),
             access=lambda user_id: self.access(user_id, account_id),
+            order_cap=order_cap or (lambda _i, _p: None),
         )
 
         def on_switch(_name: str, state) -> None:
@@ -669,7 +671,8 @@ class Platform:
                 )
             )
         algos = self._algo_engine(account.id, orders, switch, algo_types, clock, book, throttle,
-                                  firm=firm, prices=md)  # fmt: skip
+                                  firm=firm, prices=md,  # pieces that pass risk (#422):
+                                  order_cap=risk.max_order_qty)  # fmt: skip
         basket_audit = None
         if self.event_log is not None:
             log = self.event_log

@@ -70,6 +70,19 @@ class RiskGate:
         # what an order can close is its own product's position (#258); net when not given
         self._product_position = product_position or (lambda i, _p: position(i))
 
+    def max_order_qty(self, instrument_id: str, price_paise: int | None) -> int:
+        """The most one order on this instrument may carry now, in whole lots (0: not even one
+        lot): the lots limit, and the value limit at `price_paise` (#422). An algo splits a
+        bigger quantity into pieces that each pass; the checks below still decide each one."""
+        instrument = self._instrument(instrument_id)
+        if instrument is None:
+            return 0
+        lots = self.limits.max_order_lots
+        if price_paise is not None and price_paise > 0:
+            one_lot = price_paise * instrument.lot_size
+            lots = min(lots, self.limits.max_order_value_paise // one_lot)
+        return max(0, lots) * instrument.lot_size
+
     # --- the gate -------------------------------------------------------------------------
 
     async def admit_new(self, request: OrderRequest) -> str | None:

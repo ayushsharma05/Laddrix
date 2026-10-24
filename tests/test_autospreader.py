@@ -53,7 +53,7 @@ class Clock:
 class W:
     """One account's engine with the ASE algo, a fake broker, and a spread book."""
 
-    def __init__(self, nifty_fut):
+    def __init__(self, nifty_fut, order_cap=None):
         self.store = InstrumentStore()
         self.store.add(nifty_fut)
         self.store.add(replace(nifty_fut, symbol="NIFTY26NOVFUT", expiry=date(2026, 11, 24)))
@@ -68,7 +68,9 @@ class W:
         self.om = OrderManager("acc-1", self.broker, self.store.get, ids=ClientIds("MT"),
                                clock=self.clock)  # fmt: skip
         types = (*BUILTIN, algo_type(self.book.get))
-        self.engine = AlgoEngine("acc-1", self.om, self.md, self.store.get, types, clock=self.clock)
+        caps = {"order_cap": order_cap} if order_cap else {}
+        self.engine = AlgoEngine("acc-1", self.om, self.md, self.store.get, types, clock=self.clock,
+                                 **caps)  # fmt: skip
 
     def calendar(self, payup=2):
         legs = [SpreadLeg(OCT, 1, 1, quote=True, payup_ticks=payup),
@@ -346,6 +348,114 @@ async def test_only_your_own_whole_spread_lots_on_its_quoting_leg(w):
     assert w.broker.placed == []
 
 
+# --- pieces that fit one order (#422) -------------------------------------------------------
+
+
+def lots_cap(lots):
+    """At most `lots` lots of 75 in one order, whatever the price (a dict: tests change it)."""
+    cap = {"lots": lots, "asked": []}
+
+    def order_cap(instrument_id, price):
+        cap["asked"].append((instrument_id, price))
+        return cap["lots"] * 75
+
+    return cap, order_cap
+
+
+async def test_a_hedge_bigger_than_one_order_goes_out_at_once_in_pieces(nifty_fut):
+    cap, order_cap = lots_cap(10)
+    w = W(nifty_fut, order_cap)
+    algo = w.start(w.butterfly(), 0, lots=6)  # 6 lots of OCT; 12 lots of NOV to hedge
+    await w.engine.settle()
+    (q,) = w.children(algo)
+    w.fill(q, 450, 2500990)
+    await w.engine.settle()
+    assert w.placed()[1:] == [("NIFTY26NO", "SELL", 750, 2513980),
+                              ("NIFTY26NO", "SELL", 150, 2513980),
+                              ("NIFTY26DE", "BUY", 450, 2527020)]  # fmt: skip
+    assert (NOV, 2513980) in cap["asked"]  # the limit is asked at the price it goes at
+    for c in w.children(algo, NOV):
+        w.fill(c, w.om.get(c).request.qty, 2514000)
+    w.engine.heartbeat()  # repeated updates never send a third NOV piece
+    await w.engine.settle()
+    assert len(w.children(algo, NOV)) == 2
+
+
+async def test_a_hedge_that_no_longer_fits_says_so_and_sends_nothing(nifty_fut):
+    cap, order_cap = lots_cap(10)
+    w = W(nifty_fut, order_cap)
+    algo = w.start(w.calendar(), -13000, lots=1)
+    await w.engine.settle()
+    (q,) = w.children(algo)
+    cap["lots"] = 0  # the limits changed after the start: not one lot fits now
+    w.fill(q, 75, 2501000)
+    await w.engine.settle()
+    view = w.engine.get(algo.algo_id)
+    assert view.status == f"UNHEDGED 75 on {NOV}: one lot is over the per-order limit"
+    assert w.children(algo, NOV) == [] and view.extra["unhedged"] == 75
+
+
+async def test_the_quote_rests_one_piece_at_a_time_in_whole_spread_lots(nifty_fut):
+    cap, order_cap = lots_cap(10)
+    w = W(nifty_fut, order_cap)
+    algo = w.start(w.calendar(), -13000, lots=15)
+    await w.engine.settle()
+    assert w.placed() == [("NIFTY26OC", "BUY", 750, 2501000)]  # 10 of 15 spread lots
+    (q,) = w.children(algo)
+    w.fill(q, 750, 2501000)
+    w.engine.on_tick(w.md.latest(NOV))
+    await w.engine.settle()
+    assert w.placed()[1:] == [("NIFTY26NO", "SELL", 750, 2513980)]  # hedged before more
+    (hedge,) = w.children(algo, NOV)
+    w.fill(hedge, 750, 2514000)
+    cap["lots"] = 3  # the limits changed while it works: they are asked again each time
+    w.engine.on_tick(w.md.latest(NOV))
+    await w.engine.settle()
+    assert w.placed()[-1] == ("NIFTY26OC", "BUY", 225, 2501000)
+
+    fly = w.butterfly(quote_on=NOV)  # one fly is 2 lots of NOV: 3 lots fit one fly only
+    sold = w.start(fly, 10, lots=4)
+    await w.engine.settle()
+    (q,) = w.children(sold, NOV)
+    assert w.om.get(q).request.qty == 150
+
+
+async def test_a_resting_quote_too_big_at_its_new_price_is_pulled_and_quoted_smaller(nifty_fut):
+    # a value limit: 2 lots fit at OCT's price now, 1 lot once it is above 25,050
+    def order_cap(_instrument_id, price):
+        return (1 if price and price > 2505000 else 2) * 75
+
+    w = W(nifty_fut, order_cap)
+    algo = w.start(w.calendar(), -13000, lots=2)
+    await w.engine.settle()
+    (q,) = w.children(algo)
+    assert w.om.get(q).request.qty == 150
+    w.md.on_tick(quote(NOV, 2518010, 2518020))  # NOV up: the OCT quote goes to 25,050.10
+    w.engine.on_tick(w.md.latest(NOV))
+    await w.engine.settle()
+    assert w.broker.cancelled == [w.om.get(q).broker_order_id]  # pulled, not modified
+    assert w.broker.modified == []
+    view = w.om.get(q)
+    w.om.apply(OrderUpdate(q, view.broker_order_id, OrderStatus.CANCELLED, 0, 0))
+    w.engine.on_tick(w.md.latest(NOV))
+    await w.engine.settle()
+    assert w.placed()[-1] == ("NIFTY26OC", "BUY", 75, 2505010)
+
+
+async def test_it_fails_at_start_in_words_if_one_lot_is_over_the_limit(nifty_fut):
+    w = W(nifty_fut, lambda instrument_id, _price: 0 if instrument_id == NOV else 750)
+    hedge_too_big = w.start(w.calendar(), -13000)
+    w2 = W(nifty_fut, lambda _instrument_id, _price: 75)  # 1 lot: half of one fly's 2 NOV lots
+    quote_too_big = w2.start(w2.butterfly(quote_on=NOV), 10, lots=1)
+    await w.engine.settle()
+    await w2.engine.settle()
+    assert w.engine.get(hedge_too_big.algo_id).reason == (
+        f"one lot of {NOV} is over this account's per-order limit")  # fmt: skip
+    assert w2.engine.get(quote_too_big.algo_id).reason == (
+        f"one spread lot (2 lots of {NOV}) is over this account's per-order limit")  # fmt: skip
+    assert w.broker.placed == [] and w2.broker.placed == []
+
+
 # --- end to end on the paper broker ---------------------------------------------------------
 
 
@@ -381,6 +491,45 @@ async def test_a_butterfly_on_the_paper_broker(nifty_fut):
         assert view.extra["traded_spread_paise"] == 2500990 - 2 * 2514000 + 2527010
         held = [runtime.positions.net_qty(i) for i in (OCT, NOV, DEC)]
         assert held == [75, -150, 75]
+    finally:
+        running.cancel()
+        await asyncio.gather(running, return_exceptions=True)
+        await paper.aclose()
+
+
+async def test_on_the_paper_broker_every_order_fits_the_accounts_limits(nifty_fut):
+    """The platform gives the algo the account's own limits (#422): ₹50 lakh fits 2 lots of
+    OCT, so buying 3 calendars quotes 2, hedges 2, then quotes and hedges 1; nothing refused."""
+    w = W(nifty_fut)
+    md, store = w.md, w.store
+    platform = Platform(store, md, KillSwitch("firm"))
+    paper = PaperBroker(md, store, latency_s=0.0)
+    paper.start()
+    runtime = platform.add_account(
+        BrokerAccount("acc-p", "paper", "P1", "ayush"), paper, ids=ClientIds("MT"),
+        limits=RiskLimits(), algo_types=(*BUILTIN, algo_type(w.book.get)),
+    )  # fmt: skip
+    running = asyncio.create_task(platform.run(reconcile=False))
+    try:
+        cal = w.calendar()
+        params = {"spread": cal.spread_id, "level_paise": -13000}
+        algo = runtime.algos.start("ASE", user_id="ayush", instrument_id=OCT, side=Side.BUY,
+                                   qty=225, params=params)  # fmt: skip
+        async with asyncio.timeout(5):
+            while not runtime.orders.working():
+                await asyncio.sleep(0.02)
+        assert runtime.orders.working()[0].request.qty == 150
+        md.on_tick(quote(OCT, 2500000, 2501000))  # OCT offered at our quote: it fills
+        async with asyncio.timeout(5):
+            while runtime.algos.get(algo.algo_id).state is not AlgoState.DONE:
+                await asyncio.sleep(0.02)
+                md.on_tick(quote(NOV, 2514000, 2514010))  # keep the legs fresh together
+                md.on_tick(quote(OCT, 2500000, 2501000))
+        orders = runtime.orders.orders()
+        assert sorted((o.request.instrument_id, o.request.qty) for o in orders) == [
+            (NOV, 75), (NOV, 150), (OCT, 75), (OCT, 150)]  # fmt: skip
+        assert all(o.status is OrderStatus.FILLED for o in orders)
+        assert [runtime.positions.net_qty(i) for i in (OCT, NOV)] == [225, -225]
     finally:
         running.cancel()
         await asyncio.gather(running, return_exceptions=True)
