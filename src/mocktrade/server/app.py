@@ -42,7 +42,7 @@ from mocktrade.charges.model import bill_to_dict
 from mocktrade.charges.schedules import schedule_to_dict
 from mocktrade.charges.service import ChargesError
 from mocktrade.charts.candles import IST
-from mocktrade.charts.service import ChartError, Charts
+from mocktrade.charts.service import ChartError, Charts, spread_candles
 from mocktrade.domain.accounts import BrokerAccount, Role, User, can_manage, can_view
 from mocktrade.domain.gtt import gtt_spec_to_dict, gtt_to_dict
 from mocktrade.domain.instruments import Instrument
@@ -467,6 +467,7 @@ def create_app(
         market=market,
         market_alerts=market_alerts,
         spread_visible=lambda user, i: book.visible(user, i) is not None,
+        spread_of=book.visible,
     )
     app.state.hub = hub
     METRICS.gauge("stream_connections", lambda: hub.connections)
@@ -871,6 +872,11 @@ def create_app(
         service = chart_service(user)
         first, last = chart_time(start, "start"), chart_time(end, "end")
         try:
+            if instrument_id.startswith(PREFIX):  # a spread: from its legs' candles (#429)
+                spread = book.visible(user, instrument_id)
+                if spread is None:
+                    raise HTTPException(404, f"unknown instrument {instrument_id}")
+                return await spread_candles(service, spread, interval, first, last)
             return await service.candles(chart_instrument(instrument_id), interval, first, last)
         except ChartError as exc:
             raise HTTPException(422, str(exc)) from None
@@ -880,6 +886,10 @@ def create_app(
                           end: str = "") -> dict[str, Any]:  # fmt: skip
         runtime(account_id, user)
         service = chart_service(user)
+        if instrument_id.startswith(PREFIX):  # a spread (#429): its fills are on its legs
+            if book.visible(user, instrument_id) is None:
+                raise HTTPException(404, f"unknown instrument {instrument_id}")
+            return {"account_id": account_id, "instrument_id": instrument_id, "marks": []}
         last = chart_time(end, "end") or datetime.now(IST) + timedelta(minutes=1)
         first = chart_time(start, "start") or last - timedelta(days=1)
         marks = await asyncio.to_thread(service.marks, account_id, chart_instrument(instrument_id),

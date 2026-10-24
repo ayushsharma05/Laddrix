@@ -17,12 +17,12 @@ Ayush asked for this on 24 Oct 2026. It is built in three parts:
 | – | #426 | after a restart a working ASE comes back paused, with its orders | done |
 | – | #427 | several quoting legs at once | done |
 | – | #428 | structure positions: spreads held, their P&L, the unallocated rest | done |
+| – | #429 | spread charts: candles of the spread's mark from its legs | done |
 
 Recovery after a restart (#426): a working Autospreader comes back paused, with its orders
 ([algos.md](algos.md#after-a-restart-426)).
 
-Still to come, in #250 and #251 (one issue each, in this order):
-- #429 historical spread charts.
+Nothing is left to come in #250 and #251: every part above is built.
 
 ## 1. A definition
 
@@ -208,23 +208,53 @@ every change            ─► a STRUCTURE_* note in the account's audit trail, 
 - An automatic allocation taken out by hand is never put back by a replayed fill.
 - Structures are account data, kept with the account's audit trail like its orders.
 
-## 7. Code
+## 7. Spread charts (#429)
+
+The Autospreader's **Chart** button opens a chart of the spread; its window is titled with
+the spread's name. A spread never trades, so its candles are worked out from its legs'
+candles, bucket by bucket (`spread_candles` in `src/mocktrade/charts/service.py`):
+
+```
+each leg's candles (history + live, as any chart) ─┐  fetched together
+                                                   ├─► a bucket where EVERY leg has a candle:
+                                                   │     open  = Σ price× · leg open
+                                                   │     close = Σ price× · leg close
+                                                   │     high, low = the larger and smaller of those two
+                                                   │     volume 0
+                                                   └─► a bucket some leg lacks: a gap, never filled in
+```
+
+Worked by hand, a calendar OCT − NOV at 09:15: OCT opens 25,000.00 and closes 25,010.00,
+NOV opens 25,140.00 and closes 25,130.00, so the spread opens −140.00 and closes −120.00.
+
+- **High and low are approximate**: each leg's high and low can come at different moments,
+  so they can't be added. The chart says so: "spread mark, not traded prices", with the
+  number of gaps, and the full reason when you hover.
+- The forming candle comes live from the legs' forming candles, once every leg has one in
+  the same bucket. Live from the moment every leg is.
+- Only the spread's owner can chart it (anyone else gets 404, as for the spread itself). It
+  has no fills of its own, so no fill marks.
+
+## 8. Code
 
 - `src/mocktrade/spreads/model.py`: definitions, checks, the implied price.
 - `src/mocktrade/spreads/store.py`: `SpreadBook`, per user, on disk.
 - `src/mocktrade/spreads/pricer.py`: live prices as derived ticks.
 - `src/mocktrade/algos/autospreader.py`: the ASE algo (#415).
 - `ui/src/widgets/ase/`: the Autospreader widget and its form model.
+- `src/mocktrade/charts/service.py`: `spread_candles`, `spread_forming` (#429).
 - `ui/src/widgets/ladder/`: the spread ladder (`spreadWorking` in `model.ts`, the spread path in
   `Ladder.tsx`).
 - Tests:
   - `tests/test_spreads.py` (hand-worked prices, rules, the book, the pricer);
   - `tests/test_spread_api.py` (routes, ownership, the stream, trading a spread);
   - `tests/test_autospreader.py` (the algo: quotes, hedges, stops, the paper broker);
+  - `tests/test_spread_charts.py` (#429: hand-worked candles, gaps, live, the owner-only API and stream);
   - `ui/src/widgets/ase/*.test.ts*`, `ui/src/widgets/ladder/SpreadLadder.test.tsx`.
 - Checks:
   - `context/scripts/mutate-spreads.py` (50/50), `context/scripts/mutate-autospreader.py` (34/34),
     `context/scripts/mutate-ase-pieces.py` (18/18, #422),
     `context/scripts/mutate-ase-controls.py` (32/32, #425);
   - `context/scripts/e2e-autospreader.cjs` (real browser, 11/11);
-  - `context/scripts/e2e-spread-ladder.cjs` (real browser, 9/9), `context/scripts/mutate-spread-ladder.py` (22/22).
+  - `context/scripts/e2e-spread-ladder.cjs` (real browser, 9/9), `context/scripts/mutate-spread-ladder.py` (22/22);
+  - `context/scripts/mutate-spread-charts.py` (17/17), `context/scripts/e2e-spread-chart.cjs` (real browser, 4/4).

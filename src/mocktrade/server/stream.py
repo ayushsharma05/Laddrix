@@ -38,7 +38,7 @@ from mocktrade.alerts.service import MarketAlerts
 from mocktrade.algos.engine import AlgoEvent
 from mocktrade.charges.model import ChargeBill, bill_to_dict
 from mocktrade.charges.service import ChargesService
-from mocktrade.charts.service import ChartError
+from mocktrade.charts.service import ChartError, spread_forming
 from mocktrade.domain.accounts import MAIN, User, can_view
 from mocktrade.domain.gtt import GttView, gtt_to_dict
 from mocktrade.domain.ticks import Tick
@@ -116,8 +116,11 @@ class StreamHub:
         market_alerts: MarketAlerts | None = None,
         # a spread's implied price "SPREAD:<id>" is known to its owner only (#414)
         spread_visible: Callable[[User, str], bool] = lambda _user, _id: False,
+        # the user's own spread by its instrument id (#429: its chart's forming candle)
+        spread_of: Callable[[User, str], Any] = lambda _user, _id: None,
     ) -> None:
         self._spread_visible = spread_visible
+        self._spread_of = spread_of
         self._clock = clock
         self._platform = platform
         self._users = users
@@ -317,27 +320,30 @@ class StreamHub:
         except ChartError as exc:
             connection.put({"type": "error", "message": str(exc)})
             return
-        if self._platform.instruments.get(instrument_id) is None:
+        spread = self._spread_of(connection.user, instrument_id)
+        if self._platform.instruments.get(instrument_id) is None and spread is None:
             connection.put({"type": "error", "message": f"unknown instrument {instrument_id}"})
             return
         if len(connection.charts) >= MAX_CHARTS:
             connection.put({"type": "error", "message": f"at most {MAX_CHARTS} charts at a time"})
             return
         connection.charts[key] = asyncio.create_task(
-            self._stream_candle(connection, market, instrument_id, code)
+            self._stream_candle(connection, market, instrument_id, code, spread)
         )
 
     async def _stream_candle(self, connection: _Connection, market: Market, instrument_id: str,
-                             code: str) -> None:  # fmt: skip
+                             code: str, spread: Any = None) -> None:  # fmt: skip
         """The forming candle at once, then at most once a second while it changes. The
         instrument is watched meanwhile, so its ticks keep coming from the broker (the
-        person's own subscription, #395)."""
+        person's own subscription, #395); a spread's legs are (#429)."""
         assert market.charts is not None
-        watch = market.prices.subscribe([instrument_id])
+        legs = [x.instrument_id for x in spread.legs] if spread is not None else [instrument_id]
+        watch = market.prices.subscribe(legs)
         last: Any = ()  # never a candle: the first one is always sent, even "none yet"
         try:
             while True:
-                candle = market.charts.forming(instrument_id, code)
+                candle = (spread_forming(market.charts, spread, code) if spread is not None
+                          else market.charts.forming(instrument_id, code))  # fmt: skip
                 if candle != last:
                     connection.put({"type": "candle", "instrument_id": instrument_id,
                                     "interval": code, "candle": candle})  # fmt: skip

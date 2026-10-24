@@ -9,6 +9,7 @@
 The screen gets the intervals and range limits from `spec()`; nothing about them is coded in it.
 """
 
+import asyncio
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -140,3 +141,67 @@ class Charts:
                         "price_paise": fill.price_paise, "client_order_id": e.client_order_id,
                         "strategy": strategy_of(r)})  # fmt: skip
         return out
+
+
+# --- a spread's chart (#429) ---------------------------------------------------------------
+
+SPREAD_NOTE = (
+    "spread mark from leg prices (Σ price× · each leg's open and close), not traded "
+    "prices; high and low are the open's and close's; gaps where a leg had no data"
+)
+
+
+def combine(legs: list[tuple[int, dict[str, Any] | None]]) -> dict[str, Any] | None:
+    """One spread candle from its legs' candles of the same bucket (each with its price×), or
+    None if a leg has none. Open and close are the legs' together; a high and low can't be
+    known from the legs' own, which may come at different moments, so they are the open's
+    and close's. No volume: a spread mark doesn't trade."""
+    if any(c is None for _, c in legs):
+        return None
+    starts = {c["t"] for _, c in legs if c is not None}
+    if len(starts) != 1:
+        return None
+    o = sum(m * c["o"] for m, c in legs if c is not None)
+    cl = sum(m * c["c"] for m, c in legs if c is not None)
+    return {"t": starts.pop(), "o": o, "h": max(o, cl), "l": min(o, cl), "c": cl, "v": 0,
+            "oi": None}  # fmt: skip
+
+
+async def spread_candles(charts: Charts, spread: Any, code: str, start: datetime | None = None,
+                         end: datetime | None = None) -> dict[str, Any]:  # fmt: skip
+    """A spread's candles from its legs' (each fetched as any chart would): a bucket counts
+    only when every leg has a candle in it; one some leg lacks is a gap, never filled in. The
+    legs are fetched together: a history source keeps to its own rate limit."""
+    per_leg = await asyncio.gather(
+        *(charts.candles(leg.instrument_id, code, start, end) for leg in spread.legs)
+    )
+    by_t = [{c["t"]: c for c in got["candles"]} for got in per_leg]
+    every = sorted(set().union(*by_t))
+    rows, gaps = [], 0
+    for t in every:
+        pairs = zip(spread.legs, by_t, strict=True)
+        candle = combine([(leg.multiplier, have.get(t)) for leg, have in pairs])
+        if candle is None:
+            gaps += 1
+        else:
+            rows.append(candle)
+    notes = [n for n in (got.get("note") for got in per_leg) if n]
+    lives = [got.get("live_from") for got in per_leg]
+    return {
+        "instrument_id": spread.instrument_id,
+        "interval": per_leg[0]["interval"] if per_leg else code,
+        "candles": rows,
+        "live_from": None if None in lives else max(lives),  # live once every leg is
+        "note": "; ".join(notes) or None,
+        "kind": "spread mark",
+        "approximate_high_low": True,
+        "gaps": gaps,
+        "label": SPREAD_NOTE,
+    }
+
+
+def spread_forming(charts: Charts, spread: Any, code: str) -> dict[str, Any] | None:
+    """The spread's forming candle: its legs' forming candles, when every leg has one in the
+    same bucket."""
+    return combine([(leg.multiplier, charts.forming(leg.instrument_id, code))
+                    for leg in spread.legs])  # fmt: skip

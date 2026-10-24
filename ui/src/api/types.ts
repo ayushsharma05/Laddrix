@@ -783,6 +783,10 @@ export interface CandlesAnswer {
   candles: Candle[];
   live_from: string | null;
   note: string | null; // why history is missing, if it is
+  // a spread's chart (#429): its mark from its legs, said in words; buckets a leg lacked
+  kind?: string;
+  label?: string;
+  gaps?: number;
 }
 
 export interface ChartMark {
