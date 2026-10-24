@@ -124,6 +124,12 @@ describe("Order ticket", () => {
     expect(screen.getByRole("note").textContent).toBe(note);
   });
 
+  it("says the exchange's most per order when the server knows it (#424)", async () => {
+    setup({}, { [`GET /api/accounts/acc-a/instruments/${encodeURIComponent(ID)}/order-spec`]: orderSpec(ID, { freeze_qty: 1800 }) });
+    await ready();
+    expect(screen.getByText(/max 1,800 per order/)).toBeTruthy();
+  });
+
   it("shows no expiry line on other days", async () => {
     setup();
     await ready();

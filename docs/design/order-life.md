@@ -59,7 +59,7 @@ Each broker update carries the order's total filled quantity. Only the new part 
 
 ![Rejects](../../context/images/v1-journey-reject.png)
 
-Our rules, the risk gate and the throttle refuse an order **before it is sent**, saying why. A clear refusal from the broker also becomes REJECTED with the broker's words. An exchange reject arrives later, as an update. A call with **no clear answer** is the dangerous case: it stays PENDING and UNCONFIRMED, never assumed rejected, until the broker's order list settles it.
+Our rules, the risk gate and the throttle refuse an order **before it is sent**, saying why. A clear refusal from the broker also becomes REJECTED with the broker's words. One of our rules is the exchange's **freeze quantity** (#424): one order above it is refused, so algos, closes and the Autospreader split bigger quantities into orders that fit (`RiskGate.max_order_qty`), and the ticket says "max … per order". An exchange reject arrives later, as an update. A call with **no clear answer** is the dangerous case: it stays PENDING and UNCONFIRMED, never assumed rejected, until the broker's order list settles it.
 
 ### Restart with recovery
 

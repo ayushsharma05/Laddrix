@@ -39,7 +39,16 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   one order may carry was refused whole and left the spread unhedged. Now every ASE order fits
   the account's lots and value limits: hedges go in pieces at once, the quote one piece at a
   time, and a leg that can't fit one lot fails at start in words. Fixed (PR #423).
-- **Pull requests:** none open.
+- **Ayush asked (24 Oct, night) to continue with the Autospreader's open items.** Split into
+  six issues, done in this order, one PR each:
+  1. #424 freeze quantities (the exchange's most per order): in its PR;
+  2. #425 Autospreader controls (re-quote threshold, max unhedged, hedge chase and timeout,
+     hedge-now and flatten actions);
+  3. #426 algos survive a restart (reconcile first, come back paused, hedges kept);
+  4. #427 several quoting legs at once;
+  5. #428 structure positions (spreads held, their P&L, the unallocated rest);
+  6. #429 spread charts (history from the legs, gaps shown).
+- **Pull requests:** the #424 PR.
 
 ## What's next
 

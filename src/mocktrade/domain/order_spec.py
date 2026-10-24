@@ -60,6 +60,7 @@ class OrderSpec:
     products: tuple[Product, ...]
     auto_protection_pct: Decimal  # what automatic market protection means (for "pays at most")
     max_modifications: int
+    freeze_qty: int | None = None  # the exchange's most per order (#424); None: not known
 
 
 LIMIT = OrderTypeSpec(
@@ -111,6 +112,7 @@ def standard_spec(
         products=products_for(instrument),
         auto_protection_pct=auto_protection_pct,
         max_modifications=max_modifications,
+        freeze_qty=instrument.max_order_qty,
     )
 
 
@@ -156,4 +158,5 @@ def spec_to_dict(spec: OrderSpec) -> dict:
         "products": [p.value for p in spec.products],
         "auto_protection_pct": str(spec.auto_protection_pct),
         "max_modifications": spec.max_modifications,
+        "freeze_qty": spec.freeze_qty,
     }

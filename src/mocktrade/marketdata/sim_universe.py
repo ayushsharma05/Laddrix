@@ -112,3 +112,8 @@ def _nifty_options() -> list[tuple[Instrument, int]]:
 
 
 INSTRUMENTS += _nifty_options()
+
+# Freeze quantities for the simulated contracts (#424): the most one order may carry.
+# Sample values in the shape NSE publishes; a real server reads them from a file
+# (MOCKTRADE_FREEZE_FILE), and they must be checked against NSE's latest list before trading.
+FREEZE: dict[str, int] = {"NIFTY": 1800, "BANKNIFTY": 900}

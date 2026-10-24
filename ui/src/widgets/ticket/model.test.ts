@@ -54,6 +54,8 @@ describe("problems are found before the click", () => {
     expect(ticketProblem(t({ type: "MKT", price: null }), LTP)).toBeNull();
     expect(ticketProblem(t({ type: "SL", price: 2502000, trigger: 2501500 }), LTP)).toBeNull();
     expect(ticketProblem(t({ type: "SL-M", side: "SELL", trigger: 2500000 }), LTP)).toBeNull();
+    expect(ticketProblem(t({ spec: { ...SPEC, freeze_qty: 1800 }, lots: 24 }), LTP)).toBeNull(); // at the freeze: fine
+    expect(ticketProblem(t({ spec: { ...SPEC, freeze_qty: null }, lots: 500 }), LTP)).toBeNull(); // none known
   });
   it.each([
     [{ lots: 0 }, "quantity is 0"],
@@ -67,6 +69,7 @@ describe("problems are found before the click", () => {
     [{ type: "SL-M", trigger: 2502000, validity: "IOC" }, "can't be IOC (allowed: DAY)"],
     [{ product: "CNC" }, "CNC isn't offered"],
     [{ spec: { ...SPEC, tradable: false } }, "can't be traded"],
+    [{ spec: { ...SPEC, freeze_qty: 1800 }, lots: 25 }, "the exchange takes at most 1800 (24 lots) in one order: send fewer lots"],
   ] as [Change, string][])("%o → %s", (change, reason) => {
     expect(ticketProblem(t(change), LTP)).toContain(reason);
   });

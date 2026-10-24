@@ -55,6 +55,10 @@ export function ticketProblem(t: TicketInput, ltp: number | null): string | null
   const { spec, type } = t;
   if (!spec.tradable) return `${t.symbol} can't be traded`;
   if (!(t.lots > 0)) return "quantity is 0: set the lots";
+  const most = spec.freeze_qty;
+  if (most && t.lots * spec.lot_size > most) {
+    return `the exchange takes at most ${most} (${most / spec.lot_size} lots) in one order: send fewer lots`;
+  }
   if (needsPrice(type)) {
     if (t.price === null) return "enter a price";
     if (t.price % spec.tick_paise !== 0) return `price must be a multiple of the tick (${tickText(spec.tick_paise)})`;

@@ -22,6 +22,9 @@ Settings (environment; secrets never on the command line):
                                           replay, backtests); 0 turns recording off
     MOCKTRADE_CHARGES          (built in) a charge schedule (JSON, charges/schedules.py) to use
                                           instead of the built-in rates, e.g. after a budget
+    MOCKTRADE_FREEZE_FILE      (none)     the exchange's freeze quantities (most per order) for
+                                          futures and options: a file of underlying,qty lines
+                                          (refdata/freeze.py); orders are split to fit them
     MOCKTRADE_ALGO_IDS         (none)     exchange algo ids, once an algo is registered
                                           (SEBI, above 10 orders a second): SLICER=AB123,...
     MOCKTRADE_ALERT_WEBHOOK    (none)     https:// address that gets WARN/ERROR alerts as
@@ -80,6 +83,7 @@ from mocktrade.charts.service import Charts
 from mocktrade.config import ConfigError, KiteSettings, environment
 from mocktrade.domain.accounts import BrokerAccount
 from mocktrade.marketdata.service import MarketData
+from mocktrade.marketdata.sim_universe import FREEZE as SIM_FREEZE
 from mocktrade.marketdata.sim_universe import INSTRUMENTS
 from mocktrade.marketdata.simulator import MarketSimulator
 from mocktrade.marketdata.sources import PriceSources
@@ -93,6 +97,7 @@ from mocktrade.ops.protection import ProtectionGuard
 from mocktrade.ops.scheduler import Scheduler, parse_holidays
 from mocktrade.orders.model import ClientIds
 from mocktrade.platform import Platform
+from mocktrade.refdata.freeze import apply_freeze, load_freeze
 from mocktrade.refdata.store import InstrumentStore
 from mocktrade.reports.service import Reports
 from mocktrade.reports.store import ReportStore
@@ -134,6 +139,7 @@ class ServeSettings:
     charges_file: Path | None = None  # a charge schedule (JSON) instead of the built-in one
     record_days: int = 30  # keep this many days of recorded ticks (0: don't record)
     algo_ids: tuple[tuple[str, str], ...] = ()  # exchange algo ids per algo code (#291)
+    freeze_file: Path | None = None  # freeze quantities per underlying (#424)
 
     def kite_url(self, name: str, default: str) -> str:
         """KITE_API_URL / KITE_WS_URL: only to point at a Kite simulator (load tests)."""
@@ -223,6 +229,12 @@ class ServeSettings:
                 load_schedule(charges_text)
             except (OSError, ValueError) as exc:
                 problems.append(f"MOCKTRADE_CHARGES: {exc}")
+        freeze_text = env.get("MOCKTRADE_FREEZE_FILE", "")
+        if freeze_text:
+            try:
+                load_freeze(Path(freeze_text))  # bad lines are only warned about, at start
+            except OSError as exc:
+                problems.append(f"MOCKTRADE_FREEZE_FILE can't be read: {exc.strerror or exc}")
         algo_ids: dict[str, str] = {}
         try:
             algo_ids = parse_algo_ids(env.get("MOCKTRADE_ALGO_IDS", ""))
@@ -249,6 +261,7 @@ class ServeSettings:
             charges_file=Path(charges_text) if charges_text else None,
             record_days=int(record_text) if record_text.isdigit() else 30,
             algo_ids=tuple(sorted(algo_ids.items())),
+            freeze_file=Path(freeze_text) if freeze_text else None,
         )
 
 
@@ -297,6 +310,8 @@ def build(settings: ServeSettings) -> Assembly:
         raise ConfigError(str(exc)) from None
     users = UserStore(settings.data_dir / "users.db", SecretBox(settings.secret_key))
     instruments = InstrumentStore()
+    if settings.freeze_file is not None:
+        apply_freeze(instruments, settings.freeze_file)
     md = MarketData()
     jobs = []
     kite: KiteLive | None = None
@@ -326,6 +341,8 @@ def build(settings: ServeSettings) -> Assembly:
     else:
         for instrument, _ in INSTRUMENTS:
             instruments.add(instrument)
+        if settings.freeze_file is None:
+            instruments.set_freeze(SIM_FREEZE)  # the simulated contracts' sample limits
         simulator = MarketSimulator(md, dict(INSTRUMENTS))
         simulator.step()  # every contract has a price before the first order
         jobs.append(simulator.run)

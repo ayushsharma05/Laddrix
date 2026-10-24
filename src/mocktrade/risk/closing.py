@@ -51,9 +51,9 @@ async def close_position(
     side = Side.SELL if qty > 0 else Side.BUY
     left = abs(qty)
     piece = max(instrument.lot_size, max_lots * instrument.lot_size)
-    freeze = getattr(instrument, "freeze_qty", None)
+    freeze = instrument.max_order_qty  # the exchange's most per order (#424)
     if freeze:
-        piece = min(piece, freeze - freeze % instrument.lot_size or instrument.lot_size)
+        piece = min(piece, freeze)
     sent = []
     while left > 0:
         size = min(left, piece)

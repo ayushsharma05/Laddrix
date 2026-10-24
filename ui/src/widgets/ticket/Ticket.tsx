@@ -294,7 +294,10 @@ function TicketBody({
       <ExpiryNote info={spec.expiry} />
       <div className="ticket-head">
         <b>{instrument.symbol}</b>
-        <span className="dim">{instrument.exchange} · lot {spec.lot_size} · tick {fmtPrice(tickSize)}</span>
+        <span className="dim">
+          {instrument.exchange} · lot {spec.lot_size} · tick {fmtPrice(tickSize)}
+          {spec.freeze_qty ? ` · max ${fmtQty(spec.freeze_qty)} per order` : ""}
+        </span>
         <span className="book-spacer" />
         <span>
           LTP <b>{ltp !== null ? fmtPrice(ltp) : "–"}</b>
