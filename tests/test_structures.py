@@ -9,6 +9,8 @@ Calendar OCT − NOV (both lot 75). Hand-worked numbers:
                         (25,020.00 − 25,010.00) × 75 = ₹750 on OCT, 0 on NOV
 """
 
+from types import SimpleNamespace
+
 import pytest
 from test_autospreader import AYUSH, NOV, OCT, W
 
@@ -20,6 +22,7 @@ from mocktrade.domain.orders import (
     Product,
     Side,
 )
+from mocktrade.orders.model import EventKind
 from mocktrade.structures.book import StructureBook, StructureError, StructureLeg
 
 CALENDAR = [StructureLeg(OCT, 1, 1), StructureLeg(NOV, -1, -1)]
@@ -273,3 +276,26 @@ async def test_the_api_for_structures(tmp_path, nifty_fut):
     await ayush.aclose()
     await riya.aclose()
     w.log.close()
+
+
+async def test_an_auto_fill_taken_out_by_hand_is_not_put_back_by_a_replay(w):
+    spread = w.calendar()
+    algo = await trade_calendar(w, spread, 1)
+    (s,) = w.sb.structures()
+    (q,) = w.children(algo, OCT)
+    w.sb.remove(s["structure_id"], q, 75, "ayush")  # the trader takes it out
+    reloaded = book_for(w, Notes())
+    reloaded.load(w.notes.items)
+    view = w.om.get(q)
+    for book in (w.sb, reloaded):
+        book.on_order_event(SimpleNamespace(kind=EventKind.FILL, order=view))
+        assert book.get(s["structure_id"])["legs"][0]["qty"] == 0  # not put back
+    assert w.sb.free_fills()[0]["client_order_id"] == q
+
+
+async def test_a_deleted_structure_stays_deleted_after_a_restart(w):
+    s = w.sb.create("gone", CALENDAR, "ayush")
+    w.sb.delete(s.structure_id, "ayush")
+    reloaded = book_for(w, Notes())
+    reloaded.load(w.notes.items)
+    assert reloaded.structures() == []

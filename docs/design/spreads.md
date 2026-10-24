@@ -16,12 +16,12 @@ Ayush asked for this on 24 Oct 2026. It is built in three parts:
 | – | #425 | each spread's controls; "Hedge now" and "Flatten" on a running ASE | done |
 | – | #426 | after a restart a working ASE comes back paused, with its orders | done |
 | – | #427 | several quoting legs at once | done |
+| – | #428 | structure positions: spreads held, their P&L, the unallocated rest | done |
 
 Recovery after a restart (#426): a working Autospreader comes back paused, with its orders
 ([algos.md](algos.md#after-a-restart-426)).
 
 Still to come, in #250 and #251 (one issue each, in this order):
-- #428 positions grouped by structure;
 - #429 historical spread charts.
 
 ## 1. A definition
@@ -180,7 +180,35 @@ Work | PIQ | Bids |  Price  | Asks | LTQ | VAP        prices: the spread's impli
   - a resting order showed in Work and was cancelled;
   - the right-click menu opened the settings.
 
-## 6. Code
+## 6. Structure positions (#428)
+
+A **structure** is a spread held in one account: its legs, and the fills allocated to it.
+Fills never change; a structure only says which part of which order's fills belongs to it
+(`src/mocktrade/structures/book.py`, the **Structures** widget).
+
+```
+an Autospreader's fills ─► its spread's structure, at once (made at its first fill)
+by hand                 ─► add part of an order's fills; remove; move to another structure
+every change            ─► a STRUCTURE_* note in the account's audit trail, replayed at start
+```
+
+| It shows | Worked out as |
+| --- | --- |
+| spread lots | the whole spreads its legs make: + bought, − sold; 0 when its legs point opposite ways |
+| each leg | its quantity, average, P&L, and its **residual** beyond the whole spreads |
+| average, mark | Σ price× · leg average; Σ price× · last price |
+| P&L | each leg's realised and unrealised, weighted average cost as the positions screen; gross of charges |
+| unallocated | per instrument, the account's net position less every structure's |
+
+- An order's filled quantity is never allocated twice in all (allocated ≤ filled), only to
+  a structure that has its leg, in whole lots; the server says what's wrong in words.
+- **Splitting and combining** are moves: all structures together keep each leg's quantity,
+  realised P&L and cost. A partial exit (selling some spread lots back) leaves the rest at
+  its own cost; the cost basis never resets.
+- An automatic allocation taken out by hand is never put back by a replayed fill.
+- Structures are account data, kept with the account's audit trail like its orders.
+
+## 7. Code
 
 - `src/mocktrade/spreads/model.py`: definitions, checks, the implied price.
 - `src/mocktrade/spreads/store.py`: `SpreadBook`, per user, on disk.

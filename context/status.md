@@ -46,10 +46,10 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
      hedge-now and flatten actions): merged (PR #431);
   3. #426 algos survive a restart (reconcile first, come back paused, hedges kept): merged
      (PR #432);
-  4. #427 several quoting legs at once: in its PR;
-  5. #428 structure positions (spreads held, their P&L, the unallocated rest);
+  4. #427 several quoting legs at once: merged (PR #433);
+  5. #428 structure positions (spreads held, their P&L, the unallocated rest): in its PR;
   6. #429 spread charts (history from the legs, gaps shown).
-- **Pull requests:** the #427 PR.
+- **Pull requests:** the #428 PR.
 
 ## What's next
 

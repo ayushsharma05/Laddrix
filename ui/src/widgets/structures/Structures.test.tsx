@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { Structures as Body, StructureView } from "../../api/types";
 import { AppProvider, createApp } from "../../app/context";
 import { fakeRest, fakeStream } from "../../test/fakes";
-import { ME } from "../../test/fixtures";
+import { ME, order } from "../../test/fixtures";
 import { Structures } from "./Structures";
 
 const OCT = "NFO:NIFTY26OCTFUT";
@@ -57,7 +57,7 @@ function setup(routes: Record<string, unknown> = {}) {
       <Structures {...props} />
     </AppProvider>,
   );
-  return { ...server, url };
+  return { ...server, url, app };
 }
 
 const posts = (calls: { method: string; path: string; body: unknown }[]) => calls.filter((c) => c.method !== "GET");
@@ -74,6 +74,7 @@ describe("Structures (#428)", () => {
     const { calls, url } = setup();
     fireEvent.click(await screen.findByRole("button", { name: "Open NIFTY Oct/Nov" }));
     expect(screen.getByLabelText("NIFTY26OCTFUT residual").textContent).toBe("residual 0");
+    expect(screen.getByRole("group", { name: "NIFTY Oct/Nov" }).textContent).toContain("75 NIFTY26OCTFUT"); // MT12's 75
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(posts(calls)).toHaveLength(1));
     expect(posts(calls)[0]).toMatchObject({ path: `${url}/s1/allocations/remove`, body: { client_order_id: "MT12", qty: 75 } });
@@ -88,6 +89,14 @@ describe("Structures (#428)", () => {
     fireEvent.change(screen.getByLabelText("Add MT20 to"), { target: { value: "s2" } });
     expect((await screen.findByRole("alert")).textContent).toBe("MT20 has 75 filled not yet in a structure, not 150");
     expect(posts(calls)[0]).toMatchObject({ path: `${url}/s2/allocations`, body: { client_order_id: "MT20", qty: 150 } });
+  });
+
+  it("asks again when the account's orders change (a fill, an exit)", async () => {
+    const { calls, url, app } = setup();
+    await screen.findByLabelText("NIFTY Oct/Nov lots");
+    const before = calls.filter((c) => c.path === url).length;
+    act(() => app.store.applyOrders("acc-a", [order("MT30", "FILLED", "2026-10-24T05:00:01+00:00")]));
+    await waitFor(() => expect(calls.filter((c) => c.path === url).length).toBe(before + 1));
   });
 
   it("makes a structure from one of my spreads, and deletes an empty one", async () => {
