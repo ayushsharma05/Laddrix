@@ -38,8 +38,8 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
 - **Bug #422 (found reviewing the Autospreader against the old brief):** a hedge bigger than
   one order may carry was refused whole and left the spread unhedged. Now every ASE order fits
   the account's lots and value limits: hedges go in pieces at once, the quote one piece at a
-  time, and a leg that can't fit one lot fails at start in words. In PR #423.
-- **Pull requests:** #423 (#422), until it merges.
+  time, and a leg that can't fit one lot fails at start in words. Fixed (PR #423).
+- **Pull requests:** none open.
 
 ## What's next
 
