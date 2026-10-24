@@ -2,11 +2,11 @@
 // Keyboard shortcuts from Widgets; a browser key is refused in words; "Open a chart" gets F2 and
 // F2 opens a chart; STOP gets F9 and F9 opens the stop dialog while Ctrl+Shift+K still does; the
 // choices survive a reload (saved on the server); "all back to the defaults" takes two clicks.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execSync } = require('child_process');
 const flat = (s) => (s || '').replace(/\s+/g, ' ').trim();
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));

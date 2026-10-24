@@ -2,11 +2,11 @@
 // computer set to light, an unchosen theme shows light; picking Dark, Colour-blind and Light
 // switches at once (no reload) and the chart repaints; the choice survives a reload (saved on the
 // server); "Same as the computer" saves nothing. Screenshots of each theme go to context/images.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execSync } = require('child_process');
 const IMAGES = `${__dirname}/../images`;
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   const context = await browser.newContext({ viewport: { width: 1500, height: 950 }, colorScheme: 'light' });
   const page = await context.newPage();
   const errors = [];

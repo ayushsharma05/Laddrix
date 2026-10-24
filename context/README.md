@@ -12,7 +12,7 @@ Everything a new Claude chat needs to continue this project exactly where the la
 1. Read the four files above (in order), then `CLAUDE.md` and `docs/design/product-vision.md`.
 2. **Where things live:** code, design and context are all on **main**. Start new work from current main: one short-lived branch and one PR per issue, targeting main; Claude merges it once CI is green. The old stacked branches are history only.
 3. Check the open PRs (CI green? review comments?) and fix anything red first.
-4. Take the "Next" item in `status.md`. Work like the earlier milestones: brainstorm the traps in a table → code → tests (Python `pytest`, `ruff check .`, `ruff format --check .`; UI `cd ui && npm ci && npm run typecheck && npm test && npm run build`) → mutation check → real-browser check against the demo server (`scripts/`) → self-review → push → PR with `Closes #N` and the PR body style used in #170–#172.
+4. Take the next item in `status.md` (the open feature issues, after Ayush's to-do issue). Work like the earlier milestones: brainstorm the traps in a table → code → tests (Python `pytest`, `ruff check .`, `ruff format --check .`; UI `cd ui && npm ci && npm run typecheck && npm test && npm run build`) → mutation check → real-browser check against the demo server (`scripts/`) → self-review → push → PR with `Closes #N` and the PR body style used in #170–#172.
 5. Commit and push WIP often: limits can end a session at any time. Never run two mutation scripts at once.
 6. **Update `context/` at every important point, not only at the end** (Ayush, 14 Oct): status table, Next, conversation log, screenshots. Commit context changes on the same feature branch as the code, so they merge together.
 7. Before pushing, run `git status --ignored` and check no source file is hidden by `.gitignore` (K5.3 lost `ui/src/lib/format.ts` that way).
@@ -23,14 +23,15 @@ Everything a new Claude chat needs to continue this project exactly where the la
 | --- | --- |
 | `../docs/design/product-vision.md` | **Product vision**: principles (replaceable parts, backend provides / frontend displays), feature catalogue, roadmap K8–K13 |
 | `../docs/design/kite-architecture.md` | **Active design (Kite track)**: limits, components, adapter, languages, deployment |
-| [cme-wiki-guide.md](cme-wiki-guide.md) | Beginner guide to CME MDP 3.0 (prices) and iLink 3 (orders), with 3 diagrams |
-| [build-map/](build-map/) | The MockTrade Build Map: `MockTrade-Build-Map.html` (open in a browser) and the generator that rebuilds it |
 | [images/](images/) | Every diagram from the conversation, as PNG, plus screenshots of the built screens (`k5-4-ladder.png`, `k5-5-screens.png`) |
 | [scripts/](scripts/) | Real-browser checks and mutation checks Claude runs before each PR |
-| [backlog-scripts/](backlog-scripts/) | The Python scripts that created all issues, labels and milestones in both repos |
+| [evidence/](evidence/) | Saved output of drills and live checks (the proof behind a "done") |
+| [one-chart/](one-chart/) | The interactive one-chart of the architecture (open `one-chart.html` in a browser) |
+| `../docs/archive/` | The paused COMEX/CME track (the CME guide, requirements, diagrams) and project history (the build map, the backlog scripts, the 15 Oct merge recovery, the old status file) |
+| `../docs/running-locally.md` | How to run and test everything on one computer |
 
 ## Related repo
-The mock exchange lives in [ayushsharma05/MockCME](https://github.com/ayushsharma05/MockCME). It has its own `context/` folder.
+The paused CME track's mock exchange lives in [ayushsharma05/MockCME](https://github.com/ayushsharma05/MockCME); it is not part of the current platform ([../docs/archive/](../docs/archive/README.md)).
 
 ## Not in this folder, on purpose
 The three private reference files about Ayush's firm's platform, and the raw chat (it contains company details). See the privacy rules in `working-with-ayush.md`.

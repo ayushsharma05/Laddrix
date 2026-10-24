@@ -25,14 +25,14 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 ## 4. Studying CME (Phase 3)
 - #14: a paper exercise on how matching works (sells 2400.4 × 3 and 2400.5 × 5, then buy 6 @ 2400.5).
 - He asked why study CME's MDP at all, since MockTrade isn't tied to one exchange. Answer: the **adapter pattern**. Generic ideas go in the core, CME-specific names and numbers go only in the adapter. CME's specs are excellent and public, and his data is in CME format.
-- He asked what to read on the CME Client Systems wiki. The pages load with JavaScript and couldn't be fetched, so Claude wrote a beginner guide from CME's public specs: [cme-wiki-guide.md](cme-wiki-guide.md), with 3 diagrams.
+- He asked what to read on the CME Client Systems wiki. The pages load with JavaScript and couldn't be fetched, so Claude wrote a beginner guide from CME's public specs: [cme-wiki-guide.md](../docs/archive/comex-track/cme-wiki-guide.md), with 3 diagrams.
 - He closed #14, #15 and #16.
 
 ## 5. The build map
 - He asked to see which issue programs which part of the architecture, so he always knows where he is.
-- Claude built the **MockTrade Build Map**, an interactive page: every box of the architecture with the issues that design it (dashed) and build it (coloured by release), a "you are here" marker and a release slider. Files are in [build-map/](build-map/); screenshot below.
+- Claude built the **MockTrade Build Map**, an interactive page: every box of the architecture with the issues that design it (dashed) and build it (coloured by release), a "you are here" marker and a release slider. Files are in [build-map/](../docs/archive/history/build-map/); screenshot below.
 
-![MockTrade build map](images/mocktrade-build-map.png)
+![MockTrade build map](../docs/archive/history/mocktrade-build-map.png)
 
 ## 6. The exchange gets its own repo: MockCME
 - He suggested building the mock exchange first, in its own repo, because a real exchange exists before the platforms that connect to it.
@@ -40,7 +40,7 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 - Ayush created `ayushsharma05/MockCME`. Claude pushed the skeleton (package folders, smoke test, CI, PR template), created 9 milestones and 40 issues written code-first (goal → steps with file and function names → tests to write first), and opened design **PR #41** (`docs/design.md`).
 - The 6 exchange issues in MockTrade (#34, #37, #38, #49, #52, #73) were closed as moved, with links. #39, #50, #55, #76 and #77 got cross-links. The build map now points to MockCME's milestones.
 
-![MockCME architecture](images/mockcme-architecture.png)
+![MockCME architecture](../docs/archive/comex-track/images/mockcme-architecture.png)
 
 ## 7. Mid-conversation questions worth remembering
 - **"Are we writing our own TCP and UDP?"** No. The operating system provides TCP and UDP through sockets. We write the protocols on top: iLink-lite for orders (logon, sequence numbers, heartbeats, resend) and MDP-lite for prices (numbered packets, gaps, snapshots). E3 builds reliability on top of UDP, the same core idea TCP uses. A "write a tiny TCP yourself" side-quest issue was offered for later.
@@ -139,7 +139,7 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 - Recovery combines those histories in one integration PR, retaining the original commits and a backup of pre-recovery main. No code revert is required by the merge audit.
 - Main CI had 450 lint errors in the historical context generators, before Python tests ran. These archived, session-specific utilities are now explicitly outside application lint scope; all src/ and tests/ rules remain enabled.
 - The intended stopping point is K9.1 complete. #200 synthetic orders, #201 GTT, and #202 screens remain pending. AWS deployment, AMO checks and a real trading day remain manual work.
-- Future code and context updates travel in the same PR against main, avoiding a second divergent context branch. See merge-recovery-2026-10-15.md for the audit and validation.
+- Future code and context updates travel in the same PR against main, avoiding a second divergent context branch. See docs/archive/history/merge-recovery-2026-10-15.md for the audit and validation.
 
 ## 23. Back after the recovery (15 Oct 2026)
 - Ayush: after Claude got stuck he merged PRs out of order, asked another assistant to fix the merges, and it made some changes; "recheck and continue".
@@ -239,7 +239,7 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 
 ## 16 October 2026 — researched later-stage expansion (Codex)
 
-Ayush asked for broad research across seven public trading product ecosystems, customer feedback and detailed later GitHub additions. Reviewed public documentation and available reviews; mapped existing foundations and avoided parallel replacement engines. Created parent #297 and 25 packages #298–#322, then linked them from #241. Each describes purpose, scope, dependencies and acceptance criteria. Coverage and evidence limits are in [feature-expansion-2026-10-16.md](feature-expansion-2026-10-16.md).
+Ayush asked for broad research across seven public trading product ecosystems, customer feedback and detailed later GitHub additions. Reviewed public documentation and available reviews; mapped existing foundations and avoided parallel replacement engines. Created parent #297 and 25 packages #298–#322, then linked them from #241. Each describes purpose, scope, dependencies and acceptance criteria. Coverage and evidence limits are in [feature-expansion-2026-10-16.md](../docs/roadmap/feature-research-2026-10-16.md).
 
 Core #240 and hardening #257 remain first, with security #279, data rights #278 and applicable compliance #291 preserved. Mobile new-entry, public marketplace/performance sharing, assistant tools and institutional services are decision-gated. Reviews are qualitative, often dated; paid/private functionality and claimed performance were not independently tested. Requirements remain vendor-neutral. No application code or deployment was changed. Context handoff tracked by #323.
 - 16 Oct (after Claude's limit reset):
@@ -637,3 +637,24 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - The operator added acme from the terminal, as the runbook says. Each firm saw only its own accounts and users. An acme order was invisible to main, and each firm's request for the other's account was answered "not found".
   - Acme's STOP showed on acme's screens only and cancelled acme's resting order; main kept trading.
   - With this, #368 (multi-tenant) is done. What remains before an outside firm trades is Zerodha's answer (#278), on Ayush's to-do list.
+- 24 Oct, morning (India). **The repo tidied, while Ayush slept** (his ask: bugs first, then a clean professional repo, keeping every piece of design and future-feature information).
+  - **Bug issues:** all fixed and merged: #271 (PR #404), #274 (PR #405), #277 (PR #406), plus the #397 two-firm drill (PR #407), which completed #368.
+  - **Pull requests:** none left open. The Dependabot majors were already closed. #399 (React minor) is merged. #371's two notes were carried into PR #403 and it was closed.
+  - **Issues:**
+    - Ayush's own steps are in one issue, #408. #240 (accept v1), #278 (Zerodha's questions) and #369 (the security review) are closed into it.
+    - The gates #257 and #279 are closed as done.
+    - Every open feature issue (#241–#255, #297–#322) had its stale "after #240/#257" opening rewritten. Its scope and acceptance criteria are kept word for word.
+  - **Archived, not deleted** (`docs/archive/`, with an index):
+    - the COMEX/CME track: the CME guide, its requirements, its diagrams;
+    - project history: the build map, the backlog scripts, the 15 Oct merge recovery, the old status file.
+    - The one-chart stays: it is current architecture.
+  - **New:**
+    - `docs/README.md` (the index);
+    - `docs/running-locally.md` (run and test everything on one computer);
+    - `docs/roadmap/` (with the feature research moved there);
+    - a fresh short `context/status.md`;
+    - the changelog's "Unreleased" section.
+  - **Made portable:** the 34 browser checks no longer hard-code the cloud container's paths (`PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`).
+  - **Found on the way:**
+    - a new undici advisory failed the desktop audit (fixed in PR #405);
+    - the workload tests took 13 minutes on CI (now about 20 s, and the CI test job has a 30-minute limit).

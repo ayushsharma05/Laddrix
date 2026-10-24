@@ -5,21 +5,21 @@
 //      a too-short password gets the server's words; their own one opens the terminal;
 //   3. the admin tightens acc-paper's per-order limit to 1 lot in the Limits tab (check, then
 //      save) and a 2-lot order is refused with that limit; then puts it back (looser: two clicks).
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execSync } = require('child_process');
 const flat = (s) => (s || '').replace(/\s+/g, ' ').trim();
 const totp = (secret) => execSync(`python3 -c "import pyotp,sys; print(pyotp.TOTP(sys.argv[1]).now())" ${secret}`).toString().trim();
 const shots = '/tmp/claude-0';
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   const errors = [];
   const admin = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
   admin.on('pageerror', (e) => errors.push(e.message));
   await admin.goto('http://localhost:8000/');
   await admin.getByLabel('Username').fill('demo');
   await admin.getByLabel('Password').fill('demo-password-123');
-  await admin.getByLabel('Authenticator code').fill(execSync('cd /home/user/MockTrade && python3 -m mocktrade.tools.demo --code').toString().trim());
+  await admin.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await admin.keyboard.press('Enter');
   await admin.locator('.dv-tab').first().waitFor({ timeout: 20000 });
   const api = (page, m, p, b) => page.evaluate(async ([m, p, b]) => {

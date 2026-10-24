@@ -27,7 +27,7 @@ target-version = "py312"
 # Historical context generators and session-specific mutation harnesses are
 # preserved as evidence, not maintained application modules. Source and tests
 # remain subject to every existing rule; runnable tools live under src/.
-extend-exclude = ["context/backlog-scripts", "context/build-map", "context/scripts"]
+extend-exclude = ["docs/archive", "context/scripts"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

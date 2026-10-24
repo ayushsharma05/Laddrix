@@ -10,7 +10,7 @@ against live prices. Built on Zerodha Kite Connect, behind a broker-agnostic cor
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)
-![Tests](https://img.shields.io/badge/tests-1%2C650%2B-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1%2C900%2B-brightgreen)
 ![Docker](https://img.shields.io/badge/deploy-Docker%20%2B%20Caddy-2496ED?logo=docker&logoColor=white)
 
 <picture>
@@ -27,7 +27,7 @@ the order book, positions with P&L, and the audit trail, all streaming in real t
 
 ## What it is
 
-MockTrade is a full trading stack for a single desk:
+MockTrade is a full trading stack for a trading desk, or for several firms on one server:
 - **A Python server** that holds the order manager, the risk engine, positions and P&L, an algo
   engine, and an append-only audit log.
 - **A React terminal** of dockable widgets that stream from it.
@@ -52,6 +52,7 @@ was refused. The UI hard-codes no market rules.
 | **Options** | An option chain with Greeks, a multi-leg strategy builder with payoff charts, and basket orders. |
 | **Research** | Tick recording, replay of a recorded day as if live, and backtests that run the same engine, paper broker and risk checks. |
 | **Operations** | Crash recovery from the audit log, backups with checksums and verified restore, deploys gated to market hours with automatic rollback, plus operational alert bands and webhooks. |
+| **Security and firms** | Password + authenticator login, step-up for privileged changes, key rotation, a hash-chained audit trail, logs without secrets, signed dependencies; several firms on one server, each seeing only its own users, accounts and its own traders' Zerodha prices. |
 
 ## Screens
 
@@ -94,9 +95,9 @@ More: [architecture](docs/design/kite-architecture.md) · [domain model](docs/de
 
 | | |
 | --- | --- |
-| **Size** | ~23k lines of Python and ~14k lines of TypeScript, plus ~24k lines of tests |
-| **Tests** | 1,250+ pytest and 400 vitest tests, run in CI on every pull request |
-| **Mutation testing** | 44 scripts that inject deliberate bugs into safety rules and check that a test catches each one |
+| **Size** | ~27k lines of Python and ~14k lines of TypeScript, plus ~29k lines of tests |
+| **Tests** | 1,480+ pytest and 420 vitest tests, run in CI on every pull request, with dependency audit, secret scanning and an SBOM |
+| **Mutation testing** | 60+ scripts that inject deliberate bugs into safety rules and check that a test catches each one |
 | **Real-browser checks** | Playwright runs against the live demo, with the results kept as evidence |
 | **Drills** | Crash-and-restart, backup-and-restore and deploy-and-rollback, each rehearsed for real |
 | **Process** | Every change goes issue → branch → pull request (`Closes #N`) → green CI → merge |
@@ -105,18 +106,20 @@ More: [architecture](docs/design/kite-architecture.md) · [domain model](docs/de
 
 ```bash
 pip install -r requirements-dev.txt
-cd ui && npm install && npm run build && cd ..
+cd ui && npm ci && npm run build && cd ..
 python -m mocktrade.tools.demo --ui ui/dist      # http://localhost:8000
 python -m mocktrade.tools.demo --code            # the login code (user demo / demo-password-123)
 ```
 
-**Tests:** `pytest` and `cd ui && npx vitest run`.
+Everything else (the tests, the desktop app, Docker, live Kite prices) is in
+**[docs/running-locally.md](docs/running-locally.md)**.
 
 ## Documentation
 
+- **[docs/README.md](docs/README.md):** where everything is.
 - **[The guide](docs/guide/README.md):** the whole system from first principles, with diagrams, in nine chapters.
 - **[Reading order](docs/guide/reading-order.md):** every source file, in the order to read it.
-- **[Design docs](docs/design/README.md)** · **[Runbooks](docs/runbooks/README.md)** (morning routine, incidents, release, go-live) · **[Changelog](CHANGELOG.md)**
+- **[Design docs](docs/design/README.md)** · **[Runbooks](docs/runbooks/README.md)** (morning routine, incidents, release, go-live, several firms) · **[Roadmap](docs/roadmap/README.md)** · **[Changelog](CHANGELOG.md)**
 
 ## How it was built
 
@@ -128,9 +131,10 @@ request are in the repo.
 
 ## Status
 
-- **Version:** `1.0.0-rc.1`. Paper trading is complete.
-- **Hardening:** a production-hardening pass is in progress (issue #257).
-- **Live trading:** it goes live only after a manual go-live checklist
-  ([docs/runbooks/go-live.md](docs/runbooks/go-live.md)).
+- **Version:** `1.0.0-rc.1`, plus the hardening since (see the [changelog](CHANGELOG.md)).
+- **Paper trading:** complete. The code is production-grade.
+- **Live trading:** only after the manual go-live checklist
+  ([docs/runbooks/go-live.md](docs/runbooks/go-live.md)) and an independent security review.
+- **Next:** the feature issues on GitHub ([roadmap](docs/roadmap/README.md)).
 
 <sub>Not affiliated with Zerodha. Market rules (lot sizes, cut-off times, SEBI requirements) change, so re-check them before trading real money.</sub>

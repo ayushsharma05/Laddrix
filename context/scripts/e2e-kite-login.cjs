@@ -1,17 +1,17 @@
 // Kite mode before the daily login: the strip says so, orders are gated, and the button
 // leads to Zerodha's login page with our API key and a one-time state.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execSync } = require('child_process');
 const secret = process.argv[2];
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('ayush');
   await page.getByLabel('Password').fill('compose-test-password-1');
-  const code = execSync(`cd /home/user/MockTrade && PYTHONPATH=src python3 -c "import time;from mocktrade.server.security import totp_code;print(totp_code('${secret}', time.time()))"`).toString().trim();
+  const code = execSync(`PYTHONPATH=src python3 -c "import time;from mocktrade.server.security import totp_code;print(totp_code('${secret}', time.time()))"`).toString().trim();
   await page.getByLabel('Authenticator code').fill(code);
   await page.keyboard.press('Enter');
   await page.locator('.env-strip').waitFor({ timeout: 20000 });

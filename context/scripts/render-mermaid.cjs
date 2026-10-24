@@ -2,12 +2,12 @@
 //   npm pack mermaid@11.4.1 && tar xzf mermaid-11.4.1.tgz     (once, anywhere)
 //   MERMAID_JS=<that folder>/package/dist/mermaid.min.js node context/scripts/render-mermaid.cjs context/images/x.mmd …
 // Each x.mmd becomes x.png beside it (white background, 2x for sharp text).
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const fs = require('fs');
 (async () => {
   const lib = process.env.MERMAID_JS;
   if (!lib || !fs.existsSync(lib)) throw new Error('set MERMAID_JS to mermaid.min.js (see the top of this file)');
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   const page = await browser.newPage({ deviceScaleFactor: 2, viewport: { width: 1400, height: 1000 } });
   await page.setContent('<html><body style="margin:0;background:#fff"><div id="out"></div></body></html>');
   await page.addScriptTag({ path: lib });

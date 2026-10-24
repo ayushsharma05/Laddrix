@@ -2,16 +2,16 @@
 // tab (today's preview: totals, positions, strategies), both downloads saved by the browser and
 // read back (CSV text, PDF header and page count), and the History tab.
 // Run against a fresh demo (rm -rf data/demo) with ui/dist rebuilt.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execSync } = require('child_process');
 const fs = require('fs');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, acceptDownloads: true });
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByLabel('Authenticator code').fill(execSync('cd /home/user/MockTrade && python3 -m mocktrade.tools.demo --code').toString().trim());
+  await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
   await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
   const api = (m, p, b) => page.evaluate(async ([m, p, b]) => {

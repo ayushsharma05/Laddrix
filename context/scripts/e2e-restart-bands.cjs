@@ -6,7 +6,7 @@
 //   3. freezes the server (SIGSTOP) for 9 s: the PRICES … OLD band shows (screenshot); SIGCONT:
 //      it goes away;
 //   4. closes the position: the UNPROTECTED band goes away.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execSync } = require('child_process');
 const IMAGES = `${__dirname}/../images`;
 const PATTERN = '[-]m mocktrade[.]tools[.]demo';
@@ -29,7 +29,7 @@ const pid = () => execSync(`pgrep -f "${PATTERN}"`).toString().trim().split('\n'
   await sleep(1000);
   execSync('rm -rf data/demo');  // a clean start: nothing open from an earlier run
   await startDemo();
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
