@@ -1,3 +1,7 @@
+"""Kite's binary ticks decoded exactly as Kite documents them (broker/kite/decoder.py), packet by
+packet.
+"""
+
 import struct
 import time
 from datetime import UTC, datetime

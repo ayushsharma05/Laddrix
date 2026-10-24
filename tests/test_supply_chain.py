@@ -97,8 +97,10 @@ def test_update_proposals_are_grouped_and_never_major():
 
     config = yaml.safe_load((ROOT / ".github/dependabot.yml").read_text())
     folders = {(u["package-ecosystem"], u["directory"]) for u in config["updates"]}
+    # the Compose images (Caddy, Prometheus, Grafana) too, since #439
     assert folders == {("pip", "/"), ("npm", "/ui"), ("npm", "/ui/desktop"),
-                       ("github-actions", "/"), ("docker", "/")}  # fmt: skip
+                       ("github-actions", "/"), ("docker", "/"),
+                       ("docker-compose", "/deploy")}  # fmt: skip
     for update in config["updates"]:
         ignored = {t for rule in update.get("ignore", []) if rule["dependency-name"] == "*"
                    for t in rule["update-types"]}  # fmt: skip

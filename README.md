@@ -7,10 +7,10 @@ Live market data, a price ladder, algos, options, risk controls, and a paper bro
 against live prices. Built on Zerodha Kite Connect, behind a broker-agnostic core.
 
 [![CI](https://github.com/ayushsharma05/MockTrade/actions/workflows/ci.yml/badge.svg)](https://github.com/ayushsharma05/MockTrade/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)
-![Tests](https://img.shields.io/badge/tests-1%2C900%2B-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2%2C150%2B-brightgreen)
 ![Docker](https://img.shields.io/badge/deploy-Docker%20%2B%20Caddy-2496ED?logo=docker&logoColor=white)
 
 <picture>
@@ -51,7 +51,7 @@ was refused. The UI hard-codes no market rules.
 | **Algos** | A parent/child algo engine: slicer, iceberg, TWAP/VWAP, POV, a two-leg spreader, and protection algos (trailing stop, OCO, bracket). |
 | **Options** | An option chain with Greeks, a multi-leg strategy builder with payoff charts, and basket orders. |
 | **Research** | Tick recording, replay of a recorded day as if live, and backtests that run the same engine, paper broker and risk checks. |
-| **Operations** | Crash recovery from the audit log, backups with checksums and verified restore, deploys gated to market hours with automatic rollback, plus operational alert bands and webhooks. |
+| **Operations** | Crash recovery from the audit log, backups with checksums and verified restore, deploys gated to market hours with automatic rollback, operational alert bands and webhooks, a status page of every part, JSON logs with request and order ids, and a Grafana dashboard. |
 | **Security and firms** | Password + authenticator login, step-up for privileged changes, key rotation, a hash-chained audit trail, logs without secrets, signed dependencies; several firms on one server, each seeing only its own users, accounts and its own traders' Zerodha prices. |
 
 ## Screens
@@ -95,20 +95,20 @@ More: [architecture](docs/design/kite-architecture.md) · [domain model](docs/de
 
 | | |
 | --- | --- |
-| **Size** | ~27k lines of Python and ~14k lines of TypeScript, plus ~29k lines of tests |
-| **Tests** | 1,480+ pytest and 420 vitest tests, run in CI on every pull request, with dependency audit, secret scanning and an SBOM |
-| **Mutation testing** | 60+ scripts that inject deliberate bugs into safety rules and check that a test catches each one |
-| **Real-browser checks** | Playwright runs against the live demo, with the results kept as evidence |
-| **Drills** | Crash-and-restart, backup-and-restore and deploy-and-rollback, each rehearsed for real |
-| **Process** | Every change goes issue → branch → pull request (`Closes #N`) → green CI → merge |
+| **Size** | ~30k lines of Python and ~18k lines of TypeScript (plus ~3k of CSS), and ~35k lines of tests |
+| **Tests** | 1,600+ server tests (pytest) and 530 screen and desktop tests (vitest), plus type checks, run in CI on every pull request with a dependency audit, secret scanning and SBOMs |
+| **Mutation testing** | 80+ scripts that inject deliberate bugs into the rules and check that a test catches each one |
+| **Real-browser checks** | 40+ Playwright scripts against the live demo, with screenshots kept as evidence |
+| **Drills** | Crash-and-restart, backup-and-restore, a stolen credential and deploy-and-rollback, each rehearsed for real |
+| **Process** | Every change goes issue → branch → pull request (`Closes #N`) → green CI → merge ([CONTRIBUTING.md](CONTRIBUTING.md)) |
 
 ## Quick start (demo: no broker account needed)
 
 ```bash
-pip install -r requirements-dev.txt
-cd ui && npm ci && npm run build && cd ..
-python -m mocktrade.tools.demo --ui ui/dist      # http://localhost:8000
-python -m mocktrade.tools.demo --code            # the login code (user demo / demo-password-123)
+make setup     # once: the server, its test tools and the screens (in a virtual environment)
+make demo      # http://localhost:8000, user demo / demo-password-123
+make code      # the login code, in a second terminal
+make check     # everything CI checks
 ```
 
 Everything else (the tests, the desktop app, Docker, live Kite prices) is in
@@ -116,8 +116,8 @@ Everything else (the tests, the desktop app, Docker, live Kite prices) is in
 
 ## Documentation
 
-- **[docs/README.md](docs/README.md):** where everything is.
-- **[The guide](docs/guide/README.md):** the whole system from first principles, with diagrams, in nine chapters.
+- **[docs/README.md](docs/README.md):** where everything is. **[CONTRIBUTING.md](CONTRIBUTING.md):** how a change is made.
+- **[The guide](docs/guide/README.md):** the whole system from first principles, with diagrams, in ten chapters.
 - **[Reading order](docs/guide/reading-order.md):** every source file, in the order to read it.
 - **[Design docs](docs/design/README.md)** · **[Runbooks](docs/runbooks/README.md)** (morning routine, incidents, release, go-live, several firms) · **[Roadmap](docs/roadmap/README.md)** · **[Changelog](CHANGELOG.md)**
 

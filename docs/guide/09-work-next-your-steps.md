@@ -54,57 +54,43 @@ release process.
 Then an outside review listed what a professional platform still needs. That list is the
 **hardening gate, #257**.
 
-## 9.4 What's next (from Wednesday 21 Oct)
+## 9.4 What's next
 
-```
- DONE  #258 positions per product · #259 unanswered orders · #260 changes in doubt ·
-       #261 coordinated exits · #262 STOP/flatten · #263 loss limits survive restarts · #269
-   │
-   ▼
- NEXT (most important, "P0")
-   #264  lost stops: flag survives restarts + a safe "Restore stop"   (half done, branch
-                                                                       h-264-protection)
-   #265  write each order to disk BEFORE sending; stop safely if the disk fails
-   #267  never trade on old prices
-   #270  one user can never see another user's alerts or research files
-   │
-   ▼
- THEN ("P1")
-   #266 the new trading day (P&L and limits reset at the right moment)
-   #268 screens wait for a full sync before allowing trades
-   #271–#277 webhooks, backups, supervision, capacity, exact charges, broker-held triggers,
-             honest data labels
-   #287 logs and a status page · #290 F&O expiry day · #291 compliance (SEBI algo id)
-   │
-   ▼
- YOUR DECISIONS   #279 security review · #278 who pays for live data, and many users on Zerodha
-   │
-   ▼
- NEW FEATURES     #241 (#242–#255) and the later roadmap #297–#322
-```
+What is done and what comes next changes every week, so it is kept in one place:
+[context/status.md](../../context/status.md) (where things are, and the next issue). The
+[roadmap](../roadmap/README.md) lists the feature issues, and the [changelog](../../CHANGELOG.md)
+says what changed, version by version.
 
-**Why waiting until Wednesday is safe:** none of these matter until real money trades, and that
-only happens when you do the steps below yourself.
+Since this chapter was first written (16 Oct), the whole hardening gate (#257) is done:
+lost stops, orders on disk before sending, stale prices, a new trading day, the audit trail,
+backups, supervised loops, several firms on one server, and more. So are the Autospreader
+(#414–#416, #424–#429) and operations (#287).
 
 ## 9.5 Your steps (only you can do these; slowly, when ready)
 
+They are one GitHub issue, **"Ayush's to-do list"**, each step with what it is for and where
+the instructions are:
+
 ```
- ① TRY IT               run the demo; use it like a trader for a while
+ ① LEARN IT         read this guide; run the demo; use it like a trader for a while
         │
         ▼
- ② SAY "ACCEPTED"       write on GitHub issue #240 whether v1 does what you wanted
-        │                (your honest opinion, written down)
+ ② ACCEPT v1        say "v1 accepted" on the to-do issue (your honest opinion, written down)
+        │
         ▼
- ③ GO LIVE, SMALL       docs/runbooks/go-live.md: 28 boxes, done together, with your own
-        │               Zerodha login, the server's fixed IP, and the smallest quantity
-        │               NO live order is ever placed without you saying so
+ ③ ASK ZERODHA      the questions about several traders, keys and algos (Claude drafts the
+        │           email; you send it)
         ▼
- ④ TAG v1.0.0           one command (docs/runbooks/release.md) after ① to ③
+ ④ GO LIVE, SMALL   set up the server, then docs/runbooks/go-live.md, with your own Zerodha
+        │           login, the server's fixed IP and the smallest quantity.
+        │           NO live order is ever placed without you saying so
+        ▼
+ ⑤ A SECURITY REVIEW  by an independent firm, before real money for others
 ```
 
-## 9.6 Questions to bring on Wednesday
+## 9.6 Questions
 
-Write them as you read. Good ones:
+Write them as you read, and bring them to the next session. Good ones:
 - "In Chapter X, I didn't understand why …"
 - "What happens if … (a scenario)?"
 - "Show me where in the code …"

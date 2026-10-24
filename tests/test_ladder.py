@@ -1,3 +1,5 @@
+"""The text ladder for the terminal (marketdata/ladder.py)."""
+
 from mocktrade.domain.ticks import DepthLevel, Tick
 from mocktrade.marketdata.ladder import render_ladder
 

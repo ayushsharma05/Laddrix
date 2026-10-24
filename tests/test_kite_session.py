@@ -1,3 +1,7 @@
+"""Kite's daily login (broker/kite/session.py): the checksum, the login address, the redirect,
+the session.
+"""
+
 import hashlib
 from urllib.parse import parse_qs, urlparse
 

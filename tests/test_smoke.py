@@ -1,3 +1,5 @@
+"""The package imports: the smallest proof the install works."""
+
 import mocktrade
 
 

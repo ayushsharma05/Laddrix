@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+import mocktrade
 from mocktrade.version import VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,9 +27,11 @@ def test_one_version_everywhere():
     assert re.fullmatch(r"\d+\.\d+\.\d+(-rc\.\d+)?", VERSION)
     pep440 = re.sub(r"-rc\.(\d+)$", r"rc\1", VERSION)
     assert tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"] == pep440
-    assert json.loads((ROOT / "ui/package.json").read_text())["version"] == VERSION
-    lock = json.loads((ROOT / "ui/package-lock.json").read_text())
-    assert lock["version"] == lock["packages"][""]["version"] == VERSION
+    for app in ("ui", "ui/desktop"):  # the screens and the desktop app around them
+        assert json.loads((ROOT / app / "package.json").read_text())["version"] == VERSION
+        lock = json.loads((ROOT / app / "package-lock.json").read_text())
+        assert lock["version"] == lock["packages"][""]["version"] == VERSION
+    assert mocktrade.__version__ == VERSION
     notes = ROOT / "docs/releases" / f"v{VERSION.split('-')[0]}.md"
     assert notes.exists(), "every version has release notes"
     assert f"## {VERSION}" in (ROOT / "CHANGELOG.md").read_text()

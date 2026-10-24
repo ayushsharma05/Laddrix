@@ -2,13 +2,13 @@
 
 ## Versions
 
-- **One version** lives in `src/mocktrade/version.py`. `pyproject.toml` holds the same number in Python's form (`1.0.0rc1`), and `ui/package.json` and its lockfile hold it too. `tests/test_release.py` fails if they differ, or if the version has no release notes or changelog entry.
+- **One version** lives in `src/mocktrade/version.py`. `pyproject.toml` holds the same number in Python's form (`1.0.0rc1`), and `ui/package.json`, `ui/desktop/package.json` and their lockfiles hold it too (`mocktrade.__version__` reads `version.py`). `tests/test_release.py` fails if they differ, or if the version has no release notes or changelog entry.
 - **Semantic versions:** MAJOR.MINOR.PATCH. A fix is a PATCH; a feature that changes nothing for existing data or screens is a MINOR; a change that needs action from you is a MAJOR. A release candidate is `-rc.N`.
 - **The running server says its version** at `/api/health` (`version`, plus `build`, the commit the image was made from). The screens show it in the status bar, bottom right, with the build on hover.
 
 ## Making a release
 
-1. **Change the version:** edit `version.py` and `pyproject.toml`, `ui/package.json`, then `cd ui && npm install --package-lock-only` for the lockfile.
+1. **Change the version:** edit `version.py` and `pyproject.toml`, `ui/package.json` and `ui/desktop/package.json`, then `npm install --package-lock-only` in `ui` and in `ui/desktop` for the lockfiles.
 2. **Write the notes:** `docs/releases/vX.Y.Z.md` (what changed, data migrations, known limits) and a short entry at the top of `CHANGELOG.md`.
 3. **Run the release scenarios:** those in [the test plan](../test/README.md#scenarios-that-must-pass-before-a-release).
 4. **Merge,** then check that CI is green on `main`.

@@ -1,3 +1,5 @@
+"""Money as whole paise (domain/money.py): rupees to paise and back, bad amounts refused."""
+
 from decimal import Decimal
 
 import pytest

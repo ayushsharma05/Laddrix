@@ -1,3 +1,7 @@
+"""Talking to Kite's REST API (broker/kite/http.py): headers, forms, each error mapped to its own
+exception.
+"""
+
 import httpx
 import pytest
 

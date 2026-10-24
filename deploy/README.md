@@ -67,8 +67,10 @@ so contracts can be searched after a restart even before that day's login.
 Stopping waits for open requests to finish, then flushes the audit trail. The app exits with
 code 0 and logs `stopped cleanly`.
 
-## What is not here yet
+## Where else to look
 
-- A check with a real Zerodha account (only Ayush can run it) is in the runbook (#155).
-- The Mumbai server, static IP and hardening checklist: #153. Latency and load measurements:
-  #154. Morning routine, alerts and runbooks: #155.
+- **The Mumbai server:** static IP, hardening, the Kite IP whitelist, backups: [docs/runbooks/server.md](../docs/runbooks/server.md).
+- **The trading day and what to do when something breaks:** [morning.md](../docs/runbooks/morning.md), [incidents.md](../docs/runbooks/incidents.md).
+- **Is it ready, which part is wrong, the logs, the dashboard:** [monitoring.md](../docs/runbooks/monitoring.md).
+- **Releases, deploys and rollback:** [release.md](../docs/runbooks/release.md). **Going live:** [go-live.md](../docs/runbooks/go-live.md).
+- **Speed and load, measured:** [docs/design/performance.md](../docs/design/performance.md).

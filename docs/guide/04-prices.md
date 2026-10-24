@@ -67,7 +67,8 @@ may be closed, or the feed may be down.
 
 ![Prices old band](../../context/images/v1-2-prices-old-band.png)
 
-(Making sure orders are never priced on old data is issue #267, planned after Wednesday.)
+Orders are never priced on old data (#267): an order that would add risk is refused while its
+price is older than the limit, and the screens say why.
 
 ## 4.5 Charts and options use the same prices
 

@@ -1,5 +1,9 @@
+# The server, plus the tools to test and check it (docs/running-locally.md, `make setup`).
+# Pinned, so a new release of a tool can't turn CI red on its own; Dependabot proposes updates
+# weekly (.github/dependabot.yml). The server's own packages are pinned with hashes in
+# requirements.lock.
 -e .
-pytest
-pytest-asyncio
-ruff
+pytest==9.1.1
+pytest-asyncio==1.4.0
+ruff==0.17.0
 kiteconnect==5.2.2  # only as a reference implementation in tests
