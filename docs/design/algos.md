@@ -114,7 +114,10 @@ Q fills f lots ─► every other leg: floor(f · |its ratio| / |Q's ratio|) lot
   `act`; the engine checks that the preview still holds before acting.
 - **Paused or stopping:** the heartbeat calls the strategy's `on_watch`, so hedges are still
   retried and timed; a hedge sent then stays working (`keep_on_stop`).
-- **After a restart (#426)** it comes back, see below. Not yet: several quoting legs (#427).
+- **After a restart (#426)** it comes back, see below.
+- **Several quoting legs (#427):** each rests a quote; the lots left are shared out so all
+  quotes together never overfill; every order carries its role (`algo_role`)
+  ([spreads.md](spreads.md#4-trading-a-spread-415)).
 
 ## After a restart (#426)
 

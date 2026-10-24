@@ -15,12 +15,12 @@ Ayush asked for this on 24 Oct 2026. It is built in three parts:
 | – | #424 | freeze quantities: every order fits the exchange's most per order | done |
 | – | #425 | each spread's controls; "Hedge now" and "Flatten" on a running ASE | done |
 | – | #426 | after a restart a working ASE comes back paused, with its orders | done |
+| – | #427 | several quoting legs at once | done |
 
 Recovery after a restart (#426): a working Autospreader comes back paused, with its orders
 ([algos.md](algos.md#after-a-restart-426)).
 
 Still to come, in #250 and #251 (one issue each, in this order):
-- #427 several quoting legs at once;
 - #428 positions grouped by structure;
 - #429 historical spread charts.
 
@@ -30,7 +30,7 @@ Still to come, in #250 and #251 (one issue each, in this order):
 | --- | --- |
 | **ratio** | Lots of this leg per spread lot. Its sign is the side: buying the spread buys the + legs and sells the − legs. |
 | **price ×** | How much this leg's price counts in the spread's price. It has the ratio's sign and is usually the ratio itself. |
-| **quote** | The one leg that rests a quote. The others are hedged when it fills. |
+| **quote** | A leg that rests a quote: one or more (#427). A fill on any of them is hedged at once on every other leg. |
 | **pay-up** | How many ticks worse than the best price this leg's hedge may pay. |
 
 ```
@@ -43,7 +43,7 @@ price = NOV − DEC     one spread lot = 1 lot of each (75 + 75)
 The server checks every rule and says what is wrong in words:
 - 2 to 6 legs, each a different, known, tradable contract that has not expired;
 - ratios and multipliers are whole numbers from 1 to 50 (+ or −), with the same sign;
-- exactly one quoting leg;
+- at least one quoting leg;
 - pay-up is 0 to 50 ticks;
 - the name is 1 to 40 characters;
 - at most 50 spreads per user.
@@ -113,9 +113,29 @@ a leg ticks ─► SpreadPricer (a tap) ─► implied() ─► MarketData.on_de
 
 ```
 POST /api/accounts/{account}/spreads/{spread}/orders   {"side": "BUY", "lots": 2, "price_paise": -13000}
-     └─► the ASE algo: parent = the quoting leg (its side and lots · |ratio| · lot size)
+     └─► the ASE algo: parent = the first quoting leg (its side and lots · |ratio| · lot size)
          quote it where the spread = the price, hedge every other leg the moment it fills
 ```
+
+**Several quoting legs (#427).** Each quoting leg rests its own quote, at the price that makes
+the spread = the price against all the other legs (each rounded its own way, so the spread
+is never worse). A fill on any quote commits spread lots; every other leg, quoting ones too,
+is hedged for them.
+
+```
+buy 2 calendars OCT − NOV at −130.00, both legs quoting:
+   OCT quote  BUY  75 at NOV bid − 130.00          NOV quote  SELL 75 at OCT ask + 130.00
+   OCT fills ─► hedge SELL 75 NOV at its bid − pay-up   NOV fills ─► hedge BUY 75 OCT at ask + pay-up
+```
+
+- **Never past the order.** All quotes together never carry more spread lots than are still
+  to do (filled + working + on their way ≤ the order). The lots left are shared out among the
+  quoting legs with no quote: 2 lots over 2 legs is 1 + 1; 3 lots is 1 + 2; 1 lot: only the
+  first leg quotes. So two quotes filling at the same moment can't overfill, and no quote has
+  to be cut when another fills.
+- **Each order says what it is** (`algo_role`: quote, hedge or flatten), kept with the order:
+  one leg can carry a quote and a hedge on the same side. Orders from before #427 carry none:
+  a quote is then the parent leg's own side, as it always was.
 
 **Actions on a running ASE (#425)**, on the algo screen. A click shows what it would do, in
 the server's words; Confirm sends those words back and the server does exactly that, or

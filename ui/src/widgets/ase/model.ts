@@ -79,9 +79,11 @@ export function setLeg(d: Draft, index: number, change: Partial<LegDraft>): Draf
   return { ...d, legs };
 }
 
-/** Quote this leg (only one leg quotes). */
+/** Quote this leg too, or stop quoting it (#427: one or more legs quote; the last one stays). */
 export function quoteLeg(d: Draft, index: number): Draft {
-  return { ...d, legs: d.legs.map((l, i) => ({ ...l, quote: i === index })) };
+  const turnOff = d.legs[index]?.quote === true;
+  if (turnOff && d.legs.filter((l) => l.quote).length <= 1) return d;
+  return { ...d, legs: d.legs.map((l, i) => (i === index ? { ...l, quote: !turnOff } : l)) };
 }
 
 export function addLeg(d: Draft): Draft {

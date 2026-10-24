@@ -6,7 +6,7 @@ A spread is 2 to 6 legs traded as one thing. Each leg has:
               buys the + legs and sells the − legs
     price ×   how much its price counts in the spread's price (the same sign as the ratio;
               usually the ratio itself, e.g. a 1:−2:1 butterfly prices as A − 2B + C)
-    quote     the leg that rests a quote (exactly one for now; the others are hedged, #415)
+    quote     a leg that rests a quote; one or more (#427), the others are only hedged
     pay-up    how many ticks worse than the best price its hedge may pay
 
 And the spread has its trading controls (#425), used by the Autospreader algo:
@@ -125,7 +125,12 @@ class SpreadDef:
 
     @property
     def quote_leg(self) -> SpreadLeg:
+        """The first quoting leg: the Autospreader's parent order is on it."""
         return next(leg for leg in self.legs if leg.quote)
+
+    @property
+    def quote_legs(self) -> tuple[SpreadLeg, ...]:
+        return tuple(leg for leg in self.legs if leg.quote)
 
 
 def check(
@@ -161,10 +166,8 @@ def check(
                             "bought with the spread counts + in its price)")  # fmt: skip
         if not 0 <= leg.payup_ticks <= MAX_PAYUP:
             problems.append(f"leg {n}: pay-up must be 0 to {MAX_PAYUP} ticks")
-    quoting = sum(1 for leg in legs if leg.quote)
-    if quoting != 1:
-        problems.append("choose exactly one leg to quote (quoting several legs at once comes "
-                        "with #251)")  # fmt: skip
+    if not any(leg.quote for leg in legs):
+        problems.append("choose at least one leg to quote")
     return problems
 
 

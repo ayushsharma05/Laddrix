@@ -40,7 +40,7 @@ MUTANTS = [
  (M, "        if leg.ratio == 0 or abs(leg.ratio) > MAX_RATIO:", "        if leg.ratio == 0:", PY),
  (M, "        elif leg.ratio and (leg.ratio > 0) != (leg.multiplier > 0):", "        elif False:", PY),
  (M, "        if not 0 <= leg.payup_ticks <= MAX_PAYUP:", "        if leg.payup_ticks < 0:", PY),
- (M, "    if quoting != 1:", "    if quoting < 1:", PY),
+ (M, "    if not any(leg.quote for leg in legs):", "    if False:", PY),
  # the book
  (S, "    return spread.user_id == user.id and spread.workspace == user.workspace", "    return spread.user_id == user.id", PY),
  (S, "        if len(self.mine(user)) >= MAX_SPREADS_PER_USER:", "        if len(self.mine(user)) > MAX_SPREADS_PER_USER:", PY),
@@ -67,7 +67,7 @@ MUTANTS = [
  (U, "            spreads.unlink()", "", PY),
  # the form
  (F, "    if (change.ratio !== undefined && change.multiplier === undefined && l.multiplier === l.ratio) next.multiplier = change.ratio;", "", UI),
- (F, "  return { ...d, legs: d.legs.map((l, i) => ({ ...l, quote: i === index })) };", "  return { ...d, legs: d.legs.map((l, i) => (i === index ? { ...l, quote: true } : l)) };", UI),
+ (F, "  return { ...d, legs: d.legs.map((l, i) => (i === index ? { ...l, quote: !turnOff } : l)) };", "  return { ...d, legs: d.legs.map((l, i) => (i === index ? { ...l, quote: true } : l)) };", UI),
  (F, "  if (!legs.some((l) => l.quote)) legs[0] = { ...legs[0]!, quote: true };", "", UI),
  (F, "  if (d.legs.length <= MIN_LEGS) return d;", "", UI),
  (F, "  if (d.legs.length >= MAX_LEGS) return d;", "", UI),

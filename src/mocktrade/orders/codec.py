@@ -34,6 +34,7 @@ def request_to_dict(r: OrderRequest) -> dict[str, Any]:
         "basket_id": r.basket_id,
         "reduce_only": r.reduce_only,
         "forced_close": r.forced_close,
+        "algo_role": r.algo_role,
     }
 
 
@@ -57,6 +58,7 @@ def request_from_dict(d: dict[str, Any]) -> OrderRequest:
         basket_id=d.get("basket_id"),  # absent in orders stored before baskets
         reduce_only=bool(d.get("reduce_only", False)),  # absent before #261
         forced_close=bool(d.get("forced_close", False)),  # absent before #262
+        algo_role=str(d.get("algo_role", "")),  # absent before #427
     )
 
 

@@ -18,14 +18,14 @@ MUTANTS = [
  (A, "        cap = self._cap(ctx, leg.instrument_id, price)\n", "        cap = self._cap(ctx, leg.instrument_id, None)\n", PY),
  (A, "        if cap == 0:\n            ctx.say(f\"UNHEDGED", "        if False:\n            ctx.say(f\"UNHEDGED", PY),
  # the quote, one piece at a time
- (A, "            want = ctx.remaining() if piece is None else min(ctx.remaining(), piece)", "            want = ctx.remaining()", PY),
+ (A, "            want = lots * lot if piece is None else min(lots * lot, piece)", "            want = lots * lot", PY),
  (A, "        return min(known) // unit * unit", "        return min(known)", PY),
- (A, "        unit = abs(self.q.ratio) * ctx.instrument().lot_size", "        unit = ctx.instrument().lot_size", PY),
+ (A, "        unit = abs(quote.ratio) * self._lot(ctx, quote)", "        unit = self._lot(ctx, quote)", PY),
  (A, "            if piece is not None and c.leaves_qty > piece:", "            if False:", PY),
- (A, "        piece = self._piece(ctx, price)\n", "        piece = self._piece(ctx, None)\n", PY),
+ (A, "            piece = self._piece(ctx, price, q)\n", "            piece = self._piece(ctx, None, q)\n", PY),
  # the start check
  (A, "        if why := self._too_big(ctx):\n            return ctx.fail(why)\n", "", PY),
- (A, "        if self._piece(ctx, self._quote_price(ctx)) == 0:", "        if False:", PY),
+ (A, "            if self._piece(ctx, self._quote_price(ctx, q), q) == 0:", "            if False:", PY),
  (A, "            if self._cap(ctx, leg.instrument_id, level.price_paise if level else None) == 0:", "            if False:", PY),
  # the risk gate
  (R, "            lots = min(lots, self.limits.max_order_value_paise // one_lot)", "            lots = lots", PY),

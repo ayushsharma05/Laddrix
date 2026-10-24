@@ -400,6 +400,7 @@ class AlgoContext:
         check_remaining: bool = True,
         hedge: bool = False,
         reduce_only: bool = False,  # an exit: never past what is open (the risk gate, #261)
+        role: str = "",  # what the order is to the strategy (#427), kept with the order
     ) -> bool:
         """Send a child order. False (and nothing sent) if the algo isn't working, is held,
         or the child would take the main leg past the parent's quantity."""
@@ -433,6 +434,7 @@ class AlgoContext:
             algo_id=p.exchange_algo_id,
             parent_id=p.algo_id,
             reduce_only=reduce_only,
+            algo_role=role,
         )
         p.in_flight += 1
         if main:
