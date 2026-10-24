@@ -64,6 +64,7 @@ from mocktrade.spreads.model import MAX_LEG_SKEW_S, SpreadDef, SpreadLeg
 
 MODIFY_BUDGET = 24  # brokers allow 25 modifications per order
 AUTO = Decimal(-1)  # the broker's automatic market protection
+CHANGE_WAIT_S = 1.0  # how long a change asked waits for its answer before another may go
 
 SPEC = AlgoSpec(
     code="ASE",
@@ -115,6 +116,10 @@ class AutoSpreader(BaseStrategy):
         self.others: tuple[SpreadLeg, ...] = tuple(x for x in spread.legs if not x.quote)
         self.buying = True  # buying the spread (set at start, from the parent's side)
         self.modifies: dict[str, int] = {}
+        # orders asked to change whose answer hasn't come yet: ctx.modify only sends later, so
+        # two ticks in a row would both see nothing pending and ask twice. A change refused
+        # quietly brings no answer, so the mark lapses after CHANGE_WAIT_S.
+        self.changing: dict[str, datetime] = {}
         self.in_flight: dict[str, int] = {leg.instrument_id: 0 for leg in spread.legs}
         self.seen: set[str] = set()  # children already counted out of `in_flight`
         self.hedge_first: dict[str, int] = {}  # each hedge's first price (the chase's anchor)
@@ -155,6 +160,7 @@ class AutoSpreader(BaseStrategy):
         self._quote(ctx)
 
     def on_child(self, ctx: AlgoContext, child: OrderView, event: OrderEvent) -> None:
+        self.changing.pop(child.client_order_id, None)  # the broker answered (or it ended)
         if child.status.is_final:
             self.modifies.pop(child.client_order_id, None)
         if self.flattening:
@@ -282,6 +288,11 @@ class AutoSpreader(BaseStrategy):
         resting quote above (down) or below (up) its target would trade the spread worse."""
         return self.buying == (self.q.multiplier > 0)
 
+    def _changing(self, ctx: AlgoContext, client_order_id: str) -> bool:
+        """A change to this order was asked a moment ago and not yet answered."""
+        asked = self.changing.get(client_order_id)
+        return asked is not None and (ctx.now() - asked).total_seconds() < CHANGE_WAIT_S
+
     def _cap(self, ctx: AlgoContext, instrument_id: str, price: int | None) -> int | None:
         """The most one order on this leg may carry at this price, or None: no limit known.
         Asked each time: the account's limits can change while the algo works."""
@@ -330,6 +341,8 @@ class AutoSpreader(BaseStrategy):
             current = c.request.price_paise
             if current == price or current is None or c.pending is not Pending.NONE:
                 continue
+            if self._changing(ctx, c.client_order_id):
+                continue
             if piece is not None and c.leaves_qty > piece:
                 ctx.cancel(c.client_order_id)  # too big at the new price: re-quote smaller
                 continue
@@ -341,6 +354,7 @@ class AutoSpreader(BaseStrategy):
                 ctx.cancel(c.client_order_id)
                 continue
             self.modifies[c.client_order_id] = done + 1
+            self.changing[c.client_order_id] = ctx.now()
             ctx.modify(c.client_order_id, price_paise=price)
         if not quotes:
             want = ctx.remaining() if piece is None else min(ctx.remaining(), piece)
@@ -432,6 +446,8 @@ class AutoSpreader(BaseStrategy):
                     continue
                 if c.pending is not Pending.NONE or r.price_paise is None:
                     continue
+                if self._changing(ctx, c.client_order_id):
+                    continue
                 reach = tick * self.controls.chase_ticks
                 if side is Side.BUY:
                     target = min(level.price_paise + step, first + reach)
@@ -442,6 +458,7 @@ class AutoSpreader(BaseStrategy):
                 done = self.modifies.get(c.client_order_id, 0)
                 if moves and done < MODIFY_BUDGET:  # at the budget a hedge stays: never pulled
                     self.modifies[c.client_order_id] = done + 1
+                    self.changing[c.client_order_id] = ctx.now()
                     ctx.modify(c.client_order_id, price_paise=target)
                     ctx.say(f"chasing {c.leaves_qty} of {leg.instrument_id} to {target / 100:.2f}")
 

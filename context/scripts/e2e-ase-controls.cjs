@@ -63,15 +63,17 @@ const check = (name, ok, detail = '') => {
   const spread = (await api('/api/spreads')).find((s) => s.name === 'NIFTY Oct/Nov');
   check('the spread keeps its controls', spread?.controls?.requote_ticks === 2 && spread.controls.max_unhedged_lots === 1 && spread.controls.hedge_timeout_s === 3, JSON.stringify(spread?.controls));
 
-  // trade 3 spread lots far from the market: the quote rests, 1 lot at a time
-  const algo = await api(`/api/accounts/acc-paper/spreads/${spread.spread_id}/orders`, { method: 'POST', body: { side: 'BUY', lots: 3, price_paise: -50000 } });
+  // sell 3 spread lots above the market: the quote rests, 1 lot at a time (selling also
+  // needs no new margin on a demo account that already holds calendars)
+  const algo = await api(`/api/accounts/acc-paper/spreads/${spread.spread_id}/orders`, { method: 'POST', body: { side: 'SELL', lots: 3, price_paise: -13000 } });
   let quote;
   for (let i = 0; i < 40 && !quote; i++) {
     await page.waitForTimeout(250);
     const orders = await api('/api/accounts/acc-paper/orders');
     quote = orders.find((o) => o.request.parent_id === algo.algo_id && !['CANCELLED', 'REJECTED', 'FILLED'].includes(o.status));
   }
-  check('max unhedged 1: a 3-lot spread order quotes 1 lot', quote?.request.qty === 75, `${quote?.request.side} ${quote?.request.qty} @ ${quote?.request.price_paise}`);
+  const seen = (await api('/api/accounts/acc-paper/algos')).find((a) => a.algo_id === algo.algo_id);
+  check('max unhedged 1: a 3-lot spread order quotes 1 lot', quote?.request.qty === 75, `${quote?.request.side} ${quote?.request.qty} @ ${quote?.request.price_paise}; ${seen?.state} ${seen?.status} ${seen?.reason}`);
 
   // the algo screen: its actions, previewed in the server's words
   await page.mouse.click(1560, 880, { button: 'right' });

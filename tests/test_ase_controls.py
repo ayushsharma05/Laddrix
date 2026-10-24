@@ -342,3 +342,13 @@ async def test_a_flatten_while_paused_keeps_its_closing_order_working(w):
     w.engine.heartbeat()
     view = w.engine.get(algo.algo_id)
     assert view.state is AlgoState.STOPPED and view.reason.startswith("flattened")
+
+
+async def test_a_quote_is_not_modified_again_while_a_change_is_on_its_way(w):
+    w.start(calendar(w), -13000)
+    await w.engine.settle()
+    for bid in (2513990, 2513980):  # worse twice, before the broker answered the first
+        w.md.on_tick(nov(bid, bid + 10))
+        w.engine.on_tick(w.md.latest(NOV))
+    await w.engine.settle()
+    assert [c["price_paise"] for _, c in w.broker.modified] == [2500990]

@@ -8,7 +8,8 @@ import subprocess
 A = "src/mocktrade/algos/autospreader.py"
 P = "src/mocktrade/server/app.py"
 F = "ui/src/widgets/algos/model.ts"
-PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_autospreader.py", "tests/test_spread_api.py"], ".")
+PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_autospreader.py", "tests/test_spread_api.py",
+       "tests/test_ase_controls.py"], ".")
 UI = (["npx", "vitest", "run", "src/widgets/algos"], "ui")
 MUTANTS = [
  # the quote
@@ -21,7 +22,7 @@ MUTANTS = [
  (A, "        self.buying = (ctx.side is Side.BUY) == (self.q.ratio > 0)", "        self.buying = ctx.side is Side.BUY", PY),
  (A, "        if ages and max(ages) - min(ages) > MAX_LEG_SKEW_S:", "        if False:", PY),
  (A, "            if level is None:\n                return None", "            if level is None:\n                continue", PY),
- (A, "            if current == price or current is None or c.pending is not Pending.NONE:", "            if current is None or c.pending is not Pending.NONE:", PY),
+ (A, "            if self._changing(ctx, c.client_order_id):\n                continue\n            if piece", "            if piece", PY),
  (A, "            if done >= MODIFY_BUDGET:", "            if done > MODIFY_BUDGET:", PY),
  (A, "            for c in quotes:\n                ctx.cancel(c.client_order_id)  # no hedge price", "            for c in []:\n                ctx.cancel(c.client_order_id)  # no hedge price", PY),
  (A, "            elif want > 0 and not self._short(ctx) and ctx.send(want, price):", "            elif want > 0 and ctx.send(want, price):", PY),
