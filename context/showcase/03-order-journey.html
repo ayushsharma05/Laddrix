@@ -1,0 +1,70 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>One order's journey</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .lane { position: absolute; left: 64px; right: 64px; display: flex; align-items: stretch; gap: 0; }
+  .step { flex: 1; padding: 18px 18px 16px; position: relative; }
+  .step .num { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 16px; color: #060a14; }
+  .step b { display: block; font-size: 19px; margin-top: 12px; }
+  .step span { display: block; color: var(--dim); font-size: 13.5px; margin-top: 5px; line-height: 1.4; }
+  .step code { font-family: "DejaVu Sans Mono"; font-size: 12px; color: var(--cyan); background: rgba(34,211,238,.08); padding: 2px 6px; border-radius: 5px; }
+  .arrow { width: 46px; display: grid; place-items: center; color: var(--faint); font-size: 26px; }
+  .gate { position: absolute; left: 64px; right: 64px; top: 452px; padding: 22px 26px; border-color: rgba(251,191,36,.4);
+          background: linear-gradient(90deg, rgba(251,191,36,.08), rgba(251,113,133,.06)); }
+  .gate .head { display: flex; align-items: baseline; gap: 14px; }
+  .gate .head b { font-size: 21px; } .gate .head span { color: var(--dim); font-size: 14px; }
+  .checks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+  .chk { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; background: rgba(6,10,20,.55); border: 1px solid var(--line); }
+  .chk i { font-style: normal; color: var(--green); font-weight: 800; font-size: 15px; }
+  .chk b { font-size: 14px; display: block; } .chk span { font-size: 12px; color: var(--dim); }
+  .down { position: absolute; font-size: 28px; color: var(--amber); }
+  .stopped { position: absolute; right: 64px; top: 404px; color: var(--rose); font-size: 13.5px; font-weight: 600; }
+  .time { position: absolute; left: 64px; right: 64px; bottom: 70px; display: flex; gap: 14px; align-items: center; color: var(--dim); font-size: 14px; }
+  .time .track { flex: 1; height: 6px; border-radius: 6px; background: linear-gradient(90deg, var(--cyan), var(--amber) 40%, var(--green) 70%, var(--violet)); opacity: .8; }
+</style></head>
+<body><div class="page">
+  <div class="kicker">Follow one real order</div>
+  <h1>From a click on the ladder <span class="grad">to a fill on your screen</span></h1>
+  <div class="sub">Buy 75 NIFTY October futures at ₹25,010.00. Every step is checked, recorded and streamed back.</div>
+
+  <div class="lane" style="top:232px">
+    <div class="card step"><div class="num" style="background:var(--rose)">1</div><b>Click the ladder</b><span>a price row in the ladder, or a hotkey. Quantity from the ticket.</span></div>
+    <div class="arrow">→</div>
+    <div class="card step"><div class="num" style="background:var(--violet)">2</div><b>Ticket fills in</b><span>the server's order spec says which types, products and ticks are allowed.</span></div>
+    <div class="arrow">→</div>
+    <div class="card step"><div class="num" style="background:var(--blue)">3</div><b>Sent to the server</b><span><code>POST /api/accounts/…/orders</code> with a fresh id, so a retry never doubles it.</span></div>
+    <div class="arrow">→</div>
+    <div class="card step"><div class="num" style="background:var(--cyan)">4</div><b>Charges &amp; margin</b><span>estimated before you send: brokerage, STT, margin blocked.</span></div>
+  </div>
+  <div class="down" style="left:1418px;top:400px">↓</div>
+  <div class="stopped">✕ any check fails → refused, with the reason</div>
+
+  <div class="card gate">
+    <div class="head"><b class="c-amber">5 · The safety gate</b><span>every order passes all of these, in order, before any broker sees it</span></div>
+    <div class="checks">
+      <div class="chk"><i>✓</i><div><b>Who are you?</b><span>signed in, right firm, right role</span></div></div>
+      <div class="chk"><i>✓</i><div><b>Kill switch</b><span>off for this account and firm</span></div></div>
+      <div class="chk"><i>✓</i><div><b>Order rate</b><span>under 10 orders a second</span></div></div>
+      <div class="chk"><i>✓</i><div><b>Freeze quantity</b><span>too big? split into slices</span></div></div>
+      <div class="chk"><i>✓</i><div><b>Market protection</b><span>never 0: a limit on slippage</span></div></div>
+      <div class="chk"><i>✓</i><div><b>Price band</b><span>not far from the last price: a typo guard</span></div></div>
+      <div class="chk"><i>✓</i><div><b>Margin</b><span>enough funds to carry it</span></div></div>
+      <div class="chk"><i>✓</i><div><b>Loss limits</b><span>MTM and position limits hold</span></div></div>
+    </div>
+  </div>
+  <div class="down" style="left:150px;top:690px">↓</div>
+
+  <div class="lane" style="top:732px">
+    <div class="card step"><div class="num" style="background:var(--green)">6</div><b>Broker</b><span>paper fills against the live price; Kite sends it to NSE.</span></div>
+    <div class="arrow">→</div>
+    <div class="card step"><div class="num" style="background:var(--green)">7</div><b>Fill</b><span>full or partial; every fill becomes an event.</span></div>
+    <div class="arrow">→</div>
+    <div class="card step"><div class="num" style="background:var(--amber)">8</div><b>Position &amp; P&amp;L</b><span>average price, MTM, charges, live.</span></div>
+    <div class="arrow">→</div>
+    <div class="card step"><div class="num" style="background:var(--violet)">9</div><b>Audit trail</b><span>who, what, when: kept forever.</span></div>
+    <div class="arrow">→</div>
+    <div class="card step"><div class="num" style="background:var(--rose)">10</div><b>Your screen</b><span>the stream updates the ladder, books and positions.</span></div>
+  </div>
+</div>
+<div class="foot"><span><b>MockTrade</b> · showcase 3 of 9 · order journey</span><span>orders/gate.py · risk/ · broker/ · store/events.py</span></div>
+</body></html>
