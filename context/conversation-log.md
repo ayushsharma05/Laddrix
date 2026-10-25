@@ -837,3 +837,6 @@ What changed:
 - The posters and the advert were redrawn with the new screenshots, taken with `context/scripts/shoot-showcase.cjs`.
 
 Links to the GitHub repository keep the old address until Ayush renames it; GitHub redirects after that. Ayush also asked that the advert be about the app, not how many days it took: its opening and ending now speak only about the product.
+
+## 25 Oct 2026: the feature tour video (#461)
+Ayush asked for a long video that explains every feature, and said he would merge the rename PR himself. Claude built it cheaply on what already existed: the video script got a `features` mode, and the posters and screenshots were reused. Older screenshots that show features a fresh demo can't (spreads, algos, sessions, firms) have their top menu bar, which still shows the old name, trimmed off while the video is made, so the repo stores no extra pictures. The result is 3½ minutes in 8 chapters, every screen captioned in plain words.
