@@ -59,11 +59,13 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
        order kept complete by a test): merged (PR #443, merged by Ayush);
      - #440 types (mypy clean, in CI): merged (PR #447);
      - #441 routes (`server/app.py` split by area: `server/routes/`, `context.py`, `bodies.py`;
-       [context/images/server-api-layout.png](images/server-api-layout.png)): in its PR;
-     - #442 screens lint (ESLint with the React hooks rules).
-- **Next in the review:** #442 screens lint, then #448 (every mutant applies, every browser
-  script runs on the free pages).
-- **Pull requests:** the #441 PR (#449). Dependabot's updates #444-#446 merged green.
+       [context/images/server-api-layout.png](images/server-api-layout.png)): merged (PR #449);
+     - #442 screens lint (ESLint with the TypeScript rules and React's two hooks rules, in CI and
+       `make lint`): in its PR;
+     - found on the way: #448 (every mutant applies, every browser script runs on the free
+       pages) and #450 (React's compiler-readiness lint rules, 49 places).
+- **Next in the review:** #448, then #450; then #438 is done.
+- **Pull requests:** the #442 PR.
 
 ## What's next
 

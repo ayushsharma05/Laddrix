@@ -7,6 +7,7 @@ stream contract: `../docs/design/stream.md`.
 npm ci
 npm run dev        # http://localhost:5173 (start the server: python -m mocktrade.tools.demo --origin http://localhost:5173)
 npm test           # unit tests (Vitest + Testing Library)
+npm run lint       # ESLint: TypeScript and React's hooks rules (eslint.config.js)
 npm run build      # production build in dist/ (served by the Python server)
 ```
 

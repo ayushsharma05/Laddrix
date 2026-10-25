@@ -174,7 +174,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
   const rows = useMemo(
     () =>
       centre === null ? [] : buildRows({ prices: rowPrices(centre, rowCount, tickSize), tick, working, queue, vap }),
-    // vapVersion: the server's count arrived
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- vapVersion: the counter changed in place (the server's count arrived)
     [centre, rowCount, tickSize, tick, working, queue, vap, vapVersion],
   );
 

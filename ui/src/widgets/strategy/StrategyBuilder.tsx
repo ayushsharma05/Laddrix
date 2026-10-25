@@ -80,15 +80,16 @@ export function StrategyBuilder({ params, setParams }: WidgetProps<StrategyParam
   // the server analyses the legs now, and again every few seconds (live prices)
   const key = JSON.stringify(legs);
   useEffect(() => {
+    const asked = JSON.parse(key) as typeof legs; // the legs as of this key
     setProblem("");
-    if (!legs.length) {
+    if (!asked.length) {
       setAnalysis(null);
       return;
     }
     let live = true;
     const ask = () =>
       rest
-        .post<StrategyAnalysis>("/api/options/strategy/analyse", { legs })
+        .post<StrategyAnalysis>("/api/options/strategy/analyse", { legs: asked })
         .then((a) => live && setAnalysis(a))
         .catch((e: unknown) => {
           if (!live) return;

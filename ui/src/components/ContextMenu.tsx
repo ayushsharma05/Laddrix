@@ -83,7 +83,6 @@ function MenuList({ items, x, y, onClose, onBack }: ListProps) {
     setPlace({ left, top });
     buttons()[0]?.focus();
     // focus once, when the list appears
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [x, y]);
 
   const buttons = () => Array.from(list.current?.querySelectorAll<HTMLButtonElement>(":scope > .cm-item:not(:disabled)") ?? []);

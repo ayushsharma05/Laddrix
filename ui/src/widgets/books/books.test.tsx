@@ -12,7 +12,7 @@ import { Positions } from "./Positions";
 const T = "2026-10-14T04:41:00+00:00";
 const SNAP = { positions: [], realised_paise: 0, unrealised_paise: 0, day_pnl_paise: 0, reconcile: { checked_at: null, ok: null, error: "", alerts: [] } };
 
-// `any`: each widget has its own props
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each widget takes its own params
 function setup(widget: (props: any) => ReactElement, params: Record<string, unknown>, routes: Record<string, unknown> = {}, open = true) {
   const server = fakeRest(routes);
   const { stream, socket } = fakeStream();

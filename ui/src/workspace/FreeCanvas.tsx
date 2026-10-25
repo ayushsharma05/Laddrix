@@ -28,6 +28,7 @@ const HANDLES: { name: string; edges: Edges }[] = [
   { name: "sw", edges: { bottom: true, left: true } },
 ];
 
+const NO_WINDOWS: CanvasWindow[] = []; // one empty list, the same every render
 const EDGE_SCROLL = 32; // dragging this close to the page's edge scrolls it
 const SCROLL_STEP = 24;
 
@@ -42,7 +43,7 @@ export function FreeCanvas({ controller, empty }: { controller: WorkspaceControl
   const [view, setView] = useState<Box>({ x: 0, y: 0, w: 1200, h: 800 });
   const [live, setLive] = useState<Live | null>(null);
   const [maximized, setMaximized] = useState<string | null>(null);
-  const windows = controller.canvas?.windows ?? [];
+  const windows = controller.canvas?.windows ?? NO_WINDOWS;
 
   // which part of the canvas is on screen (new windows are placed there)
   const readView = useCallback((): Box => {
