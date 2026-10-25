@@ -1,3 +1,4 @@
+# ruff: noqa: E501  (the scene list and the HTML/CSS templates read best one item per line)
 """Builds the MockTrade advert (#455): about three minutes of the posters, the real screens and
 title cards, with music.
 
@@ -38,7 +39,9 @@ class Scene:
     """One picture on screen. The camera goes from `start` to `end`, each (x, y, zoom), where
     x and y are the centre as a share of the picture's width and height."""
 
-    picture: str  # a poster name, "shot:<file>|<kicker>|<headline>", or "card:<kicker>|<headline>|<sub>"
+    picture: (
+        str  # a poster name, "shot:<file>|<kicker>|<headline>", or "card:<kicker>|<headline>|<sub>"
+    )
     seconds: float
     start: tuple[float, float, float] = (0.5, 0.5, 1.0)
     end: tuple[float, float, float] = (0.5, 0.5, 1.06)
@@ -50,22 +53,74 @@ SCENES = [
     # 1. the hook
     Scene("card:|What if one person built a trading platform…|", 3.5, (*C, 1.0), (*C, 1.05), 1),
     Scene("card:|…in 13 days?|", 3.0, (*C, 1.05), (*C, 1.0), 1),
-    Scene("card:NSE · BSE · ZERODHA KITE|Live prices. A real broker. Real risk rules.|Not a toy. A professional trading platform.", 4.5, act=1),
+    Scene(
+        "card:NSE · BSE · ZERODHA KITE|Live prices. A real broker. Real risk rules.|Not a toy. A professional trading platform.",
+        4.5,
+        act=1,
+    ),
     Scene("01-hero", 6.0, (0.32, 0.25, 1.35), (*C, 1.0), 1),
     # 2. the screens
     Scene("card:PART ONE|Meet the terminal|Everything a trader needs, on one screen.", 3.5, act=2),
-    Scene("shot:k5-5-screens.png|THE TRADING PAGE|Watch, ladders, orders, positions, audit: live", 5.5, (0.5, 0.52, 1.0), (0.5, 0.52, 1.12), 2),
-    Scene("shot:k5-4-ladder.png|THE PRICE LADDER|Click a price. Trade it. See the queue.", 5.0, (0.5, 0.55, 1.05), (0.42, 0.6, 1.35), 2),
-    Scene("shot:k5-ticket.png|THE ORDER TICKET|It knows the rules: the server tells it what is allowed", 5.0, act=2),
-    Scene("shot:14-chain.png|OPTION CHAIN|Every strike, every Greek, live", 5.0, (0.5, 0.55, 1.0), (0.5, 0.6, 1.18), 2),
-    Scene("shot:15-strategy.png|STRATEGY BUILDER|Build multi-leg option strategies in seconds", 5.0, act=2),
-    Scene("shot:mocktrade-one-chart.png|CHARTS|Candles from one minute to one day", 5.0, (0.5, 0.55, 1.0), (0.55, 0.5, 1.15), 2),
-    Scene("shot:autospreader-live.png|AUTOSPREADER|Quote one leg, hedge the rest the moment it fills", 5.5, (0.5, 0.55, 1.0), (0.5, 0.45, 1.15), 2),
-    Scene("shot:spread-chart.png|SPREAD CHARTS|The price of a whole spread, as candles", 4.5, act=2),
+    Scene(
+        "shot:k5-5-screens.png|THE TRADING PAGE|Watch, ladders, orders, positions, audit: live",
+        5.5,
+        (0.5, 0.52, 1.0),
+        (0.5, 0.52, 1.12),
+        2,
+    ),
+    Scene(
+        "shot:k5-4-ladder.png|THE PRICE LADDER|Click a price. Trade it. See the queue.",
+        5.0,
+        (0.5, 0.55, 1.05),
+        (0.42, 0.6, 1.35),
+        2,
+    ),
+    Scene(
+        "shot:k5-ticket.png|THE ORDER TICKET|It knows the rules: the server tells it what is allowed",
+        5.0,
+        act=2,
+    ),
+    Scene(
+        "shot:14-chain.png|OPTION CHAIN|Every strike, every Greek, live",
+        5.0,
+        (0.5, 0.55, 1.0),
+        (0.5, 0.6, 1.18),
+        2,
+    ),
+    Scene(
+        "shot:15-strategy.png|STRATEGY BUILDER|Build multi-leg option strategies in seconds",
+        5.0,
+        act=2,
+    ),
+    Scene(
+        "shot:mocktrade-one-chart.png|CHARTS|Candles from one minute to one day",
+        5.0,
+        (0.5, 0.55, 1.0),
+        (0.55, 0.5, 1.15),
+        2,
+    ),
+    Scene(
+        "shot:autospreader-live.png|AUTOSPREADER|Quote one leg, hedge the rest the moment it fills",
+        5.5,
+        (0.5, 0.55, 1.0),
+        (0.5, 0.45, 1.15),
+        2,
+    ),
+    Scene(
+        "shot:spread-chart.png|SPREAD CHARTS|The price of a whole spread, as candles", 4.5, act=2
+    ),
     Scene("shot:structures.png|STRUCTURES|Spreads you hold, with their own P&L", 4.5, act=2),
-    Scene("shot:11-algos.png|ALGOS|Slicer · iceberg · POV · TWAP · VWAP · protect", 5.0, (0.5, 0.55, 1.0), (0.45, 0.5, 1.15), 2),
+    Scene(
+        "shot:11-algos.png|ALGOS|Slicer · iceberg · POV · TWAP · VWAP · protect",
+        5.0,
+        (0.5, 0.55, 1.0),
+        (0.45, 0.5, 1.15),
+        2,
+    ),
     Scene("shot:free-canvas-page.png|YOUR LAYOUT|Any widget, any size, anywhere", 4.5, act=2),
-    Scene("shot:k5-6-desktop-popout.png|DESKTOP APP|Pop windows out onto every monitor", 4.5, act=2),
+    Scene(
+        "shot:k5-6-desktop-popout.png|DESKTOP APP|Pop windows out onto every monitor", 4.5, act=2
+    ),
     Scene("shot:k13-5-theme-light.png|THEMES|Dark, light, and colour-blind safe", 4.5, act=2),
     # 3. under the hood
     Scene("card:PART TWO|Under the hood|Built the way professional systems are built.", 3.5, act=3),
@@ -78,13 +133,25 @@ SCENES = [
     Scene("05-safety", 6.0, (0.28, 0.58, 1.55), (0.76, 0.5, 1.45), 3),
     Scene("09-algos", 5.5, (*C, 1.25), (*C, 1.0), 3),
     # 4. running it
-    Scene("card:PART THREE|Ready for the real world|Firms, users, limits, monitoring, deployment.", 3.5, act=4),
-    Scene("shot:k13-2-admin-users.png|ADMIN|Firms and users, each firm sees only its own", 4.5, act=4),
-    Scene("shot:k13-2-admin-limits.png|RISK LIMITS|Loss limits, kill switch, per account", 4.5, act=4),
+    Scene(
+        "card:PART THREE|Ready for the real world|Firms, users, limits, monitoring, deployment.",
+        3.5,
+        act=4,
+    ),
+    Scene(
+        "shot:k13-2-admin-users.png|ADMIN|Firms and users, each firm sees only its own", 4.5, act=4
+    ),
+    Scene(
+        "shot:k13-2-admin-limits.png|RISK LIMITS|Loss limits, kill switch, per account", 4.5, act=4
+    ),
     Scene("shot:grafana-dashboard.png|MONITORING|Every part measured, live", 4.5, act=4),
     Scene("shot:status-page.png|STATUS|Health at a glance", 4.0, act=4),
     # 5. quality and the finale
-    Scene("card:PART FOUR|Built like a professional|Every change: an issue, tests, a review, green CI.", 3.5, act=4),
+    Scene(
+        "card:PART FOUR|Built like a professional|Every change: an issue, tests, a review, green CI.",
+        3.5,
+        act=4,
+    ),
     Scene("08-quality", 5.5, (0.5, 0.4, 1.5), (0.5, 0.75, 1.3), 4),
     Scene("06-journey", 6.5, (0.25, 0.55, 1.6), (0.78, 0.55, 1.6), 4),
     Scene("01-hero", 5.5, (0.5, 0.85, 1.6), (*C, 1.0), 5),
@@ -92,7 +159,16 @@ SCENES = [
     Scene("outro", 6.0, (*C, 1.0), (*C, 1.08), 5),
 ]
 
-TRANSITIONS = ["fade", "smoothleft", "circleopen", "smoothup", "dissolve", "slideleft", "radial", "smoothright"]
+TRANSITIONS = [
+    "fade",
+    "smoothleft",
+    "circleopen",
+    "smoothup",
+    "dissolve",
+    "slideleft",
+    "radial",
+    "smoothright",
+]
 
 CARD = """<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="{css}">
 <style>.c{{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:0 120px}}
@@ -160,7 +236,23 @@ def film(png: Path, s: Scene, mp4: Path) -> None:
     y = f"max(0,min(ih-ih/zoom,({y0}+({y1 - y0})*{e})*ih-ih/zoom/2))"
     vf = f"scale=3840:2400,zoompan=z='{zoom}':x='{x}':y='{y}':d={frames}:s=1920x1200:fps={FPS},format=yuv420p"
     subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(png), "-vf", vf, "-frames:v", str(frames), "-c:v", "libx264", "-crf", "16", str(mp4)],
+        [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(png),
+            "-vf",
+            vf,
+            "-frames:v",
+            str(frames),
+            "-c:v",
+            "libx264",
+            "-crf",
+            "16",
+            str(mp4),
+        ],
         check=True,
     )
 
@@ -175,17 +267,35 @@ def join(clips: list[Path], scenes: list[Scene], mp4: Path) -> list[float]:
         offset += scenes[i - 1].seconds - FADE
         cuts.append(offset)
         kind = TRANSITIONS[i % len(TRANSITIONS)]
-        chain.append(f"{last}[{i}:v]xfade=transition={kind}:duration={FADE}:offset={offset:.3f}[v{i}]")
+        chain.append(
+            f"{last}[{i}:v]xfade=transition={kind}:duration={FADE}:offset={offset:.3f}[v{i}]"
+        )
         last = f"[v{i}]"
     total = offset + scenes[-1].seconds
     chain.append(f"{last}fade=t=in:st=0:d=1,fade=t=out:st={total - 2}:d=2[v]")
-    args += ["-filter_complex", ";".join(chain), "-map", "[v]", "-c:v", "libx264", "-crf", "23", "-preset", "slow", str(mp4)]
+    args += [
+        "-filter_complex",
+        ";".join(chain),
+        "-map",
+        "[v]",
+        "-c:v",
+        "libx264",
+        "-crf",
+        "23",
+        "-preset",
+        "slow",
+        str(mp4),
+    ]
     subprocess.run(args, check=True)
     return [total] + cuts
 
 
 def tone(freq: float, t: np.ndarray) -> np.ndarray:
-    return np.sin(2 * np.pi * freq * t) + 0.3 * np.sin(4 * np.pi * freq * t) + 0.12 * np.sin(6 * np.pi * freq * t)
+    return (
+        np.sin(2 * np.pi * freq * t)
+        + 0.3 * np.sin(4 * np.pi * freq * t)
+        + 0.12 * np.sin(6 * np.pi * freq * t)
+    )
 
 
 def soundtrack(seconds: float, cuts: list[float], acts: list[tuple[float, int]], wav: Path) -> None:
@@ -195,9 +305,19 @@ def soundtrack(seconds: float, cuts: list[float], acts: list[tuple[float, int]],
     t = np.arange(n) / RATE
     beat = 60 / 100
     bar = 4 * beat
-    chords = [(220.0, 261.63, 329.63), (174.61, 220.0, 261.63), (130.81, 196.0, 261.63), (196.0, 246.94, 293.66)]
+    chords = [
+        (220.0, 261.63, 329.63),
+        (174.61, 220.0, 261.63),
+        (130.81, 196.0, 261.63),
+        (196.0, 246.94, 293.66),
+    ]
     bass = [110.0, 87.31, 65.41, 98.0]
-    arp = [[440.0, 523.25, 659.25, 880.0], [349.23, 440.0, 523.25, 698.46], [392.0, 523.25, 659.25, 783.99], [392.0, 493.88, 587.33, 783.99]]
+    arp = [
+        [440.0, 523.25, 659.25, 880.0],
+        [349.23, 440.0, 523.25, 698.46],
+        [392.0, 523.25, 659.25, 783.99],
+        [392.0, 493.88, 587.33, 783.99],
+    ]
 
     def act_at(sec: float) -> int:
         return max((a for s, a in acts if s <= sec), default=1)
@@ -217,14 +337,23 @@ def soundtrack(seconds: float, cuts: list[float], acts: list[tuple[float, int]],
             for half in (0, 2 * beat):
                 s, e = a + int(half * RATE), min(b, a + int((half + 1.6 * beat) * RATE))
                 if s < e:
-                    mix[s:e] += 0.26 * np.sin(2 * np.pi * bass[k] * t[s:e]) * np.exp(-(t[s:e] - t[s]) * 2.2)
+                    mix[s:e] += (
+                        0.26 * np.sin(2 * np.pi * bass[k] * t[s:e]) * np.exp(-(t[s:e] - t[s]) * 2.2)
+                    )
         if act in (2, 3, 4):
             for q in range(4):
                 s, e = a + int(q * beat * RATE), min(b, a + int((q * beat + 0.25) * RATE))
                 if s < e:
                     kt = t[s:e] - t[s]
-                    mix[s:e] += 0.45 * np.sin(2 * np.pi * (50 + 90 * np.exp(-kt * 30)) * kt) * np.exp(-kt * 14)
-                h, he = a + int((q + 0.5) * beat * RATE), min(b, a + int(((q + 0.5) * beat + 0.05) * RATE))
+                    mix[s:e] += (
+                        0.45
+                        * np.sin(2 * np.pi * (50 + 90 * np.exp(-kt * 30)) * kt)
+                        * np.exp(-kt * 14)
+                    )
+                h, he = (
+                    a + int((q + 0.5) * beat * RATE),
+                    min(b, a + int(((q + 0.5) * beat + 0.05) * RATE)),
+                )
                 if h < he:
                     mix[h:he] += 0.05 * rng.standard_normal(he - h) * np.exp(-(t[h:he] - t[h]) * 60)
         if act in (3, 4):
@@ -233,14 +362,20 @@ def soundtrack(seconds: float, cuts: list[float], acts: list[tuple[float, int]],
                 s, e = a + int(q * step * RATE), min(b, a + int((q * step + 0.22) * RATE))
                 if s < e:
                     f = arp[k][q % 4] * (2 if q >= 8 and act == 4 else 1)
-                    mix[s:e] += 0.07 * np.sin(2 * np.pi * f * t[s:e]) * np.exp(-(t[s:e] - t[s]) * 12)
+                    mix[s:e] += (
+                        0.07 * np.sin(2 * np.pi * f * t[s:e]) * np.exp(-(t[s:e] - t[s]) * 12)
+                    )
     for c in cuts:  # a whoosh into every cut: noise swelling up and away
         s, e = max(0, int((c - 0.35) * RATE)), min(n, int((c + 0.5) * RATE))
         wt = (t[s:e] - (c - 0.35)) / 0.85
         noise = np.convolve(rng.standard_normal(e - s), np.ones(12) / 12, mode="same")
         mix[s:e] += 0.18 * noise * np.sin(np.pi * np.clip(wt, 0, 1)) ** 2
     sw = int(2 * bar * RATE)  # a rising swell under the opening
-    mix[:sw] += 0.1 * np.sin(2 * np.pi * (110 + 110 * t[:sw] / (2 * bar)) * t[:sw]) * (t[:sw] / (2 * bar)) ** 2
+    mix[:sw] += (
+        0.1
+        * np.sin(2 * np.pi * (110 + 110 * t[:sw] / (2 * bar)) * t[:sw])
+        * (t[:sw] / (2 * bar)) ** 2
+    )
     mix *= np.minimum(1, t / 2) * np.minimum(1, (seconds - t) / 4)
     mix = mix / np.max(np.abs(mix)) * 0.85
     right = np.concatenate([np.zeros(300), mix[:-300]])
@@ -257,7 +392,7 @@ def main() -> None:
         work = Path(tmp)
         pngs = draw_pages(SCENES, work)
         clips = []
-        for i, (png, s) in enumerate(zip(pngs, SCENES)):
+        for i, (png, s) in enumerate(zip(pngs, SCENES, strict=True)):
             c = work / f"clip{i:02}.mp4"
             film(png, s, c)
             clips.append(c)
@@ -270,8 +405,26 @@ def main() -> None:
         wav = work / "music.wav"
         soundtrack(total, cuts, starts, wav)
         subprocess.run(
-            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(video), "-i", str(wav),
-             "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(OUT)],
+            [
+                "ffmpeg",
+                "-y",
+                "-loglevel",
+                "error",
+                "-i",
+                str(video),
+                "-i",
+                str(wav),
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-shortest",
+                "-movflags",
+                "+faststart",
+                str(OUT),
+            ],
             check=True,
         )
     print(f"wrote {OUT} ({total:.0f} s, {len(SCENES)} scenes)")
