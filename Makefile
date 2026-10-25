@@ -37,8 +37,8 @@ lint:
 	ruff check .
 	ruff format --check .
 	$(PYTHON) -m mypy
-	cd ui && npm run typecheck
-	cd ui/desktop && npm run typecheck
+	cd ui && npm run typecheck && npm run lint
+	cd ui/desktop && npm run typecheck && npm run lint
 
 format:
 	ruff format .

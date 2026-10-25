@@ -468,9 +468,9 @@ function NewRun({ defaultInstrument, onStarted }: { defaultInstrument: string | 
     setProduct(form.defaults.product);
   }, [form, algo]);
 
-  const offered = offeredDays(form, candles);
+  const offered = useMemo(() => offeredDays(form, candles), [form, candles]);
   // days no longer offered (another instrument's candles) are dropped
-  useEffect(() => setDays((old) => old.filter((d) => offered.includes(d))), [offered.join(",")]);
+  useEffect(() => setDays((old) => (old.every((d) => offered.includes(d)) ? old : old.filter((d) => offered.includes(d)))), [offered]);
 
   if (error && !form) return <div className="empty-note tone-bad">{error}</div>;
   if (form && !form.algos.length) return <div className="empty-note">This server offers no algos to backtest.</div>;

@@ -8,7 +8,7 @@ What each layer of checks proves, how to run it, and what must pass before a rel
 |---|---|---|---|
 | **Python tests** (`tests/`, about 1,480) | Each part's rules on its own and wired together: domain rules, the order manager, risk, recovery, the paper and Kite adapters (against a fake Kite), the REST API, backups | `pytest` (all), `pytest tests/test_x.py -k name` | yes (`test`) |
 | **UI tests** (`ui/src/**/*.test.ts(x)`, about 420) | Widgets and models: what the screen shows for given data, what a click sends, keyboard shortcuts, themes and contrast | `cd ui && npm test` | yes (`ui`) |
-| **Lint, format, types** | Style, and types across the UI | `ruff check .` · `ruff format --check .` · `cd ui && npm run typecheck` | yes |
+| **Lint, format, types** | Style, the server's types (mypy), the screens' types and ESLint (React's hooks rules) | `ruff check .` · `ruff format --check .` · `mypy` · `cd ui && npm run typecheck && npm run lint` | yes |
 | **Build and image** | The UI builds; the Docker image builds and passes its smoke test (health, a clean stop) | `cd ui && npm run build` · `deploy/smoke.sh` | yes (`ui`, `image`) |
 | **Desktop shell** | The desktop app's pop-out windows | `cd ui/desktop && npm test` | yes (`desktop`) |
 | **Mutation scripts** (`mutate-*.py`, 60+) | That the tests notice when a rule is broken. Each breaks one rule at a time, runs the tests and restores the file; a surviving mutant is a missing test | `python3 context/scripts/mutate-<area>.py` (alone) | no: run for each change in its area |

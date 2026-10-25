@@ -56,7 +56,7 @@ export class ThemeSetting {
     try {
       saved = env.storage()?.getItem(LOCAL) ?? null;
     } catch {
-      saved = null;
+      // the browser refused its storage (a private window): the default stands
     }
     if (saved && CHOICES.has(saved)) this.choice = saved as ThemeChoice;
     env.onSystemChange(() => this.apply()); // "system" follows the computer as it changes

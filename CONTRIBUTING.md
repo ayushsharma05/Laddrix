@@ -29,7 +29,7 @@ run each tool: [docs/running-locally.md](docs/running-locally.md).
 ## 3. Open the pull request
 
 - Put `Closes #N` at the top. The template lists the checks.
-- **CI must be green:** the server's tests and lint, the screens' tests and build, the
+- **CI must be green:** the server's tests and lint, the screens' lint, tests and build, the
   desktop app, the Docker image's smoke test, and the supply-chain checks (known
   vulnerabilities, secrets in the history, SBOMs).
 - Merge with a merge commit, never a squash.

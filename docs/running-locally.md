@@ -84,10 +84,10 @@ ruff format --check .
 mypy                       # the types: "Success: no issues found" means good
 
 # the screens: about 520 tests, types, and the production build
-cd ui && npm run typecheck && npm test && npm run build && cd ..
+cd ui && npm run typecheck && npm run lint && npm test && npm run build && cd ..
 
 # the desktop shell
-cd ui/desktop && npm ci && npm run typecheck && npm test && cd ../..
+cd ui/desktop && npm ci && npm run typecheck && npm run lint && npm test && cd ../..
 ```
 
 **CI's two other jobs, `image` and `supply-chain`, can be run too:**

@@ -23,7 +23,7 @@ const { _electron: electron } = require(process.env.PLAYWRIGHT || '/opt/node22/l
   const os = require('node:os');
   const usedFile = path.join(os.tmpdir(), 'mocktrade-desktop-smoke-code');
   const used = fs.existsSync(usedFile) ? fs.readFileSync(usedFile, 'utf8') : '';
-  let code = '';
+  let code;
   for (;;) {
     code = execSync('python3 -m mocktrade.tools.demo --code', { cwd: path.join(__dirname, '..', '..', '..') }).toString().trim();
     if (code !== used) break;
