@@ -124,7 +124,7 @@ REST create/change/delete ─► AlertStore: one JSON file per user (alerts + we
 - **Webhooks** (`/api/alerts/webhook` PUT/GET/DELETE, `…/test`):
   - The URL must be https with a public host. IP literals and anything resolving to private, loopback, link-local or metadata addresses are refused, so a webhook can't reach the server's own network.
   - The secret is shown once, when the URL is set.
-  - Each POST carries `X-MockTrade-Timestamp` and `X-MockTrade-Signature: sha256=HMAC(secret, "<timestamp>.<body>")`. The receiver recomputes the signature and refuses old timestamps, so a copied request can't be replayed.
+  - Each POST carries `X-Laddrix-Timestamp` and `X-Laddrix-Signature: sha256=HMAC(secret, "<timestamp>.<body>")`. The receiver recomputes the signature and refuses old timestamps, so a copied request can't be replayed.
   - Each send has a 5 s timeout and is tried up to 4 times (1/2/4 s apart) on network errors, 429 and 5xx. A 4xx or a redirect is not retried. At most 500 sends wait at once.
   - The result shows on the alert (`webhook_ok_at`, `webhook_error`).
   - **The checked address is the one connected to (#271).** Each try looks the host up, refuses it unless every answer is public, then connects to that address. The TLS certificate is still checked against the host name. So a DNS answer that changes between the check and the connection (rebinding) can't reach a private address.

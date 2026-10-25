@@ -27,7 +27,7 @@ the server ─┬─ ops/status.py: each part ─┬─► /api/ready  ─► Do
   script rolls back a release that never gets ready. Caddy starts once the app has started,
   not once it is healthy. A server that is up but not ready must still show its screens.
 
-What each part's state means (`src/mocktrade/ops/status.py`):
+What each part's state means (`src/laddrix/ops/status.py`):
 
 | State | Meaning | Ready? |
 |---|---|---|
@@ -53,11 +53,11 @@ stay "ready enough" for someone to open the screens and log in.
 
 ## The log
 
-The server writes one JSON object a line (`MOCKTRADE_LOG_FORMAT=json`, the default; `text`
+The server writes one JSON object a line (`LADDRIX_LOG_FORMAT=json`, the default; `text`
 gives plain lines):
 
 ```json
-{"ts":"2026-10-24T09:15:02.113Z","level":"WARNING","logger":"mocktrade.orders.manager",
+{"ts":"2026-10-24T09:15:02.113Z","level":"WARNING","logger":"laddrix.orders.manager",
  "msg":"place MT12: no clear answer: TimeoutError()","request_id":"a1b2c3d4e5f60718",
  "user":"ayush","account_id":"acc-ayush","client_order_id":"MT12"}
 ```
@@ -83,7 +83,7 @@ logs 1d | jq -c 'select(.account_id == "acc-ayush" and .level != "INFO")'
 ```
 
 The audit trail stays the record of what happened to orders (the Audit Trail screen, or
-`python -m mocktrade.tools.audit`). The log is for finding problems.
+`python -m laddrix.tools.audit`). The log is for finding problems.
 
 Docker keeps 5 files of 10 MB for each container (`deploy/compose.yaml`). Save what you need
 before it rotates: `logs 1d > incident-$(date +%F).jsonl`. A central log store only becomes
@@ -97,13 +97,13 @@ Prometheus reads the app's metrics every 15 seconds; Grafana draws them:
 
 It shows readiness, active alerts, 5xx answers, rejected orders, memory, ticks a second, order
 events a minute, p99 request time by route, p99 broker time, event loop lag, tick age and CPU.
-The definition is `deploy/monitoring/grafana/dashboards/mocktrade.json`.
+The definition is `deploy/monitoring/grafana/dashboards/laddrix.json`.
 
 **Turning it on:**
 
 1. In `deploy/.env`, set Prometheus's own key and Grafana's admin password:
    ```bash
-   echo "MOCKTRADE_METRICS_TOKEN=$(openssl rand -hex 32)" >> deploy/.env
+   echo "LADDRIX_METRICS_TOKEN=$(openssl rand -hex 32)" >> deploy/.env
    echo "GRAFANA_ADMIN_PASSWORD=<a long password>" >> deploy/.env
    ```
 2. Restart the app (it reads the key at start), then start the two monitoring containers:
@@ -115,12 +115,12 @@ The definition is `deploy/monitoring/grafana/dashboards/mocktrade.json`.
    ```bash
    ssh -L 3000:127.0.0.1:3000 <you>@<server>
    ```
-   Then open <http://localhost:3000> and log in as `admin`. The MockTrade dashboard is the home page.
+   Then open <http://localhost:3000> and log in as `admin`. The Laddrix dashboard is the home page.
 
 **Checks:**
 - Prometheus reads the app:
   `docker compose -f deploy/compose.yaml exec prometheus wget -qO- localhost:9090/api/v1/targets`
-  shows the `mocktrade` target with `"health":"up"`.
+  shows the `laddrix` target with `"health":"up"`.
 - The key is the only way in without a login. It reads the Prometheus text and nothing else.
   A wrong or missing key gets 401. With no key set, only signed-in admin and risk users can
   read `/api/metrics`.

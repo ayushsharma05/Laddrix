@@ -2,7 +2,7 @@
 Restores each file in `finally`; a mutant that hangs the tests counts as caught.
 Run alone (two runs at once overwrite each other's files)."""
 import subprocess
-G, P, L = "src/mocktrade/risk/margin.py", "src/mocktrade/broker/paper.py", "src/mocktrade/platform.py"
+G, P, L = "src/laddrix/risk/margin.py", "src/laddrix/broker/paper.py", "src/laddrix/platform.py"
 M = [
  (G, "        if net and (net > 0) != (request.side.sign > 0) and request.qty <= abs(net):", "        if net and (net > 0) != (request.side.sign > 0):"),
  (G, "        if net and (net > 0) != (request.side.sign > 0) and request.qty <= abs(net):", "        if False:"),

@@ -258,7 +258,7 @@ describe("Ladder", () => {
     await ready();
     push();
     fireEvent.click(screen.getByLabelText("Buy at 25,010.00"));
-    await vi.waitFor(() => expect(statusLine().textContent).toContain("no answer from MockTrade, check the order book"));
+    await vi.waitFor(() => expect(statusLine().textContent).toContain("no answer from Laddrix, check the order book"));
   });
 
   it("lot buttons add, 0 and Esc clear", async () => {

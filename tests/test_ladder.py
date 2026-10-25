@@ -1,7 +1,7 @@
 """The text ladder for the terminal (marketdata/ladder.py)."""
 
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.ladder import render_ladder
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.ladder import render_ladder
 
 
 def test_ladder_shows_asks_above_bids_and_skips_empty_levels():

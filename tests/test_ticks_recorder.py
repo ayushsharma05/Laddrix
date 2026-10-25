@@ -8,9 +8,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.research.ticks import FileTickStore, TickRecorder, decode, encode
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.research.ticks import FileTickStore, TickRecorder, decode, encode
 
 IST = ZoneInfo("Asia/Kolkata")
 FUT = "NFO:NIFTY26OCTFUT"
@@ -137,7 +137,7 @@ async def test_the_recordings_api(tmp_path, nifty_fut):
     from test_server import ORIGIN
     from test_server import World as ServerWorld
 
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.server.app import ServerSettings, create_app
 
     w = ServerWorld(tmp_path, nifty_fut)
     store = FileTickStore(tmp_path / "ticks", keep_days=30)
@@ -162,14 +162,14 @@ async def test_the_recordings_api(tmp_path, nifty_fut):
 def test_the_recording_setting(value, ok):
     from test_serve import env
 
-    from mocktrade.config import ConfigError
-    from mocktrade.tools.serve import ServeSettings
+    from laddrix.config import ConfigError
+    from laddrix.tools.serve import ServeSettings
 
     if ok:
-        assert ServeSettings.from_env(env(MOCKTRADE_RECORD_DAYS=value)).record_days == int(value)
+        assert ServeSettings.from_env(env(LADDRIX_RECORD_DAYS=value)).record_days == int(value)
     else:
-        with pytest.raises(ConfigError, match="MOCKTRADE_RECORD_DAYS"):
-            ServeSettings.from_env(env(MOCKTRADE_RECORD_DAYS=value))
+        with pytest.raises(ConfigError, match="LADDRIX_RECORD_DAYS"):
+            ServeSettings.from_env(env(LADDRIX_RECORD_DAYS=value))
 
 
 def test_a_day_is_deleted_on_request_but_never_today(tmp_path):
@@ -193,7 +193,7 @@ async def test_deleting_a_recorded_day_and_the_replay_command(tmp_path, nifty_fu
     from test_server import ORIGIN
     from test_server import World as ServerWorld
 
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.server.app import ServerSettings, create_app
 
     w = ServerWorld(tmp_path, nifty_fut)
     store = FileTickStore(tmp_path / "ticks", clock=lambda: T0 + timedelta(days=1))

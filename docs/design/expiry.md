@@ -2,11 +2,11 @@
 
 Every future and option has an **expiry date**. At the market close that day (15:30 India
 time) it stops trading, and the exchange **settles** every open position in it. This page is
-how MockTrade handles that (issue #290). Code: `src/mocktrade/refdata/expiry.py`.
+how Laddrix handles that (issue #290). Code: `src/laddrix/refdata/expiry.py`.
 
 ## The rules (checked 23 Oct 2026, re-check before trading real money)
 
-| Rule | What MockTrade does |
+| Rule | What Laddrix does |
 | --- | --- |
 | Equity F&O contracts end at **15:30 India time** on their expiry date | `expires_at` = 15:30 on the expiry date; from that minute the contract is *expired* |
 | **Index** F&O (NIFTY, BANKNIFTY, SENSEX…) settle **in cash** | `settlement: "cash"`: the position closes at the final settlement price |
@@ -14,7 +14,7 @@ how MockTrade handles that (issue #290). Code: `src/mocktrade/refdata/expiry.py`
 | An option that ends out of the money is worth nothing | settlement price 0 |
 | Brokers add their own cut-offs (closing physically settled positions themselves, or refusing new ones, on or before expiry day) and raise margins on expiry day. These differ by broker and change | **Settings**, not guesses: `ExpiryRules(physical_open_cutoff=…, cash_open_cutoff=…)`. From the cut-off on the expiry day, only closing trades are allowed. Both are off by default |
 
-How MockTrade tells index from stock F&O: if the contract's underlying is a listed share
+How Laddrix tells index from stock F&O: if the contract's underlying is a listed share
 (`NSE:<underlying>` or `BSE:<underlying>` is an equity), it settles by delivery; otherwise
 (an index) in cash.
 
@@ -71,8 +71,8 @@ Example: long 75 NIFTY 25000 CE bought at ₹120.05; NIFTY ends at 25,200. Settl
 
 ## Live trading
 
-The broker settles expired positions itself; MockTrade's book settles the same way at the
-next morning's roll, so reconciling finds both sides flat. The settlement price MockTrade
+The broker settles expired positions itself; Laddrix's book settles the same way at the
+next morning's roll, so reconciling finds both sides flat. The settlement price Laddrix
 uses is its own estimate (the last prices it saw); the broker's contract note and P&L are
 the official numbers. Stock F&O delivered as shares appear as holdings at the broker.
 

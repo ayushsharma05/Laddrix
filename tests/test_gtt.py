@@ -7,14 +7,14 @@ from datetime import date
 import httpx
 import pytest
 
-from mocktrade.broker.base import BrokerError, GttBook
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.kite.broker import KiteBroker
-from mocktrade.broker.kite.gtt import gtt_params, parse_gtt
-from mocktrade.broker.kite.http import KiteHttp
-from mocktrade.broker.paper import PaperBroker
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.domain.gtt import (
+from laddrix.broker.base import BrokerError, GttBook
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.kite.broker import KiteBroker
+from laddrix.broker.kite.gtt import gtt_params, parse_gtt
+from laddrix.broker.kite.http import KiteHttp
+from laddrix.broker.paper import PaperBroker
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.domain.gtt import (
     GttKind,
     GttLeg,
     GttRequest,
@@ -22,23 +22,23 @@ from mocktrade.domain.gtt import (
     gtt_problems,
     standard_gtt_spec,
 )
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.orders import (
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.orders import (
     OrderRequest,
     OrderStatus,
     OrderType,
     Product,
     Side,
 )
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders.gtt import GttError
-from mocktrade.orders.model import ClientIds, EventKind
-from mocktrade.platform import Platform
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.risk.limits import RiskLimits
-from mocktrade.store.events import EventLog
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.orders.gtt import GttError
+from laddrix.orders.model import ClientIds, EventKind
+from laddrix.platform import Platform
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.limits import RiskLimits
+from laddrix.store.events import EventLog
 
 FUT = "NFO:NIFTY26OCTFUT"
 LTP = 2501000
@@ -359,7 +359,7 @@ class Holding(FakeBroker):
 async def test_the_gtt_api(tmp_path, nifty_fut):
     from test_server import World as ServerWorld
 
-    from mocktrade.orders.gtt import GttService
+    from laddrix.orders.gtt import GttService
 
     w = ServerWorld(tmp_path, nifty_fut)
     rt = w.platform.account("acc-ayush")
@@ -371,7 +371,7 @@ async def test_the_gtt_api(tmp_path, nifty_fut):
     assert spec["kinds"] == ["single", "two-leg"] and spec["min_distance_pct"] == 0.25
     assert spec["legs"] == {"single": 1, "two-leg": 2}
     assert spec["labels"]["two-leg"] == "OCO (stop + target)"
-    assert "works even if MockTrade is down" in spec["help"]["single"]
+    assert "works even if Laddrix is down" in spec["help"]["single"]
     body = {"instrument_id": FUT, "product": "NRML", "kind": "single",
             "legs": [{"trigger_paise": 2480000, "side": "SELL", "qty": 75,
                       "price_paise": 2478000}]}  # fmt: skip

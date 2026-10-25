@@ -10,7 +10,7 @@ import type { State } from "./store";
  */
 export function cancelBlock(s: State, accountId: string | null = s.accountId): string | null {
   if (!s.me) return "not logged in";
-  if (s.stream !== "open") return "disconnected from MockTrade: order clicks are paused";
+  if (s.stream !== "open") return "disconnected from Laddrix: order clicks are paused";
   const account = s.me.accounts.find((a) => a.id === accountId);
   if (!account) return "no account selected";
   if (!account.can_trade) return `you can view ${account.id} but not trade it`;

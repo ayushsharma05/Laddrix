@@ -19,7 +19,7 @@ BOXES = [
  ("algo","C1",3,"Algo server","runs the robots",[59,60],[],"Runs algos next to the exchange, so they react in microseconds. Their orders still go through the guard."),
  ("spreader","C2",3,"Spreader","quotes a leg, hedges rest",[62,109],[],"Works the quoting leg of a structure and hedges the other legs the moment it fills."),
  ("scripted","C1",4,"Scripted strategies","sandbox and upload tool",[107,108],[],"Traders' own small strategy scripts, run safely in a sandbox."),
- ("sdk","C2",4,"Client SDK app","an outside algo app",[106],[],"A library so an outside program can trade through MockTrade like a screen does."),
+ ("sdk","C2",4,"Client SDK app","an outside algo app",[106],[],"A library so an outside program can trade through Laddrix like a screen does."),
  ("practice","C1",5,"Practice mode","simulated runner",[102],[],"A runner that fills orders in a simulator instead of the exchange, for safe practice."),
  ("gateways","C2",5,"FIX & broker","FIX gateway, mock broker",[104,105],[],"Lets outside systems send FIX orders in, and routes some orders through a mock broker."),
  ("mockcme","D",1,"MockCME","its own repo, E1–E4",[],[14,15,16,18],"Our own exchange, built in its own repo (ayushsharma05/MockCME) like a real outside exchange. It keeps order books, matches by price and time, takes orders over iLink-lite, broadcasts prices over MDP-lite and replays real COMEX data."),

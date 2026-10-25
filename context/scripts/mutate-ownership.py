@@ -4,16 +4,16 @@ all, someone else's is 'no backtest'; old runs are admin-only; candles imported 
 the tests must notice. Runs the tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-A = "src/mocktrade/ops/alerts.py"
-S = "src/mocktrade/server/stream.py"
-ROUTES_RESEARCH = "src/mocktrade/server/routes/research.py"
-B = "src/mocktrade/research/backtest.py"
-G = "src/mocktrade/ops/guards.py"
+A = "src/laddrix/ops/alerts.py"
+S = "src/laddrix/server/stream.py"
+ROUTES_RESEARCH = "src/laddrix/server/routes/research.py"
+B = "src/laddrix/research/backtest.py"
+G = "src/laddrix/ops/guards.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_ownership.py", "tests/test_stream.py",
          "tests/test_backtest.py", "tests/test_ops.py", "tests/test_protection_guard.py"]
-C = "src/mocktrade/ops/checks.py"
-R = "src/mocktrade/ops/protection.py"
-V = "src/mocktrade/tools/serve.py"
+C = "src/laddrix/ops/checks.py"
+R = "src/laddrix/ops/protection.py"
+V = "src/laddrix/tools/serve.py"
 MUTANTS = [
  (C, "                                account_id=account.id)  # fmt: skip", "                                )  # fmt: skip"),
  (R, "                account_id=account_id,\n            )\n            self._raised.add(where)", "            )\n            self._raised.add(where)"),

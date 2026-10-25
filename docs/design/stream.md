@@ -85,7 +85,7 @@ format as `GET /api/accounts/{a}/orders` and the event log.
 ```json
 {"type": "position_alert", "account_id": "acc-ayush", "state": "raised",
  "instrument_id": "NFO:NIFTY26OCTFUT", "ours": 75, "broker": 150,
- "message": "NFO:NIFTY26OCTFUT: MockTrade shows +75, the broker shows +150 (...)"}
+ "message": "NFO:NIFTY26OCTFUT: Laddrix shows +75, the broker shows +150 (...)"}
 ```
 `state` is `"raised"` or `"cleared"`.
 

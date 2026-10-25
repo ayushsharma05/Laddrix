@@ -1,7 +1,7 @@
 """F&O expiry day (#290): warnings before, refusals on the day, settlement after.
 
 The failure before: nothing knew that a contract ends. On its expiry date at 15:30 a future or
-option stops trading and the exchange settles every open position in it, but MockTrade kept
+option stops trading and the exchange settles every open position in it, but Laddrix kept
 showing the position, carried it into the next day at its last price, offered it in search,
 and would have sent orders in it (the exchange refuses them). Paper and live then disagreed
 about positions, and reconciling stopped trading.
@@ -18,21 +18,21 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from mocktrade.broker.paper import PaperBroker
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.marketdata.sim_universe import last_tuesday, monthly_expiries
-from mocktrade.options.chain import ChainService
-from mocktrade.orders.model import ClientIds, OrderError
-from mocktrade.platform import Platform
-from mocktrade.positions.book import PositionBook
-from mocktrade.refdata.expiry import Expiries, ExpiryRules, expiry_to_dict
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.risk.limits import RiskLimits
+from laddrix.broker.paper import PaperBroker
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.marketdata.sim_universe import last_tuesday, monthly_expiries
+from laddrix.options.chain import ChainService
+from laddrix.orders.model import ClientIds, OrderError
+from laddrix.platform import Platform
+from laddrix.positions.book import PositionBook
+from laddrix.refdata.expiry import Expiries, ExpiryRules, expiry_to_dict
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.limits import RiskLimits
 
 pytestmark = pytest.mark.real_expiry  # these tests judge expiry by their own clock
 
@@ -195,7 +195,7 @@ class Desk:
 
     def __init__(self, tmp_path, clock: Clock, *, rules: ExpiryRules | None = None,
                  recover: bool = False):  # fmt: skip
-        from mocktrade.store.events import EventLog
+        from laddrix.store.events import EventLog
 
         self.clock, self.store, self.md = clock, store(), MarketData()
         for instrument_id, ltp in ((FUT, 2501000), (CE, 12000), (PE, 500), (NOV_I.id, 2514860),

@@ -1,4 +1,4 @@
-# The MockTrade guide
+# The Laddrix guide
 
 **For Ayush. You need no programming or trading knowledge to start.** Each chapter builds on the
 one before, with pictures, flowcharts, everyday comparisons and small pieces of real code

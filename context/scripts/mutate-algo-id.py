@@ -5,10 +5,10 @@ it doesn't have); the tests must notice. Runs the tests unmutated first. Restore
 Run alone."""
 import subprocess
 
-E = "src/mocktrade/algos/engine.py"
-T = "src/mocktrade/risk/throttle.py"
-V = "src/mocktrade/tools/serve.py"
-ROUTES_TRADING = "src/mocktrade/server/routes/trading.py"
+E = "src/laddrix/algos/engine.py"
+T = "src/laddrix/risk/throttle.py"
+V = "src/laddrix/tools/serve.py"
+ROUTES_TRADING = "src/laddrix/server/routes/trading.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_algo_id.py", "tests/test_kite_orders.py"]
 MUTANTS = [
  (E, "        if not kind.exchange_algo_id and self._ops() > OPS_WITHOUT_ALGO_ID:", "        if False:"),

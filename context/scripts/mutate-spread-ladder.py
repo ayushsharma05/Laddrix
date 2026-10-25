@@ -9,8 +9,8 @@ import subprocess
 M = "ui/src/widgets/ladder/model.ts"
 L = "ui/src/widgets/ladder/Ladder.tsx"
 A = "ui/src/widgets/ase/Autospreader.tsx"
-S = "src/mocktrade/algos/autospreader.py"
-SERVER_FORMATS = "src/mocktrade/server/formats.py"
+S = "src/laddrix/algos/autospreader.py"
+SERVER_FORMATS = "src/laddrix/server/formats.py"
 UI = (["npx", "vitest", "run", "src/widgets/ladder", "src/widgets/ase"], "ui")
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_autospreader.py", "tests/test_spread_api.py"], ".")
 MUTANTS = [

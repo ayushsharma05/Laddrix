@@ -9,18 +9,18 @@ import httpx
 import pytest
 from kite_packets import NFO_TOKEN, NSE_TOKEN
 
-from mocktrade.broker.base import BrokerError
-from mocktrade.broker.kite import token_store
-from mocktrade.broker.kite.daily_login import WrongKiteUser
-from mocktrade.broker.kite.decoder import KiteTick
-from mocktrade.broker.kite.http import KiteHttp
-from mocktrade.broker.kite.live import LIVE, LOGIN_NEEDED, KiteLive
-from mocktrade.broker.kite.session import KiteSession
-from mocktrade.config import KiteSettings
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
-from mocktrade.marketdata.service import MarketData
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.broker.base import BrokerError
+from laddrix.broker.kite import token_store
+from laddrix.broker.kite.daily_login import WrongKiteUser
+from laddrix.broker.kite.decoder import KiteTick
+from laddrix.broker.kite.http import KiteHttp
+from laddrix.broker.kite.live import LIVE, LOGIN_NEEDED, KiteLive
+from laddrix.broker.kite.session import KiteSession
+from laddrix.config import KiteSettings
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
+from laddrix.marketdata.service import MarketData
+from laddrix.refdata.store import InstrumentStore
 
 CSV = (Path(__file__).parent / "data" / "kite_instruments_sample.csv").read_text()
 FUT, REL = "NFO:NIFTY26OCTFUT", "NSE:RELIANCE"
@@ -303,10 +303,10 @@ async def test_one_connection_carries_prices_and_the_list_downloads_once_a_day(w
 
 
 async def test_chart_history_goes_through_the_account_that_carries_prices(world):
-    from mocktrade.broker.kite.http import KiteAuthError
-    from mocktrade.broker.kite.instruments import BROKER
-    from mocktrade.charts.candles import BY_CODE
-    from mocktrade.charts.history import HistoryError, KiteHistory
+    from laddrix.broker.kite.http import KiteAuthError
+    from laddrix.broker.kite.instruments import BROKER
+    from laddrix.charts.candles import BY_CODE
+    from laddrix.charts.history import HistoryError, KiteHistory
 
     world.live.add_account(AYUSH)
     await world.live.start()

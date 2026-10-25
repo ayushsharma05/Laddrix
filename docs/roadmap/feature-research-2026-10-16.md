@@ -76,7 +76,7 @@ A = data foundation; B = analysis/portfolio/usability; C = advanced automation/e
 
 ## Boundaries and deferred decisions
 
-A recurring investment schedule is an application workflow; custody, lending, funding, IPO applications and fund distribution require authorized provider capabilities. Track them through #321 rather than pretending MockTrade becomes a broker. Marketplace payments, public performance sharing, full mobile entry, model-assisted drafts, institutional connectivity and market making are decisions, not silently approved launch scope.
+A recurring investment schedule is an application workflow; custody, lending, funding, IPO applications and fund distribution require authorized provider capabilities. Track them through #321 rather than pretending Laddrix becomes a broker. Marketplace payments, public performance sharing, full mobile entry, model-assisted drafts, institutional connectivity and market making are decisions, not silently approved launch scope.
 
 No public undocumented feature is asserted absent merely because it was not found. No synthetic candle, sampled order book, paper valuation or estimated margin is represented as an authoritative trade or balance. Special execution features do not promise risk-free arbitrage, institutional latency or profit.
 

@@ -11,8 +11,8 @@ import pytest
 from test_algo_engine import FUT, SPEC, Scripted, start
 from test_algo_engine import world as _world  # noqa: F401  (the fixture)
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.algos.engine import (
+from laddrix.algos.builtin import BUILTIN
+from laddrix.algos.engine import (
     AlgoEngine,
     AlgoError,
     AlgoType,
@@ -20,8 +20,8 @@ from mocktrade.algos.engine import (
     parse_algo_ids,
     with_exchange_ids,
 )
-from mocktrade.domain.orders import Side
-from mocktrade.risk.throttle import DEFAULT_RULES, OrderThrottle, RateRule
+from laddrix.domain.orders import Side
+from laddrix.risk.throttle import DEFAULT_RULES, OrderThrottle, RateRule
 
 
 @pytest.fixture
@@ -85,13 +85,13 @@ def test_the_screens_are_told_whether_an_algo_has_one():
 def test_the_server_refuses_ids_for_algos_it_doesnt_have():
     from test_serve import env
 
-    from mocktrade.config import ConfigError
-    from mocktrade.tools.serve import ServeSettings
+    from laddrix.config import ConfigError
+    from laddrix.tools.serve import ServeSettings
 
-    s = ServeSettings.from_env(env(MOCKTRADE_ALGO_IDS="SLICER=AB123"))
+    s = ServeSettings.from_env(env(LADDRIX_ALGO_IDS="SLICER=AB123"))
     assert s.algo_ids == (("SLICER", "AB123"),)
     with pytest.raises(ConfigError, match="no algo called NOPE"):
-        ServeSettings.from_env(env(MOCKTRADE_ALGO_IDS="NOPE=1"))
+        ServeSettings.from_env(env(LADDRIX_ALGO_IDS="NOPE=1"))
 
 
 async def test_algo_specs_say_it_over_the_api(tmp_path, nifty_fut):

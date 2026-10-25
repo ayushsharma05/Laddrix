@@ -33,7 +33,7 @@ export function Login() {
     <main className="login">
       <section className="window login-box" aria-labelledby="login-title">
         <div className="window-bar">
-          <span id="login-title" className="strong">MockTrade · Sign in</span>
+          <span id="login-title" className="strong">Laddrix · Sign in</span>
         </div>
         <form className="login-form" onSubmit={submit}>
           <label className="field">

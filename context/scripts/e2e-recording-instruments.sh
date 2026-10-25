@@ -7,9 +7,9 @@
 #   3. the same day without its list: the replay refuses to start and says why.
 set -u
 OUT=${OUT:-$(mktemp -d)}
-stop() { pkill -f "^python3? -m mocktrade.tools.demo" 2>/dev/null; sleep 1; }
+stop() { pkill -f "^python3? -m laddrix.tools.demo" 2>/dev/null; sleep 1; }
 stop; rm -rf data/demo data/replay/2025-01-20
-python3 -m mocktrade.tools.demo > "$OUT/demo.log" 2>&1 &
+python3 -m laddrix.tools.demo > "$OUT/demo.log" 2>&1 &
 sleep 12; stop
 today=$(ls data/demo/ticks | tail -1)
 echo "1. demo recorded $today: $(python3 -c "import json;print(len(json.load(open('data/demo/ticks/$today/instruments.json'))),'instruments described,',len(json.load(open('data/demo/ticks/$today/index.json'))),'recorded')")"
@@ -17,9 +17,9 @@ python3 - "$OUT/ticks" <<'PY'
 import sys
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.research.ticks import FileTickStore
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.research.ticks import FileTickStore
 bank = Instrument(Exchange.NFO, "BANKNIFTY25JANFUT", InstrumentKind.FUTURE, 20, 30,
                   date(2025, 1, 30), None, "BANKNIFTY")
 t0 = datetime(2025, 1, 20, 9, 15, tzinfo=ZoneInfo("Asia/Kolkata"))
@@ -31,11 +31,11 @@ for n in range(600):  # ten minutes, a tick a second
                       asks=(DepthLevel(p + 20, 300, 3),)), t0 + timedelta(seconds=n)))
 store.append(rows)
 PY
-python3 -m mocktrade.tools.demo --replay 2025-01-20 --ticks "$OUT/ticks" --speed 1 --port 8001 > "$OUT/replay.log" 2>&1 &
+python3 -m laddrix.tools.demo --replay 2025-01-20 --ticks "$OUT/ticks" --speed 1 --port 8001 > "$OUT/replay.log" 2>&1 &
 sleep 8
 python3 - <<'PY'
 import subprocess, httpx
-code = subprocess.run(["python3", "-m", "mocktrade.tools.demo", "--replay", "2025-01-20", "--code"],
+code = subprocess.run(["python3", "-m", "laddrix.tools.demo", "--replay", "2025-01-20", "--code"],
                       capture_output=True, text=True).stdout.strip()
 c = httpx.Client(base_url="http://127.0.0.1:8001", headers={"origin": "http://localhost:8001"})
 r = c.post("/api/session", json={"username": "demo", "password": "demo-password-123", "code": code})
@@ -56,5 +56,5 @@ for o in orders:
 PY
 stop
 rm "$OUT/ticks/2025-01-20/instruments.json"; rm -rf data/replay/2025-01-20
-python3 -m mocktrade.tools.demo --replay 2025-01-20 --ticks "$OUT/ticks" --port 8001 > "$OUT/refused.log" 2>&1
+python3 -m laddrix.tools.demo --replay 2025-01-20 --ticks "$OUT/ticks" --port 8001 > "$OUT/refused.log" 2>&1
 echo "3. without its list: exit $? -> $(tail -1 "$OUT/refused.log")"

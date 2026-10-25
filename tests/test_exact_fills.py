@@ -15,14 +15,14 @@ from fractions import Fraction
 
 import pytest
 
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.kite.orders import exact_paise, to_update
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
-from mocktrade.orders.codec import fill_from_dict, fill_to_dict, view_from_dict, view_to_dict
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, EventKind
-from mocktrade.positions.book import PositionBook
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.kite.orders import exact_paise, to_update
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
+from laddrix.orders.codec import fill_from_dict, fill_to_dict, view_from_dict, view_to_dict
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, EventKind
+from laddrix.positions.book import PositionBook
+from laddrix.refdata.store import InstrumentStore
 
 S = OrderStatus
 FUT = "NFO:NIFTY26OCTFUT"
@@ -130,7 +130,7 @@ def test_a_rounded_average_that_agrees_is_no_correction():
     om = OrderManager("acc-1", FakeBroker(), lambda _i: None, ids=ClientIds("MT"))
     events = []
     om.subscribe(events.append)
-    from mocktrade.orders.manager import _filled_value, _Order
+    from laddrix.orders.manager import _filled_value, _Order
 
     order = _Order(OrderRequest("MT1", "acc-1", "u", FUT, Side.BUY, 150, OrderType.LIMIT,
                                 Product.NRML, price_paise=1), None, None)  # fmt: skip
@@ -142,7 +142,7 @@ def test_a_rounded_average_that_agrees_is_no_correction():
 
 
 def test_the_exact_value_survives_a_restart():
-    from mocktrade.orders.model import Fill
+    from laddrix.orders.model import Fill
 
     f = Fill("MT1", 100, 2501005, False, 100 * 2501005)
     assert fill_from_dict(fill_to_dict(f)) == f
@@ -163,7 +163,7 @@ async def test_an_old_saved_order_gets_its_value_from_its_average(world):
 async def test_a_restart_rebuilds_the_same_exact_position(nifty_fut, tmp_path):
     """Fills worked out from averages and a correction, written to the audit trail and read
     back as recovery does: the rebuilt position is the live one, to the paisa."""
-    from mocktrade.store.events import EventLog
+    from laddrix.store.events import EventLog
 
     store = InstrumentStore()
     store.add(nifty_fut)

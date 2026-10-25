@@ -1,22 +1,24 @@
-# Conversation log: how MockTrade and MockCME came to be
+# Conversation log: how Laddrix and MockCME came to be
+
+The product was called **MockTrade** until 25 Oct 2026, when it was renamed Laddrix (#457). The entries below use the new name throughout.
 
 A summary of the first long planning conversation (5–12 Oct 2026), in order. It replaces the raw chat, which can't be committed because it contains the firm's internal details.
 
 ## 1. Understanding a professional trading platform (private)
 - Ayush wanted to understand the trading platform his firm uses: its architecture, latency and how orders travel. He shared drawings and a few config and UI files.
 - Claude explained it in very simple language with flowcharts and produced three private reference files: **NG One Chart**, **NG Architecture** and **How NG Works**. They stay private, outside the repos.
-- Key ideas he took away, which MockTrade copies in generic form:
+- Key ideas he took away, which Laddrix copies in generic form:
   - Robots and the risk guard sit **next to the exchange** (co-location), because Jaipur → Chicago is about 85 ms one way, slower than any robot.
   - A central **hub** handles screens and logins. Screens never talk to the exchange directly.
   - There's a **fast lane** for orders and prices, and a **careful lane** for fills, positions, P&L and audit.
   - Every order passes a **guard** (risk checks) and then a **runner**, which speaks the exchange's language.
 
-## 2. Deciding to build his own: MockTrade
-- He decided to design and build his own platform from scratch as a learning project. He named it **MockTrade** (not NG) and runs it against a mock exchange replaying real data.
+## 2. Deciding to build his own: Laddrix
+- He decided to design and build his own platform from scratch as a learning project. He named it **Laddrix** (not NG) and runs it against a mock exchange replaying real data.
 - Goal: a real, complete project he understands bit by bit, with the whole one-chart architecture built in mock form.
 - He asked Claude to act as the expert team and to put the whole plan into **GitHub issues**, so he can go step by step.
 
-## 3. Repo and backlog (MockTrade)
+## 3. Repo and backlog (Laddrix)
 - Repo `ayushsharma05/MockTrade` (private). Copilot made the folder structure, and Claude added CI (`pytest` on PRs).
 - Claude created labels, 18 milestones (Phase 0–8 design, then releases v0.1–v1.0) and issues #3–#121. #119 tracks that every box of the reference architecture gets built.
 - Ayush finished the Phase 0 setup on his Windows laptop (Git, Python, VS Code, his first PR).
@@ -24,21 +26,21 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 
 ## 4. Studying CME (Phase 3)
 - #14: a paper exercise on how matching works (sells 2400.4 × 3 and 2400.5 × 5, then buy 6 @ 2400.5).
-- He asked why study CME's MDP at all, since MockTrade isn't tied to one exchange. Answer: the **adapter pattern**. Generic ideas go in the core, CME-specific names and numbers go only in the adapter. CME's specs are excellent and public, and his data is in CME format.
+- He asked why study CME's MDP at all, since Laddrix isn't tied to one exchange. Answer: the **adapter pattern**. Generic ideas go in the core, CME-specific names and numbers go only in the adapter. CME's specs are excellent and public, and his data is in CME format.
 - He asked what to read on the CME Client Systems wiki. The pages load with JavaScript and couldn't be fetched, so Claude wrote a beginner guide from CME's public specs: [cme-wiki-guide.md](../docs/archive/comex-track/cme-wiki-guide.md), with 3 diagrams.
 - He closed #14, #15 and #16.
 
 ## 5. The build map
 - He asked to see which issue programs which part of the architecture, so he always knows where he is.
-- Claude built the **MockTrade Build Map**, an interactive page: every box of the architecture with the issues that design it (dashed) and build it (coloured by release), a "you are here" marker and a release slider. Files are in [build-map/](../docs/archive/history/build-map/); screenshot below.
+- Claude built the **Laddrix Build Map**, an interactive page: every box of the architecture with the issues that design it (dashed) and build it (coloured by release), a "you are here" marker and a release slider. Files are in [build-map/](../docs/archive/history/build-map/); screenshot below.
 
-![MockTrade build map](../docs/archive/history/mocktrade-build-map.png)
+![Laddrix build map](../docs/archive/history/laddrix-build-map.png)
 
 ## 6. The exchange gets its own repo: MockCME
 - He suggested building the mock exchange first, in its own repo, because a real exchange exists before the platforms that connect to it.
 - Agreed, with one change: write the **spec in full**, then **build in releases** (E0–E8), rather than "complete" all at once.
 - Ayush created `ayushsharma05/MockCME`. Claude pushed the skeleton (package folders, smoke test, CI, PR template), created 9 milestones and 40 issues written code-first (goal → steps with file and function names → tests to write first), and opened design **PR #41** (`docs/design.md`).
-- The 6 exchange issues in MockTrade (#34, #37, #38, #49, #52, #73) were closed as moved, with links. #39, #50, #55, #76 and #77 got cross-links. The build map now points to MockCME's milestones.
+- The 6 exchange issues in Laddrix (#34, #37, #38, #49, #52, #73) were closed as moved, with links. #39, #50, #55, #76 and #77 got cross-links. The build map now points to MockCME's milestones.
 
 ![MockCME architecture](../docs/archive/comex-track/images/mockcme-architecture.png)
 
@@ -47,7 +49,7 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 - **"Show the diagram here."** The MockCME architecture above, with its order path explained.
 
 ## 9. Change of plan: NSE/BSE on Kite Connect (14 Oct 2026)
-- Ayush paused MockCME and asked for MockTrade to connect to the real Indian market through Zerodha Kite Connect, designed like a professional platform team, with a broker adapter (real Kite + paper simulator), honest limits, and a one-small-server deployment ($100 cloud credits, ₹500–800/month budget).
+- Ayush paused MockCME and asked for Laddrix to connect to the real Indian market through Zerodha Kite Connect, designed like a professional platform team, with a broker adapter (real Kite + paper simulator), honest limits, and a one-small-server deployment ($100 cloud credits, ₹500–800/month budget).
 - Claude researched Kite and SEBI rules (sources in the design doc). Key findings: ~1 tick/s per instrument, 5-level depth, 10 orders/s, static IP for order endpoints since April 2026, market_protection mandatory, daily manual login.
 - Decisions: one Python asyncio process (modular monolith); official SDK for REST, own asyncio WebSocket client + decoder; SQLite event log; FastAPI; React + TypeScript widgets; AWS Lightsail Mumbai 2 GB ($12/month, static IP included).
 - 33 issues created (#124–#156), old issues labelled `paused: cme-track`.
@@ -57,9 +59,9 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 ![Kite overview](images/kite-overview.png)
 
 ## 10. Multi-user, broker-agnostic, and Claude codes it (14 Oct 2026)
-- Ayush asked for MockTrade to be **multi-user** (users registered through their broker's login), following all exchange rules, with Zerodha as only one broker (others or own exchange access later), modelled on the reference platform's professional architecture.
+- Ayush asked for Laddrix to be **multi-user** (users registered through their broker's login), following all exchange rules, with Zerodha as only one broker (others or own exchange access later), modelled on the reference platform's professional architecture.
 - Research found: a retail Kite app is bound to one client id (multi-user needs a Zerodha arrangement); Kite data can't be shown to other users (needs an authorised data vendor); serving others makes the platform an algo provider (exchange empanelment; broker is principal; algo IDs); black-box algos need SEBI RA registration. Design runs for him + family accounts until those gates are passed.
-- Delivered the **MockTrade One Chart** (`context/one-chart/one-chart.html`, PNG in images) and §0 of the design doc.
+- Delivered the **Laddrix One Chart** (`context/one-chart/one-chart.html`, PNG in images) and §0 of the design doc.
 - He asked Claude to **write the whole project** professionally with extensive tests, sending progress updates; he'll type "continue" when limits reset. K0 (#158) and K1 (#159) done, CI green.
 - He asked that the UI be designed as thoughtfully as the backend (as with a chart-trading app he works on); a UI design pass with mockups is planned before UI code.
 
@@ -104,7 +106,7 @@ A summary of the first long planning conversation (5–12 Oct 2026), in order. I
 
 ## 18. "Complete the whole project" and the product direction (14 Oct 2026)
 - Ayush asked to complete the whole project, designed like the platform a top professional trading-software company would build for India, paying only for the Zerodha API. Every component independent and replaceable. Claude acts as the whole expert team.
-- He then said: don't copy or mention any other vendor; MockTrade is its own product and may be deployed professionally in India later. All vendor mentions were removed from the repo and context.
+- He then said: don't copy or mention any other vendor; Laddrix is its own product and may be deployed professionally in India later. All vendor mentions were removed from the repo and context.
 - And: "backend provides, frontend displays". The UI must not hard-code order types or other market rules: the server publishes an order spec (types, required fields, validities, products, rules) and the screens render from it. Applied first to the order ticket and ladder (#173).
 - Plan agreed: order ticket (#173) → Electron (#156) → K6 algos (#148–#151) → K7 deploy (#152–#155), one stacked PR each, context updated at every PR; then a product-vision catalogue of what a professional Indian-market platform provides, turned into new milestones.
 
@@ -267,7 +269,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - mutation 22/22 (found four test gaps, now covered); the demo check passed;
     - known limit: backtests still use the live list.
 - 16 Oct, #327 merged (PR #331). **#328 done:**
-  - **A protection guard on the server.** A position that *had* a stop held by MockTrade and lost it (restart, pause, stop, failure, or the stop ending while the position is still open) gets one red UNPROTECTED band. It clears when the position is flat or covered again (a working stop algo, a closing-side SL/SL-M order, or an active GTT).
+  - **A protection guard on the server.** A position that *had* a stop held by Laddrix and lost it (restart, pause, stop, failure, or the stop ending while the position is still open) gets one red UNPROTECTED band. It clears when the position is flat or covered again (a working stop algo, a closing-side SL/SL-M order, or an active GTT).
   - **What changed from before.** The old restart alert existed only in `serve.py`, never cleared, and never appeared in the demo; the guard replaces it in both. It waits for recovery before deciding. Never-protected positions are deliberately left alone, so the band stays meaningful.
   - **The crash drill (SIGKILL, restart twice) passed 17/17:**
     - the position came back at its size, and bought stayed 150, not 300;
@@ -282,7 +284,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
 - 16 Oct, **#329 done:**
   - **What a backup holds now.** Everything a restored server needs: the two databases plus rules, reports, alerts, candles and backtests. Recordings come only with `--with-ticks`.
   - **What it never holds:** broker tokens, keys, `.env` or temporary files. `manifest.json` gives each file's size and SHA-256.
-  - **A new restore command** (`mocktrade.tools.restore`):
+  - **A new restore command** (`laddrix.tools.restore`):
     - it checks the manifest, the checksums and SQLite's integrity first, and refuses a tampered or path-escaping manifest;
     - it never overwrites; `--replace` moves the old data aside, and nothing is deleted;
     - at the end it lists what comes from the password manager.
@@ -304,7 +306,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Old stubs:** `docs/adr` now points to where decisions live; `docs/exchange` (CME-era) is removed.
   - **Diagrams:** rendered offline with a local Mermaid (`context/scripts/render-mermaid.cjs`), because the CDN is blocked here. Writing them caught one mistake in my first restart diagram: positions are compared *before* the gate decides, not after.
 - 16 Oct, #288 merged (PR #335). **#289 done** (release process):
-  - **Versions.** One version (`src/mocktrade/version.py`, `1.0.0-rc.1`) is kept in step with pyproject, `ui/package.json` and the lockfile by a test. The server reports it at `/api/health` with the image's commit, and the status bar shows it.
+  - **Versions.** One version (`src/laddrix/version.py`, `1.0.0-rc.1`) is kept in step with pyproject, `ui/package.json` and the lockfile by a test. The server reports it at `/api/health` with the image's commit, and the status bar shows it.
   - **Notes.** `docs/releases/v1.0.0.md` (scope, migrations, known limits) and `CHANGELOG.md`.
   - **Deploy and rollback.** `deploy/deploy.sh` checks the tag, refuses market hours (`window.sh`; `--emergency "reason"` is logged), backs up, keeps the previous image, builds, and checks health and the version, rolling back by itself on failure. `rollback.sh` (`--restore-data` for migrations). `docs/runbooks/release.md`.
   - **Decided:** the `v1.0.0` tag waits for Ayush's live go-live run and his acceptance on #240. Everything is ready as `1.0.0-rc.1` until then.
@@ -385,7 +387,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
 - 16 Oct (last, on the branch only): #264 tests written and pushed to `h-264-protection` (5 tests; all 1253 pass). They showed the intended behaviour: a restored stop is itself lost at the next restart and flagged again, because only broker-held stops survive outages. Wednesday: the Restore button, mutation check, docs, PR. Ayush's weekly usage is at 65% until Thursday, so be economical: finish #264, then #265, #267, #270.
 - 16 Oct (Ayush said to keep going until the 4-hour limit): **#264 done** (lost stops: a durable flag and a guarded Restore).
   - **The defect (test first):** a lost stop was reported once (ALGO_LOST) and then forgotten, so after a second restart an open, unprotected position had no band.
-  - **Decided (the guarantee, written in docs and the API):** MockTrade-held stops work only while the server runs; only broker-held stop orders or GTTs survive an outage.
+  - **Decided (the guarantee, written in docs and the API):** Laddrix-held stops work only while the server runs; only broker-held stop orders or GTTs survive an outage.
   - **The fix:**
     - **Durable notes:** every flag and every resolution is an audit note (UNPROTECTED / PROTECTION_RESOLVED), rebuilt at each start until resolved.
     - **Restore (two clicks, by someone who trades the account):**
@@ -397,7 +399,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **The check found a real defect:** the scheduler ran **no** jobs on weekends and holidays, so the lost-stop band and the MTM close warnings never showed then (positions stay open over a weekend). `Scheduler.every(..., any_day=True)` now runs those two all week; trading jobs stay trading-days only.
 - 23 Oct, Ayush's limits reset; work resumed. **#265 done** (orders on disk before the broker).
   - **Defects confirmed:**
-    - the audit log wrote in the background, after the order was at the broker: a crash in that moment left an order MockTrade forgot, and its id could be reused;
+    - the audit log wrote in the background, after the order was at the broker: a crash in that moment left an order Laddrix forgot, and its id could be reused;
     - serve never wired the log's failure callback;
     - the queue was unbounded.
   - **The fix:**
@@ -452,7 +454,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Settlement:** the 08:45 new-day roll first settles positions in contracts that ended (our book and the paper broker), so the result belongs to expiry day; noted as EXPIRY_SETTLED, which recovery re-applies; a restart after the server was off over expiry settles them itself.
     - **Search, chain, watch list** drop expired contracts; charts and recordings still find them by id.
     - **Screens** show the server's sentence: a warning line on the ticket, the ladder and the chain; an "EXP" tag before the name in Positions and the watch list (the first try put the tag after the name, and narrow columns cut it off: caught in the browser check).
-    - **The demo's contracts roll with the calendar** (near and next monthly expiry, the last Tuesday); `MOCKTRADE_SIM_NEAR_EXPIRY` sets an expiry day to try.
+    - **The demo's contracts roll with the calendar** (near and next monthly expiry, the last Tuesday); `LADDRIX_SIM_NEAR_EXPIRY` sets an expiry day to try.
     - **Tests not about expiry** see expiry as on 16 Oct 2026 (`tests/conftest.py`), so they don't break when the test contracts' date passes.
   - **Decided:** paper settles stock F&O in cash and says so (delivery of shares is not simulated yet); broker cut-offs are settings, not guesses, because they differ by broker and change. Rules checked 23 Oct 2026 with sources in `docs/design/expiry.md`.
   - **Checks:** 15 new tests plus an API test, 2 ticket and 3 watch-list tests; mutation 18/18; a real demo whose near contracts expired at 15:30 on 23 Oct, checked before and after (`context/evidence/h-290-*.txt`, `context/images/h-290-expires-today.png`).
@@ -471,17 +473,17 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **The fix:** at STOP (account or firm switch) and on every GTT poll while stopped, GTTs whose every leg only reduces the position are kept (stop-losses still protect); any that could open or add are deleted at the broker (GTT_STOPPED); a failed delete is said (GTT_STOP_UNCLEAR) and retried without blocking the others; a GTT that fires anyway and adds risk has its order cancelled (GTT_FIRED_IN_STOP). After Flatten, the closed position's stop-losses are deleted too.
   - **Decided:** split #276; manual/outside trades and the resolve workflow is #355.
   - **Checks:** 6 tests; mutation 8/8 (the first run had one equivalent mutant, replaced, and showed a missing case: one failed delete mustn't keep the others armed, added).
-- 23 Oct (after the limit reset), #276 part A merged (PR #356). **#355 done** (trades made outside MockTrade).
+- 23 Oct (after the limit reset), #276 part A merged (PR #356). **#355 done** (trades made outside Laddrix).
   - **The gap:** a trade made in the broker's own app raised a reconcile alert that nothing could resolve.
   - **The fix:** `positions/external.py`: risk or admin previews the broker's trades in that position that no order of ours placed; only if they explain the difference exactly can they be adopted, with a written acknowledgement; each at its own price, audited with the broker's trade id (EXTERNAL_ADOPTED), never twice (even before the audit is on disk); recovery re-applies them; the alert clears. Endpoints `GET/POST /api/accounts/{id}/external-trades`. Never sets our position to the broker's number.
   - **Checks:** 7 tests (one through a restart, one for permissions); mutation 9/9 (the first run showed a missing case: a later outside trade after one was adopted; added).
 - 23 Oct, #355 merged (PR #357), closing #276. **#291 part 1** (surveillance alerts and the auditor's export).
-  - **Rules checked (23 Oct 2026):** SEBI retail algo framework in force since 1 Apr 2026: registration and an exchange algo id above 10 orders a second per exchange; static IP for API orders. MockTrade's throttle is 8/s, below the line. Sources in `docs/design/compliance.md` (broker and industry summaries; read the circular before live).
+  - **Rules checked (23 Oct 2026):** SEBI retail algo framework in force since 1 Apr 2026: registration and an exchange algo id above 10 orders a second per exchange; static IP for API orders. Laddrix's throttle is 8/s, below the line. Sources in `docs/design/compliance.md` (broker and industry summaries; read the circular before live).
   - **The fix:** `risk/surveillance.py` watches every account's order events: possible self-trades (same account or same user, crossing), unusually large orders (5x the day's median after 10), high cancel/modify ratio (3x after 10), bursts (8 in a second). Kept in the audit trail, shown to risk, acknowledged with a note; restored after a restart; never blocking. `GET /api/surveillance`, `POST .../ack`, and `GET /api/accounts/{id}/audit-export?day=` (CSV for an auditor).
   - **Checks:** 10 tests (each kind by hand, plus the API and export); mutation 11/11.
 - 23 Oct, #291 part 1 merged (PR #358; I merged it before its CI finished, by mistake: main's CI then passed, and the rule stays green CI first). **#291 part 2** (the exchange algo id).
   - **Found:** the slots existed (`AlgoType.exchange_algo_id`, `OrderRequest.algo_id`, the Kite adapter sends `algo_id`) but nothing set them, nothing said whether an algo had one, and nothing stopped an unregistered algo from running above SEBI's 10 orders a second.
-  - **The fix:** ids per algo code from `MOCKTRADE_ALGO_IDS` (unknown codes refused at start); an algo's orders carry its id; an algo without one can't start if the account's throttle allows more than 10 a second (`OrderThrottle.per_second`, 8 by default); the algo specs say whether each has an id. Kite's public docs name no field for the id (checked 23 Oct 2026): a go-live checklist row says to confirm it with Zerodha.
+  - **The fix:** ids per algo code from `LADDRIX_ALGO_IDS` (unknown codes refused at start); an algo's orders carry its id; an algo without one can't start if the account's throttle allows more than 10 a second (`OrderThrottle.per_second`, 8 by default); the algo specs say whether each has an id. Kite's public docs name no field for the id (checked 23 Oct 2026): a go-live checklist row says to confirm it with Zerodha.
   - **Checks:** 7 tests; mutation 8/8.
 - 23 Oct, #291 merged (PR #359). **#268 done** (the screens trade on loaded state, not an open connection).
   - **Defect confirmed:** after a (re)connect the stream showed "open" and order clicks were allowed while orders and positions were still loading; a failed load only left a message; algos/GTTs that failed to load showed as empty lists; a slow older load could apply after a newer one.
@@ -493,7 +495,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - restore accepted a backup of any format: now an unknown format is refused by name;
     - new state in the data folder would be skipped silently: now every top-level entry must be backed up or listed as reproducible, else the backup is made but fails with exit 2 and `not_covered` in the manifest (its first real run caught `demo_totp.txt`, a secret, now listed);
     - no test that a restored server never re-sends an order: added;
-    - RPO/RTO measured and written in `docs/runbooks/server.md` (217 MB: backup 2.4 s, restore 1.7 s; people about 15-20 min; RPO up to a trading day of MockTrade's own state, positions and orders rebuilt from the broker).
+    - RPO/RTO measured and written in `docs/runbooks/server.md` (217 MB: backup 2.4 s, restore 1.7 s; people about 15-20 min; RPO up to a trading day of Laddrix's own state, positions and orders rebuilt from the broker).
   - **Checks:** 3 new tests (21 in test_backup.py); the drill 19/19 (`context/evidence/h-272-backup-restore-drill.txt`).
 - 23 Oct, #272 merged (PR #361). **#273 done** (critical loops watched; one trading server per data folder).
   - **Defects confirmed:** all background loops ran in one `gather`: one that crashed ended silently while `/api/health` kept saying ok (and restarting the whole gather would have duplicated the healthy loops); nothing stopped a second server on the same data trading the same accounts.
@@ -508,7 +510,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
 - 23 Oct, #279 first part merged (PR #370); all 9 trading issues done (#279 stays open by design, children #363-#369).
   - **Ayush asked:** what he has to do, and why the app looks simple if it's production level.
   - **Explained:** simple to read on purpose; the size is in the number of safety pieces and tests; the code is production-grade but live trading still needs the go-live steps, time running live and a security review.
-  - **Ayush decided:** MockTrade will be offered to other firms (#278 commented; #368 unblocked); go-live later; the algo-id field not now; he will arrange #369.
+  - **Ayush decided:** Laddrix will be offered to other firms (#278 commented; #368 unblocked); go-live later; the algo-id field not now; he will arrange #369.
 - 23 Oct, **Ayush decided** (#278): each trader brings their own Zerodha subscription (₹500 each) and sees only their own prices; build for either IP rule; write to Zerodha before any outside trader (a draft from Claude, sent by Ayush). **#372 done:** `KITE_EGRESS_<ACCOUNT>` routes an account's orders and daily login through its own proxy (its own IP); unset or `direct` uses the server's shared static IP; `KITE_EGRESS` sets a default. http/https proxies only (SOCKS would need another library). Checks: 4 tests (a real local proxy sees the account's requests), mutation 7/7. Each firm's own price feed is part of #368.
 - 23 Oct, #372 merged (PR #373). **#366 done** (rights re-checked when the action happens; limit races).
   - **Defect confirmed:** rights were checked only at the door (the request). An algo, a GTT or a resting change kept acting for a trader after an admin removed them, disabled them or took the trader role away.
@@ -516,9 +518,9 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Races:** 10 orders at once against the position limit (3 lots) and the open-orders limit (4): exactly the limit gets through; already true, now tested.
   - **Checks:** 8 tests; mutation 12/12; all 1,387 tests pass.
 - 23 Oct, #366 merged (PR #374). **#364 done** (rotating the key, ending sessions, a stolen-credential drill).
-  - **Gaps confirmed:** no way to rotate `MOCKTRADE_SECRET_KEY`. Sessions could only be ended one user at a time (password change or disable), and open streams noticed only after up to a minute. Backups carried the sessions table, so a restore brought old logins back. The security doc said broker secrets were encrypted: they aren't (they're in `.env`); corrected.
+  - **Gaps confirmed:** no way to rotate `LADDRIX_SECRET_KEY`. Sessions could only be ended one user at a time (password change or disable), and open streams noticed only after up to a minute. Backups carried the sessions table, so a restore brought old logins back. The security doc said broker secrets were encrypted: they aren't (they're in `.env`); corrected.
   - **The fix:**
-    - `users rotate-key` re-encrypts every authenticator secret under a new key (from `MOCKTRADE_NEW_SECRET_KEY`), all at once or not at all. Each secret is read back before writing. It is refused while a server owns the data folder or if the key in use is wrong, and `--check` changes nothing.
+    - `users rotate-key` re-encrypts every authenticator secret under a new key (from `LADDRIX_NEW_SECRET_KEY`), all at once or not at all. Each secret is read back before writing. It is refused while a server owns the data folder or if the key in use is wrong, and `--check` changes nothing.
     - `users revoke-sessions [--user U]`: open streams close within 2 s (one shared read of the live sessions every 2 s; the full check stays at a minute).
     - Backups leave sessions out (overwritten, not just freed).
     - The demo now takes the data-folder lock like the real server.
@@ -566,7 +568,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Workspaces:** each user and broker account belongs to one workspace. Today's admin becomes a workspace admin. The platform operator is not a web role at all: terminal only.
   - **The one rule:** anything in another workspace answers 404.
   - **STOP:** one kill switch per workspace.
-  - **Prices:** each Kite account is its own price source, and today's "first account carries prices for everyone" goes. Screens see only the sources of accounts the person may see. The setting `MOCKTRADE_PRICES_VISIBLE` (`owner` by default) waits on Zerodha's answer for supervisors.
+  - **Prices:** each Kite account is its own price source, and today's "first account carries prices for everyone" goes. Screens see only the sources of accounts the person may see. The setting `LADDRIX_PRICES_VISIBLE` (`owner` by default) waits on Zerodha's answer for supervisors.
   - **Split into steps:** #394 (368a), #395 (368b), #396 (368c), #397 (368d).
 - 23 Oct, design merged (PR #398). **#394 (368a) done:** workspaces in the data and in every check.
   - **The data:** users and accounts carry a workspace, and today's data is `main`. An account belongs to its owner's firm, and its traders must be from that firm. Ids are unique across firms.
@@ -671,7 +673,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Checks:** 478 UI tests; mutation 43/43; browser 14/14 (`context/scripts/e2e-context-menu.cjs`).
   - Merged as PR #413.
 - 24 Oct, evening. **The Autospreader, part 1 (#414).** #250 and #251 were split into three children: #414 (definitions and live prices), #415 (multi-leg execution) and #416 (the spread ladder).
-  - **Built:** `src/mocktrade/spreads/` (model, store, pricer).
+  - **Built:** `src/laddrix/spreads/` (model, store, pricer).
     - A spread is priced from its trader's own leg prices and streamed as the instrument `SPREAD:<id>`. The ask is Σ price× · (ask if + else bid); the bid mirrors it; the size is in spread lots.
     - Only the top level is implied (no invented depth). Legs more than 3 s apart give no tradable price.
   - **A design choice:** spread prices are *derived* ticks (`MarketData.on_derived`). Screens see them; the recorder, paper fills, charts, alerts and movers never do. Otherwise a replay would count a spread twice.
@@ -713,7 +715,7 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - **Checks:** 7 new tests (one on the paper broker with the default limits: 3 calendars go 2 + 1); mutation 18/18 (`mutate-ase-pieces.py`, after adding a test for a hedge that stops fitting).
 - 24 Oct, night. **The Autospreader is complete for now.** PRs #420 (#419), #421 (#416) and #423 (#422) merged, each after green CI. What is left is in #250/#251: several quoting legs at once, a maximum unhedged exposure, timeouts, restart recovery, structure positions, historical spread charts, and freeze quantity (not yet on Instrument).
 - 24 Oct, night. **"Continue to those too": the Autospreader's open items.** Ayush asked to build what was left. Split into six issues (#424 to #429, children of #250/#251), smallest dependency first.
-  - **#424 freeze quantities.** The exchange refuses an order above a contract's freeze quantity. Kite's instrument list doesn't carry it, so the operator keeps a small file (`underlying,qty`, `MOCKTRADE_FREEZE_FILE`); the demo has sample limits (NIFTY 1,800).
+  - **#424 freeze quantities.** The exchange refuses an order above a contract's freeze quantity. Kite's instrument list doesn't carry it, so the operator keeps a small file (`underlying,qty`, `LADDRIX_FREEZE_FILE`); the demo has sample limits (NIFTY 1,800).
     - **Where it acts:** our order rules refuse above it in words (paper broker too, as the exchange would); `RiskGate.max_order_qty` takes it, so algos, the Autospreader and forced closes split to fit; the order spec carries it and the ticket says "max 1,800 per order" and refuses 25 lots before the click.
     - **A choice:** a bad line in the file is warned about and skipped, never stops the server; a file that can't be read at all is a setting error at start.
     - **Checks:** 13 tests (one: 30 calendars on the paper broker go 24 + 6 per leg); mutation 22/22 (one gap fixed: a share must never take a freeze limit); browser 5/5 (`e2e-freeze.cjs`, screenshot `context/images/freeze-ticket.png`).
@@ -752,18 +754,18 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
   - Merged as PR #435. With it every child of #250 and #251 was done, so both were closed.
 - 24 Oct, late. **"Complete just #287", then "go through file by file and make the repo really good".** Ayush first asked whether any open issue was as important as the Autospreader or a bug: none was (no bugs open; #287 matters before live money, #283 after). He chose #287, then a full review.
   - **#287 operations.** What was there: plain-text logs, `/api/ready` that knew only the loops and recovery, `/api/metrics` for signed-in admins only.
-    - **Logs:** one JSON object a line (`ops/logs.py`), carrying `request_id` (sent back as `X-Request-ID`; a caller's own only if short and plain), `user`, and while an order is placed, changed, cancelled or updated, its `account_id` and `client_order_id`. `jq` finds one order's journey. Still through the secret filter. `MOCKTRADE_LOG_FORMAT=text` for plain lines.
+    - **Logs:** one JSON object a line (`ops/logs.py`), carrying `request_id` (sent back as `X-Request-ID`; a caller's own only if short and plain), `user`, and while an order is placed, changed, cancelled or updated, its `account_id` and `client_order_id`. `jq` finds one order's journey. Still through the secret filter. `LADDRIX_LOG_FORMAT=text` for plain lines.
     - **One status (`ops/status.py`):** every part is ready, starting, degraded or down, with why and since when: the server, the watchdog, each loop, each account's recovery, the audit log, and a row per kind of ops alert. Readiness = nothing starting or down. It is `/api/ready`, Docker's health check, the `ready` metric, and the Admin screen's new **Status** tab (admin and risk, own firm only).
     - **A choice:** a missing Kite login is only *degraded*, never down, and Caddy keeps checking liveness and starts when the app has started, not when it is healthy. Otherwise a morning restart before the Kite login would hide the very screens needed to log in.
     - **Another choice:** "since when" for parts that keep no time (the audit log, "no problem reported") comes from the server looking at itself every 5 s, so it is right whether or not anyone is watching.
-    - **Metrics:** Prometheus reads them with its own key (`MOCKTRADE_METRICS_TOKEN`, Prometheus text only, constant-time compare); new counters for answers by status class and order events by kind; gauges for readiness and active alerts. An optional `monitoring` Compose profile adds Prometheus and Grafana (on 127.0.0.1 only, reached by SSH tunnel) with a MockTrade dashboard.
+    - **Metrics:** Prometheus reads them with its own key (`LADDRIX_METRICS_TOKEN`, Prometheus text only, constant-time compare); new counters for answers by status class and order events by kind; gauges for readiness and active alerts. An optional `monitoring` Compose profile adds Prometheus and Grafana (on 127.0.0.1 only, reached by SSH tunnel) with a Laddrix dashboard.
     - **Bugs found on the way:** the Prometheus text repeated a labelled metric's `# TYPE` line (Prometheus refuses the scrape: it would never have worked); an order sent without an id had its first log lines without one; Compose can't put an environment secret into a read-only container (Prometheus is not read-only); `.tone-warn` was used (#428) but never styled.
     - **Checks:** 17 server tests, 2 screen tests, the metrics test that fails on the old code; mutation 33/33 (`mutate-operations.py`); the real image built and smoke-tested (healthy = ready, JSON log); the whole Compose stack with monitoring run for real (Prometheus target up with the key, Grafana dashboard with live data, `context/images/grafana-dashboard.png`); browser 6/6 (`e2e-status.cjs`, `context/images/status-page.png`).
   - Merged as PR #437.
   - **The repo review (#438).** Read the code file by file and ran tools over all of it: no TODOs, no stray prints, almost no dead code (vulture). The weak spots were around the code, so the review became four issues: #439 setup, #440 types (mypy found 141 errors, not checked in CI), #441 routes (`create_app` in `server/app.py` is one 1,664-line function), #442 the screens' lint. Left alone on purpose: Prettier over the screens (a rewrite of ~160 files, and the mutation scripts match source text), moving `context/scripts` (Ayush's rule keeps scripts in context), a licence (Ayush's choice: on his to-do list).
   - **#439 setup.** What was wrong and what changed:
     - the README's numbers disagreed and were stale (Python 3.13 vs 3.12, "1,900+" vs "1,480+ and 420" tests): now measured (1,600+ server tests, 530 screen and desktop tests, 80+ mutation scripts, 40+ browser checks);
-    - `mocktrade.__version__` said 0.1.0 and the desktop app 0.1.0: both now follow `version.py`, and the version test covers them;
+    - `laddrix.__version__` said 0.1.0 and the desktop app 0.1.0: both now follow `version.py`, and the version test covers them;
     - a project `.gitignore` instead of the generic template; `.editorconfig`; a `Makefile` (`make setup`, `demo`, `code`, `check`); `CONTRIBUTING.md`; a PR template; the dev tools pinned (a new ruff could have turned CI red on its own); Dependabot also watches the Compose images; a real `.github/workflows/README.md`;
     - one guide: `docs/GUIDE.md` became `docs/guide/summary.md` without its dated plan and status; `docs/adr/` folded into `docs/README.md`; the guide's chapters no longer talk about "Wednesday" (#264 and #267 are done);
     - the reading order had missed 25 files since 16 Oct, and the code map had no `refdata/`: `context/scripts/render-reading-order.py` now keeps the reading order complete, each file described by its own first sentence, and `tests/test_docs.py` fails if a code file is missing, a server folder is not in the code map, or a link between the docs leads nowhere;
@@ -822,5 +824,16 @@ Ayush is pausing until Thursday because his weekly limit is nearly used up. He a
 9. the algos.
 
 `context/showcase/README.md` is the gallery. Every claim was checked against the code. For example, the price band is a typo guard, not the exchange circuit, and square-off is an assistant, not automatic. Each picture was looked at and fixed where text overlapped. The session's shell was unavailable for a while (a server-side permission check failing), so part of the work was pushed through GitHub directly.
+
 ## 25 Oct 2026: bug #458, backtest ids
 CI on the showcase PR failed a backtest test. The cause was real: a backtest id is the time to the second plus 4 random hex characters, so ten runs started in one second can share an id (about once in 1,500 tries). The second run then replaced the first, and the waiting limit counted one fewer. Fix: pick the id again while it is taken. A new test forces a collision; with the fix removed, that test fails.
+
+## 25 Oct 2026: MockTrade becomes Laddrix (#457)
+Ayush noticed other GitHub repositories already called MockTrade and asked for a new name, a logo, and the name changed everywhere: code, the video and the pictures. Claude checked candidate names on the web and dropped "Vyuha", which an Indian trading-journal app already uses. Ayush chose **Laddrix**, after the price ladder.
+
+What changed:
+- The Python package (`laddrix`), the `LADDRIX_*` settings, the screens, the desktop app, deploy files, docs and context: 550 files.
+- The logo: a price ladder in a hexagon (rose rungs are the asks, the cyan rung is the last price, green rungs are the bids). It is the app's icon and sits in its menu bar.
+- The posters and the advert were redrawn with the new screenshots, taken with `context/scripts/shoot-showcase.cjs`.
+
+Links to the GitHub repository keep the old address until Ayush renames it; GitHub redirects after that. Ayush also asked that the advert be about the app, not how many days it took: its opening and ending now speak only about the product.

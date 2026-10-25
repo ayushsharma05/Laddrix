@@ -4,9 +4,9 @@ screens come last, the shared checks in server/context.py); the tests must notic
 tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-A = "src/mocktrade/server/app.py"
-C = "src/mocktrade/server/context.py"
-M = "src/mocktrade/server/routes/market.py"
+A = "src/laddrix/server/app.py"
+C = "src/laddrix/server/context.py"
+M = "src/laddrix/server/routes/market.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_routes.py", "tests/test_server.py",
          "tests/test_workspaces.py", "tests/test_admin.py", "tests/test_step_up.py",
          "tests/test_operations.py", "tests/test_security_surface.py"]

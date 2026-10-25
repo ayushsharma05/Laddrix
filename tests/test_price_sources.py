@@ -13,17 +13,17 @@ from kite_packets import NFO_TOKEN
 from test_gtt import CALL
 from test_kite_live import AYUSH, OTHER, FakeTicker, settle, world  # noqa: F401 (fixture)
 
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.kite.decoder import KiteTick
-from mocktrade.domain.accounts import BrokerAccount, Role, User
-from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
-from mocktrade.domain.ticks import Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.marketdata.sources import PriceSources
-from mocktrade.orders.model import ClientIds
-from mocktrade.platform import Platform
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.kite.decoder import KiteTick
+from laddrix.domain.accounts import BrokerAccount, Role, User
+from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
+from laddrix.domain.ticks import Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.marketdata.sources import PriceSources
+from laddrix.orders.model import ClientIds
+from laddrix.platform import Platform
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
 
 FUT = "NFO:NIFTY26OCTFUT"
 
@@ -31,7 +31,7 @@ FUT = "NFO:NIFTY26OCTFUT"
 def test_the_rules_of_who_trades_and_sees_which_prices():
     shared, a, b = MarketData(), MarketData(), MarketData()
     sim = PriceSources(shared)
-    assert sim.of("anything") is shared  # the simulator: MockTrade's own data, everyone's
+    assert sim.of("anything") is shared  # the simulator: Laddrix's own data, everyone's
 
     kite = PriceSources(shared, per_account=True)
     kite.register("acc-a", a)
@@ -156,9 +156,9 @@ async def test_a_screen_gets_ticks_only_from_its_own_subscription(tmp_path, nift
 async def test_on_a_kite_server_a_paper_account_fills_on_its_owners_own_prices(tmp_path):
     from test_serve import KEY, env
 
-    from mocktrade.server.security import SecretBox
-    from mocktrade.server.users import UserStore
-    from mocktrade.tools.serve import ServeSettings, build
+    from laddrix.server.security import SecretBox
+    from laddrix.server.users import UserStore
+    from laddrix.tools.serve import ServeSettings, build
 
     data = tmp_path / "data"
     data.mkdir()
@@ -168,7 +168,7 @@ async def test_on_a_kite_server_a_paper_account_fills_on_its_owners_own_prices(t
     users.add_account(BrokerAccount("acc-kite", "kite", "AB1234", "ayush"))
     users.add_account(BrokerAccount("acc-paper", "paper", "P1", "ayush"))  # ayush's: his prices
     users.add_account(BrokerAccount("acc-p2", "paper", "P2", "riya"))  # riya has no Kite account
-    settings = ServeSettings.from_env(env(MOCKTRADE_DATA=str(data), MOCKTRADE_PRICES="kite",
+    settings = ServeSettings.from_env(env(LADDRIX_DATA=str(data), LADDRIX_PRICES="kite",
                                           KITE_API_KEY="k", KITE_API_SECRET="s"))  # fmt: skip
     built = build(settings)
     try:
@@ -186,7 +186,7 @@ async def test_on_a_kite_server_a_paper_account_fills_on_its_owners_own_prices(t
 
 
 def book(ltp, volume, bid, ask):
-    from mocktrade.domain.ticks import DepthLevel
+    from laddrix.domain.ticks import DepthLevel
 
     return Tick(FUT, ltp, volume=volume, bids=(DepthLevel(bid, 75, 1),),
                 asks=(DepthLevel(ask, 75, 1),))  # fmt: skip
@@ -196,7 +196,7 @@ async def test_every_market_screen_reads_the_askers_own_subscription(tmp_path, n
     from test_server import ORIGIN
     from test_server import World as ServerWorld
 
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.server.app import ServerSettings, create_app
 
     w = ServerWorld(tmp_path, nifty_fut)  # ayush owns acc-ayush, riya owns acc-riya
     a, b = MarketData(), MarketData()
@@ -227,7 +227,7 @@ async def test_every_market_screen_reads_the_askers_own_subscription(tmp_path, n
 
 
 def test_a_price_alert_fires_only_on_its_owners_own_prices():
-    from mocktrade.alerts.engine import AlertEngine
+    from laddrix.alerts.engine import AlertEngine
 
     a, b = MarketData(), MarketData()
     owners = {"ayush": a, "riya": b}
@@ -264,7 +264,7 @@ async def test_chart_history_goes_through_the_askers_own_login(world):  # noqa: 
     await world.live.reader(OTHER.id).request("GET", "/instruments/historical/1/minute")
     assert world.kite.calls[-1][2] == "tok-b"  # its own login, not the first account's
     world.live.log_out(world.live._links[OTHER.id], "test")
-    from mocktrade.broker.kite.http import KiteAuthError
+    from laddrix.broker.kite.http import KiteAuthError
 
     with pytest.raises(KiteAuthError, match="isn't logged in"):
         await world.live.reader(OTHER.id).request("GET", "/instruments/historical/1/minute")
@@ -277,9 +277,9 @@ async def test_each_screens_forming_candle_is_built_from_its_own_ticks(tmp_path,
     from test_charts import t, tick
     from test_stream import Live, all_of, next_of
 
-    from mocktrade.charts.candles import CandleBuilder
-    from mocktrade.charts.service import Charts
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.charts.candles import CandleBuilder
+    from laddrix.charts.service import Charts
+    from laddrix.server.app import ServerSettings, create_app
 
     server = Live(tmp_path, nifty_fut)
     server.store.add(CALL)  # a NIFTY option, for the chain

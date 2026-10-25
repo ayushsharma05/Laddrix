@@ -6,10 +6,10 @@ notice. Restores each file in `finally`; a hang counts as caught. Run alone from
 root."""
 import subprocess
 
-A = "src/mocktrade/algos/autospreader.py"
-M = "src/mocktrade/spreads/model.py"
-C = "src/mocktrade/orders/codec.py"
-E = "src/mocktrade/algos/engine.py"
+A = "src/laddrix/algos/autospreader.py"
+M = "src/laddrix/spreads/model.py"
+C = "src/laddrix/orders/codec.py"
+E = "src/laddrix/algos/engine.py"
 FM = "ui/src/widgets/ase/model.ts"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_ase_multi_quote.py", "tests/test_autospreader.py",
        "tests/test_ase_controls.py", "tests/test_algo_restore.py", "tests/test_spreads.py",

@@ -3,7 +3,7 @@
     python3 context/scripts/drill-restart.py            # prints each check, PASS/FAIL; exit 1 if any fail
 
 1. start a fresh demo; buy 150 at the market (fills), rest a buy limit far away, and protect the
-   position with a trailing stop (held by MockTrade)
+   position with a trailing stop (held by Laddrix)
 2. SIGKILL the server mid-session (no clean shutdown), and start it again
 3. check: the position is rebuilt to 150 (bought 150, not 300: no fill counted twice), the
    resting order's fate is said (the paper broker restarted empty, so it is closed, not left
@@ -38,7 +38,7 @@ def check(ok: bool, what: str) -> None:
 
 def start() -> subprocess.Popen:
     log = open("data/drill-demo.log", "a")
-    proc = subprocess.Popen([sys.executable, "-m", "mocktrade.tools.demo"], stdout=log, stderr=log)
+    proc = subprocess.Popen([sys.executable, "-m", "laddrix.tools.demo"], stdout=log, stderr=log)
     for _ in range(60):
         try:
             if httpx.get(f"{BASE}/api/health", timeout=1).status_code == 200:
@@ -58,7 +58,7 @@ def login() -> httpx.Client:
     window = int(time.time()) // 30
     while int(time.time()) // 30 == window:  # a fresh code (each one works once)
         time.sleep(0.5)
-    code = subprocess.run([sys.executable, "-m", "mocktrade.tools.demo", "--code"],
+    code = subprocess.run([sys.executable, "-m", "laddrix.tools.demo", "--code"],
                           capture_output=True, text=True, check=True).stdout.strip()  # fmt: skip
     c = httpx.Client(base_url=BASE, headers={"origin": ORIGIN}, timeout=10)
     r = c.post("/api/session", json={"username": "demo", "password": "demo-password-123",
@@ -99,7 +99,7 @@ def order(c, **fields):
 
 
 def main() -> None:
-    subprocess.run(["pkill", "-f", "[-]m mocktrade[.]tools[.]demo"], check=False)
+    subprocess.run(["pkill", "-f", "[-]m laddrix[.]tools[.]demo"], check=False)
     time.sleep(1)
     subprocess.run(["rm", "-rf", "data/demo", "data/drill-demo.log"], check=True)
     proc = start()

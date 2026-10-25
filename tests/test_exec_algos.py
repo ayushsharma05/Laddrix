@@ -5,13 +5,13 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.algos.engine import AlgoEngine, AlgoError, AlgoState, AlgoType
-from mocktrade.algos.iceberg import SPEC as ICEBERG
-from mocktrade.algos.iceberg import Iceberg
-from mocktrade.algos.pov import SPEC as POV
-from mocktrade.algos.pov import Pov
-from mocktrade.algos.schedule import (
+from laddrix.algos.builtin import BUILTIN
+from laddrix.algos.engine import AlgoEngine, AlgoError, AlgoState, AlgoType
+from laddrix.algos.iceberg import SPEC as ICEBERG
+from laddrix.algos.iceberg import Iceberg
+from laddrix.algos.pov import SPEC as POV
+from laddrix.algos.pov import Pov
+from laddrix.algos.schedule import (
     TWAP_SPEC,
     VWAP_SPEC,
     Twap,
@@ -20,15 +20,15 @@ from mocktrade.algos.schedule import (
     market_close,
     nse_u_shape,
 )
-from mocktrade.algos.spec import spec_to_dict
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import OrderStatus, OrderUpdate, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.options.model import IST
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.algos.spec import spec_to_dict
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import OrderStatus, OrderUpdate, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.options.model import IST
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds
+from laddrix.refdata.store import InstrumentStore
 
 FUT = "NFO:NIFTY26OCTFUT"
 T0 = datetime(2026, 10, 14, 4, 0, tzinfo=UTC)  # a Wednesday, 09:30 IST
@@ -423,11 +423,11 @@ async def test_pov_waits_for_a_feed_with_volume_and_can_cross(world):
 async def test_each_algo_completes_against_the_paper_broker(nifty_fut, code, params):
     import asyncio
 
-    from mocktrade.broker.paper import PaperBroker
-    from mocktrade.domain.accounts import BrokerAccount
-    from mocktrade.platform import Platform
-    from mocktrade.risk.kill_switch import KillSwitch
-    from mocktrade.risk.limits import RiskLimits
+    from laddrix.broker.paper import PaperBroker
+    from laddrix.domain.accounts import BrokerAccount
+    from laddrix.platform import Platform
+    from laddrix.risk.kill_switch import KillSwitch
+    from laddrix.risk.limits import RiskLimits
 
     store = InstrumentStore()
     store.add(nifty_fut)

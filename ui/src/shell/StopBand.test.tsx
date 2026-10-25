@@ -71,7 +71,7 @@ describe("the STOP band", () => {
   });
 
   it("a position whose size isn't known is shown and never offered for flattening", async () => {
-    const unknown = { ...STATUS, can_flatten: false, positions: [{ ...STATUS.positions[0]!, unknown: "MockTrade shows +150, the broker shows +225" }] };
+    const unknown = { ...STATUS, can_flatten: false, positions: [{ ...STATUS.positions[0]!, unknown: "Laddrix shows +150, the broker shows +225" }] };
     setup({ [`GET ${BASE}`]: unknown });
     await screen.findByText("NIFTY26OCTFUT MIS: size not known, close it at the broker");
     expect(screen.queryByRole("button", { name: /Flatten/ })).toBeNull();

@@ -1,5 +1,5 @@
 // The limits spec and limits as the server sends them (a part of the real spec, from
-// mocktrade.risk.limits_spec, so the screen is tested against the real shapes).
+// laddrix.risk.limits_spec, so the screen is tested against the real shapes).
 import type { LimitValue, LimitsSpec } from "../../api/types";
 
 export const SPEC: LimitsSpec = {

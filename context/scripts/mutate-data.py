@@ -3,15 +3,15 @@ backup's recorded head, and one person's export and erase; the tests must notice
 tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-L = "src/mocktrade/logsafe.py"
-E = "src/mocktrade/store/events.py"
-B = "src/mocktrade/tools/backup.py"
-A = "src/mocktrade/tools/audit.py"
-U = "src/mocktrade/server/users.py"
-T = "src/mocktrade/tools/users.py"
-K = "src/mocktrade/broker/kite/session.py"
-C = "src/mocktrade/config.py"
-N = "src/mocktrade/ops/notify.py"
+L = "src/laddrix/logsafe.py"
+E = "src/laddrix/store/events.py"
+B = "src/laddrix/tools/backup.py"
+A = "src/laddrix/tools/audit.py"
+U = "src/laddrix/server/users.py"
+T = "src/laddrix/tools/users.py"
+K = "src/laddrix/broker/kite/session.py"
+C = "src/laddrix/config.py"
+N = "src/laddrix/ops/notify.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_log_redaction.py",
          "tests/test_audit_chain.py", "tests/test_personal_data.py"]
 MUTANTS = [

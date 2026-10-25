@@ -6,13 +6,13 @@
 # the NRML one), cancel the target, close 150 exactly, and leave the account flat, never short.
 set -u
 OUT=${OUT:-$(mktemp -d)}
-stop() { pkill -f "^python3? -m mocktrade[.]tools[.]demo" 2>/dev/null; sleep 1; }
+stop() { pkill -f "^python3? -m laddrix[.]tools[.]demo" 2>/dev/null; sleep 1; }
 stop; rm -rf data/demo
-python3 -m mocktrade.tools.demo > "$OUT/demo.log" 2>&1 &
+python3 -m laddrix.tools.demo > "$OUT/demo.log" 2>&1 &
 sleep 10
 python3 - <<'PY'
 import subprocess, time, httpx
-code = subprocess.run(["python3", "-m", "mocktrade.tools.demo", "--code"],
+code = subprocess.run(["python3", "-m", "laddrix.tools.demo", "--code"],
                       capture_output=True, text=True).stdout.strip()
 c = httpx.Client(base_url="http://127.0.0.1:8000", headers={"origin": "http://localhost:8000"})
 r = c.post("/api/session", json={"username": "demo", "password": "demo-password-123", "code": code})

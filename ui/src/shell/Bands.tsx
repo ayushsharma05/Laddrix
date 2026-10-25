@@ -70,7 +70,7 @@ export function Bands() {
   if (status === "reconnecting" || status === "connecting") {
     bands.push(
       <div key="disc" role="status" className="band warn">
-        <b>{status === "connecting" ? "CONNECTING TO MOCKTRADE" : "DISCONNECTED FROM MOCKTRADE"}</b>
+        <b>{status === "connecting" ? "CONNECTING TO LADDRIX" : "DISCONNECTED FROM LADDRIX"}</b>
         <span>reconnecting… order clicks paused so nothing is sent blind · orders at the broker are unaffected</span>
       </div>,
     );
@@ -90,7 +90,7 @@ export function Bands() {
       <div key={`recon-${alert.instrumentId}`} role="alert" className="band warn">
         <b>POSITION DIFFERS · {shortName(alert.instrumentId)}</b>
         <span>
-          MockTrade {signed(alert.ours)} · broker {signed(alert.broker)} · check the broker before trading it
+          Laddrix {signed(alert.ours)} · broker {signed(alert.broker)} · check the broker before trading it
         </span>
       </div>,
     );

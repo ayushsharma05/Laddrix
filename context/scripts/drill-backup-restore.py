@@ -4,7 +4,7 @@
 
 1. a fresh demo gets a day's worth of state: a second user, a trade and a position, a saved
    layout, a theme, an MTM limit, a market alert
-2. while it runs, `mocktrade.tools.backup` backs it up (the server keeps writing meanwhile)
+2. while it runs, `laddrix.tools.backup` backs it up (the server keeps writing meanwhile)
 3. the server stops; the restore goes into an ISOLATED, EMPTY folder first, never over the
    live one; the demo's secret key and login secret are put back "from the password manager"
    (copied by hand: they are never in a backup)
@@ -34,13 +34,13 @@ def check(ok, what):
 
 
 def stop():
-    subprocess.run(["pkill", "-f", "[-]m mocktrade[.]tools[.]demo"], check=False)
+    subprocess.run(["pkill", "-f", "[-]m laddrix[.]tools[.]demo"], check=False)
     time.sleep(1.5)
 
 
 def start():
     log = open(WORK / "demo.log", "a")
-    subprocess.Popen([sys.executable, "-m", "mocktrade.tools.demo"], stdout=log, stderr=log)
+    subprocess.Popen([sys.executable, "-m", "laddrix.tools.demo"], stdout=log, stderr=log)
     for _ in range(60):
         try:
             if httpx.get(f"{BASE}/api/health", timeout=1).status_code == 200:
@@ -55,7 +55,7 @@ def login():
     window = int(time.time()) // 30
     while int(time.time()) // 30 == window:  # a fresh code: each works once
         time.sleep(0.5)
-    code = subprocess.run([sys.executable, "-m", "mocktrade.tools.demo", "--code"],
+    code = subprocess.run([sys.executable, "-m", "laddrix.tools.demo", "--code"],
                           capture_output=True, text=True, check=True).stdout.strip()  # fmt: skip
     c = httpx.Client(base_url=BASE, headers={"origin": ORIGIN}, timeout=10)
     c.post("/api/session", json={"username": "demo", "password": "demo-password-123",
@@ -115,7 +115,7 @@ def main():
           f"audit events: {len(before['audit'])}")
 
     print("--- 2. back up while the server runs")
-    backup = subprocess.run([sys.executable, "-m", "mocktrade.tools.backup", "--data", str(DEMO),
+    backup = subprocess.run([sys.executable, "-m", "laddrix.tools.backup", "--data", str(DEMO),
                              "--to", str(WORK / "backups")], capture_output=True, text=True)  # fmt: skip
     check(backup.returncode == 0, backup.stdout.strip() or backup.stderr.strip())
     (folder,) = (WORK / "backups").iterdir()
@@ -129,10 +129,10 @@ def main():
 
     print("--- 3. restore into an isolated, empty folder")
     fresh = WORK / "restored"
-    r = subprocess.run([sys.executable, "-m", "mocktrade.tools.restore", "--from", str(folder),
+    r = subprocess.run([sys.executable, "-m", "laddrix.tools.restore", "--from", str(folder),
                         "--to", str(fresh)], capture_output=True, text=True)  # fmt: skip
-    check(r.returncode == 0 and "MOCKTRADE_SECRET_KEY" in r.stdout, r.stdout.splitlines()[0])
-    refused = subprocess.run([sys.executable, "-m", "mocktrade.tools.restore", "--from",
+    check(r.returncode == 0 and "LADDRIX_SECRET_KEY" in r.stdout, r.stdout.splitlines()[0])
+    refused = subprocess.run([sys.executable, "-m", "laddrix.tools.restore", "--from",
                               str(folder), "--to", str(DEMO)], capture_output=True, text=True)  # fmt: skip
     check(refused.returncode == 1 and "is not empty" in refused.stderr,
           "over the live folder without --replace: refused")

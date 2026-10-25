@@ -57,7 +57,7 @@ export function Recordings({ publish }: WidgetProps<BaseParams>) {
 
   const refresh = useCallback(() => setLoads((n) => n + 1), []);
 
-  if (off) return <div className="empty-note">Not recording: {off} (MOCKTRADE_RECORD_DAYS sets how many days are kept).</div>;
+  if (off) return <div className="empty-note">Not recording: {off} (LADDRIX_RECORD_DAYS sets how many days are kept).</div>;
   return (
     <div className="book research">
       <div className="book-bar">

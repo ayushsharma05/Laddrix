@@ -5,12 +5,12 @@ account's own prices, each subscription checked for silence on its own, dropped 
 every subscription); the tests must notice. Runs the tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-B = "src/mocktrade/research/backtest.py"
-A = "src/mocktrade/server/app.py"
-ROUTES_RESEARCH = "src/mocktrade/server/routes/research.py"
-R = "src/mocktrade/reports/service.py"
-C = "src/mocktrade/ops/checks.py"
-V = "src/mocktrade/tools/serve.py"
+B = "src/laddrix/research/backtest.py"
+A = "src/laddrix/server/app.py"
+ROUTES_RESEARCH = "src/laddrix/server/routes/research.py"
+R = "src/laddrix/reports/service.py"
+C = "src/laddrix/ops/checks.py"
+V = "src/laddrix/tools/serve.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_firm_files.py"]
 MUTANTS = [
  (B, "        return CandleStore(self.root / f\"@{workspace}\")", "        return CandleStore(self.root)"),
@@ -20,7 +20,7 @@ MUTANTS = [
  (B, "        if candles and self._sources(owner)[1] is None:", "        if False:"),
  (ROUTES_RESEARCH, "        return candles_for(user.workspace) if candles_for is not None else candles", "        return candles_for(MAIN) if candles_for is not None else candles"),
  (ROUTES_RESEARCH, "        if candles_for is None:  # one dataset for every firm on the server\n            platform_wide", "        if False:\n            platform_wide"),
- (ROUTES_RESEARCH, "        if not platform.prices.per_account:  # MockTrade's own recordings: every firm's\n            platform_wide", "        if True:\n            platform_wide"),
+ (ROUTES_RESEARCH, "        if not platform.prices.per_account:  # Laddrix's own recordings: every firm's\n            platform_wide", "        if True:\n            platform_wide"),
  (ROUTES_RESEARCH, "        found = market(user).ticks\n", "        found = next(iter(filter(None, (markets.of(s).ticks for s in platform.prices.all()))), None)\n"),
  (ROUTES_RESEARCH, "        store = market(user).ticks  # their own subscription's days (#396)", "        store = markets.of(platform.prices.all()[0]).ticks"),
  (A, "        ticks_for=ticks_for or (lambda md: ticks if md is platform.market_data else None),", "        ticks_for=lambda md: ticks,"),

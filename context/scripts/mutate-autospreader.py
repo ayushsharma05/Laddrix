@@ -5,8 +5,8 @@ the frozen definition, ownership, whole spread lots, the trade route); the tests
 Restores each file in `finally`; a hang counts as caught. Run alone from the repo root."""
 import subprocess
 
-A = "src/mocktrade/algos/autospreader.py"
-ROUTES_SPREADS = "src/mocktrade/server/routes/spreads.py"
+A = "src/laddrix/algos/autospreader.py"
+ROUTES_SPREADS = "src/laddrix/server/routes/spreads.py"
 F = "ui/src/widgets/algos/model.ts"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_autospreader.py", "tests/test_spread_api.py",
        "tests/test_ase_controls.py"], ".")

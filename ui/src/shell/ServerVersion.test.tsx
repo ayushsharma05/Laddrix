@@ -19,7 +19,7 @@ describe("Server version", () => {
   it("shows the version the server reports, with its build on hover", async () => {
     setup({ status: "ok", version: "1.0.0-rc.1", build: "abc1234" });
     const shown = await screen.findByText("v1.0.0-rc.1");
-    expect(shown.getAttribute("title")).toBe("MockTrade 1.0.0-rc.1, build abc1234");
+    expect(shown.getAttribute("title")).toBe("Laddrix 1.0.0-rc.1, build abc1234");
   });
 
   it("shows nothing when the server doesn't say (no guess)", async () => {

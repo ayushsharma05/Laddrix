@@ -12,7 +12,7 @@ What each layer of checks proves, how to run it, and what must pass before a rel
 | **Build and image** | The UI builds; the Docker image builds and passes its smoke test (health, a clean stop) | `cd ui && npm run build` · `deploy/smoke.sh` | yes (`ui`, `image`) |
 | **Desktop shell** | The desktop app's pop-out windows | `cd ui/desktop && npm test` | yes (`desktop`) |
 | **Mutation scripts** (`mutate-*.py`, 60+) | That the tests notice when a rule is broken. Each breaks one rule at a time, runs the tests and restores the file; a surviving mutant is a missing test | `python3 context/scripts/mutate-<area>.py` (alone) | no: run for each change in its area |
-| **Browser checks** (`e2e-*.cjs`, 34) | The real screens in Chromium against the demo: clicks, bands, pop-outs, screenshots | `python3 -m mocktrade.tools.demo --ui ui/dist`, then `node context/scripts/e2e-<area>.cjs` | no: run for each UI change in its area |
+| **Browser checks** (`e2e-*.cjs`, 34) | The real screens in Chromium against the demo: clicks, bands, pop-outs, screenshots | `python3 -m laddrix.tools.demo --ui ui/dist`, then `node context/scripts/e2e-<area>.cjs` | no: run for each UI change in its area |
 | **Demo checks** (`check-*.py`) | A feature end to end over the real API on the demo | `python3 context/scripts/check-<area>.py` | no |
 | **Drills** | What must survive a bad day: a crash (`drill-restart.py`, plus `e2e-restart-bands.cjs`) and a backup restored into a fresh folder (`drill-backup-restore.py`) | each runs its own demo | no: before a release |
 | **Go-live, paper** | Every go-live step that can be shown on paper (`golive-paper.py`). Never evidence about Kite | `python3 context/scripts/golive-paper.py` | no: before a release |

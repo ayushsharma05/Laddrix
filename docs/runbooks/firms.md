@@ -1,6 +1,6 @@
 # Running several firms on one server
 
-**When:** you (the operator) host another trading firm on the same MockTrade server.
+**When:** you (the operator) host another trading firm on the same Laddrix server.
 **Design:** [tenancy.md](../design/tenancy.md). **Before the first outside firm trades:** Zerodha's
 answer on shared IPs and platform-held keys (#278). The two-firm drill (#397) passed: run it again after
 any change to access checks (`node context/scripts/drill-two-firms.cjs`).
@@ -17,7 +17,7 @@ users add-workspace acme "Acme" --admin ravi
 
 ```bash
 docker compose -f deploy/compose.yaml run --rm -it app \
-  python -m mocktrade.tools.users add-workspace acme "Acme Capital" --admin ravi
+  python -m laddrix.tools.users add-workspace acme "Acme Capital" --admin ravi
 ```
 
 - It prints ravi's authenticator link **once**. Send it to ravi privately and never put it in a
@@ -41,7 +41,7 @@ Each Kite account needs its app key in the settings (`KITE_API_KEY_<ACCOUNT>`, s
 | price-silence bands | that account's viewers | none (the screens) |
 | the firm STOP | that firm only | `events.db` |
 
-On a simulator or replay server there is one price feed: MockTrade's own simulated data,
+On a simulator or replay server there is one price feed: Laddrix's own simulated data,
 shared by everyone. Its recordings stay in `data/ticks/<day>/`.
 
 ## 3. The daily jobs, per firm

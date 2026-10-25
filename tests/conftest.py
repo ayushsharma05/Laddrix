@@ -5,9 +5,9 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from mocktrade.domain.accounts import BrokerAccount, Role, User
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.refdata.expiry import Expiries
+from laddrix.domain.accounts import BrokerAccount, Role, User
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.refdata.expiry import Expiries
 
 # The test contracts are dated October 2026 (NIFTY26OCTFUT expires 27 Oct 2026). Tests that
 # aren't about expiry, many of them on the real clock, see expiry as on 16 Oct 2026, so they
@@ -67,7 +67,7 @@ def account(trader: User) -> BrokerAccount:
 @pytest.fixture
 def mocker_free_request(nifty_fut):
     """A simple valid order request used by broker tests."""
-    from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
+    from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
 
     return OrderRequest(
         client_order_id="MT0001",
@@ -88,7 +88,7 @@ def light_password_hashing():
     Production keeps the strong defaults (security.use_hasher is never called there)."""
     from argon2 import PasswordHasher
 
-    from mocktrade.server import security
+    from laddrix.server import security
 
     previous = security.use_hasher(PasswordHasher(time_cost=1, memory_cost=8, parallelism=1))
     yield

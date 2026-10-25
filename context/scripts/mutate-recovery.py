@@ -1,6 +1,6 @@
 """#206 mutation check: break one recovery rule, the tests must notice."""
 import subprocess
-F = "src/mocktrade/recovery.py"
+F = "src/laddrix/recovery.py"
 M = [
  (F, "        if self.state == \"ok\":\n            return None", "        if True:\n            return None"),
  (F, "            report.fills += 1", "            report.fills += 1\n            book.replay(e.client_order_id, e.order.request, e.order.filled_qty + 75, 75, e.fill.price_paise)"),
@@ -12,8 +12,8 @@ M = [
  (F, '            price = close(held.instrument_id) or round(held.avg_price_paise)', '            price = round(held.avg_price_paise)'),
  (F, "            book.mark(tick)", "            pass"),
  (F, "            gate.set(\"failed\", report.summary())", "            gate.set(\"ok\", report.summary())"),
- ("src/mocktrade/platform.py", '        if runtime.recovery is not None:\n            await runtime.recovery.finished.wait()\n        self.restore_algos', '        self.restore_algos'),
- ("src/mocktrade/tools/serve.py", "            recover_on_start=True,", "            recover_on_start=False,"),
+ ("src/laddrix/platform.py", '        if runtime.recovery is not None:\n            await runtime.recovery.finished.wait()\n        self.restore_algos', '        self.restore_algos'),
+ ("src/laddrix/tools/serve.py", "            recover_on_start=True,", "            recover_on_start=False,"),
 ]
 caught = 0
 for f, a, b in M:

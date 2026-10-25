@@ -9,10 +9,10 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execSync } = require('child_process');
 const IMAGES = `${__dirname}/../images`;
-const PATTERN = '[-]m mocktrade[.]tools[.]demo';
+const PATTERN = '[-]m laddrix[.]tools[.]demo';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const startDemo = async () => {
-  execSync('nohup python3 -m mocktrade.tools.demo --ui ui/dist >> data/drill-demo.log 2>&1 &');
+  execSync('nohup python3 -m laddrix.tools.demo --ui ui/dist >> data/drill-demo.log 2>&1 &');
   for (let i = 0; i < 60; i++) {
     try { execSync('curl -sf http://127.0.0.1:8000/api/health >/dev/null'); return; } catch { await sleep(500); }
   }
@@ -21,7 +21,7 @@ const startDemo = async () => {
 const freshCode = async () => {
   const w = Math.floor(Date.now() / 30000);
   while (Math.floor(Date.now() / 30000) === w) await sleep(500);  // each code works once
-  return execSync('python3 -m mocktrade.tools.demo --code').toString().trim();
+  return execSync('python3 -m laddrix.tools.demo --code').toString().trim();
 };
 const pid = () => execSync(`pgrep -f "${PATTERN}"`).toString().trim().split('\n')[0];
 (async () => {

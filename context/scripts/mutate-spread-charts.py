@@ -6,9 +6,9 @@ the Autospreader's Chart button); the tests must notice. Restores each
 file in `finally`; a hang counts as caught. Run alone from the repo root."""
 import subprocess
 
-C = "src/mocktrade/charts/service.py"
-ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
-T = "src/mocktrade/server/stream.py"
+C = "src/laddrix/charts/service.py"
+ROUTES_MARKET = "src/laddrix/server/routes/market.py"
+T = "src/laddrix/server/stream.py"
 CH = "ui/src/widgets/chart/Chart.tsx"
 AW = "ui/src/widgets/ase/Autospreader.tsx"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_spread_charts.py", "tests/test_charts.py"], ".")

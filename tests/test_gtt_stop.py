@@ -14,8 +14,8 @@ import asyncio
 
 from test_gtt import FUT, LTP, World, single, tick
 
-from mocktrade.domain.gtt import GttKind, GttLeg, GttRequest, GttStatus
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.domain.gtt import GttKind, GttLeg, GttRequest, GttStatus
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
 
 
 def opening_buy(trigger=2530000, price=2531000):

@@ -6,22 +6,22 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.algos.engine import AlgoEngine, AlgoState
-from mocktrade.broker.base import BrokerError
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.paper import PaperBroker
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.orders import OrderStatus, OrderUpdate, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds
-from mocktrade.platform import Platform
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.risk.limits import RiskLimits
+from laddrix.algos.builtin import BUILTIN
+from laddrix.algos.engine import AlgoEngine, AlgoState
+from laddrix.broker.base import BrokerError
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.paper import PaperBroker
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.orders import OrderStatus, OrderUpdate, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds
+from laddrix.platform import Platform
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.limits import RiskLimits
 
 OCT, NOV = "NFO:NIFTY26OCTFUT", "NFO:NIFTY26NOVFUT"
 T0 = datetime(2026, 10, 14, 4, 0, tzinfo=UTC)

@@ -35,7 +35,7 @@ AFTER=$(ist "2026-10-16 18:00")
 
 git clone -q "$REPO" "$WORK/repo" && cd "$WORK/repo" || exit 1
 git -c advice.detachedHead=false checkout -q "$(cd "$REPO" && git rev-parse "$NEW")"
-version=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' src/mocktrade/version.py)
+version=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' src/laddrix/version.py)
 git tag v0.0.1 "$(cd "$REPO" && git rev-parse "$OLD")"
 git tag "v$version" HEAD
 git tag v9.9.9 HEAD
@@ -47,21 +47,21 @@ s = s[: s.index("\n  caddy:")] + "\nvolumes:\n  data:\n"
 s = s.replace("      dockerfile: Dockerfile\n", "      dockerfile: Dockerfile\n      network: host\n")
 open("deploy/rehearsal.compose.yaml", "w").write(s)
 PY
-if ! docker image inspect mocktrade:old-main >/dev/null 2>&1; then  # the old version's image
+if ! docker image inspect laddrix:old-main >/dev/null 2>&1; then  # the old version's image
   git -c advice.detachedHead=false checkout -q v0.0.1
-  docker build --network host -q -t mocktrade:old-main . >/dev/null
+  docker build --network host -q -t laddrix:old-main . >/dev/null
   git -c advice.detachedHead=false checkout -q "v$version"
 fi
-key=$(docker run --rm mocktrade:old-main python -m mocktrade.tools.users new-key | sed -n '1s/^[^=]*=//p')
-printf 'MOCKTRADE_DOMAIN=localhost\nMOCKTRADE_SECRET_KEY=%s\nMOCKTRADE_PRICES=sim\nMOCKTRADE_HOLIDAYS=\n' "$key" >deploy/.env
+key=$(docker run --rm laddrix:old-main python -m laddrix.tools.users new-key | sed -n '1s/^[^=]*=//p')
+printf 'LADDRIX_DOMAIN=localhost\nLADDRIX_SECRET_KEY=%s\nLADDRIX_PRICES=sim\nLADDRIX_HOLIDAYS=\n' "$key" >deploy/.env
 
 echo "--- 1. production runs the old version"
 git -c advice.detachedHead=false checkout -q v0.0.1
-docker image tag mocktrade:old-main mocktrade:latest
+docker image tag laddrix:old-main laddrix:latest
 dc up -d app >/dev/null 2>&1
 for _ in $(seq 1 40); do [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q app)")" = healthy ] && break; sleep 2; done
 printf 'a-long-password-1\na-long-password-1\n' |
-  dc exec -T app python -m mocktrade.tools.users add-user ayush Ayush --roles admin,trader >/dev/null 2>&1
+  dc exec -T app python -m laddrix.tools.users add-user ayush Ayush --roles admin,trader >/dev/null 2>&1
 dc restart app >/dev/null 2>&1; sleep 6
 before=$(health)
 check "old version running ($before), user: $(users)" '[ "$(users)" = ayush ] && [ "${before%% *}" = "(none)" ]'
@@ -93,7 +93,7 @@ DEPLOY_NOW=$IN_HOURS deploy "v$version" --emergency "rehearsal: a fix that can't
 check "emergency deploy went ahead (exit $code): $(health)" '[ $code = 0 ] && [ "$(health | cut -d" " -f1)" = "$version" ]'
 check "and was logged with who and why" 'grep -q "EMERGENCY deploy of v$version in market hours by .*: rehearsal: a fix that can.t wait" "$DEPLOY_LOG"'
 printf 'a-long-password-2\na-long-password-2\n' |
-  dc exec -T app python -m mocktrade.tools.users add-user late "After the deploy" --roles trader >/dev/null 2>&1
+  dc exec -T app python -m laddrix.tools.users add-user late "After the deploy" --roles trader >/dev/null 2>&1
 check "a user added after the deploy: $(users)" '[ "$(users)" = "ayush late" ]'
 bash deploy/rollback.sh --restore-data >"$WORK/restore.out" 2>&1; code=$?
 check "rollback --restore-data (exit $code): $(health), users: $(users)" '[ $code = 0 ] && [ "$(health)" = "$before" ] && [ "$(users)" = ayush ]'

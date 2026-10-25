@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from mocktrade.charts.candles import (
+from laddrix.charts.candles import (
     BY_CODE,
     MINUTE,
     Candle,
@@ -29,9 +29,9 @@ from mocktrade.charts.candles import (
     aggregate,
     bucket_start,
 )
-from mocktrade.charts.history import HistoryError, KiteHistory, RecordedHistory
-from mocktrade.charts.service import ChartError, Charts
-from mocktrade.domain.ticks import Tick
+from laddrix.charts.history import HistoryError, KiteHistory, RecordedHistory
+from laddrix.charts.service import ChartError, Charts
+from laddrix.domain.ticks import Tick
 
 IST = ZoneInfo("Asia/Kolkata")
 FUT = "NFO:NIFTY26OCTFUT"
@@ -285,7 +285,7 @@ async def test_kite_history_is_split_spaced_cached_and_read_exactly():
 
 
 async def test_recorded_ticks_make_the_history_on_paper(tmp_path):
-    from mocktrade.research.ticks import FileTickStore
+    from laddrix.research.ticks import FileTickStore
 
     store = FileTickStore(tmp_path)
     y = DAY - timedelta(days=1)
@@ -321,8 +321,8 @@ async def test_recorded_ticks_make_the_history_on_paper(tmp_path):
 async def test_the_accounts_fills_become_marks_each_once(tmp_path):
     from test_reports import fill
 
-    from mocktrade.domain.orders import Side
-    from mocktrade.store.events import EventLog
+    from laddrix.domain.orders import Side
+    from laddrix.store.events import EventLog
 
     log = EventLog(tmp_path / "events.db")
     log.start()
@@ -354,7 +354,7 @@ async def live(tmp_path, nifty_fut):
     """A running server with charts: the builder taps every tick, history from a fake."""
     from test_stream import Live
 
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.server.app import ServerSettings, create_app
 
     server = Live(tmp_path, nifty_fut)
     builder = CandleBuilder()
@@ -423,7 +423,7 @@ async def test_the_forming_candle_streams_at_most_once_a_second(live, monkeypatc
         assert await all_of(ws, "candle", quiet=0.5) == []
         await ws.send(json.dumps({"op": "candles", "instrument_id": FUT, "interval": "2m"}))
         assert "interval must be one of" in (await next_of(ws, "error"))["message"]
-        monkeypatch.setattr("mocktrade.server.stream.MAX_CHARTS", 2)
+        monkeypatch.setattr("laddrix.server.stream.MAX_CHARTS", 2)
         for code in ("1m", "1m", "5m"):  # the same chart twice replaces it
             await ws.send(json.dumps({"op": "candles", "instrument_id": FUT, "interval": code}))
         await ws.send(json.dumps({"op": "candles", "instrument_id": FUT, "interval": "1h"}))

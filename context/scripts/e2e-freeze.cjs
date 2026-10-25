@@ -2,7 +2,7 @@
 // the ticket says "max 1,800 per order", refuses 25 lots before the click in words, takes
 // 24; the order spec and the instrument carry the limit; no page errors.
 //
-//   python3 -m mocktrade.tools.demo --port 8000 --ui ui/dist      (saved layouts cleared)
+//   python3 -m laddrix.tools.demo --port 8000 --ui ui/dist      (saved layouts cleared)
 //   node context/scripts/e2e-freeze.cjs <folder for screenshots>
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execFileSync } = require('child_process');
@@ -23,7 +23,7 @@ const check = (name, ok, detail = '') => {
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByLabel('Authenticator code').fill(execFileSync('python3', ['-m', 'mocktrade.tools.demo', '--code']).toString().trim());
+  await page.getByLabel('Authenticator code').fill(execFileSync('python3', ['-m', 'laddrix.tools.demo', '--code']).toString().trim());
   await page.keyboard.press('Enter');
   const ticket = page.locator('section.frame:has(.ticket-head)').first();
   await ticket.waitFor({ timeout: 20000 });

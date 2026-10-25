@@ -1,7 +1,7 @@
 """Orders on disk before the broker (#265).
 
 The failure before: the audit log wrote in the background, after the order was already at the
-broker. A crash in that moment left an order at the exchange that MockTrade had never heard
+broker. A crash in that moment left an order at the exchange that Laddrix had never heard
 of after a restart, and its id could be given to a new order. A broken disk only logged an
 error, and a stalled disk let memory grow without end. Now an order's record (and its id) is
 on disk before the broker sees it; if the disk can't confirm, the order isn't sent, the
@@ -12,14 +12,14 @@ from decimal import Decimal
 
 import pytest
 
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.checks import audit_log
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, EventKind, OrderEvent, Pending
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.store.events import EventLog, StorageError
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.ops.alerts import Alerts
+from laddrix.ops.checks import audit_log
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, EventKind, OrderEvent, Pending
+from laddrix.refdata.store import InstrumentStore
+from laddrix.store.events import EventLog, StorageError
 
 S = OrderStatus
 FUT = "NFO:NIFTY26OCTFUT"
@@ -138,7 +138,7 @@ async def test_a_change_that_cannot_be_recorded_is_not_sent(world):
     world.om.apply(_open(view))
     world.log.healthy = False
     world.log.last_error = OSError("disk gone")
-    from mocktrade.orders.model import OrderError
+    from laddrix.orders.model import OrderError
 
     with pytest.raises(OrderError, match="not sent: the change couldn't be recorded on disk"):
         await world.om.modify(view.client_order_id, qty=150)
@@ -147,7 +147,7 @@ async def test_a_change_that_cannot_be_recorded_is_not_sent(world):
 
 
 def _open(view):
-    from mocktrade.domain.orders import OrderUpdate
+    from laddrix.domain.orders import OrderUpdate
 
     return OrderUpdate(view.client_order_id, view.broker_order_id or "F1", S.OPEN)
 
@@ -212,9 +212,9 @@ async def test_the_platform_wires_it_for_real_accounts_not_for_backtests(nifty_f
     p = Paper(nifty_fut, tmp_path)
     assert p.rt.orders._durable == p.log.persist  # every order: on disk first
     await p.stop()
-    from mocktrade.marketdata.service import MarketData
-    from mocktrade.platform import Platform
-    from mocktrade.risk.kill_switch import KillSwitch
+    from laddrix.marketdata.service import MarketData
+    from laddrix.platform import Platform
+    from laddrix.risk.kill_switch import KillSwitch
 
     store = InstrumentStore()
     replay = Platform(store, MarketData(), KillSwitch("firm"), None, durable_orders=False)

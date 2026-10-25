@@ -193,7 +193,7 @@ describe("the order book's Trades tab", () => {
     );
     expect(screen.getByRole("button", { name: /Trades 2/ }).getAttribute("aria-pressed")).toBe("true");
     const rows = within(screen.getByRole("grid", { name: "Trades" })).getAllByRole("row");
-    expect(rows[0]!.textContent).toContain("outside MockTrade");
+    expect(rows[0]!.textContent).toContain("outside Laddrix");
     expect(rows[1]!.textContent).toContain("10:00:01");
     expect(rows[1]!.textContent).toContain("18,75,757.50");
     fireEvent.doubleClick(rows[1]!);

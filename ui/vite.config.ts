@@ -2,7 +2,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// In development the Python server runs on :8000 (python -m mocktrade.tools.demo
+// In development the Python server runs on :8000 (python -m laddrix.tools.demo
 // --origin http://localhost:5173); the dev server forwards the API, the stream and the
 // broker-login callback to it, keeping the browser's Origin header.
 const server = "http://localhost:8000";

@@ -1,5 +1,5 @@
 import subprocess
-F = "src/mocktrade/options/strategy.py"
+F = "src/laddrix/options/strategy.py"
 M = [
  ('return 1 if self.side == "BUY" else -1', 'return 1'),
  ('return self.sign * self.lots * self.instrument.lot_size', 'return self.sign * self.lots'),

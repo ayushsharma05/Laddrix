@@ -1,5 +1,5 @@
 import subprocess, pathlib
-E="src/mocktrade/algos/engine.py"
+E="src/laddrix/algos/engine.py"
 M=[
  (E,'        return max(0, p.qty - self.filled(p.instrument_id, p.side) - working - sent)','        return max(0, p.qty - self.filled(p.instrument_id, p.side) - working)',"in-flight counts against the parent"),
  (E,"if p.state is not AlgoState.STOPPING or p.in_flight:","if p.state is not AlgoState.STOPPING:","stop waits for in-flight children"),
@@ -9,9 +9,9 @@ M=[
  (E,'            log.exception("algo %s failed", p.algo_id)\n            self.stop_parent(p, f"the algo\'s own code failed: {exc!r}", final=AlgoState.FAILED)','            log.exception("algo %s failed", p.algo_id)',"broken strategy fails"),
  (E,'        if event.kind is EventKind.FILL and self._is_done(p):','        if False:',"done when filled"),
  (E,'            if child.status.is_final or child.pending is Pending.CANCEL:\n                continue\n            if not self._keeps','            if True:\n                continue\n            if not self._keeps',"pull children"),
- ("src/mocktrade/platform.py","                engine.stop_all(f\"trading stopped: {state.reason}\")","                pass","kill switch stops algos"),
- ("src/mocktrade/risk/throttle.py","return await self._admit(Kind.NEW, waits=request.from_algo)","return await self._admit(Kind.NEW, waits=request.algo_id is not None)","children wait in the throttle"),
- ("src/mocktrade/algos/spec.py","        problems.append(f\"{spec.name} has no setting called {name!r}\")","        pass","unknown settings refused"),
+ ("src/laddrix/platform.py","                engine.stop_all(f\"trading stopped: {state.reason}\")","                pass","kill switch stops algos"),
+ ("src/laddrix/risk/throttle.py","return await self._admit(Kind.NEW, waits=request.from_algo)","return await self._admit(Kind.NEW, waits=request.algo_id is not None)","children wait in the throttle"),
+ ("src/laddrix/algos/spec.py","        problems.append(f\"{spec.name} has no setting called {name!r}\")","        pass","unknown settings refused"),
  (E,"            algo_id=p.exchange_algo_id,","            algo_id=p.algo_id,","no invented exchange id"),
 ]
 caught=0

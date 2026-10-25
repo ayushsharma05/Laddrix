@@ -12,17 +12,17 @@ from test_mtm import Clock, flat, move, notes
 from test_portfolio import FUT, Paper
 from test_protect import price, start, view
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.algos.engine import AlgoEngine, AlgoState
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders.codec import request_from_dict, request_to_dict
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, OrderError, Pending
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.closing import CloseResult, ExitDesk
-from mocktrade.risk.mtm import PositionRule
+from laddrix.algos.builtin import BUILTIN
+from laddrix.algos.engine import AlgoEngine, AlgoState
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.marketdata.service import MarketData
+from laddrix.orders.codec import request_from_dict, request_to_dict
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, OrderError, Pending
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.closing import CloseResult, ExitDesk
+from laddrix.risk.mtm import PositionRule
 
 S = OrderStatus
 
@@ -403,7 +403,7 @@ async def test_a_stop_protecting_a_long_does_nothing_to_a_short(w):
 
 
 async def test_an_algos_own_closing_orders_are_not_counted_against_it(w):
-    from mocktrade.algos.engine import AlgoContext
+    from laddrix.algos.engine import AlgoContext
 
     algo = start(w, "OCO", target_paise=2520000, stop_paise=2490000)
     await w.engine.settle()

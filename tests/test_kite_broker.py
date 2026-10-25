@@ -8,13 +8,13 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 
-from mocktrade.broker.base import Broker, BrokerError
-from mocktrade.broker.kite.broker import AMO, KiteBroker, KiteUnknownOutcome
-from mocktrade.broker.kite.http import KiteHttp
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, Pending
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.broker.base import Broker, BrokerError
+from laddrix.broker.kite.broker import AMO, KiteBroker, KiteUnknownOutcome
+from laddrix.broker.kite.http import KiteHttp
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, Pending
+from laddrix.refdata.store import InstrumentStore
 
 S = OrderStatus
 
@@ -143,7 +143,7 @@ async def test_refusal_reasons_are_readable(broker, kite):
 
 async def test_unknown_outcome_leaves_the_order_unconfirmed_then_reconcile_finds_it(kite, broker):
     store = InstrumentStore()
-    from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
+    from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
 
     store.add(Instrument(Exchange.NFO, "NIFTY26OCTFUT", InstrumentKind.FUTURE, 10, 75))
     om = OrderManager("acc-1", broker, store.get, ids=ClientIds("MT"))

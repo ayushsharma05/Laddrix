@@ -17,7 +17,7 @@ export const THEME_CHOICES: { value: ThemeChoice; label: string }[] = [
 ];
 
 const PATH = "/api/me/settings/theme";
-const LOCAL = "mocktrade.theme"; // this browser's copy, for the first paint
+const LOCAL = "laddrix.theme"; // this browser's copy, for the first paint
 const CHOICES = new Set<string>(THEME_CHOICES.map((c) => c.value));
 
 export interface ThemeEnv {

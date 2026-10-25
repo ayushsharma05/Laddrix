@@ -1,6 +1,6 @@
 /* Widgets inside dockview: the theme (tabs act as title bars) and the shared grid look. */
 
-.dockview-theme-mocktrade {
+.dockview-theme-laddrix {
   --dv-paneview-active-outline-color: var(--accent);
   --dv-tabs-and-actions-container-font-size: 13px;
   --dv-tabs-and-actions-container-height: 24px;
@@ -33,10 +33,10 @@
   --dv-scrollbar-background-color: var(--scrollbar);
   background: var(--desktop);
 }
-.dockview-theme-mocktrade .dv-groupview {
+.dockview-theme-laddrix .dv-groupview {
   border: 1px solid var(--border);
 }
-.dockview-theme-mocktrade .dv-tabs-and-actions-container {
+.dockview-theme-laddrix .dv-tabs-and-actions-container {
   border-bottom: 1px solid var(--border);
 }
 

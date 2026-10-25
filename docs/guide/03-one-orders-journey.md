@@ -16,11 +16,11 @@ The same trip in words, with the file at each stop:
 ```
  ① you click BUY on the ladder           ui/src/widgets/ladder/
  ② the screen sends a request            ui/src/api/rest.ts        POST /api/accounts/acc-paper/orders
- ③ the waiter checks who you are         src/mocktrade/server/routes/trading.py   place()
- ④ the note becomes an OrderRequest      src/mocktrade/domain/orders.py
- ⑤ the kitchen manager takes it          src/mocktrade/orders/manager.py  OrderManager.submit()
- ⑥ the safety inspector checks it        src/mocktrade/risk/checks.py (+ margin, throttle)
- ⑦ it goes to the broker                 src/mocktrade/broker/paper.py  (or kite/)
+ ③ the waiter checks who you are         src/laddrix/server/routes/trading.py   place()
+ ④ the note becomes an OrderRequest      src/laddrix/domain/orders.py
+ ⑤ the kitchen manager takes it          src/laddrix/orders/manager.py  OrderManager.submit()
+ ⑥ the safety inspector checks it        src/laddrix/risk/checks.py (+ margin, throttle)
+ ⑦ it goes to the broker                 src/laddrix/broker/paper.py  (or kite/)
  ⑧ the broker reports back               OrderManager.apply()
  ⑨ the news spreads                      positions, charges, ledger, algos, screens
  ⑩ your screen updates                   ui/src/api/stream.ts → ui/src/state/store.ts
@@ -28,11 +28,11 @@ The same trip in words, with the file at each stop:
 
 ## 3.2 Stop ④: what an order looks like inside
 
-Money is **never** a decimal number inside MockTrade. It is a whole number of **paise**
+Money is **never** a decimal number inside Laddrix. It is a whole number of **paise**
 (₹25,010.00 = 2501000 paise). Why? Computers store decimals like 0.1 slightly wrong, and with
 money "slightly wrong" is not OK. Whole numbers are exact.
 
-From `src/mocktrade/domain/money.py`:
+From `src/laddrix/domain/money.py`:
 
 ```python
 PAISE_PER_RUPEE = 100
@@ -104,7 +104,7 @@ self._emit(EventKind.SENT, order)  # tell everyone: "sent"
 - **`try / except`** is like saying "try this, and if it goes wrong in this way, do that instead".
 - The three endings are refused, sent, and **unconfirmed** ("we don't know"). The third is
   the reason this code is careful: if we don't know whether an order reached the exchange,
-  sending it again could make **two** orders. So MockTrade waits and asks instead.
+  sending it again could make **two** orders. So Laddrix waits and asks instead.
 
 ## 3.4 Stop ⑥: the safety inspector (the gates)
 
@@ -121,7 +121,7 @@ self._emit(EventKind.SENT, order)  # tell everyone: "sent"
 
 Each check returns either **nothing** ("fine") or a **sentence** saying what's wrong. The first
 sentence stops the order, and that exact sentence is shown on your screen.
-That's why refusals in MockTrade read like "75 is not a multiple of NIFTY26OCTFUT's lot size
+That's why refusals in Laddrix read like "75 is not a multiple of NIFTY26OCTFUT's lot size
 75" and not "ERROR 4012".
 
 ## 3.5 Stops ⑧–⑨: the broker reports back, and the news spreads
@@ -129,7 +129,7 @@ That's why refusals in MockTrade read like "75 is not a multiple of NIFTY26OCTFU
 The broker sends updates: OPEN, then PARTIAL with a fill, then FILLED. `OrderManager.apply`
 reads each one and, if it really changes something, **announces** it.
 
-Announcing works like a group chat: parts of MockTrade **subscribe** to the order manager, and
+Announcing works like a group chat: parts of Laddrix **subscribe** to the order manager, and
 each announcement reaches all of them.
 
 ```
@@ -142,7 +142,7 @@ each announcement reaches all of them.
  ₹25,010        taxes          events.db    my order?"     new P&L        open screen
 ```
 
-This pattern ("subscribe, then announce") appears all over MockTrade. Look for
+This pattern ("subscribe, then announce") appears all over Laddrix. Look for
 `.subscribe(` in `platform.py`: each line plugs one listener in.
 
 ## 3.6 Stop ⑩: your screen updates

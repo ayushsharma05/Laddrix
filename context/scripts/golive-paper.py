@@ -32,11 +32,11 @@ def check(ok, what):
 
 
 def start():
-    subprocess.run(["pkill", "-f", "[-]m mocktrade[.]tools[.]demo"], check=False)
+    subprocess.run(["pkill", "-f", "[-]m laddrix[.]tools[.]demo"], check=False)
     time.sleep(1)
     subprocess.run(["rm", "-rf", "data/demo"], check=True)
     log = open("data/golive-demo.log", "w")
-    subprocess.Popen([sys.executable, "-m", "mocktrade.tools.demo"], stdout=log, stderr=log)
+    subprocess.Popen([sys.executable, "-m", "laddrix.tools.demo"], stdout=log, stderr=log)
     for _ in range(60):
         try:
             if httpx.get(f"{BASE}/api/health", timeout=1).status_code == 200:
@@ -48,7 +48,7 @@ def start():
 
 
 def login():
-    code = subprocess.run([sys.executable, "-m", "mocktrade.tools.demo", "--code"],
+    code = subprocess.run([sys.executable, "-m", "laddrix.tools.demo", "--code"],
                           capture_output=True, text=True, check=True).stdout.strip()  # fmt: skip
     c = httpx.Client(base_url=BASE, headers={"origin": ORIGIN}, timeout=10)
     c.post("/api/session", json={"username": "demo", "password": "demo-password-123",
@@ -147,7 +147,7 @@ def main():
 
     order(side="SELL", qty=75, order_type="MARKET", market_protection="2")
     until(lambda: net() == 0)
-    subprocess.run(["pkill", "-f", "[-]m mocktrade[.]tools[.]demo"], check=False)
+    subprocess.run(["pkill", "-f", "[-]m laddrix[.]tools[.]demo"], check=False)
     print(f"\nPAPER: {sum(ok for ok, _ in results)}/{len(results)} steps passed. "
           "None of this is evidence about Kite.")  # fmt: skip
     sys.exit(0 if all(ok for ok, _ in results) else 1)

@@ -1,6 +1,6 @@
 # Server: Mumbai, static IP, hardened
 
-Checklist for putting MockTrade on its own server. Steps marked **(Ayush)** need your AWS,
+Checklist for putting Laddrix on its own server. Steps marked **(Ayush)** need your AWS,
 domain or Zerodha login. Everything else is scripted. Tick each box as you go.
 
 Why Mumbai: the NSE and BSE matching engines and Kite's servers are in Mumbai. A server there
@@ -11,9 +11,9 @@ backup).
 ## 1. Server (Ayush, about 15 minutes)
 
 - [ ] AWS Lightsail → Create instance → region **Mumbai (ap-south-1)**, **Linux · Ubuntu 24.04 LTS**,
-      plan **2 GB RAM**. Name it `mocktrade-1`. Upload your SSH public key (or download the
+      plan **2 GB RAM**. Name it `laddrix-1`. Upload your SSH public key (or download the
       Lightsail key) when asked.
-- [ ] Networking → **Create static IP** → attach it to `mocktrade-1`. Note the IP.
+- [ ] Networking → **Create static IP** → attach it to `laddrix-1`. Note the IP.
 - [ ] Networking → IPv4 firewall:
 
       | Rule | Who can reach it |
@@ -31,9 +31,9 @@ backup).
 
 ```bash
 ssh ubuntu@<static-ip>
-sudo git clone https://github.com/ayushsharma05/MockTrade.git /opt/mocktrade
-sudo chown -R ubuntu: /opt/mocktrade
-sudo /opt/mocktrade/deploy/server-setup.sh
+sudo git clone https://github.com/ayushsharma05/MockTrade.git /opt/laddrix
+sudo chown -R ubuntu: /opt/laddrix
+sudo /opt/laddrix/deploy/server-setup.sh
 exit   # log in again so the docker group applies
 ```
 
@@ -47,21 +47,21 @@ exit   # log in again so the docker group applies
 | SSH: keys only, no root login | passwords can be guessed. It refuses to change SSH if you have no key yet, so you can't lock yourself out |
 | Keeps the clock in sync | sign-in codes are time-based; Kite logins expire at 6 AM |
 | Adds 2 GB swap | building the image on a 2 GB server needs it |
-| Runs a backup Mon–Fri at 21:45 India time | `tools/backup.py`: consistent copies while running; 14 days kept in the volume, 30 days in `/var/backups/mocktrade` |
+| Runs a backup Mon–Fri at 21:45 India time | `tools/backup.py`: consistent copies while running; 14 days kept in the volume, 30 days in `/var/backups/laddrix` |
 
 - [ ] The script ends with `done`, and `ssh: keys only` appears (or you add a key and run it again).
 
-## 3. MockTrade (about 10 minutes)
+## 3. Laddrix (about 10 minutes)
 
 ```bash
-cd /opt/mocktrade
+cd /opt/laddrix
 cp deploy/.env.example deploy/.env && chmod 600 deploy/.env
-nano deploy/.env               # MOCKTRADE_DOMAIN=trade.<your-domain>.in
+nano deploy/.env               # LADDRIX_DOMAIN=trade.<your-domain>.in
 docker compose -f deploy/compose.yaml build
-docker compose -f deploy/compose.yaml run --rm app python -m mocktrade.tools.users new-key
-nano deploy/.env               # paste the MOCKTRADE_SECRET_KEY=... line
+docker compose -f deploy/compose.yaml run --rm app python -m laddrix.tools.users new-key
+nano deploy/.env               # paste the LADDRIX_SECRET_KEY=... line
 docker compose -f deploy/compose.yaml up -d
-docker compose -f deploy/compose.yaml run --rm -it app python -m mocktrade.tools.users add-user ayush "Ayush" --roles admin,trader
+docker compose -f deploy/compose.yaml run --rm -it app python -m laddrix.tools.users add-user ayush "Ayush" --roles admin,trader
 ```
 
 - [ ] `https://trade.<your-domain>.in` shows the sign-in page with a valid certificate.
@@ -73,7 +73,7 @@ docker compose -f deploy/compose.yaml run --rm -it app python -m mocktrade.tools
 - [ ] developers.kite.trade → your app → **Redirect URL** `https://trade.<your-domain>.in/kite/callback`.
 - [ ] Same page → **IP whitelist**: the static IP (primary). Add the laptop only if you want
       a backup IP; otherwise leave it out.
-- [ ] `deploy/.env`: `MOCKTRADE_PRICES=kite`, `KITE_API_KEY`, `KITE_API_SECRET`. Then add your
+- [ ] `deploy/.env`: `LADDRIX_PRICES=kite`, `KITE_API_KEY`, `KITE_API_SECRET`. Then add your
       account: `users add-account acc-ayush kite <ZERODHA-ID> --owner ayush` and run
       `docker compose -f deploy/compose.yaml up -d` (restart).
 - [ ] On the screen, pick `acc-ayush` → **Log in to Kite** → Zerodha's page → you're back and the
@@ -87,7 +87,7 @@ laptop is refused, which shows the IP whitelist is doing its job.
 ```bash
 # on the server, after today's Kite login from the screen
 docker compose -f deploy/compose.yaml exec -it -e KITE_TOKEN_FILE=/data/kite_token_acc-ayush.json \
-  app python -m mocktrade.tools.amo_check NSE:SBIN 1 500.00
+  app python -m laddrix.tools.amo_check NSE:SBIN 1 500.00
 ```
 
 Use a price far from the market (it is cancelled straight away, and must never fill even if
@@ -98,7 +98,7 @@ the cancel failed). Then check the Kite app.
 
 ## What a backup holds (V1.3, #329)
 
-The 21:45 cron job runs `python -m mocktrade.tools.backup`. One folder per run:
+The 21:45 cron job runs `python -m laddrix.tools.backup`. One folder per run:
 
 | In the backup | What it is |
 |---|---|
@@ -110,7 +110,7 @@ The 21:45 cron job runs `python -m mocktrade.tools.backup`. One folder per run:
 | `manifest.json` | every file with its size and SHA-256: a restore checks them first |
 
 **Never in a backup:** keep these in the password manager instead.
-- `MOCKTRADE_SECRET_KEY` and `deploy/.env`: the key decrypts the authenticator secrets stored in `users.db`.
+- `LADDRIX_SECRET_KEY` and `deploy/.env`: the key decrypts the authenticator secrets stored in `users.db`.
 - The broker's API secret.
 - The broker tokens (`kite_token_*.json`). They expire at 6 AM anyway: log in again after a restore.
 - The daily instrument list. It is downloaded again.
@@ -118,12 +118,12 @@ The 21:45 cron job runs `python -m mocktrade.tools.backup`. One folder per run:
 Backups hold password hashes and users' webhook secrets, so they are readable by their owner only.
 
 **Another firm on this server (#368):** run
-`docker compose -f deploy/compose.yaml run --rm -it app python -m mocktrade.tools.users add-workspace <id> "<name>" --admin <user>`.
+`docker compose -f deploy/compose.yaml run --rm -it app python -m laddrix.tools.users add-workspace <id> "<name>" --admin <user>`.
 It makes the workspace and its first admin, prints the admin's authenticator link once, and
 asks for their first password. Their admin adds their users and accounts from the Admin screen
 and sees nothing of any other firm. Don't let an outside firm trade until Zerodha's answer (#278) is in ([tenancy.md](../design/tenancy.md)). The full steps: [firms.md](firms.md).
 
-**Each backup also proves the audit trail (#367).** Its `manifest.json` records the audit trail's head (`audit_chain`). To check that nothing in the trail was changed or cut since a backup was made, run `python -m mocktrade.tools.audit verify --against /var/backups/mocktrade/<stamp>/manifest.json`. Do it monthly, and after any incident. A copy of the manifests kept off the machine is what makes this proof ([data.md](../design/data.md) §5).
+**Each backup also proves the audit trail (#367).** Its `manifest.json` records the audit trail's head (`audit_chain`). To check that nothing in the trail was changed or cut since a backup was made, run `python -m laddrix.tools.audit verify --against /var/backups/laddrix/<stamp>/manifest.json`. Do it monthly, and after any incident. A copy of the manifests kept off the machine is what makes this proof ([data.md](../design/data.md) §5).
 
 **Nothing new is left out unnoticed (#272).** Every top-level entry in the data folder must be
 either backed up or listed in `tools/backup.py` (`FOLDERS` for state, `REPRODUCIBLE` for what is
@@ -137,11 +137,11 @@ rebuilt or kept elsewhere).
 
 | | |
 | --- | --- |
-| **RPO** (what a restore can lose) | **MockTrade's own state since the last backup.** Backups run Mon–Fri at 21:45, plus the cloud's daily snapshot, so up to a trading day: audit events, MTM limits, alerts, reports, users or settings changed since. **Positions and working orders are not lost:** at the broker they are the truth, and the restart rebuilds today's from the broker's lists before trading opens (recovery). A restored server never sends an order twice (tested). |
+| **RPO** (what a restore can lose) | **Laddrix's own state since the last backup.** Backups run Mon–Fri at 21:45, plus the cloud's daily snapshot, so up to a trading day: audit events, MTM limits, alerts, reports, users or settings changed since. **Positions and working orders are not lost:** at the broker they are the truth, and the restart rebuilds today's from the broker's lists before trading opens (recovery). A restored server never sends an order twice (tested). |
 | **RTO** (how long) | **The tools take seconds:** a 217 MB audit trail took 2.4 s to back up and 1.7 s to restore with every check. **The rest is people, about 15 to 20 minutes:** stop the server; check the backup into an empty folder; restore; put back the secret key and `.env` from the password manager; start; log in to Kite; wait for the recovery band to clear (it reconciles with the broker before taking orders). Rehearse it: `context/scripts/drill-backup-restore.py` (19/19 on 23 Oct, `context/evidence/h-272-backup-restore-drill.txt`). |
 
-**A backup from another MockTrade version** is refused by name (`backup format N, this
-MockTrade restores format 1`): restore with the version that made it, then upgrade.
+**A backup from another Laddrix version** is refused by name (`backup format N, this
+Laddrix restores format 1`): restore with the version that made it, then upgrade.
 
 ## One IP per account, or one shared (#372)
 
@@ -171,24 +171,24 @@ way it is a setting:
 
 ```bash
 docker compose -f deploy/compose.yaml run --rm --no-deps \
-  -v /var/backups/mocktrade/<YYYYMMDDTHHMMSSZ>:/restore:ro app \
-  python -m mocktrade.tools.restore --from /restore --to /tmp/check
+  -v /var/backups/laddrix/<YYYYMMDDTHHMMSSZ>:/restore:ro app \
+  python -m laddrix.tools.restore --from /restore --to /tmp/check
 ```
 
 **2. Then for real, with the app stopped:**
 
 ```bash
-cd /opt/mocktrade
+cd /opt/laddrix
 docker compose -f deploy/compose.yaml stop app
 docker compose -f deploy/compose.yaml run --rm --no-deps \
-  -v /var/backups/mocktrade/<YYYYMMDDTHHMMSSZ>:/restore:ro app \
-  python -m mocktrade.tools.restore --from /restore --to /data --replace
+  -v /var/backups/laddrix/<YYYYMMDDTHHMMSSZ>:/restore:ro app \
+  python -m laddrix.tools.restore --from /restore --to /data --replace
 docker compose -f deploy/compose.yaml start app
 ```
 
 - `--replace` first moves the current data into `/data/.before-restore-<time>/`, inside the volume (a volume's root can't be moved); nothing is deleted, and `backups/` stays where it is. Without it, a folder with data in it is refused.
 - The restore runs as the app's own user, so the files keep the right owner.
-- At the end the command lists what to put back by hand: the same `MOCKTRADE_SECRET_KEY` (without it, users must set up their authenticator again), `.env`, and a fresh Kite login.
+- At the end the command lists what to put back by hand: the same `LADDRIX_SECRET_KEY` (without it, users must set up their authenticator again), `.env`, and a fresh Kite login.
 
 **Practise it:** `context/scripts/drill-backup-restore.py` does all of this on the demo. Its last run passed 19/19; the output is in `context/evidence/v1-3-backup-restore-drill.txt`.
 - **Backed up while the server ran:** a second user, a trade, a layout, a theme, an MTM limit and a market alert.
@@ -202,9 +202,9 @@ The numbers in `docs/design/performance.md` were taken on a shared cloud VM. Tak
 here, outside market hours, and replace the table:
 
 ```bash
-cd /opt/mocktrade
-docker compose -f deploy/compose.yaml run --rm --no-deps app python -m mocktrade.tools.loadtest
-docker compose -f deploy/compose.yaml run --rm --no-deps app python -m mocktrade.tools.loadtest \
+cd /opt/laddrix
+docker compose -f deploy/compose.yaml run --rm --no-deps app python -m laddrix.tools.loadtest
+docker compose -f deploy/compose.yaml run --rm --no-deps app python -m laddrix.tools.loadtest \
   --instruments 3000 --rate 1 --clients 10
 ```
 

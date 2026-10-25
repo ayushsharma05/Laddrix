@@ -184,7 +184,7 @@ Work | PIQ | Bids |  Price  | Asks | LTQ | VAP        prices: the spread's impli
 
 A **structure** is a spread held in one account: its legs, and the fills allocated to it.
 Fills never change; a structure only says which part of which order's fills belongs to it
-(`src/mocktrade/structures/book.py`, the **Structures** widget).
+(`src/laddrix/structures/book.py`, the **Structures** widget).
 
 ```
 an Autospreader's fills ─► its spread's structure, at once (made at its first fill)
@@ -212,7 +212,7 @@ every change            ─► a STRUCTURE_* note in the account's audit trail, 
 
 The Autospreader's **Chart** button opens a chart of the spread; its window is titled with
 the spread's name. A spread never trades, so its candles are worked out from its legs'
-candles, bucket by bucket (`spread_candles` in `src/mocktrade/charts/service.py`):
+candles, bucket by bucket (`spread_candles` in `src/laddrix/charts/service.py`):
 
 ```
 each leg's candles (history + live, as any chart) ─┐  fetched together
@@ -237,12 +237,12 @@ NOV opens 25,140.00 and closes 25,130.00, so the spread opens −140.00 and clos
 
 ## 8. Code
 
-- `src/mocktrade/spreads/model.py`: definitions, checks, the implied price.
-- `src/mocktrade/spreads/store.py`: `SpreadBook`, per user, on disk.
-- `src/mocktrade/spreads/pricer.py`: live prices as derived ticks.
-- `src/mocktrade/algos/autospreader.py`: the ASE algo (#415).
+- `src/laddrix/spreads/model.py`: definitions, checks, the implied price.
+- `src/laddrix/spreads/store.py`: `SpreadBook`, per user, on disk.
+- `src/laddrix/spreads/pricer.py`: live prices as derived ticks.
+- `src/laddrix/algos/autospreader.py`: the ASE algo (#415).
 - `ui/src/widgets/ase/`: the Autospreader widget and its form model.
-- `src/mocktrade/charts/service.py`: `spread_candles`, `spread_forming` (#429).
+- `src/laddrix/charts/service.py`: `spread_candles`, `spread_forming` (#429).
 - `ui/src/widgets/ladder/`: the spread ladder (`spreadWorking` in `model.ts`, the spread path in
   `Ladder.tsx`).
 - Tests:

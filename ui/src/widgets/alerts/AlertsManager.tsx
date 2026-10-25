@@ -303,7 +303,7 @@ function Webhook({ hook, onChange }: { hook: WebhookSettings | null; onChange: (
       }}
     >
       <p className="dim">
-        Alerts marked "Webhook" are also POSTed to this https address, signed: <code>X-MockTrade-Signature: sha256=HMAC(secret, "&lt;X-MockTrade-Timestamp&gt;.&lt;body&gt;")</code>. Only public addresses are allowed.
+        Alerts marked "Webhook" are also POSTed to this https address, signed: <code>X-Laddrix-Signature: sha256=HMAC(secret, "&lt;X-Laddrix-Timestamp&gt;.&lt;body&gt;")</code>. Only public addresses are allowed.
       </p>
       <div className="algo-form-row">
         <div className="algo-field wide">

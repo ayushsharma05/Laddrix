@@ -63,7 +63,7 @@ export class Rest {
     try {
       response = await this.fetcher(path, init);
     } catch {
-      throw new ApiError(0, "can't reach the MockTrade server");
+      throw new ApiError(0, "can't reach the Laddrix server");
     }
     if (response.status === 204) return undefined as T;
     const text = await response.text();

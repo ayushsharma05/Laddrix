@@ -12,8 +12,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-import mocktrade
-from mocktrade.version import VERSION
+import laddrix
+from laddrix.version import VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
 IST = ZoneInfo("Asia/Kolkata")
@@ -31,14 +31,14 @@ def test_one_version_everywhere():
         assert json.loads((ROOT / app / "package.json").read_text())["version"] == VERSION
         lock = json.loads((ROOT / app / "package-lock.json").read_text())
         assert lock["version"] == lock["packages"][""]["version"] == VERSION
-    assert mocktrade.__version__ == VERSION
+    assert laddrix.__version__ == VERSION
     notes = ROOT / "docs/releases" / f"v{VERSION.split('-')[0]}.md"
     assert notes.exists(), "every version has release notes"
     assert f"## {VERSION}" in (ROOT / "CHANGELOG.md").read_text()
 
 
 def window(when: datetime, holidays: str = "") -> subprocess.CompletedProcess:
-    env = {**os.environ, "DEPLOY_NOW": str(int(when.timestamp())), "MOCKTRADE_HOLIDAYS": holidays}
+    env = {**os.environ, "DEPLOY_NOW": str(int(when.timestamp())), "LADDRIX_HOLIDAYS": holidays}
     return subprocess.run([ROOT / "deploy/window.sh"], env=env, capture_output=True, text=True)
 
 

@@ -8,8 +8,8 @@ from decimal import Decimal
 
 import pytest
 
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import (
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import (
     OrderRequest,
     OrderStatus,
     OrderType,
@@ -18,12 +18,12 @@ from mocktrade.domain.orders import (
     Side,
     Validity,
 )
-from mocktrade.orders.codec import view_from_dict, view_to_dict
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, EventKind, OrderView, Pending
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.store.events import KILL_SWITCH, EventLog
+from laddrix.orders.codec import view_from_dict, view_to_dict
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, EventKind, OrderView, Pending
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.store.events import KILL_SWITCH, EventLog
 
 S = OrderStatus
 FUT = "NFO:NIFTY26OCTFUT"
@@ -375,6 +375,6 @@ def _view(cid, created=T0) -> OrderView:
 
 
 def _event(cid, kind, ts, account_id="acc-1", order=None):
-    from mocktrade.orders.model import OrderEvent
+    from laddrix.orders.model import OrderEvent
 
     return OrderEvent(kind, ts, account_id, cid, order, detail="")

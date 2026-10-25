@@ -4,15 +4,15 @@ password gate, account changes, a late account's loops); the tests must notice. 
 file in `finally`; a hang counts as caught. Run alone. Every anchor is checked to be unique."""
 import subprocess
 
-LS = "src/mocktrade/risk/limits_spec.py"
-SP = "src/mocktrade/algos/spec.py"
-CK = "src/mocktrade/risk/checks.py"
-PF = "src/mocktrade/platform.py"
-US = "src/mocktrade/server/users.py"
-AD = "src/mocktrade/server/admin.py"
-SERVER_CONTEXT = "src/mocktrade/server/context.py"
-DA = "src/mocktrade/domain/accounts.py"
-SR = "src/mocktrade/server/stream.py"
+LS = "src/laddrix/risk/limits_spec.py"
+SP = "src/laddrix/algos/spec.py"
+CK = "src/laddrix/risk/checks.py"
+PF = "src/laddrix/platform.py"
+US = "src/laddrix/server/users.py"
+AD = "src/laddrix/server/admin.py"
+SERVER_CONTEXT = "src/laddrix/server/context.py"
+DA = "src/laddrix/domain/accounts.py"
+SR = "src/laddrix/server/stream.py"
 CMD = ["python3", "-m", "pytest", "-q", "-x", "tests/test_admin.py", "tests/test_server.py",
        "tests/test_accounts.py", "tests/test_users.py", "tests/test_risk_checks.py", "tests/test_algo_engine.py"]
 # (`new > old` → `>=` and `bool(new) and not old` → `bool(new)` are left out on purpose: a change

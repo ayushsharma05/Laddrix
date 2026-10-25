@@ -8,18 +8,18 @@ the stop, only when that can't duplicate an exit."""
 import pytest
 from test_protect import FUT, tick
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
-from mocktrade.marketdata.service import MarketData
-from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.protection import ProtectionGuard, RestoreError
-from mocktrade.orders.model import ClientIds, Pending
-from mocktrade.platform import Platform
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.store.events import EventLog
+from laddrix.algos.builtin import BUILTIN
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
+from laddrix.marketdata.service import MarketData
+from laddrix.ops.alerts import Alerts
+from laddrix.ops.protection import ProtectionGuard, RestoreError
+from laddrix.orders.model import ClientIds, Pending
+from laddrix.platform import Platform
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.store.events import EventLog
 
 NRML = Product.NRML
 

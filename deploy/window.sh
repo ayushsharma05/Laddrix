@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# May MockTrade be deployed now? (V1.6, #289) Exit 0: yes. Exit 3: no, inside market hours
-# (09:00-15:45 India time, Monday to Friday, except the holidays in MOCKTRADE_HOLIDAYS); the
-# reason is printed. Exit 2: MOCKTRADE_HOLIDAYS isn't a list of dates.
+# May Laddrix be deployed now? (V1.6, #289) Exit 0: yes. Exit 3: no, inside market hours
+# (09:00-15:45 India time, Monday to Friday, except the holidays in LADDRIX_HOLIDAYS); the
+# reason is printed. Exit 2: LADDRIX_HOLIDAYS isn't a list of dates.
 #
 # It runs on the server itself, not in the app's image, so it works whichever version is
 # running (even one from before this rule existed). DEPLOY_NOW (epoch seconds) is for tests.
@@ -9,12 +9,12 @@ set -euo pipefail
 now=${DEPLOY_NOW:-$(date +%s)}
 ist() { TZ=Asia/Kolkata date -d "@$now" "$@"; }
 day=$(ist +%F)
-IFS=',' read -r -a holidays <<<"${MOCKTRADE_HOLIDAYS:-}"
+IFS=',' read -r -a holidays <<<"${LADDRIX_HOLIDAYS:-}"
 for h in "${holidays[@]}"; do
   h=${h// /}
   [ -z "$h" ] && continue
   if ! [[ $h =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || ! date -d "$h" +%F >/dev/null 2>&1; then
-    echo "MOCKTRADE_HOLIDAYS is not a list of dates: $h" >&2
+    echo "LADDRIX_HOLIDAYS is not a list of dates: $h" >&2
     exit 2
   fi
   if [ "$h" = "$day" ]; then

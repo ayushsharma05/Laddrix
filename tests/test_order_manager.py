@@ -7,16 +7,16 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.broker.base import BrokerError
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.paper import PaperBroker
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders import manager as manager_module
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, EventKind, OrderError, Pending
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.broker.base import BrokerError
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.paper import PaperBroker
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.orders import manager as manager_module
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, EventKind, OrderError, Pending
+from laddrix.refdata.store import InstrumentStore
 
 S = OrderStatus
 FUT = "NFO:NIFTY26OCTFUT"
@@ -568,7 +568,7 @@ async def test_end_to_end_with_the_paper_broker(store, clock, events):
 
 
 def test_transition_table_only_moves_forward():
-    from mocktrade.orders.manager import ALLOWED
+    from laddrix.orders.manager import ALLOWED
 
     rank = {S.PENDING: 0, S.OPEN: 1, S.PARTIAL: 2, S.FILLED: 3, S.CANCELLED: 3, S.REJECTED: 3}
     assert set(ALLOWED) == set(S)

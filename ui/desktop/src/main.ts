@@ -1,4 +1,4 @@
-// The MockTrade desktop app (Electron main process).
+// The Laddrix desktop app (Electron main process).
 //
 //   app ready ─► which server (config.ts) ─► one main window on our server's page
 //                 every window: secure settings (security.ts), no Node in pages, no preload
@@ -35,7 +35,7 @@ function lockDown(contents: WebContents, origin: string): void {
       return {
         action: "allow",
         overrideBrowserWindowOptions: {
-          title: "MockTrade",
+          title: "Laddrix",
           backgroundColor: "#14181d",
           autoHideMenuBar: true,
           webPreferences: secureWebPreferences(),
@@ -65,7 +65,7 @@ function createMainWindow(origin: string): BrowserWindow {
     height: place.height,
     minWidth: 800,
     minHeight: 500,
-    title: "MockTrade",
+    title: "Laddrix",
     backgroundColor: "#14181d",
     autoHideMenuBar: true,
     show: false,
@@ -93,7 +93,7 @@ async function start(): Promise<void> {
     origin = resolveServer(process.argv, process.env, readJson<{ server?: unknown }>(settingsFile()));
   } catch (err) {
     const reason = err instanceof ConfigError ? err.message : String(err);
-    dialog.showErrorBox("MockTrade can't start", `${reason}\n\nSet the server in ${settingsFile()}`);
+    dialog.showErrorBox("Laddrix can't start", `${reason}\n\nSet the server in ${settingsFile()}`);
     app.quit();
     return;
   }
@@ -105,14 +105,14 @@ async function start(): Promise<void> {
     if (main.isMinimized()) main.restore();
     main.focus();
   });
-  if (process.env.MOCKTRADE_SMOKE) {
+  if (process.env.LADDRIX_SMOKE) {
     // smoke test: report what the page can reach, then quit (see the desktop README)
     main.webContents.once("did-finish-load", async () => {
       const probe = await main.webContents.executeJavaScript(
         "({ require: typeof require, process: typeof process, electron: typeof window.electron })",
       );
       const metrics = app.getAppMetrics().map((m) => ({ type: m.type, kb: m.memory.workingSetSize }));
-      console.log(`MOCKTRADE_SMOKE ${JSON.stringify({ origin, probe, metrics })}`);
+      console.log(`LADDRIX_SMOKE ${JSON.stringify({ origin, probe, metrics })}`);
       app.quit();
     });
   }

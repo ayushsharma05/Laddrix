@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.algos.engine import (
+from laddrix.algos.engine import (
     MAX_REJECTS_IN_A_ROW,
     AlgoContext,
     AlgoEngine,
@@ -15,15 +15,15 @@ from mocktrade.algos.engine import (
     AlgoType,
     BaseStrategy,
 )
-from mocktrade.algos.spec import AlgoSpec, ParamKind, ParamSpec
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import OrderStatus, OrderUpdate, Side
-from mocktrade.domain.ticks import Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, Pending
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.throttle import OrderThrottle, RateRule
+from laddrix.algos.spec import AlgoSpec, ParamKind, ParamSpec
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import OrderStatus, OrderUpdate, Side
+from laddrix.domain.ticks import Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, Pending
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.throttle import OrderThrottle, RateRule
 
 FUT = "NFO:NIFTY26OCTFUT"
 T0 = datetime(2026, 10, 14, 4, 0, tzinfo=UTC)

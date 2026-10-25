@@ -206,7 +206,7 @@ function TicketBody({
         if (view.status === "REJECTED") setNote({ level: "WARN", text: `${what} refused: ${view.reason}` });
       })
       .catch((e: unknown) =>
-        warn(e instanceof ApiError && e.status === 0 ? `${what}: no answer from MockTrade, check the order book before sending again` : `${what} refused: ${e instanceof Error ? e.message : String(e)}`),
+        warn(e instanceof ApiError && e.status === 0 ? `${what}: no answer from Laddrix, check the order book before sending again` : `${what} refused: ${e instanceof Error ? e.message : String(e)}`),
       );
   };
 

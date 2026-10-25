@@ -4,15 +4,15 @@ audit names, surveillance, ops alerts, backtests, the operator-only controls); t
 notice. Runs the tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-D = "src/mocktrade/domain/accounts.py"
-U = "src/mocktrade/server/users.py"
-P = "src/mocktrade/platform.py"
-C = "src/mocktrade/server/context.py"
-ROUTES_OPS = "src/mocktrade/server/routes/ops.py"
-ROUTES_RISK = "src/mocktrade/server/routes/risk.py"
-ROUTES_SESSION = "src/mocktrade/server/routes/session.py"
-M = "src/mocktrade/server/admin.py"
-S = "src/mocktrade/server/stream.py"
+D = "src/laddrix/domain/accounts.py"
+U = "src/laddrix/server/users.py"
+P = "src/laddrix/platform.py"
+C = "src/laddrix/server/context.py"
+ROUTES_OPS = "src/laddrix/server/routes/ops.py"
+ROUTES_RISK = "src/laddrix/server/routes/risk.py"
+ROUTES_SESSION = "src/laddrix/server/routes/session.py"
+M = "src/laddrix/server/admin.py"
+S = "src/laddrix/server/stream.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_workspaces.py"]
 MUTANTS = [
  (S, "            message[\"scope\"] = \"firm\"  # to its own people it is simply their firm's STOP\n", ""),

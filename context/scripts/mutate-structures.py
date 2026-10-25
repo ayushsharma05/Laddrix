@@ -5,9 +5,9 @@ audit notes read back; the routes; the screen); the tests must notice. Restores 
 `finally`; a hang counts as caught. Run alone from the repo root."""
 import subprocess
 
-B = "src/mocktrade/structures/book.py"
-P = "src/mocktrade/platform.py"
-ROUTES_SPREADS = "src/mocktrade/server/routes/spreads.py"
+B = "src/laddrix/structures/book.py"
+P = "src/laddrix/platform.py"
+ROUTES_SPREADS = "src/laddrix/server/routes/spreads.py"
 W = "ui/src/widgets/structures/Structures.tsx"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_structures.py", "tests/test_workspaces.py"], ".")
 UI = (["npx", "vitest", "run", "src/widgets/structures"], "ui")

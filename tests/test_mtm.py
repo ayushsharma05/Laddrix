@@ -12,10 +12,10 @@ from zoneinfo import ZoneInfo
 import pytest
 from test_portfolio import FUT, REL, Paper, book
 
-from mocktrade.domain.orders import Product, Side
-from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.guards import DayGuards
-from mocktrade.risk.mtm import MtmWatch, PortfolioRule, PositionRule, rule_problems
+from laddrix.domain.orders import Product, Side
+from laddrix.ops.alerts import Alerts
+from laddrix.ops.guards import DayGuards
+from laddrix.risk.mtm import MtmWatch, PortfolioRule, PositionRule, rule_problems
 
 IST = ZoneInfo("Asia/Kolkata")
 
@@ -171,7 +171,7 @@ async def test_square_off_window_warning_and_one_click_closes_only_mis(day):
 
 
 async def test_a_big_position_closes_in_pieces_none_refused_as_a_double_click(day):
-    from mocktrade.risk.squareoff import SquareOff
+    from laddrix.risk.squareoff import SquareOff
 
     p = day
     await p.buy(FUT, 1500, 2501010, Product.MIS)  # 20 lots
@@ -224,6 +224,6 @@ async def test_the_mtm_and_square_off_api(tmp_path, nifty_fut):
 
 
 def test_cutoffs_are_data():
-    from mocktrade.risk.squareoff import CUTOFFS, WARN_FROM
+    from laddrix.risk.squareoff import CUTOFFS, WARN_FROM
 
     assert CUTOFFS["NFO"] == time(15, 25) and WARN_FROM == time(15, 0)

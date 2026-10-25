@@ -34,7 +34,7 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 **A tip for big files:** don't read top to bottom. Search for the method you care about
 (`def submit`) and read that one.
 
-## 7.2 The server: `src/mocktrade/`, every folder
+## 7.2 The server: `src/laddrix/`, every folder
 
 ### The building plan and the base
 
@@ -131,7 +131,7 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 | --- | --- |
 | `book.py` | Positions from fills: quantity, average price, realised and unrealised P&L, per product. |
 | `reconcile.py` | Compares our positions with Zerodha's; raises a band on a real difference. |
-| `external.py` | Trades made outside MockTrade (in Zerodha's own app), and the mismatch they cause. |
+| `external.py` | Trades made outside Laddrix (in Zerodha's own app), and the mismatch they cause. |
 
 ### `algos/`: the robot helpers
 
@@ -193,13 +193,13 @@ export function Flatten({ count }: { count: number }) {   // a component, given 
 }
 ```
 
-That is the whole idea behind the "two clicks" buttons in MockTrade: the first click only
+That is the whole idea behind the "two clicks" buttons in Laddrix: the first click only
 "arms" it, and the second does the action.
 
 ## 7.4 The tests sit next to the code
 
 ```
- src/mocktrade/risk/checks.py   ◄── tested by ──  tests/test_risk_checks.py
+ src/laddrix/risk/checks.py   ◄── tested by ──  tests/test_risk_checks.py
  ui/src/shell/StopBand.tsx      ◄── tested by ──  ui/src/shell/StopBand.test.tsx
 ```
 

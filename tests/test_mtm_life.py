@@ -15,11 +15,11 @@ import pytest
 from test_mtm import Clock, flat, move
 from test_portfolio import FUT, Paper
 
-from mocktrade.domain.orders import Product, Side
-from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.guards import DayGuards
-from mocktrade.positions.reconcile import Mismatch
-from mocktrade.risk.mtm import MtmWatch, PortfolioRule, PositionRule
+from laddrix.domain.orders import Product, Side
+from laddrix.ops.alerts import Alerts
+from laddrix.ops.guards import DayGuards
+from laddrix.positions.reconcile import Mismatch
+from laddrix.risk.mtm import MtmWatch, PortfolioRule, PositionRule
 
 KEY = f"{FUT}|MIS"
 
@@ -193,7 +193,7 @@ async def test_done_only_when_the_broker_agrees_on_the_size(day):
 
 
 async def test_an_unanswered_close_order_is_unknown_never_retried(day):
-    from mocktrade.orders.model import Pending
+    from laddrix.orders.model import Pending
 
     p = day
     w = watch(p)
@@ -290,7 +290,7 @@ class SlowDesk:
             self.release.set()
 
     async def close(self, instrument, product, *, basket_id, **_):
-        from mocktrade.domain.orders import OrderRequest, OrderType, Side
+        from laddrix.domain.orders import OrderRequest, OrderType, Side
 
         state = self.p.path.with_name("mtm-acc-state.json")
         self.seen.append(json.loads(state.read_text())["breaches"][0]["state"])
@@ -299,7 +299,7 @@ class SlowDesk:
                                product, price_paise=2510000, basket_id=basket_id,
                                reduce_only=True)  # fmt: skip
         await self.p.rt.orders.submit(request)
-        from mocktrade.risk.closing import CloseResult
+        from laddrix.risk.closing import CloseResult
 
         return CloseResult(instrument.id, product, position=150)
 

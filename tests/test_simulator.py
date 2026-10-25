@@ -5,9 +5,9 @@ from datetime import date
 
 import pytest
 
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.marketdata.service import MarketData
-from mocktrade.marketdata.simulator import MarketSimulator
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.marketdata.service import MarketData
+from laddrix.marketdata.simulator import MarketSimulator
 
 FUT = Instrument(Exchange.NFO, "NIFTY26OCTFUT", InstrumentKind.FUTURE, 10, 75, date(2026, 10, 27))
 OPT = Instrument(Exchange.NFO, "NIFTY26OCT25000CE", InstrumentKind.CALL, 5, 75, date(2026, 10, 27))
@@ -72,7 +72,7 @@ async def test_run_publishes_until_cancelled():
 def test_options_start_their_day_at_their_model_price():
     """An option's previous close sits near the price it trades at (within 40 ticks), not near a
     placeholder start price, so its change from the close is believable (Movers, Watch)."""
-    from mocktrade.marketdata.sim_universe import INSTRUMENTS
+    from laddrix.marketdata.sim_universe import INSTRUMENTS
 
     md = MarketData()
     sim = MarketSimulator(md, {i: p for i, p in INSTRUMENTS}, seed=7)

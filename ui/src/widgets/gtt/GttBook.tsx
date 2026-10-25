@@ -70,7 +70,7 @@ export function GttBook({ params, publish }: WidgetProps<GttParams>) {
           Delete
         </button>
         <span className="book-spacer" />
-        <span className="dim" title="A GTT is kept by the broker: it works even while MockTrade is down">
+        <span className="dim" title="A GTT is kept by the broker: it works even while Laddrix is down">
           Held by the broker
         </span>
       </div>
@@ -304,7 +304,7 @@ function GttLegsForm({ accountId, spec, defaultSide, defaultLots, onPlaced, onCa
         <button type="button" className="btn small" onClick={onCancel}>
           Close
         </button>
-        <span className="dim">Held by the broker: it works even if MockTrade is down. Expires after {spec.expiry_days} days.</span>
+        <span className="dim">Held by the broker: it works even if Laddrix is down. Expires after {spec.expiry_days} days.</span>
       </div>
     </>
   );

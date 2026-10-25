@@ -1,6 +1,6 @@
 # Chapter 10 · Build it yourself (a plan)
 
-**Goal (Ayush, 16 Oct):** understand every code file well enough to write MockTrade from scratch.
+**Goal (Ayush, 16 Oct):** understand every code file well enough to write Laddrix from scratch.
 Chapters 1–9 explain *what* each part does; this chapter will explain *how to build* each file,
 in the order you'd write them, each step small enough to type, run and test yourself.
 

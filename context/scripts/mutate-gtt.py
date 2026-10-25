@@ -2,7 +2,7 @@
 Restores each file in `finally`; a mutant that hangs the tests counts as caught.
 Run alone (two runs at once overwrite each other's files)."""
 import subprocess
-D, P, S, M_ = "src/mocktrade/domain/gtt.py", "src/mocktrade/broker/paper.py", "src/mocktrade/orders/gtt.py", "src/mocktrade/orders/manager.py"
+D, P, S, M_ = "src/laddrix/domain/gtt.py", "src/laddrix/broker/paper.py", "src/laddrix/orders/gtt.py", "src/laddrix/orders/manager.py"
 M = [
  (D, "        if leg.qty <= 0 or leg.qty % spec.lot_size:", "        if leg.qty <= 0:"),
  (D, "            if gap < spec.min_distance_pct:", "            if False:"),
@@ -20,7 +20,7 @@ M = [
  (S, "        except Exception as exc:  # no clear answer", "        except ZeroDivisionError as exc:  # no clear answer"),
  (S, "        if view.status is not GttStatus.ACTIVE:\n            raise GttError", "        if False:\n            raise GttError"),
  (M_, "        self._replay_parked(broker_order_id)\n        return order.view()\n\n    def _timed", "        return order.view()\n\n    def _timed"),
- ("src/mocktrade/risk/checks.py", "            self._price = lambda i: Tick(i, ltp_paise) if i == request.instrument_id else real(i)", "            pass"),
+ ("src/laddrix/risk/checks.py", "            self._price = lambda i: Tick(i, ltp_paise) if i == request.instrument_id else real(i)", "            pass"),
 ]
 caught = 0
 for f, a, b in M:

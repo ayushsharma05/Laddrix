@@ -4,7 +4,7 @@ rules refused.
 
 import pytest
 
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind, make_instrument_id
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind, make_instrument_id
 
 
 def test_instrument_id_is_exchange_and_symbol(reliance, nifty_fut):

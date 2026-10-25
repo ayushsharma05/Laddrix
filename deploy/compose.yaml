@@ -1,8 +1,8 @@
-# MockTrade on one server: the app behind Caddy (HTTPS certificates automatically).
+# Laddrix on one server: the app behind Caddy (HTTPS certificates automatically).
 #
 #   cp deploy/.env.example deploy/.env      # then fill it in (never commit it)
 #   docker compose -f deploy/compose.yaml up -d --build
-#   docker compose -f deploy/compose.yaml run --rm -it app python -m mocktrade.tools.users add-user ...
+#   docker compose -f deploy/compose.yaml run --rm -it app python -m laddrix.tools.users add-user ...
 #
 # Only Caddy is reachable from outside (ports 80/443). The app listens on the private
 # network, runs as a non-root user on a read-only filesystem, and keeps its data
@@ -11,20 +11,20 @@
 # Monitoring (optional, #287): Prometheus and Grafana, started only when asked for:
 #   docker compose -f deploy/compose.yaml --profile monitoring up -d
 # Grafana listens on this machine only (127.0.0.1:3000): reach it through an SSH tunnel
-# (docs/runbooks/monitoring.md). It needs MOCKTRADE_METRICS_TOKEN in deploy/.env.
+# (docs/runbooks/monitoring.md). It needs LADDRIX_METRICS_TOKEN in deploy/.env.
 
-name: mocktrade
+name: laddrix
 
 services:
   app:
     build:
       context: ..
       dockerfile: Dockerfile
-    image: mocktrade:latest
+    image: laddrix:latest
     env_file: .env
     environment:
-      MOCKTRADE_ORIGIN: https://${MOCKTRADE_DOMAIN:?set MOCKTRADE_DOMAIN in deploy/.env}
-      MOCKTRADE_TRUSTED_PROXIES: "*" # only Caddy can reach the app: believe its X-Forwarded-For
+      LADDRIX_ORIGIN: https://${LADDRIX_DOMAIN:?set LADDRIX_DOMAIN in deploy/.env}
+      LADDRIX_TRUSTED_PROXIES: "*" # only Caddy can reach the app: believe its X-Forwarded-For
     volumes:
       - data:/data
     expose:
@@ -49,7 +49,7 @@ services:
         # up but not ready (a failed recovery, no prices) must still show its screens
         condition: service_started
     environment:
-      MOCKTRADE_DOMAIN: ${MOCKTRADE_DOMAIN:?set MOCKTRADE_DOMAIN in deploy/.env}
+      LADDRIX_DOMAIN: ${LADDRIX_DOMAIN:?set LADDRIX_DOMAIN in deploy/.env}
     ports:
       - "80:80"
       - "443:443"
@@ -94,7 +94,7 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/mocktrade.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/laddrix.json
     ports:
       - "127.0.0.1:3000:3000" # this machine only: an SSH tunnel, never the internet
     volumes:
@@ -109,7 +109,7 @@ services:
 
 secrets:
   metrics_token:
-    environment: MOCKTRADE_METRICS_TOKEN # from deploy/.env; Prometheus reads it as a file
+    environment: LADDRIX_METRICS_TOKEN # from deploy/.env; Prometheus reads it as a file
 
 volumes:
   data:

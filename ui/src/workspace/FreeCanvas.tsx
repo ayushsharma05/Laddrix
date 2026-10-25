@@ -345,7 +345,7 @@ function PopoutPortal({ target, title, onClosed, children }: { target: Window; t
   }, [target]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability -- the popped-out browser window's own title: outside React, set from an effect as it should be
-    if (host) host.ownerDocument.title = `${title} · MockTrade`;
+    if (host) host.ownerDocument.title = `${title} · Laddrix`;
   }, [host, title]);
   return host ? createPortal(children, host) : null;
 }

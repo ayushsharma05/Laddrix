@@ -29,17 +29,17 @@ PROBES = [
 def server(tmp_path):
     from test_serve import env
 
-    from mocktrade.tools.serve import ServeSettings, build
+    from laddrix.tools.serve import ServeSettings, build
 
     ui, data = tmp_path / "ui", tmp_path / "data"
     (ui / "assets").mkdir(parents=True)
-    (ui / "index.html").write_text("<html>MockTrade</html>")
+    (ui / "index.html").write_text("<html>Laddrix</html>")
     (ui / "assets" / "app.js").write_text("console.log('screens')")
-    (tmp_path / ".env").write_text(f"MOCKTRADE_SECRET_KEY={PLANTED}")  # next to the UI folder
+    (tmp_path / ".env").write_text(f"LADDRIX_SECRET_KEY={PLANTED}")  # next to the UI folder
     data.mkdir()
     for name in ("secret.key", ".env", "kite_token_acc-1.json"):
         (data / name).write_text(PLANTED)
-    built = build(ServeSettings.from_env(env(MOCKTRADE_DATA=str(data), MOCKTRADE_UI=str(ui))))
+    built = build(ServeSettings.from_env(env(LADDRIX_DATA=str(data), LADDRIX_UI=str(ui))))
     yield built
     if getattr(built, "fence", None) is not None:  # the data folder's owner lock (#273)
         built.fence.release()
@@ -53,13 +53,13 @@ async def test_no_secret_file_or_private_path_is_ever_served(server):
             assert PLANTED not in r.text, path
             assert r.status_code in (200, 401, 404, 405), (path, r.status_code)
             if r.status_code == 200:  # only the screens' own page, never a file listing
-                assert r.text == "<html>MockTrade</html>", path
+                assert r.text == "<html>Laddrix</html>", path
         assert (await c.get("/api/health")).json()["status"] == "ok"
 
 
 SECRET_PATTERNS = [
     re.compile(r"api_secret\s*[:=]\s*['\"][A-Za-z0-9]{8,}"),
-    re.compile(r"MOCKTRADE_SECRET_KEY\s*=\s*\S{16,}"),
+    re.compile(r"LADDRIX_SECRET_KEY\s*=\s*\S{16,}"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"access_token['\"]?\s*[:=]\s*['\"][A-Za-z0-9]{16,}"),
 ]

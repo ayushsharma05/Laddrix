@@ -8,25 +8,25 @@ import httpx
 import pytest
 from test_kite_broker import FakeKiteRest, error, no_sleep, ok
 
-from mocktrade.broker.base import BrokerError, FundsSource, HoldingsSource, TradesSource
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.kite.broker import KiteBroker
-from mocktrade.broker.kite.http import KiteHttp
-from mocktrade.broker.paper import PaperBroker
-from mocktrade.broker.paper_funds import Exposure, PaperMargins, paper_funds, used_margin
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
-from mocktrade.domain.portfolio import Funds, FundsLine, Holding, Trade
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders.model import ClientIds
-from mocktrade.platform import Platform
-from mocktrade.portfolio.service import PortfolioError, PortfolioService, snapshot_to_dict
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.risk.limits import RiskLimits
-from mocktrade.store.events import EventLog
+from laddrix.broker.base import BrokerError, FundsSource, HoldingsSource, TradesSource
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.kite.broker import KiteBroker
+from laddrix.broker.kite.http import KiteHttp
+from laddrix.broker.paper import PaperBroker
+from laddrix.broker.paper_funds import Exposure, PaperMargins, paper_funds, used_margin
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
+from laddrix.domain.portfolio import Funds, FundsLine, Holding, Trade
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.orders.model import ClientIds
+from laddrix.platform import Platform
+from laddrix.portfolio.service import PortfolioError, PortfolioService, snapshot_to_dict
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.limits import RiskLimits
+from laddrix.store.events import EventLog
 
 FUT = "NFO:NIFTY26OCTFUT"
 REL = "NSE:RELIANCE"
@@ -352,7 +352,7 @@ async def test_one_read_at_a_time_and_ports_the_broker_lacks():
 
 
 async def test_trades_carry_our_order_ids_and_fills_refresh_once_after_a_burst():
-    from mocktrade.orders.model import EventKind, OrderEvent
+    from laddrix.orders.model import EventKind, OrderEvent
 
     broker = Reads()
     s, _, _ = service(broker, after_fill_s=0.02)

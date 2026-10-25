@@ -4,9 +4,9 @@ buys dropped; day orders expired; charges again; once a day; today already built
 the tests must notice. Runs the tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-B = "src/mocktrade/positions/book.py"
-M = "src/mocktrade/orders/manager.py"
-P = "src/mocktrade/platform.py"
+B = "src/laddrix/positions/book.py"
+M = "src/laddrix/orders/manager.py"
+P = "src/laddrix/platform.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_rollover.py", "tests/test_positions.py"]
 MUTANTS = [
  (B, "            reference = self._ltp.get(instrument_id) or round(p.avg)", "            reference = round(p.avg)"),

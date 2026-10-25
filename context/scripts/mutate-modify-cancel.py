@@ -5,10 +5,10 @@ pressable again; the broker's list settling a cancel; restart; risk re-checked a
 the tests must notice. Restores each file in `finally`. Run alone."""
 import subprocess
 
-M = "src/mocktrade/orders/manager.py"
-G = "src/mocktrade/orders/gate.py"
-K = "src/mocktrade/broker/kite/orders.py"
-R = "src/mocktrade/risk/checks.py"
+M = "src/laddrix/orders/manager.py"
+G = "src/laddrix/orders/gate.py"
+K = "src/laddrix/broker/kite/orders.py"
+R = "src/laddrix/risk/checks.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_modify_cancel.py",
          "tests/test_unconfirmed.py", "tests/test_order_manager.py", "tests/test_kite_orders.py",
          "tests/test_risk_checks.py", "tests/test_recovery.py"]

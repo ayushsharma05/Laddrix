@@ -1,0 +1,10 @@
+# The Laddrix dashboard, loaded from deploy/monitoring/grafana/dashboards (#287).
+apiVersion: 1
+providers:
+  - name: laddrix
+    folder: Laddrix
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

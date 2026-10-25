@@ -4,11 +4,11 @@ prices in the simulator); the Python or UI tests must notice. Restores each file
 hang counts as caught. Run alone. Every anchor is checked to be unique first."""
 import subprocess
 
-PR = "src/mocktrade/marketdata/prints.py"
-MV = "src/mocktrade/marketdata/movers.py"
-SI = "src/mocktrade/marketdata/simulator.py"
-SV = "src/mocktrade/marketdata/service.py"
-ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
+PR = "src/laddrix/marketdata/prints.py"
+MV = "src/laddrix/marketdata/movers.py"
+SI = "src/laddrix/marketdata/simulator.py"
+SV = "src/laddrix/marketdata/service.py"
+ROUTES_MARKET = "src/laddrix/server/routes/market.py"
 MM = "ui/src/widgets/market/model.ts"
 TS = "ui/src/widgets/market/TimeAndSales.tsx"
 MO = "ui/src/widgets/market/Movers.tsx"

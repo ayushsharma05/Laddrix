@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-from mocktrade.research.ticks import FileTickStore
+from laddrix.research.ticks import FileTickStore
 
 store = FileTickStore(Path(sys.argv[1] if len(sys.argv) > 1 else "data/demo/ticks"))
 for day in store.days():

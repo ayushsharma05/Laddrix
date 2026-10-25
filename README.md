@@ -1,6 +1,8 @@
 <div align="center">
 
-# MockTrade
+<img src="docs/brand/laddrix-logo.svg" alt="Laddrix" width="360">
+
+# Laddrix
 
 **A professional trading terminal and order-management platform for Indian markets (NSE, BSE, F&O)**
 Live market data, a price ladder, algos, options, risk controls, and a paper broker that fills
@@ -15,7 +17,7 @@ against live prices. Built on Zerodha Kite Connect, behind a broker-agnostic cor
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
-  <img alt="The MockTrade terminal: watchlist, two price ladders, order ticket, order book, positions and a live audit trail" src="docs/images/hero-light.png">
+  <img alt="The Laddrix terminal: watchlist, two price ladders, order ticket, order book, positions and a live audit trail" src="docs/images/hero-light.png">
 </picture>
 
 <sub>The terminal running on the demo: a watchlist, two live depth ladders, an order ticket with margin and charges,
@@ -27,7 +29,7 @@ the order book, positions with P&L, and the audit trail, all streaming in real t
 
 ## What it is
 
-MockTrade is a full trading stack for a trading desk, or for several firms on one server:
+Laddrix is a full trading stack for a trading desk, or for several firms on one server:
 - **A Python server** that holds the order manager, the risk engine, positions and P&L, an algo
   engine, and an append-only audit log.
 - **A React terminal** of dockable widgets that stream from it.
@@ -123,7 +125,7 @@ Everything else (the tests, the desktop app, Docker, live Kite prices) is in
 
 ## How it was built
 
-MockTrade is my project. I defined the product, the requirements and the safety rules (Kite's
+Laddrix is my project. I defined the product, the requirements and the safety rules (Kite's
 limits and SEBI's rules for algorithmic trading), set the priorities, and reviewed and accepted
 each milestone. The implementation was written with AI pair-programming (Claude Code),
 working issue by issue under that direction. The design notes, decision log and every pull

@@ -1,7 +1,7 @@
 # Builds the Windows installer: npm run dist:win (on Windows, or anywhere with wine).
-appId: in.mocktrade.desktop
-productName: MockTrade
-copyright: MockTrade
+appId: in.laddrix.desktop
+productName: Laddrix
+copyright: Laddrix
 directories:
   output: release
 files:
@@ -16,4 +16,4 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
-  shortcutName: MockTrade
+  shortcutName: Laddrix

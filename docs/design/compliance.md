@@ -20,7 +20,7 @@ circular and the NSE/BSE notices before trading real money.
 - [Kite Connect forum: preparing for SEBI's retail algo rules](https://kite.trade/forum/discussion/15912/preparing-to-comply-with-sebis-retail-algo-rules-static-ip-ratelimits-order-types)
 - [Kite Connect API FAQs](https://support.zerodha.com/category/trading-and-markets/general-kite/kite-api/articles/kite-connect-api-faqs)
 
-**MockTrade stays below the line by design:** its throttle allows 8 orders a second
+**Laddrix stays below the line by design:** its throttle allows 8 orders a second
 (`risk/throttle.py`), so its algos need no algo id. Running faster, or offering algos to
 other people, means registering first (the algo id, below).
 
@@ -56,7 +56,7 @@ other people, means registering first (the algo id, below).
 ## The exchange algo id
 
 ```
- settings: MOCKTRADE_ALGO_IDS=SLICER=AB123,TWAP=CD456   (once each is registered)
+ settings: LADDRIX_ALGO_IDS=SLICER=AB123,TWAP=CD456   (once each is registered)
       ─► each algo type carries its id (AlgoType.exchange_algo_id)
       ─► every order the algo sends carries it (OrderRequest.algo_id): the audit trail and the
          auditor's export show it; the Kite adapter sends it to the broker
@@ -66,7 +66,7 @@ other people, means registering first (the algo id, below).
  that means ("no exchange algo id: allowed while orders stay at or below 10 a second")
 ```
 
-- **Today no id is needed.** MockTrade's throttle allows 8 orders a second, below the line.
+- **Today no id is needed.** Laddrix's throttle allows 8 orders a second, below the line.
   The ids matter once the rate goes up, or the algos are offered to other people.
 - **Kite's field for the id isn't in its public documentation** (checked 23 Oct 2026). The
   adapter sends it as `algo_id`, and only when an id is set. Confirm the field name with

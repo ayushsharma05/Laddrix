@@ -5,13 +5,13 @@ at a time, says what it did; the STOP report); the tests must notice. Restores e
 `finally`. Run alone."""
 import subprocess
 
-C = "src/mocktrade/risk/checks.py"
-D = "src/mocktrade/risk/closing.py"
-M = "src/mocktrade/orders/manager.py"
-F = "src/mocktrade/risk/flatten.py"
-P = "src/mocktrade/platform.py"
-ROUTES_RISK = "src/mocktrade/server/routes/risk.py"
-O = "src/mocktrade/orders/codec.py"
+C = "src/laddrix/risk/checks.py"
+D = "src/laddrix/risk/closing.py"
+M = "src/laddrix/orders/manager.py"
+F = "src/laddrix/risk/flatten.py"
+P = "src/laddrix/platform.py"
+ROUTES_RISK = "src/laddrix/server/routes/risk.py"
+O = "src/laddrix/orders/codec.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_flatten.py", "tests/test_exits.py",
          "tests/test_server.py", "tests/test_unconfirmed.py", "tests/test_risk_checks.py",
          "tests/test_order_manager.py"]

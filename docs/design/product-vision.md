@@ -1,6 +1,6 @@
-# MockTrade: product vision
+# Laddrix: product vision
 
-**Status:** agreed direction (Ayush, 14 Oct 2026). MockTrade is its own product: a professional
+**Status:** agreed direction (Ayush, 14 Oct 2026). Laddrix is its own product: a professional
 trading platform designed for the **Indian market** (NSE, BSE; equities, futures, options),
 built to the standard of the best professional trading software, and deployable commercially
 later. Today the only paid service is the broker API (Zerodha Kite Connect, ₹500/month);

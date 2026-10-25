@@ -4,10 +4,10 @@ session, a code working once, only your own sessions, no wildcards); the tests m
 Runs the tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-U = "src/mocktrade/server/users.py"
-A = "src/mocktrade/server/admin.py"
-ROUTES_RISK = "src/mocktrade/server/routes/risk.py"
-ROUTES_SESSION = "src/mocktrade/server/routes/session.py"
+U = "src/laddrix/server/users.py"
+A = "src/laddrix/server/admin.py"
+ROUTES_RISK = "src/laddrix/server/routes/risk.py"
+ROUTES_SESSION = "src/laddrix/server/routes/session.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_step_up.py"]
 MUTANTS = [
  (U, "        return self._clock() - datetime.fromisoformat(row[\"stepped_up_at\"]) <= STEP_UP_FOR", "        return True"),

@@ -6,15 +6,15 @@ must notice. Restores each file in `finally`; a hang counts as caught. Run alone
 repo root."""
 import subprocess
 
-M = "src/mocktrade/spreads/model.py"
-S = "src/mocktrade/spreads/store.py"
-P = "src/mocktrade/spreads/pricer.py"
-D = "src/mocktrade/marketdata/service.py"
-A = "src/mocktrade/server/app.py"
-ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
-ROUTES_SPREADS = "src/mocktrade/server/routes/spreads.py"
-W = "src/mocktrade/server/stream.py"
-U = "src/mocktrade/tools/users.py"
+M = "src/laddrix/spreads/model.py"
+S = "src/laddrix/spreads/store.py"
+P = "src/laddrix/spreads/pricer.py"
+D = "src/laddrix/marketdata/service.py"
+A = "src/laddrix/server/app.py"
+ROUTES_MARKET = "src/laddrix/server/routes/market.py"
+ROUTES_SPREADS = "src/laddrix/server/routes/spreads.py"
+W = "src/laddrix/server/stream.py"
+U = "src/laddrix/tools/users.py"
 F = "ui/src/widgets/ase/model.ts"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_spreads.py", "tests/test_spread_api.py",
        "tests/test_personal_data.py", "tests/test_workspaces.py"], ".")

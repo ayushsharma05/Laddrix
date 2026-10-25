@@ -32,6 +32,6 @@ def patch(n, old, new):
     r, e = api("PATCH", f"{R}/issues/{n}", {"body": b.replace(old, new, 1)})
     print(f"#{n} patched" if r else f"#{n} failed {e}")
 patch(23, "Create `docs/design/architecture.md`.",
-      "Create `docs/design/architecture.md`.\n4. Add a **coverage table**: every box of the reference one-chart → the MockTrade component that plays its role → issue number. Nothing may be left unmapped (see #119).")
+      "Create `docs/design/architecture.md`.\n4. Add a **coverage table**: every box of the reference one-chart → the Laddrix component that plays its role → issue number. Nothing may be left unmapped (see #119).")
 patch(65, "## Depends on\n#64", "## Depends on\n#112")
 patch(71, "## Depends on\n#70", "## Depends on\n#70, #112, #113, #114, #115, #116, #117, #118, #119")

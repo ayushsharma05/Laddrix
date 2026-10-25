@@ -5,12 +5,12 @@ age check); the tests must notice. Runs the tests unmutated first. Restores each
 alone."""
 import subprocess
 
-P = "src/mocktrade/marketdata/prints.py"
-ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
-M = "src/mocktrade/marketdata/movers.py"
-D = "src/mocktrade/reports/daily.py"
-B = "src/mocktrade/research/backtest.py"
-O = "src/mocktrade/orders/manager.py"
+P = "src/laddrix/marketdata/prints.py"
+ROUTES_MARKET = "src/laddrix/server/routes/market.py"
+M = "src/laddrix/marketdata/movers.py"
+D = "src/laddrix/reports/daily.py"
+B = "src/laddrix/research/backtest.py"
+O = "src/laddrix/orders/manager.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_truthful_data.py"]
 MUTANTS = [
  (P, "        self.epoch = secrets.token_hex(4)", "        self.epoch = \"same-run\""),
@@ -22,7 +22,7 @@ MUTANTS = [
  (D, "                \"mark_at\": p.mark_at.isoformat() if p.mark_at else None,", "                \"mark_at\": None,"),
  (B, "        if self.candles:\n            out[\"fills_note\"] = CANDLE_NOTE", "        if True:\n            out[\"fills_note\"] = CANDLE_NOTE"),
  (B, "    \"extreme, close) with one tick of spread, not what traded. Fills are an \"", "    \"extreme, close) with one tick of spread. Fills are an \""),
- ("src/mocktrade/risk/checks.py", "        if age is None or age <= self.max_price_age_s:", "        if True:"),
+ ("src/laddrix/risk/checks.py", "        if age is None or age <= self.max_price_age_s:", "        if True:"),
  (O, "        if (problem := await self._make_durable(None)) is not None:", "        if (problem := await self._make_durable(None)) is not None and False:"),
 ]
 if subprocess.run(TESTS, capture_output=True, timeout=300).returncode != 0:

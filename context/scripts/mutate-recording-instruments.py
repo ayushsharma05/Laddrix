@@ -3,10 +3,10 @@ with what is on disk, read back, and how a replay uses it or refuses); the tests
 Restores each file in `finally`; a hang counts as caught. Run alone. Anchors are checked unique."""
 import subprocess
 
-R = "src/mocktrade/refdata/store.py"
-T = "src/mocktrade/research/ticks.py"
-P = "src/mocktrade/research/replay.py"
-D = "src/mocktrade/tools/demo.py"
+R = "src/laddrix/refdata/store.py"
+T = "src/laddrix/research/ticks.py"
+P = "src/laddrix/research/replay.py"
+D = "src/laddrix/tools/demo.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_recording_instruments.py",
          "tests/test_replay.py", "tests/test_ticks_recorder.py", "tests/test_refdata_store.py"]
 MUTANTS = [

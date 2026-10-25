@@ -97,7 +97,7 @@ describe("your sessions (#363)", () => {
   it("names browsers plainly", () => {
     expect(browserName("")).toBe("unknown");
     expect(browserName("Mozilla/5.0 (Macintosh; Intel Mac OS X 14) Firefox/131.0")).toBe("Firefox on macOS");
-    expect(browserName("Mozilla/5.0 (X11; Linux x86_64) Chrome/130 Electron/32.0 Safari/537")).toBe("MockTrade desktop on Linux");
+    expect(browserName("Mozilla/5.0 (X11; Linux x86_64) Chrome/130 Electron/32.0 Safari/537")).toBe("Laddrix desktop on Linux");
     expect(browserName("python-httpx/0.27")).toBe("python-httpx");
   });
 });

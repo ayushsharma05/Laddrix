@@ -13,22 +13,22 @@ import uvicorn
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidStatus
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.accounts import BrokerAccount, Role
-from mocktrade.domain.orders import OrderStatus, OrderUpdate, Product, Side
-from mocktrade.domain.ticks import Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.ops.alerts import Alerts
-from mocktrade.orders.model import ClientIds
-from mocktrade.platform import Platform
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.server import security
-from mocktrade.server.app import ServerSettings, create_app
-from mocktrade.server.security import SecretBox
-from mocktrade.server.stream import CLOSE_NOT_LOGGED_IN, CLOSE_TOO_SLOW
-from mocktrade.server.users import UserStore
+from laddrix.algos.builtin import BUILTIN
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.accounts import BrokerAccount, Role
+from laddrix.domain.orders import OrderStatus, OrderUpdate, Product, Side
+from laddrix.domain.ticks import Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.ops.alerts import Alerts
+from laddrix.orders.model import ClientIds
+from laddrix.platform import Platform
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.server import security
+from laddrix.server.app import ServerSettings, create_app
+from laddrix.server.security import SecretBox
+from laddrix.server.stream import CLOSE_NOT_LOGGED_IN, CLOSE_TOO_SLOW
+from laddrix.server.users import UserStore
 
 FUT = "NFO:NIFTY26OCTFUT"
 PASSWORD = "a long enough password"
@@ -411,8 +411,8 @@ def test_a_tick_is_encoded_once_with_the_same_fields_as_before():
     import json
     from datetime import UTC, datetime
 
-    from mocktrade.domain.ticks import DepthLevel, Tick
-    from mocktrade.server import stream
+    from laddrix.domain.ticks import DepthLevel, Tick
+    from laddrix.server import stream
 
     t = Tick(
         "NFO:NIFTY26OCTFUT",
@@ -469,7 +469,7 @@ async def test_ops_alerts_reach_every_screen_and_new_screens_see_the_active_ones
 def _add_chain(live):
     from datetime import date
 
-    from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
+    from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
 
     exp = date(2026, 10, 27)
     for k in (24900, 25000, 25100):

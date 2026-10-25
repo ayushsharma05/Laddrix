@@ -1,4 +1,4 @@
-// Real browser check of K11.2: a replay server (python -m mocktrade.tools.demo --replay <day>
+// Real browser check of K11.2: a replay server (python -m laddrix.tools.demo --replay <day>
 // --port 8001) on a day the demo recorded. The replay bar and band, prices moving on the
 // replayed time, an order filled by the paper broker, pause/resume, speed and jump ahead.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -10,7 +10,7 @@ const day = process.argv[2];
   await page.goto('http://localhost:8001/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByLabel('Authenticator code').fill(execSync(`python3 -m mocktrade.tools.demo --replay ${day} --code`).toString().trim());
+  await page.getByLabel('Authenticator code').fill(execSync(`python3 -m laddrix.tools.demo --replay ${day} --code`).toString().trim());
   await page.keyboard.press('Enter');
   await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   const bar = page.getByRole('region', { name: 'Replay' });

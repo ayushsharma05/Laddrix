@@ -1,4 +1,6 @@
-# MockTrade
+# Laddrix
+
+(Called MockTrade until 25 Oct 2026; renamed in #457 because other repositories already use that name. The Python package is `laddrix`, settings are `LADDRIX_*`. The GitHub repository keeps its old address until Ayush renames it.)
 
 Ayush's learning project: a personal, professional-style trading platform for **NSE/BSE on Zerodha Kite Connect** (REST for orders, WebSocket for live ticks), with a paper-trading broker that fills against live Kite prices. The earlier COMEX/MockCME track was paused on 14 Oct 2026 and is archived in `docs/archive/`. Design: `docs/design/kite-architecture.md`; all docs: `docs/README.md`; running it: `docs/running-locally.md`.
 

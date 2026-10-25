@@ -3,7 +3,7 @@ ids carry its start time) and the same for a replay with a fixed clock; the test
 when either rule breaks. Restores each file in `finally`. Run alone from the repo root."""
 import subprocess
 
-P = "src/mocktrade/broker/paper.py"
+P = "src/laddrix/broker/paper.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_paper_broker.py", "tests/test_recovery.py"]
 MUTANTS = [
  (P, '        broker_id = f"P{self.run_id}-{seq}"', '        broker_id = f"P{seq}"'),

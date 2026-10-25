@@ -2,7 +2,7 @@ import { checkServer, ConfigError, DEFAULT_SERVER, resolveServer } from "./confi
 
 describe("which server the app opens", () => {
   it("command line wins, then the environment, then settings, then the local demo", () => {
-    const env = { MOCKTRADE_URL: "https://env.example.in" };
+    const env = { LADDRIX_URL: "https://env.example.in" };
     const saved = { server: "https://saved.example.in" };
     expect(resolveServer(["--server=https://flag.example.in"], env, saved)).toBe("https://flag.example.in");
     expect(resolveServer([], env, saved)).toBe("https://env.example.in");

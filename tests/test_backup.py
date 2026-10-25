@@ -8,12 +8,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.server.security import SecretBox
-from mocktrade.server.users import UserStore
-from mocktrade.store.events import EventLog
-from mocktrade.tools.backup import main, run_backup
-from mocktrade.tools.restore import RestoreError, check_backup, restore
-from mocktrade.tools.restore import main as restore_main
+from laddrix.server.security import SecretBox
+from laddrix.server.users import UserStore
+from laddrix.store.events import EventLog
+from laddrix.tools.backup import main, run_backup
+from laddrix.tools.restore import RestoreError, check_backup, restore
+from laddrix.tools.restore import main as restore_main
 
 NOW = datetime(2026, 10, 14, 18, 0, tzinfo=UTC)
 
@@ -102,7 +102,7 @@ def a_server(data):
         "ticks/2026-10-14/NFO.ticks.gz": "ticks",
         "kite_token_acc-1.json": '{"access_token": "never"}',  # expires daily; a secret
         "secret.key": "never",
-        ".env": "MOCKTRADE_SECRET_KEY=never",
+        ".env": "LADDRIX_SECRET_KEY=never",
         "rules/mtm-acc-2.tmp": "half written",
         "kite_instruments.csv": "downloaded again each morning",
         "backups/20261013T180000Z/users.db": "an earlier backup",
@@ -149,7 +149,7 @@ def test_recordings_only_when_asked(tmp_path, capsys):
 
 def test_a_failed_backup_leaves_nothing_half_made(tmp_path, monkeypatch):
     a_server(tmp_path / "data")
-    import mocktrade.tools.backup as backup
+    import laddrix.tools.backup as backup
 
     def broken(*_):
         raise OSError("disk full")
@@ -215,7 +215,7 @@ def test_a_restore_never_overwrites_without_being_told_and_never_deletes(tmp_pat
     assert restore_main(["--from", str(folder), "--to", str(live), "--replace"]) == 0
     out = capsys.readouterr().out
     assert "restore OK" in out and "is kept in" in out
-    assert "MOCKTRADE_SECRET_KEY (from the password manager)" in out
+    assert "LADDRIX_SECRET_KEY (from the password manager)" in out
     assert "log in to Kite again" in out
 
 
@@ -258,7 +258,7 @@ def test_a_database_that_fails_its_integrity_check_is_refused(tmp_path):
     raw[200:4000] = b"\xff" * 3800  # damaged inside, yet the manifest is made to agree
     db.write_bytes(bytes(raw))
     listed = json.loads((folder / "manifest.json").read_text())
-    from mocktrade.tools.backup import sha256
+    from laddrix.tools.backup import sha256
 
     listed["files"]["users.db"] = {"bytes": db.stat().st_size, "sha256": sha256(db)}
     (folder / "manifest.json").write_text(json.dumps(listed))
@@ -287,18 +287,18 @@ def test_a_backup_of_an_unknown_format_is_refused(tmp_path):
     a_server(tmp_path / "data")
     folder = run_backup(tmp_path / "data", tmp_path / "b", 14, NOW)
     listed = json.loads((folder / "manifest.json").read_text())
-    listed["format"] = 2  # made by a newer MockTrade
+    listed["format"] = 2  # made by a newer Laddrix
     (folder / "manifest.json").write_text(json.dumps(listed))
-    with pytest.raises(RestoreError, match="backup format 2, this MockTrade restores format 1"):
+    with pytest.raises(RestoreError, match="backup format 2, this Laddrix restores format 1"):
         check_backup(folder)
 
 
 async def test_a_restored_server_never_sends_an_order_twice(tmp_path, nifty_fut):
     """An order working at the broker when the backup was made: after a restore and a
     restart, it is known again from the audit trail and the broker's list, never re-placed."""
-    from mocktrade.broker.fake import FakeBroker
-    from mocktrade.domain.accounts import BrokerAccount
-    from mocktrade.domain.orders import (
+    from laddrix.broker.fake import FakeBroker
+    from laddrix.domain.accounts import BrokerAccount
+    from laddrix.domain.orders import (
         OrderRequest,
         OrderStatus,
         OrderType,
@@ -306,12 +306,12 @@ async def test_a_restored_server_never_sends_an_order_twice(tmp_path, nifty_fut)
         Product,
         Side,
     )
-    from mocktrade.domain.ticks import Tick
-    from mocktrade.marketdata.service import MarketData
-    from mocktrade.orders.model import ClientIds
-    from mocktrade.platform import Platform
-    from mocktrade.refdata.store import InstrumentStore
-    from mocktrade.risk.kill_switch import KillSwitch
+    from laddrix.domain.ticks import Tick
+    from laddrix.marketdata.service import MarketData
+    from laddrix.orders.model import ClientIds
+    from laddrix.platform import Platform
+    from laddrix.refdata.store import InstrumentStore
+    from laddrix.risk.kill_switch import KillSwitch
 
     store, md = InstrumentStore(), MarketData()
     store.add(nifty_fut)
@@ -356,7 +356,7 @@ async def test_a_restored_server_never_sends_an_order_twice(tmp_path, nifty_fut)
 
 def test_a_running_servers_lock_isnt_state(tmp_path):
     """The data folder's owner lock (#273) is the running server's, not state: no INCOMPLETE."""
-    from mocktrade.ops.fence import DataFence
+    from laddrix.ops.fence import DataFence
 
     a_server(tmp_path / "data")
     fence = DataFence(tmp_path / "data")

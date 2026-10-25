@@ -4,10 +4,10 @@ settled; after a restart; unknown broker statuses kept; a person settling it, on
 confirming); the tests must notice. Restores each file in `finally`. Run alone."""
 import subprocess
 
-M = "src/mocktrade/orders/manager.py"
-K = "src/mocktrade/broker/kite/orders.py"
-R = "src/mocktrade/recovery.py"
-ROUTES_TRADING = "src/mocktrade/server/routes/trading.py"
+M = "src/laddrix/orders/manager.py"
+K = "src/laddrix/broker/kite/orders.py"
+R = "src/laddrix/recovery.py"
+ROUTES_TRADING = "src/laddrix/server/routes/trading.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_unconfirmed.py",
          "tests/test_order_manager.py", "tests/test_kite_orders.py", "tests/test_kite_broker.py",
          "tests/test_event_log.py", "tests/test_recovery.py", "tests/test_server.py"]

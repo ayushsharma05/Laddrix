@@ -1,6 +1,6 @@
 import subprocess
 F = {
- "src/mocktrade/options/pricing.py": [
+ "src/laddrix/options/pricing.py": [
   ("d1 = (math.log(F / K) + 0.5 * v * v) / v", "d1 = (math.log(F / K) - 0.5 * v * v) / v"),
   ("return d1, d1 - v", "return d1, d1 + v"),
   ("df = math.exp(-r * T)\n    if call:", "df = math.exp(r * T)\n    if call:"),
@@ -13,7 +13,7 @@ F = {
   ("        if diff > 0:\n            hi = sigma", "        if diff < 0:\n            hi = sigma"),
   ("return 0.5 * math.erfc(-x / math.sqrt(2))", "return 0.5 * math.erfc(-x / 2)"),
  ],
- "src/mocktrade/options/model.py": [
+ "src/laddrix/options/model.py": [
   ("CLOSE = time(15, 30)", "CLOSE = time(15, 0)"),
   ("YEAR_SECONDS = 365.0 * 24 * 3600", "YEAR_SECONDS = 252.0 * 24 * 3600"),
   ("return price * math.exp(rate * gap)", "return price"),

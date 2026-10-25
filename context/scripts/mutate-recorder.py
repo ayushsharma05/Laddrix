@@ -5,7 +5,7 @@ unique: a shorter line can hide inside a more indented one earlier in the file.
 Not listed: float instead of integer microseconds in `_us` (no counterexample at today's
 timestamps, checked over a whole second in steps of 7 µs; the exact form costs nothing)."""
 import subprocess
-T, M_ = "src/mocktrade/research/ticks.py", "src/mocktrade/marketdata/service.py"
+T, M_ = "src/laddrix/research/ticks.py", "src/laddrix/marketdata/service.py"
 M = [
  (T, "        tick.high_paise, tick.low_paise, tick.close_paise, tick.open_interest,", "        tick.high_paise, tick.low_paise, tick.close_paise, None,"),
  (T, "        [list(level) for level in tick.bids], [list(level) for level in tick.asks],", "        [list(level) for level in tick.bids], [],"),

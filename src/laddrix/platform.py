@@ -1,0 +1,895 @@
+"""Putting it together: one AccountRuntime per broker account, inside one Platform.
+
+    submit ─► OrderManager ─► gate = RiskGate then OrderThrottle ─► Broker
+                 │ events
+                 ├─► EventLog          (audit, restart)
+                 └─► PositionBook ─► DailyLossWatch ─► kill switch
+    market data ─► PositionBook.mark
+    broker positions ◄─► PositionReconciler
+
+The order of the gates matters: risk first (it refuses without using any of the
+rate limit), then the throttle (which counts what it lets through).
+"""
+
+import asyncio
+import logging
+from collections.abc import Callable
+from dataclasses import InitVar, dataclass, field
+from datetime import UTC, date, datetime
+from pathlib import Path
+from typing import Any, NamedTuple
+
+from laddrix.algos.engine import (
+    ORDERS_PER_SECOND,
+    AlgoEngine,
+    AlgoError,
+    AlgoEvent,
+    AlgoRecord,
+    AlgoType,
+)
+from laddrix.broker.base import Broker, BrokerWithTrades, GttBook
+from laddrix.broker.rules import order_spec
+from laddrix.charges.model import ChargesModel, ScheduleCharges
+from laddrix.charges.schedules import KITE_STANDARD
+from laddrix.charges.service import ChargesService
+from laddrix.domain.accounts import MAIN, BrokerAccount
+from laddrix.domain.instruments import Instrument
+from laddrix.domain.money import format_rupees
+from laddrix.domain.order_spec import OrderSpec
+from laddrix.domain.orders import Product, Side
+from laddrix.domain.ticks import Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.marketdata.sources import PriceSources
+from laddrix.ops.supervisor import PauseGate, Supervisor
+from laddrix.orders.basket import Baskets
+from laddrix.orders.gate import Gates
+from laddrix.orders.gtt import GttService
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, EventKind
+from laddrix.orders.trade_check import TradeCheck
+from laddrix.portfolio.service import PortfolioService
+from laddrix.positions.book import PositionBook
+from laddrix.positions.external import ADOPTED, ExternalTrades
+from laddrix.positions.reconcile import PositionReconciler
+from laddrix.recovery import IST, RecoveryGate, recover, recover_until_done, session_start
+from laddrix.refdata.expiry import Expiries, ExpiryRules
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.access import Access, AccessGate, no_check
+from laddrix.risk.checks import RiskGate
+from laddrix.risk.closing import ExitDesk, position_of
+from laddrix.risk.flatten import Flatten
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.limits import RiskLimits
+from laddrix.risk.loss_watch import DailyLossWatch
+from laddrix.risk.margin import MarginGate
+from laddrix.risk.mtm import MtmWatch
+from laddrix.risk.squareoff import SquareOff
+from laddrix.risk.surveillance import Surveillance
+from laddrix.risk.throttle import OrderThrottle
+from laddrix.store.events import EventLog
+from laddrix.structures.book import NOTES as STRUCTURE_NOTES
+from laddrix.structures.book import StructureBook
+
+
+def unknown_size(reconciler: PositionReconciler) -> Callable[[str, Product], str | None]:
+    """Why a position's size isn't known (#262), or None: the broker and Laddrix disagree
+    on it (a reconcile alert), or a difference is being re-checked."""
+
+    def unknown(instrument_id: str, product: Product) -> str | None:
+        for m in reconciler.alerts():
+            if m.instrument_id == instrument_id and m.product in (None, product):
+                return m.message
+        last = reconciler.last
+        for i, p in last.suspected if last is not None else ():
+            if i == instrument_id and p in (None, product):
+                return "the broker's position differs and is being re-checked"
+        return None
+
+    return unknown
+
+
+class LostProtection(NamedTuple):
+    """A protection algo that was running when the server stopped (it doesn't survive one)."""
+
+    instrument_id: str
+    words: str  # "TRAILING_STOP SELL 75 NFO:NIFTY26OCTFUT (A1, ayush)"
+    algo: dict | None = None  # what it was (code, side, qty, params, product…), to restore it
+
+
+ALGO_ENDS = ("DONE", "STOPPED", "FAILED", "LOST")  # audit kinds ALGO_<end>: no longer running
+
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class AccountRuntime:
+    account: BrokerAccount
+    broker: Broker
+    orders: OrderManager
+    positions: PositionBook
+    risk: RiskGate
+    throttle: OrderThrottle
+    switch: KillSwitch
+    reconciler: PositionReconciler
+    loss_watch: DailyLossWatch | None
+    algos: AlgoEngine
+    baskets: Baskets
+    recovery: RecoveryGate | None = None  # set when the account rebuilds its state at start
+    gtt: GttService | None = None  # when the broker holds GTT orders
+    portfolio: PortfolioService | None = None  # funds, holdings, trades (what the broker offers)
+    charges: ChargesService | None = None  # the day's charges, and estimates for the ticket
+    margin: MarginGate | None = None  # quotes an order's margin (the ticket)...
+    margin_check: bool = False  # ...and, when on, refuses what the funds can't carry
+    mtm: MtmWatch | None = None  # the trader's own loss limits (per position, portfolio)
+    squareoff: SquareOff | None = None  # intraday positions before the broker's cut-off
+    flatten: Flatten | None = None  # closing positions on purpose, STOP or not (#262)
+    trade_check: TradeCheck | None = None  # orders against the broker's trade list (#352)
+    external: ExternalTrades | None = None  # trades made outside Laddrix (#355)
+    session_day: date | None = None  # the trading day its positions and limits are for (#266)
+    structures: StructureBook | None = None  # spreads held: fills allocated to them (#428)
+
+    def apply_limits(self, limits: RiskLimits) -> None:
+        """An admin's new limits, from the next order on. Everything that copied a limit at
+        the start reads the new one: the checks, the daily-loss stop and the closing pieces
+        (MTM, square-off). Working orders are left as they are."""
+        self.risk.limits = limits
+        if self.loss_watch is not None:
+            self.loss_watch.limit_paise = limits.max_daily_loss_paise
+        for closer in (self.mtm, self.squareoff, self.flatten):
+            if closer is not None:
+                closer.max_lots = limits.max_order_lots
+
+    def set_active(self, active: bool) -> None:
+        """Turned off by an admin: only closing trades from then on (cancels always work)."""
+        self.risk.off_reason = None if active else "the account is turned off by an admin"
+
+
+@dataclass
+class Platform:
+    instruments: InstrumentStore
+    market_data: MarketData
+    firm_switch: KillSwitch  # the "main" workspace's: on a one-firm server, the firm's
+    event_log: EventLog | None = None
+    accounts: dict[str, AccountRuntime] = field(default_factory=dict)
+    charges_model: ChargesModel = field(default_factory=lambda: ScheduleCharges(KITE_STANDARD))
+    # every order on disk before the broker sees it (#265); off only for backtests, which
+    # replay a day faster than real time and never send a real order
+    durable_orders: bool = True
+    expiry_rules: ExpiryRules = field(default_factory=ExpiryRules)  # broker cut-offs (#290)
+    expiries: Expiries = field(init=False, repr=False)
+    surveillance: Surveillance = field(init=False, repr=False)  # alerts for risk (#291)
+    supervisor: Supervisor = field(init=False, repr=False)  # critical loops, watched (#273)
+    # where each account's prices come from (#395); default: everyone on `market_data`
+    price_sources: InitVar[PriceSources | None] = None
+    prices: PriceSources = field(init=False, repr=False)  # the sources, always set
+    # may this user still trade this account? read at each order (#366); the server sets it
+    access: Access = field(default=no_check, repr=False)
+    # every other workspace's own "firm" switch (#368): one firm's STOP never touches another
+    _firms: dict[str, KillSwitch] = field(default_factory=dict, init=False, repr=False)
+    _firm_listeners: list = field(default_factory=list, init=False, repr=False)
+    _late: set[asyncio.Task] | None = field(default=None, init=False, repr=False)
+    _reconcile: bool = field(default=True, init=False, repr=False)
+
+    def __post_init__(self, price_sources: PriceSources | None) -> None:
+        self.expiries = Expiries(self.instruments, rules=self.expiry_rules)
+        self.prices = price_sources if price_sources is not None else PriceSources(self.market_data)
+        self.supervisor = Supervisor()
+        log_ = self.event_log
+        self.surveillance = Surveillance(
+            note=(lambda k, a, d, x: log_.record_note(k, a, d, x)) if log_ else (lambda *_: None)
+        )
+        if self.event_log is not None:
+            self.firm_switch.on_change(self.event_log.record_kill)
+
+    def account(self, account_id: str) -> AccountRuntime | None:
+        return self.accounts.get(account_id)
+
+    def firm_switch_of(self, workspace: str) -> KillSwitch:
+        """The kill switch of one workspace's whole firm (#368). "main" is `firm_switch`
+        (named "firm", as before); another is "firm <id>", made on first use, audited and told
+        to every listener of `on_firm_change`."""
+        if workspace == MAIN:
+            return self.firm_switch
+        found = self._firms.get(workspace)
+        if found is None:
+            found = KillSwitch(f"firm {workspace}")
+            if self.event_log is not None:
+                found.on_change(self.event_log.record_kill)
+            for listener in self._firm_listeners:
+                found.on_change(listener)
+            self._firms[workspace] = found
+        return found
+
+    def on_firm_change(self, listener) -> None:
+        """`listener(name, state)` for every workspace's firm switch, now and later."""
+        self._firm_listeners.append(listener)
+        self.firm_switch.on_change(listener)
+        for switch in self._firms.values():
+            switch.on_change(listener)
+
+    def mark(self, tick: Tick) -> None:
+        """Send a tick to every account's positions (market data listener)."""
+        for runtime in self.accounts.values():
+            runtime.positions.mark(tick)
+
+    async def run(self, *, reconcile: bool = True) -> None:
+        """Run every background loop until cancelled: each account's broker updates and
+        position checks, and marking positions to the latest prices. An account added while
+        this runs (an admin's new account) starts its own loops at once, ended with these."""
+        self._reconcile = reconcile
+        keep = self.supervisor.keep
+        loops = [keep("marking positions to prices", self._mark_loop), self.supervisor.watchdog()]
+        for runtime in self.accounts.values():
+            loops.extend(self._account_loops(runtime))
+        self._late = set()
+        try:
+            await asyncio.gather(*loops)
+        finally:
+            late, self._late = self._late, None
+            for task in late:
+                task.cancel()
+            if late:
+                await asyncio.gather(*late, return_exceptions=True)
+
+    def _account_loops(self, runtime: AccountRuntime) -> list:
+        """Each account's loops, each watched by the supervisor (#273): a crashed one is said
+        and restarted, and a critical one that is down pauses the account's new orders."""
+        keep, a = self.supervisor.keep, runtime.account.id
+        loops = [
+            keep(f"{a}: broker updates", runtime.orders.run, account_id=a),
+            keep(f"{a}: algos", lambda: self._run_algos(runtime), account_id=a),
+        ]
+        if runtime.recovery is not None:
+            loops.append(keep(f"{a}: recovery", lambda: self._recover(runtime), account_id=a))
+        gtt, portfolio = runtime.gtt, runtime.portfolio
+        if gtt is not None:
+            loops.append(keep(f"{a}: GTTs", lambda: self._after_recovery(runtime, gtt.run),
+                              account_id=a))  # fmt: skip
+        if portfolio is not None:
+            loops.append(keep(f"{a}: funds and holdings",
+                              lambda: self._after_recovery(runtime, portfolio.run),
+                              critical=False, account_id=a))  # fmt: skip
+        if self._reconcile:
+            loops.append(keep(f"{a}: reconciling positions",
+                              lambda: self._after_recovery(runtime, runtime.reconciler.run),
+                              account_id=a))  # fmt: skip
+        return loops
+
+    def _start_late(self, runtime: AccountRuntime) -> None:
+        """An account added after run() started: its loops as tasks run() ends with its own."""
+        if self._late is None:
+            return  # not running yet: run() starts it with the others
+        for loop in self._account_loops(runtime):
+            task = asyncio.ensure_future(loop)
+            self._late.add(task)
+            task.add_done_callback(self._late_done)
+
+    def _late_done(self, task: asyncio.Task) -> None:
+        if self._late is not None:
+            self._late.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            log.error("a loop of a late-added account failed", exc_info=task.exception())
+
+    async def _recover(self, runtime: AccountRuntime, retry_s: float = 10.0) -> None:
+        """Rebuild the account from the audit trail and the broker (recovery.py)."""
+        assert runtime.recovery is not None and self.event_log is not None
+        log, account_id = self.event_log, runtime.account.id
+        md = self.prices.of(account_id)  # its own prices (#395)
+
+        def close(instrument_id: str) -> int | None:
+            tick = md.latest(instrument_id)
+            return tick.close_paise if tick is not None else None
+
+        def expired(instrument_id: str) -> bool:  # before today (#290)
+            instrument = self.instruments.get(instrument_id)
+            today = runtime.positions._clock().astimezone(IST).date()
+            return instrument is not None and self.expiries.expired_by(today)(instrument)
+
+        def settlement(instrument_id: str) -> int | None:
+            instrument = self.instruments.get(instrument_id)
+            if instrument is None:
+                return close(instrument_id)
+            found = self.expiries.settlement_price(
+                instrument, lambda i: self.last_price(i, account_id)
+            )
+            return found if found is not None else close(instrument_id)
+
+        def attempt():
+            return recover(
+                account_id,
+                runtime.orders,
+                runtime.positions,
+                runtime.broker,
+                log,
+                since=session_start(runtime.positions._clock()),  # the account's clock
+                close=close,
+                latest=md.latest,
+                expired=expired,
+                settlement=settlement,
+            )
+
+        await recover_until_done(
+            runtime.recovery,
+            attempt,
+            retry_s=retry_s,
+            audit=lambda kind, detail: log.record_note(kind, account_id, detail),
+        )
+
+    @staticmethod
+    async def _after_recovery(runtime: AccountRuntime, loop) -> None:
+        """Position checks start once the state is rebuilt (an empty book would mismatch)."""
+        if runtime.recovery is not None:
+            await runtime.recovery.finished.wait()
+        await loop()
+
+    def unknown_size_of(self, account_id: str, instrument_id: str, product) -> str | None:
+        """Why this position's size isn't known (the broker disagrees), or None."""
+        runtime = self.accounts.get(account_id)
+        return None if runtime is None else unknown_size(runtime.reconciler)(instrument_id, product)
+
+    def roll_day(self, now: datetime | None = None) -> dict[str, str]:
+        """A new trading day without a restart (#266), for every account not yet on it:
+        yesterday's day orders end as expired, overnight positions carry over at the last
+        price with today's P&L at zero (so the daily loss limit and MTM limits start fresh),
+        and the charges are worked out again. Once per account per day: running it twice, or
+        after a restart (which builds today from scratch), changes nothing. Returns what it
+        did per account, in words."""
+        done = {}
+        for account_id, runtime in self.accounts.items():
+            at = now or runtime.positions._clock()
+            today = at.astimezone(IST).date()
+            if runtime.session_day is not None and runtime.session_day >= today:
+                continue
+            expired = runtime.orders.expire_day(session_start(at))
+            settled = self._settle_expired(account_id, runtime, today)
+            carried = runtime.positions.roll()
+            if runtime.charges is not None:
+                runtime.charges.refresh()
+            runtime.session_day = today
+            words = (f"new trading day {today.isoformat()}: {len(carried)} position(s) "
+                     f"carried at the last price, {len(expired)} day order(s) expired, "
+                     f"{len(settled)} expired contract(s) settled")  # fmt: skip
+            done[account_id] = words
+            log.info("%s: %s", account_id, words)
+            if self.event_log is not None:
+                extra = {"day": today.isoformat(), "expired": expired}
+                self.event_log.record_note("SESSION_ROLLED", account_id, words, extra)
+        return done
+
+    def _trade_check(self, account_id: str, orders: OrderManager,
+                     portfolio: PortfolioService) -> TradeCheck:  # fmt: skip
+        """Each new trade list, and each new fill (against the last list), checks the orders
+        against the broker's trades (orders/trade_check.py)."""
+        log_ = self.event_log
+        note = (lambda k, d, x: log_.record_note(k, account_id, d, x)) if log_ else None
+        check = TradeCheck(orders, **({"note": note} if note else {}))
+
+        def on_snapshot(_account: str, snapshot) -> None:
+            if snapshot.kind == "trades" and not snapshot.error:
+                check.check(snapshot.items)
+
+        def on_fill(event) -> None:
+            last = portfolio.snapshot("trades")
+            if event.kind is EventKind.FILL and last is not None and not last.error:
+                check.check(last.items)
+
+        portfolio.subscribe(on_snapshot)
+        orders.subscribe(on_fill)
+        return check
+
+    def _external(self, account_id: str, book: PositionBook, broker: Broker,
+                  reconciler: PositionReconciler, portfolio) -> ExternalTrades | None:  # fmt: skip
+        """Resolving a mismatch caused by trades made outside Laddrix (#355): needs the
+        broker's trade list and the audit trail (who adopted what, and after a restart)."""
+        log_ = self.event_log
+        if log_ is None or not portfolio.offers("trades"):
+            return None
+        if not isinstance(broker, BrokerWithTrades):  # offers trades: it has them (#355)
+            return None
+
+        def adopted_ids() -> set[str]:
+            return {str(e.extra.get("trade_id")) for e in log_.notes(account_id, [ADOPTED])}
+
+        return ExternalTrades(
+            account_id, book, broker,
+            note=lambda k, d, x: log_.record_note(k, account_id, d, x),
+            adopted_ids=adopted_ids, recheck=reconciler.check,
+        )  # fmt: skip
+
+    def _structures(self, account_id: str, orders, book: PositionBook,
+                    algos: AlgoEngine) -> StructureBook:  # fmt: skip
+        """The account's structure positions (#428): an Autospreader's fills go to its spread's
+        structure; every change is a note in the audit trail, read back here at start."""
+        log_ = self.event_log
+        note = None if log_ is None else (lambda k, d, x: log_.record_note(k, account_id, d, x))
+
+        def lot(instrument_id: str) -> int:
+            found = self.instruments.get(instrument_id)
+            return found.lot_size if found is not None else 1
+
+        structures = StructureBook(
+            account_id, order=orders.get, orders=orders.orders, net_qty=book.net_qty,
+            lot_size=lot, ltp=lambda i: self.last_price(i, account_id),
+            spread_of=algos.spread_of, note=note,
+        )  # fmt: skip
+        if log_ is not None:
+            structures.load(log_.notes(account_id, list(STRUCTURE_NOTES)))
+        orders.subscribe(structures.on_order_event)
+        return structures
+
+    def last_price(self, instrument_id: str, account_id: str | None = None) -> int | None:
+        """The last traded price, from this account's own prices (#395)."""
+        md = self.prices.of(account_id) if account_id is not None else self.market_data
+        tick = md.latest(instrument_id)
+        return tick.ltp_paise if tick is not None and tick.ltp_paise > 0 else None
+
+    def _settle_expired(self, account_id: str, runtime: AccountRuntime, today: date) -> list[str]:
+        """Positions in contracts that expired before `today` close at their final settlement
+        price (#290), in the platform's book and (paper) at the broker, before the day rolls:
+        the result belongs to the expiry day. A live broker settles them itself; reconciling
+        then finds both sides flat. Each is noted in the audit trail, which recovery reads."""
+        ended = self.expiries.expired_by(today)
+        done = []
+        for p in runtime.positions.positions():
+            instrument = self.instruments.get(p.instrument_id)
+            if not p.qty or instrument is None or not ended(instrument):
+                continue
+            price = self.expiries.settlement_price(
+                instrument, lambda i: self.last_price(i, account_id)
+            )
+            if price is None:
+                price = p.ltp_paise or round(p.avg_price_paise)
+            qty = runtime.positions.settle(p.instrument_id, p.product, price)
+            settle_at_broker = getattr(runtime.broker, "settle_expired", None)
+            if callable(settle_at_broker):
+                settle_at_broker(p.instrument_id, p.product, price)
+            how = "cash" if not self.expiries.physical(instrument) else "physical"
+            words = (f"{p.instrument_id} {p.product.value} {qty:+d} expired: settled at "
+                     f"{format_rupees(price)} ({how} settlement)")  # fmt: skip
+            done.append(words)
+            log.info("%s: %s", account_id, words)
+            if self.event_log is not None:
+                extra = {"instrument_id": p.instrument_id, "product": p.product.value,
+                         "qty": qty, "price_paise": price, "settlement": how}  # fmt: skip
+                self.event_log.record_note("EXPIRY_SETTLED", account_id, words, extra)
+        return done
+
+    def lost_protection(self, account_id: str) -> list[LostProtection]:
+        """At start: protection algos (stops held by Laddrix) that were running when the
+        server last stopped. They don't survive a restart, so each is named, in words, for
+        an alert; and noted as lost in the audit, so it is reported once."""
+        if self.event_log is None:
+            return []
+        log = self.event_log
+        open_: dict[str, dict] = {}
+        for e in log.notes(account_id, [f"ALGO_{k}" for k in ALGO_ENDS + ("STARTED",)]):
+            algo_id = e.extra.get("algo_id", "")
+            if e.kind == "ALGO_STARTED":
+                if e.extra.get("family") == "protection":
+                    open_[algo_id] = e.extra
+            else:
+                open_.pop(algo_id, None)
+        lost = []
+        for algo_id, a in open_.items():
+            words = (
+                f"{a.get('code')} {a.get('side')} {a.get('qty')} {a.get('instrument_id')} "
+                f"({algo_id}, {a.get('user_id')})"
+            )
+            record = {k: a.get(k) for k in ("code", "side", "qty", "params", "product", "user_id")}
+            lost.append(LostProtection(str(a.get("instrument_id", "")), words,
+                                       {"algo_id": algo_id, **record}))  # fmt: skip
+            log.record_note("ALGO_LOST", account_id, f"not running after a restart: {words}", a)
+        return lost
+
+    def restore_algos(self, account_id: str, runtime: AccountRuntime) -> list[str]:
+        """At start, once the broker has said what happened to every order (#426): every
+        algo that hadn't ended and whose type can be rebuilt comes back PAUSED with its
+        children. One that can't is noted as lost, in words (its children are then cancelled
+        as orphans). Returns what was restored or lost, in words."""
+        if self.event_log is None:
+            return []
+        log_ = self.event_log
+        restorable = {code for code, t in runtime.algos.types.items() if t.restore is not None}
+        open_: dict[str, Any] = {}
+        for e in log_.notes(account_id, [f"ALGO_{k}" for k in ALGO_ENDS + ("STARTED",)]):
+            algo_id = e.extra.get("algo_id", "")
+            if e.kind == "ALGO_STARTED":
+                # rebuildable now, or when it started (its type gone since: noted as lost)
+                if e.extra.get("code") in restorable or "snapshot" in e.extra:
+                    open_[algo_id] = e
+            else:
+                open_.pop(algo_id, None)
+        said = []
+        for algo_id, e in open_.items():
+            a = e.extra
+            words = (f"{a.get('code')} {a.get('side')} {a.get('qty')} {a.get('instrument_id')} "
+                     f"({algo_id})")  # fmt: skip
+            try:
+                record = AlgoRecord(
+                    algo_id=algo_id, code=str(a["code"]), user_id=str(a["user_id"]),
+                    instrument_id=str(a["instrument_id"]), side=Side(a["side"]),
+                    qty=int(a["qty"]), params=dict(a["params"]),
+                    product=Product(a.get("product", "NRML")), created_at=e.ts,
+                    snapshot=a.get("snapshot"),
+                )  # fmt: skip
+                runtime.algos.restore(record)
+                said.append(f"restored, paused: {words}")
+            except (AlgoError, KeyError, ValueError, TypeError) as exc:
+                why = (exc.reason if isinstance(exc, AlgoError)
+                       else f"its record is incomplete ({exc!r})")  # fmt: skip
+                text = f"not restored after a restart: {words}: {why}; its orders are cancelled"
+                log_.record_note("ALGO_LOST", account_id, text, a)
+                log.warning("%s: %s", account_id, text)
+                said.append(text)
+        return said
+
+    async def _run_algos(self, runtime: AccountRuntime) -> None:
+        """Once the broker has said what happened to every order (recovery): restore the
+        algos that can be (#426), cancel the other algos' leftover children, then run."""
+        if runtime.recovery is not None:
+            await runtime.recovery.finished.wait()
+        self.restore_algos(runtime.account.id, runtime)
+        await runtime.algos.cancel_orphans()
+        await runtime.algos.run()
+
+    async def _mark_loop(self) -> None:
+        """Watch the prices of every instrument anyone holds; mark positions as they move.
+        Each account is marked from its own prices only (#395): two subscriptions can show
+        different prices for the same contract."""
+        watching: dict[int, Any] = {}  # id(source) -> its subscription
+        try:
+            while True:
+                by_source: dict[int, tuple[MarketData, list[AccountRuntime]]] = {}
+                for runtime in self.accounts.values():
+                    md = self.prices.of(runtime.account.id)
+                    by_source.setdefault(id(md), (md, []))[1].append(runtime)
+                for key, (md, runtimes) in by_source.items():
+                    sub = watching.get(key) or watching.setdefault(key, md.subscribe())
+                    held = {p.instrument_id for r in runtimes for p in r.positions.positions()}
+                    sub.add(held - sub.instrument_ids)
+                waits = {asyncio.ensure_future(watching[k].next_batch()): k for k in by_source}
+                if not waits:
+                    await asyncio.sleep(1.0)
+                    continue
+                done, pending = await asyncio.wait(waits, timeout=1.0,
+                                                   return_when=asyncio.FIRST_COMPLETED)  # fmt: skip
+                for task in pending:
+                    task.cancel()
+                for task in done:
+                    for tick in task.result():
+                        for runtime in by_source[waits[task]][1]:
+                            runtime.positions.mark(tick)
+        finally:
+            for sub in watching.values():
+                sub.close()
+
+    def _algo_engine(
+        self,
+        account_id: str,
+        orders: OrderManager,
+        switch: KillSwitch,
+        types: tuple[AlgoType, ...],
+        clock: Callable[[], datetime],
+        book: PositionBook | None = None,
+        throttle: OrderThrottle | None = None,
+        firm: KillSwitch | None = None,
+        prices: MarketData | None = None,
+        order_cap: Callable[[str, int | None], int | None] | None = None,
+    ) -> AlgoEngine:
+        """The account's algos: blocked while a kill switch is on, stopped when one engages,
+        every state change audited."""
+        firm = firm or self.firm_switch  # the account's workspace's (#368)
+
+        def blocked() -> str | None:
+            for s in (firm, switch):
+                if s.engaged:
+                    return f"trading is stopped: {s.state.reason}"
+            return None
+
+        audit = None
+        family = {t.spec.code: t.spec.family for t in types}
+        if self.event_log is not None:
+            log = self.event_log
+
+            def audit(event: AlgoEvent) -> None:
+                a = event.algo
+                log.record_note(
+                    f"ALGO_{event.kind}",
+                    account_id,
+                    event.detail,
+                    {
+                        "algo_id": a.algo_id,
+                        "code": a.code,
+                        "family": family.get(a.code, ""),
+                        "instrument_id": a.instrument_id,
+                        "side": a.side.value,
+                        "qty": a.qty,
+                        "filled_qty": a.filled_qty,
+                        "params": a.params,
+                        "user_id": a.user_id,
+                        "product": a.product.value,
+                        # what a restart needs to rebuild it (#426): STARTED only
+                        **({"snapshot": event.snapshot} if event.snapshot is not None else {}),
+                    },
+                    ts=event.ts,
+                )
+
+        engine = AlgoEngine(
+            account_id,
+            orders,
+            prices or self.market_data,
+            self.instruments.get,
+            types,
+            blocked=blocked,
+            clock=clock,
+            audit=audit,
+            position=None if book is None else position_of(book),
+            orders_per_second=(lambda: throttle.per_second)
+            if throttle
+            else (lambda: ORDERS_PER_SECOND),
+            access=lambda user_id: self.access(user_id, account_id),
+            order_cap=order_cap or (lambda _i, _p: None),
+        )
+
+        def on_switch(_name: str, state) -> None:
+            if state.engaged:
+                engine.stop_all(f"trading stopped: {state.reason}")
+
+        switch.on_change(on_switch)
+        firm.on_change(on_switch)
+        return engine
+
+    def add_account(
+        self,
+        account: BrokerAccount,
+        broker: Broker,
+        *,
+        limits: RiskLimits | None = None,
+        ids: ClientIds,
+        auto_kill_on_loss: bool = False,
+        throttle: OrderThrottle | None = None,
+        algo_types: tuple[AlgoType, ...] = (),
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        recover_on_start: bool = False,
+        margin_check: bool = False,
+        rules_dir: Path | None = None,
+    ) -> AccountRuntime:
+        """`recover_on_start`: the server's setting. The account takes no new orders until
+        its orders and positions are rebuilt from the audit trail and checked against the
+        broker (recovery.py). Needs the event log.
+        `margin_check`: refuse orders the funds can't carry (risk/margin.py; fails open).
+        `rules_dir`: where the trader's MTM limits are kept (risk/mtm.py; None: memory)."""
+        if recover_on_start and self.event_log is None:
+            raise ValueError("recovery after a restart needs the event log")
+        if account.id in self.accounts:
+            raise ValueError(f"account {account.id} is already running")
+        limits = limits or RiskLimits()
+        switch = KillSwitch(f"account {account.id}", clock=clock)
+        firm = self.firm_switch_of(account.workspace)  # its own firm's STOP, no other (#368)
+        md = self.prices.of(account.id)  # its own subscription's prices, no one else's (#395)
+        book = PositionBook(account.id, clock=clock)
+        holder: dict[str, Any] = {}  # the gates need what they guard (orders, portfolio)
+        risk = RiskGate(
+            limits,
+            instruments=self.instruments.get,
+            prices=md.latest,
+            position=book.net_qty,
+            working=lambda: holder["orders"].working(),
+            day_pnl_paise=book.day_pnl_paise,
+            switches=(firm, switch),
+            clock=clock,
+            positions=book.net_by_instrument,
+            product_position=book.qty,
+            price_age=md.age_s,  # per instrument: freshness (#267)
+            expiry=self.expiries.info,  # expired contracts, expiry-day cut-offs (#290)
+        )
+        throttle = throttle or OrderThrottle()
+        recovery = RecoveryGate() if recover_on_start else None
+
+        # the margin quote exists for every account; the gate only when margin_check is on
+        async def available() -> int | None:
+            portfolio = holder.get("portfolio")
+            if portfolio is None or not portfolio.offers("funds"):
+                return None
+            funds = (await portfolio.read("funds")).items
+            equity = [f for f in funds if f.segment == "equity"] or list(funds)
+            return equity[0].available_paise if equity else None
+
+        def unchecked(request, why: str) -> None:
+            if self.event_log is not None:
+                self.event_log.record_note(
+                    "MARGIN_UNCHECKED", account.id,
+                    f"{request.side.value} {request.qty} {request.instrument_id} sent "
+                    f"without a margin check: {why}",
+                )  # fmt: skip
+
+        margin = MarginGate(broker, available, book.net_qty, on_unchecked=unchecked)
+        pause = PauseGate(self.supervisor, account.id)  # a critical loop down (#273)
+        rights = AccessGate(account.id, lambda: self.access)  # still allowed to trade (#366)
+        checks = (pause, rights, recovery, risk, margin if margin_check else None, throttle)
+        gates = [g for g in checks if g is not None]
+        orders = OrderManager(
+            account.id,
+            broker,
+            self.instruments.get,
+            ids=ids,
+            gate=Gates(gates),
+            spec=spec_of(broker),
+            clock=clock,
+            durable=(
+                self.event_log.persist
+                if self.event_log is not None and self.durable_orders
+                else None
+            ),  # #265
+        )
+        holder["orders"] = orders
+        orders.subscribe(book.on_order_event)
+        if self.event_log is not None:
+            orders.subscribe(self.event_log.record)
+            switch.on_change(self.event_log.record_kill)
+        loss_watch = None
+        if auto_kill_on_loss:
+            loss_watch = DailyLossWatch(
+                book.day_pnl_paise, limits.max_daily_loss_paise, switch, [orders]
+            )
+            book.subscribe(loss_watch.check)
+        reconciler = PositionReconciler(
+            book.qty_by_product, broker, account_id=account.id, clock=clock
+        )
+        if self.event_log is not None:
+            log = self.event_log
+            reconciler.subscribe(
+                lambda what, m: log.record_note(
+                    f"POSITION_MISMATCH_{what.upper()}",
+                    account.id,
+                    m.message,
+                    {
+                        "instrument_id": m.instrument_id,
+                        "ours": m.ours,
+                        "broker": m.broker,
+                        "product": m.product.value if m.product else None,
+                    },
+                )
+            )
+        algos = self._algo_engine(account.id, orders, switch, algo_types, clock, book, throttle,
+                                  firm=firm, prices=md,  # pieces that pass risk (#422):
+                                  order_cap=risk.max_order_qty)  # fmt: skip
+        basket_audit = None
+        if self.event_log is not None:
+            log = self.event_log
+
+            def basket_audit(kind: str, detail: str, extra: dict) -> None:
+                log.record_note(kind, account.id, detail, extra)
+
+        baskets = Baskets(
+            account.id,
+            orders,
+            risk,
+            broker,
+            self.instruments.get,
+            md.latest,
+            audit=basket_audit,
+        )
+        gtt = None
+        if isinstance(broker, GttBook):
+            gtt_audit = None
+            if self.event_log is not None:
+                log = self.event_log
+
+                def gtt_audit(kind: str, detail: str, extra: dict) -> None:
+                    log.record_note(kind, account.id, detail, extra)
+
+            def stopped_by() -> str | None:
+                """Why trading is stopped (the firm's or the account's STOP), or None."""
+                return next((s.state.reason or s.name for s in (firm, switch) if s.engaged), None)
+
+            gtt = GttService(
+                account.id, broker, orders, risk, self.instruments.get, md.latest,
+                audit=gtt_audit, clock=clock,
+                stopped=stopped_by,
+                position=book.qty,
+                access=lambda user_id: self.access(user_id, account.id),
+            )  # fmt: skip
+            sweeps: set[asyncio.Task] = set()
+
+            def sweep_now(_name: str, state, gtt=gtt) -> None:
+                """STOP: broker-held GTTs that could open a position go now (#276), not at
+                the next poll."""
+                if not state.engaged:
+                    return
+                try:
+                    task = asyncio.get_running_loop().create_task(gtt.sweep())
+                except RuntimeError:  # no loop (a test without one): the next poll sweeps
+                    return
+                sweeps.add(task)
+                task.add_done_callback(sweeps.discard)
+
+            switch.on_change(sweep_now)
+            firm.on_change(sweep_now)
+
+        def client_id_of(broker_order_id: str) -> str | None:
+            view = orders.by_broker_id(broker_order_id)
+            return view.client_order_id if view is not None else None
+
+        portfolio = PortfolioService(account.id, broker, md, client_id_of=client_id_of, clock=clock)
+        orders.subscribe(portfolio.on_order_event)
+        orders.subscribe(self.surveillance.on_order_event)
+        if self.event_log is not None:  # today's alerts and acknowledgements, after a restart
+            since = session_start(clock())
+            kept = [e.extra for e in self.event_log.notes(account.id, ["SURVEILLANCE"])
+                    if e.ts >= since]  # fmt: skip
+            acks = [e.extra for e in self.event_log.notes(account.id, ["SURVEILLANCE_ACK"])
+                    if e.ts >= since]  # fmt: skip
+            self.surveillance.restore(kept, acks)
+        holder["portfolio"] = portfolio
+        trade_check = None
+        if portfolio.offers("trades"):  # orders against the broker's trade list (#352)
+            trade_check = self._trade_check(account.id, orders, portfolio)
+        charges = ChargesService(
+            account.id, self.charges_model, orders, self.instruments.get, clock=clock
+        )
+        orders.subscribe(charges.on_order_event)
+        note = None
+        if self.event_log is not None:
+            log = self.event_log
+
+            def note(kind: str, detail: str, extra: dict) -> None:
+                log.record_note(kind, account.id, detail, extra)
+
+        desk = ExitDesk(orders, position_of(book), algos=lambda: algos)  # every forced close
+        mtm = MtmWatch(
+            account.id, book, orders, self.instruments.get, max_lots=limits.max_order_lots,
+            path=rules_dir / f"mtm-{account.id}.json" if rules_dir else None,
+            audit=note, clock=clock, desk=desk, unknown=unknown_size(reconciler),
+            ready=lambda: recovery is None or recovery.state == "ok",
+        )  # fmt: skip
+        book.subscribe(mtm.check)
+        orders.subscribe(mtm.on_order_event)  # a refused close moves no position (#263)
+        squareoff = SquareOff(account.id, book, orders, self.instruments.get,
+                              max_lots=limits.max_order_lots, audit=note, clock=clock,
+                              desk=desk)  # fmt: skip
+
+        def stopped():
+            return next((sw.state for sw in (switch, firm) if sw.engaged), None)
+
+        flatten = Flatten(account.id, book, orders, desk, self.instruments.get,
+                          max_lots=limits.max_order_lots, unknown=unknown_size(reconciler),
+                          stopped=stopped, algos=lambda: algos, audit=note,
+                          clock=clock)  # fmt: skip
+        runtime = AccountRuntime(
+            account,
+            broker,
+            orders,
+            book,
+            risk,
+            throttle,
+            switch,
+            reconciler,
+            loss_watch,
+            algos,
+            baskets,
+            recovery,
+            gtt,
+            portfolio,
+            charges,
+            margin,
+            margin_check,
+            mtm,
+            squareoff,
+            flatten,
+            trade_check=trade_check,
+            external=self._external(account.id, book, broker, reconciler, portfolio),
+        )
+        self.accounts[account.id] = runtime
+        runtime.structures = self._structures(account.id, orders, book, algos)
+        runtime.session_day = clock().astimezone(IST).date()  # a start rebuilds today (recovery)
+        runtime.set_active(account.active)
+        self._start_late(runtime)
+        return runtime
+
+
+def spec_of(broker: Broker) -> Callable[[Instrument], OrderSpec]:
+    """The broker's own order spec if it publishes one, else the standard NSE/BSE one."""
+    published = getattr(broker, "order_spec", None)
+    return published if callable(published) else order_spec

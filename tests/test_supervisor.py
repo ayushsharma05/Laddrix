@@ -15,8 +15,8 @@ import sys
 
 import pytest
 
-from mocktrade.ops.fence import DataFence, FenceError
-from mocktrade.ops.supervisor import BACKOFF_S, PauseGate, Supervisor
+from laddrix.ops.fence import DataFence, FenceError
+from laddrix.ops.supervisor import BACKOFF_S, PauseGate, Supervisor
 
 
 class Clock:
@@ -129,8 +129,8 @@ async def test_a_platform_loop_failing_pauses_that_accounts_orders_then_recovers
     aren't; afterwards orders go again and fills arrive as before."""
     from test_portfolio import FUT, Paper
 
-    from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-    from mocktrade.orders.manager import OrderManager
+    from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+    from laddrix.orders.manager import OrderManager
 
     real = OrderManager.run
     crashes = []
@@ -190,7 +190,7 @@ def test_a_second_server_on_the_same_data_is_refused(tmp_path):
     first = DataFence(tmp_path)
     first.acquire()
     with pytest.raises(
-        FenceError, match=f"another MockTrade server owns {tmp_path} \\(pid {os.getpid()}"
+        FenceError, match=f"another Laddrix server owns {tmp_path} \\(pid {os.getpid()}"
     ):
         DataFence(tmp_path).acquire()
     first.release()
@@ -203,7 +203,7 @@ HOLD = """
 import sys, time
 sys.path.insert(0, "src")
 from pathlib import Path
-from mocktrade.ops.fence import DataFence
+from laddrix.ops.fence import DataFence
 DataFence(Path(sys.argv[1])).acquire()
 print("held", flush=True)
 time.sleep(60)
@@ -232,8 +232,8 @@ def test_a_paused_owner_keeps_the_data_and_a_dead_one_frees_it(tmp_path):
 def test_the_server_refuses_to_start_on_owned_data(tmp_path):
     from test_serve import env
 
-    from mocktrade.config import ConfigError
-    from mocktrade.tools.serve import ServeSettings, build
+    from laddrix.config import ConfigError
+    from laddrix.tools.serve import ServeSettings, build
 
     ui = tmp_path / "ui"
     ui.mkdir()
@@ -241,9 +241,9 @@ def test_the_server_refuses_to_start_on_owned_data(tmp_path):
     held = DataFence(tmp_path / "data")
     held.acquire()
     try:
-        with pytest.raises(ConfigError, match="another MockTrade server owns"):
-            build(ServeSettings.from_env(env(MOCKTRADE_DATA=str(tmp_path / "data"),
-                                             MOCKTRADE_UI=str(ui))))  # fmt: skip
+        with pytest.raises(ConfigError, match="another Laddrix server owns"):
+            build(ServeSettings.from_env(env(LADDRIX_DATA=str(tmp_path / "data"),
+                                             LADDRIX_UI=str(ui))))  # fmt: skip
     finally:
         held.release()
 
@@ -253,14 +253,14 @@ async def test_shutdown_drains_the_audit_trail_then_frees_the_data(tmp_path):
     server (or a restore) starts from all of it."""
     from test_serve import env
 
-    from mocktrade.store.events import EventLog
-    from mocktrade.tools.serve import ServeSettings, build
+    from laddrix.store.events import EventLog
+    from laddrix.tools.serve import ServeSettings, build
 
     ui = tmp_path / "ui"
     ui.mkdir()
     (ui / "index.html").write_text("<html></html>")
     data = tmp_path / "data"
-    built = build(ServeSettings.from_env(env(MOCKTRADE_DATA=str(data), MOCKTRADE_UI=str(ui))))
+    built = build(ServeSettings.from_env(env(LADDRIX_DATA=str(data), LADDRIX_UI=str(ui))))
     for n in range(200):
         built.log.record_note("DRILL", "-", f"note {n}")  # queued, not yet written
     await built.close()

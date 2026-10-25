@@ -6,11 +6,11 @@ trade list); the tests must notice. Runs the tests unmutated first. Restores eac
 alone."""
 import subprocess
 
-C = "src/mocktrade/orders/trade_check.py"
-M = "src/mocktrade/orders/manager.py"
-G = "src/mocktrade/charges/model.py"
-H = "src/mocktrade/charges/service.py"
-P = "src/mocktrade/platform.py"
+C = "src/laddrix/orders/trade_check.py"
+M = "src/laddrix/orders/manager.py"
+G = "src/laddrix/charges/model.py"
+H = "src/laddrix/charges/service.py"
+P = "src/laddrix/platform.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_trade_check.py", "tests/test_charges.py"]
 MUTANTS = [
  (C, "        by_id[(t.broker_order_id, t.trade_id)] = t", "        by_id[(t.broker_order_id, t.trade_id, t.price_paise)] = t"),

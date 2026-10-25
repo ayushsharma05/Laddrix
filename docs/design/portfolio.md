@@ -24,7 +24,7 @@ report holdings" and the screen says so (the order book hides its Trades tab).
 
 ## Rules (each a real failure)
 
-- **The broker's figures, untouched.** Kite's `net` is "available" and `debits` is "used". MockTrade
+- **The broker's figures, untouched.** Kite's `net` is "available" and `debits` is "used". Laddrix
   doesn't add Kite's lines up again: the signs of Kite's M2M lines are Kite's business, and a
   total that disagrees with Kite's would mislead. Each line keeps Kite's meaning under a plain label.
 - **A failed read never empties a screen.** The last good figures stay, with `as_of` (when the
@@ -34,11 +34,11 @@ report holdings" and the screen says so (the order book hides its Trades tab).
 - **Fresh soon after a fill.** A fill schedules one refresh of everything 0.5 s after the last fill
   of a burst; a timer refreshes every 30 s; Refresh on a screen asks the broker now.
 - **Pushed only when something changed** (a new `as_of` alone isn't sent).
-- **Holdings at live prices.** Holdings are re-marked from MockTrade's market data every 2 s
+- **Holdings at live prices.** Holdings are re-marked from Laddrix's market data every 2 s
   (their instruments are subscribed); the broker's last price is only a snapshot.
 - **Our order ids on the tradebook.** Kite's `/trades` doesn't carry our tag: each trade's broker
   order id is looked up in the order manager. Trades of orders placed elsewhere (Kite web, the
-  phone app) show "outside MockTrade".
+  phone app) show "outside Laddrix".
 - **Delivery buys become holdings the next day**, as at Kite: today's CNC buys are positions;
   after a restart the paper broker hands earlier days' CNC longs over as holdings (recovery.py),
   never as positions. Holdings sold today show as `used_qty`.
@@ -46,7 +46,7 @@ report holdings" and the screen says so (the order book hides its Trades tab).
 ## Paper money (an estimate)
 
 ```
-opening   = starting balance (MOCKTRADE_PAPER_FUNDS, default ₹10 lakh)
+opening   = starting balance (LADDRIX_PAPER_FUNDS, default ₹10 lakh)
             + P&L of earlier days (realised, and carried F&O settled at the close)
             − what the holdings cost
 available = opening + today's realised + unrealised P&L − margin used + holdings sold today
@@ -80,7 +80,7 @@ exchange's files. K10.4 (#216) uses the broker's margin API for real accounts.
 - **Holdings** (a tab beside Positions): instrument, qty (with T1 and sold today), average, last
   price, invested, value, P&L with %, day change, and a total row. A click drives the link group.
 - **Order book → Trades**: today's fills, newest first, with our order id (double-click for its
-  audit trail) or "outside MockTrade".
+  audit trail) or "outside Laddrix".
 
 Checked in a real browser on the demo: `context/scripts/e2e-portfolio.cjs`.
 Mutation check: `context/scripts/mutate-portfolio.py`.

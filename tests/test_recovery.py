@@ -5,11 +5,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.broker.base import BrokerError, BrokerPosition
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.paper import PaperBroker
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.domain.orders import (
+from laddrix.broker.base import BrokerError, BrokerPosition
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.paper import PaperBroker
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.domain.orders import (
     OrderRequest,
     OrderStatus,
     OrderType,
@@ -17,15 +17,15 @@ from mocktrade.domain.orders import (
     Product,
     Side,
 )
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders.model import ClientIds
-from mocktrade.platform import Platform
-from mocktrade.recovery import PAPER_GONE, session_start
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.risk.limits import RiskLimits
-from mocktrade.store.events import EventLog
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.orders.model import ClientIds
+from laddrix.platform import Platform
+from laddrix.recovery import PAPER_GONE, session_start
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.limits import RiskLimits
+from laddrix.store.events import EventLog
 
 FUT = "NFO:NIFTY26OCTFUT"
 BID, ASK = 2501000, 2501010
@@ -223,10 +223,10 @@ async def test_a_fill_while_we_were_down_counts_once(tmp_path, nifty_fut):
 
 async def test_a_position_difference_keeps_trading_shut(tmp_path, nifty_fut):
     broker = FakeBroker()
-    broker.broker_positions = [BrokerPosition(FUT, 75, ASK)]  # a trade made outside MockTrade
+    broker.broker_positions = [BrokerPosition(FUT, 75, ASK)]  # a trade made outside Laddrix
     s = Server(tmp_path, nifty_fut, broker=broker)
     gate = await s.ready("failed")
-    assert f"{FUT}: MockTrade rebuilt +0, the broker shows +75" in gate.reason
+    assert f"{FUT}: Laddrix rebuilt +0, the broker shows +75" in gate.reason
     await s.stop()
 
 
@@ -251,11 +251,11 @@ async def test_a_difference_in_one_product_is_named_after_a_restart(tmp_path, ni
     broker = FakeBroker()
     broker.broker_positions = [
         BrokerPosition(FUT, 75, ASK, overnight_qty=75, close_paise=2490000, product=Product.NRML),
-        BrokerPosition(FUT, -75, ASK, product=Product.MIS),  # made today outside MockTrade
+        BrokerPosition(FUT, -75, ASK, product=Product.MIS),  # made today outside Laddrix
     ]  # fmt: skip
     s = Server(tmp_path, nifty_fut, broker=broker)
     gate = await s.ready("failed")
-    assert f"{FUT} MIS: MockTrade rebuilt +0, the broker shows -75" in gate.reason
+    assert f"{FUT} MIS: Laddrix rebuilt +0, the broker shows -75" in gate.reason
     await s.stop()
 
 

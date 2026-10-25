@@ -2,7 +2,7 @@
 
 [Guide home](README.md) · previous: [Chapter 4](04-prices.md) · next: [Chapter 6 · The screens](06-screens.md)
 
-A car has brakes, seat belts, airbags and a dashboard light for each problem. MockTrade has the
+A car has brakes, seat belts, airbags and a dashboard light for each problem. Laddrix has the
 same kinds of things for money. Each one here exists because something really can go wrong, and
 each has tests that break it on purpose to prove it works.
 
@@ -53,14 +53,14 @@ in the red band (two clicks).
                  STOP is on: every order is refused …
                                  │
             … EXCEPT one that is BOTH:
-            ① sent by the exit desk (MockTrade's own closing service, never a person's order)
+            ① sent by the exit desk (Laddrix's own closing service, never a person's order)
             ② reduce-only (it can only make a position smaller, never flip it)
                                  │
                                  ▼
             and it still passes every other check (lot size, price band…)
 ```
 
-Flatten refuses a position whose size it isn't sure of, for example when MockTrade says +75 and
+Flatten refuses a position whose size it isn't sure of, for example when Laddrix says +75 and
 Zerodha says +150. Closing a guessed amount could open a new position by mistake. It tells you
 to close that one in Zerodha's own app.
 
@@ -183,17 +183,17 @@ brokers change them.
 size until it's clear (the safe guess). A cancel with no answer stays "on its way" and can be
 pressed again.
 
-## 5.10 Reconcile: do MockTrade and Zerodha agree?
+## 5.10 Reconcile: do Laddrix and Zerodha agree?
 
 ```
- on a timer:  MockTrade's positions  vs  Zerodha's positions
+ on a timer:  Laddrix's positions  vs  Zerodha's positions
                         │
                 same? ──yes──► nothing to show
                         │ no
                 check again soon (a fill may just be on its way)
                         │
-                still different? ──► a band: "MockTrade +75, broker +150 (a missed fill,
-                                      or a trade made outside MockTrade)"
+                still different? ──► a band: "Laddrix +75, broker +150 (a missed fill,
+                                      or a trade made outside Laddrix)"
 ```
 
 ## 5.11 After a restart: nothing trades until the books are rebuilt
@@ -214,7 +214,7 @@ pressed again.
 
 ## 5.12 Lost stops: UNPROTECTED
 
-A stop algo (trailing stop, OCO, bracket) runs **inside MockTrade**. If MockTrade stops (a crash,
+A stop algo (trailing stop, OCO, bracket) runs **inside Laddrix**. If Laddrix stops (a crash,
 a restart), that stop stops too, and nothing at the exchange stands in for it.
 
 ```
@@ -229,7 +229,7 @@ a restart), that stop stops too, and nothing at the exchange stands in for it.
 ![The UNPROTECTED band](../../context/images/v1-2-unprotected-band.png)
 
 **The rule to remember:** for a stop that must survive anything, use a **stop-loss order or a GTT
-held by Zerodha**, not a MockTrade algo. The UNPROTECTED flag survives every restart, and a
+held by Zerodha**, not a Laddrix algo. The UNPROTECTED flag survives every restart, and a
 guarded "Restore stop" button puts the stop back (#264).
 
 ## 5.13 The whole safety net on one page

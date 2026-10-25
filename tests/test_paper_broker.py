@@ -11,10 +11,10 @@ from decimal import Decimal
 
 import pytest
 
-from mocktrade.broker.base import Broker, BrokerError
-from mocktrade.broker.paper import PaperBroker, _base36
-from mocktrade.broker.rules import MAX_MODIFICATIONS_PER_ORDER, protected_limit
-from mocktrade.domain.orders import (
+from laddrix.broker.base import Broker, BrokerError
+from laddrix.broker.paper import PaperBroker, _base36
+from laddrix.broker.rules import MAX_MODIFICATIONS_PER_ORDER, protected_limit
+from laddrix.domain.orders import (
     OrderRequest,
     OrderStatus,
     OrderType,
@@ -22,9 +22,9 @@ from mocktrade.domain.orders import (
     Side,
     Validity,
 )
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.refdata.store import InstrumentStore
 
 FUT = "NFO:NIFTY26OCTFUT"
 
@@ -620,7 +620,7 @@ async def test_ids_never_repeat_across_a_restart_so_old_trades_never_correct_new
     """Found by the spread ladder's browser check: after a restart the first new order was
     "P1" again, the day's adopted trades held an older "P1"/"T1" (another price), and the
     trade check took that trade as the new order's and "corrected" it."""
-    from mocktrade.orders.trade_check import ledger
+    from laddrix.orders.trade_check import ledger
 
     store, md = market
     first_start = datetime(2026, 10, 24, 9, 30, tzinfo=UTC)

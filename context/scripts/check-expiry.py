@@ -1,6 +1,6 @@
 """#290: F&O expiry day on a running demo whose near contracts expire today:
 
-    MOCKTRADE_SIM_NEAR_EXPIRY=$(TZ=Asia/Kolkata date +%F) python3 -m mocktrade.tools.demo
+    LADDRIX_SIM_NEAR_EXPIRY=$(TZ=Asia/Kolkata date +%F) python3 -m laddrix.tools.demo
     python3 context/scripts/check-expiry.py          # before 15:30 India time
     python3 context/scripts/check-expiry.py --after  # after 15:30
 
@@ -19,7 +19,7 @@ FUT = "NFO:NIFTY26OCTFUT"
 
 
 def demo_code() -> str:
-    return subprocess.check_output(["python3", "-m", "mocktrade.tools.demo", "--code"]).decode().strip()
+    return subprocess.check_output(["python3", "-m", "laddrix.tools.demo", "--code"]).decode().strip()
 
 
 async def main(after: bool) -> None:

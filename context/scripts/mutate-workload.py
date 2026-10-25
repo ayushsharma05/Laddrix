@@ -5,11 +5,11 @@ tasks of their own); the tests must notice. Runs the tests unmutated first. Rest
 Run alone."""
 import subprocess
 
-B = "src/mocktrade/research/backtest.py"
-R = "src/mocktrade/reports/service.py"
-ROUTES_PORTFOLIO = "src/mocktrade/server/routes/portfolio.py"
-ROUTES_RESEARCH = "src/mocktrade/server/routes/research.py"
-S = "src/mocktrade/ops/scheduler.py"
+B = "src/laddrix/research/backtest.py"
+R = "src/laddrix/reports/service.py"
+ROUTES_PORTFOLIO = "src/laddrix/server/routes/portfolio.py"
+ROUTES_RESEARCH = "src/laddrix/server/routes/research.py"
+S = "src/laddrix/ops/scheduler.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_workload.py"]
 MUTANTS = [
  (B, "        algo_types=BUILTIN, clock=clock, throttle=throttle,", "        algo_types=BUILTIN, clock=clock,"),

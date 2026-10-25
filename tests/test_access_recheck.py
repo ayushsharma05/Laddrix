@@ -16,13 +16,13 @@ from test_algo_paper import SPEC, TakeTheOffer, book
 from test_gtt import FUT, LTP, World, single
 from test_gtt_stop import long_75, opening_buy, running, stop, until
 
-from mocktrade.algos.engine import AlgoState, AlgoType
-from mocktrade.broker.paper import PaperBroker
-from mocktrade.domain.accounts import BrokerAccount, Role, User
-from mocktrade.domain.gtt import GttStatus
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-from mocktrade.orders.model import ClientIds
-from mocktrade.risk.access import trading_rights
+from laddrix.algos.engine import AlgoState, AlgoType
+from laddrix.broker.paper import PaperBroker
+from laddrix.domain.accounts import BrokerAccount, Role, User
+from laddrix.domain.gtt import GttStatus
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.orders.model import ClientIds
+from laddrix.risk.access import trading_rights
 
 
 class Users:
@@ -188,7 +188,7 @@ async def test_many_orders_at_once_cannot_pass_the_open_orders_limit(tmp_path, n
 
 def test_the_platform_check_is_read_at_each_call():
     """Set after the accounts were added (as the server does): still used."""
-    from mocktrade.risk.access import AccessGate
+    from laddrix.risk.access import AccessGate
 
     holder = SimpleNamespace(access=lambda _u, _a: None)
     gate = AccessGate("acc", lambda: holder.access)
@@ -203,9 +203,9 @@ def test_the_real_server_checks_its_user_store(tmp_path):
     """serve.build hands the platform the user store's check, not the do-nothing default."""
     from test_serve import env
 
-    from mocktrade.tools.serve import ServeSettings, build
+    from laddrix.tools.serve import ServeSettings, build
 
-    built = build(ServeSettings.from_env(env(MOCKTRADE_DATA=str(tmp_path / "data"))))
+    built = build(ServeSettings.from_env(env(LADDRIX_DATA=str(tmp_path / "data"))))
     try:
         assert built.platform.access("ghost", "acc-1") == "ghost is not a user of acc-1"
     finally:

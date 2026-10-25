@@ -12,8 +12,8 @@ from datetime import timedelta
 
 from test_server import ORDER, PASSWORD, World
 
-from mocktrade.domain.accounts import Role
-from mocktrade.server.users import MAX_FAILURES, STEP_UP_FOR
+from laddrix.domain.accounts import Role
+from laddrix.server.users import MAX_FAILURES, STEP_UP_FOR
 
 COOKIE = "__Host-mt_session"  # ServerSettings.cookie_name (secure)
 

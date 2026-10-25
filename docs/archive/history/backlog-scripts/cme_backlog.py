@@ -84,7 +84,7 @@ I.append(("E0 · Setup", ["setup"], "Create the MockCME project board", body(
         "Link the project to the repo: repo → **Projects** tab → **Link a project**.",
     ],
     done=["Board exists, has every issue, and closed issues move to Done automatically"],
-    note="You did the same for MockTrade in its issue #4.")))
+    note="You did the same for Laddrix in its issue #4.")))
 
 # ---------------- E1 ----------------
 E1 = "E1 · Matching core"
@@ -157,7 +157,7 @@ I.append((E1, ["code", "core"], "Matching: price-time priority, partial fills", 
         "`match(book, incoming: Order) -> list[Fill]`. It does **not** add the leftover to the book. The engine decides that (FAK orders don't rest).",
     ],
     tests=[
-        "**Your #14 paper exercise, MockTrade issue #14**: sells 2400.4 × 3 and 2400.5 × 5 rest, then buy 6 @ 2400.5 → fills 3 @ 2400.4 and 3 @ 2400.5. The second seller has 2 left, and the buyer is fully filled.",
+        "**Your #14 paper exercise, Laddrix issue #14**: sells 2400.4 × 3 and 2400.5 × 5 rest, then buy 6 @ 2400.5 → fills 3 @ 2400.4 and 3 @ 2400.5. The second seller has 2 left, and the buyer is fully filled.",
         "No cross (buy 2400.3 vs best ask 2400.4) → no fills, book unchanged",
         "Time priority: two sells at 2400.4 (first A, then B), buy 1 → A trades, B untouched",
         "Price improvement goes to the aggressor: buy @ 2401.0 against a sell @ 2400.4 → trade at 2400.4",
@@ -330,7 +330,7 @@ I.append((E2, ["code", "orderentry"], "Connect the gateway to the engine", body(
 
 I.append((E2, ["code", "orderentry"], "A command-line trading client", body(
     "Trade on your own exchange by typing, like a tiny terminal.",
-    idea="A client is just another TCP connection that speaks our protocol. Writing one shows you what MockTrade's runner will have to do later.",
+    idea="A client is just another TCP connection that speaks our protocol. Writing one shows you what Laddrix's runner will have to do later.",
     build=[
         "File `src/mockcme/app/client.py`, run with `python -m mockcme.app.client --session T1 --port 9001`.",
         "Commands: `buy GCZ6 3 2400.5`, `sell GCZ6 3 2400.5 fak`, `cancel 7`, `modify 7 2400.6 2`, `quit`.",
@@ -405,7 +405,7 @@ I.append((E3, ["code", "marketdata"], "Snapshots for recovery", body(
     depends="#22")))
 
 I.append((E3, ["code", "marketdata", "release"], "Feed listener tool, gap test and release v0.3.0", body(
-    "A small program that rebuilds books from the feed. It proves the feed is right, and MockTrade's newsroom will copy it.",
+    "A small program that rebuilds books from the feed. It proves the feed is right, and Laddrix's newsroom will copy it.",
     build=[
         "File `src/mockcme/app/listener.py`: join the feed, take snapshots to start, apply updates, print the top 5 levels of one symbol live.",
         "Gap handling: when `seq` jumps, mark the book stale, wait for its snapshot, recover.",
@@ -421,12 +421,12 @@ E4 = "E4 · Real data replay"
 I.append((E4, ["code", "replay"], "Load a real COMEX day (Databento) into replay events", body(
     "Read the day of data you downloaded into simple events the exchange can play.",
     build=[
-        "Use the Databento file from MockTrade issue #18. `pip install databento`, add it to `pyproject.toml` dependencies.",
+        "Use the Databento file from Laddrix issue #18. `pip install databento`, add it to `pyproject.toml` dependencies.",
         "File `replay/loader.py`: read the file, convert each record to `ReplayEvent(ts, symbol, kind, ...)` with prices in ticks.",
         "Keep the data out of git: `data/` is already in `.gitignore`.",
     ],
     tests=["A tiny sample file (a few hundred records, small enough to commit under `tests/data/`) loads into the expected events"],
-    depends="#24, MockTrade #18", note="Steps get more detail when you reach this issue.")))
+    depends="#24, Laddrix #18", note="Steps get more detail when you reach this issue.")))
 I.append((E4, ["code", "replay"], "Replay player with a speed knob", body(
     "Play the events in time order at 1×, 10× or full speed, using the exchange's clock.",
     build=["File `replay/player.py`: the clock follows the data's timestamps × speed.", "Commands: start, pause, set speed."],
@@ -460,7 +460,7 @@ for title, goal in [
 ]:
     I.append((E5, ["code", "detail-later"], title, body(goal, note="Steps get written in detail when you reach this milestone.")))
 I.append(("E6 · Drop copy", ["code", "detail-later"], "Drop copy feed", body(
-    "Send a copy of every execution report on a separate connection for a firm's back office (MockTrade's accounts office reads it).",
+    "Send a copy of every execution report on a separate connection for a firm's back office (Laddrix's accounts office reads it).",
     note="Steps get written in detail when you reach this milestone.")))
 for title, goal in [
     ("Listed calendar spreads with legs", "Spread instruments with their own book, whose trades create leg fills with the right ratios."),
@@ -468,7 +468,7 @@ for title, goal in [
 ]:
     I.append(("E7 · Spreads", ["code", "core", "detail-later"], title, body(goal, note="Steps get written in detail when you reach this milestone.")))
 I.append(("E8 · Second venue", ["code", "detail-later"], "Run a second venue", body(
-    "Start two MockCME instances with different instruments and ports, as two exchange sites for MockTrade's routing work.",
+    "Start two MockCME instances with different instruments and ports, as two exchange sites for Laddrix's routing work.",
     note="Steps get written in detail when you reach this milestone.")))
 
 if __name__ == "__main__":

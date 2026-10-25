@@ -1,6 +1,6 @@
 # Data: what we hold, how it is protected, how long it is kept (#367)
 
-Part of the security gate (#279, [security.md](security.md)). Every piece of data MockTrade
+Part of the security gate (#279, [security.md](security.md)). Every piece of data Laddrix
 holds is listed here with its class, where it lives, who can read it, and how long it is kept.
 
 ## 1. Classes
@@ -10,11 +10,11 @@ holds is listed here with its class, where it lives, who can read it, and how lo
 | **Public** | anyone may know it | contract names, exchange prices shown on screens, this documentation | none |
 | **Internal** | the firm's own business | orders, fills, positions, P&L, risk limits, reports, alerts, the audit trail, backtests | logged in and allowed for that account only (#270); in backups (owner-only files) |
 | **Personal** | about one person | name, user id, roles, login times, sessions (browser, IP address), settings, layouts, their webhook address | as Internal, plus: the person can have it exported, and erased (§4) |
-| **Secret** | gives access to something | passwords, authenticator secrets, session cookies, `MOCKTRADE_SECRET_KEY`, the broker's API secret and daily tokens, webhook signing keys, one-time passwords | never in a log (§2), never in git (`test_security_surface.py`, gitleaks); stored hashed (passwords: argon2id; sessions: SHA-256) or encrypted (authenticator secrets: the secret key), or kept out of the data folder entirely (`.env`, password manager) |
+| **Secret** | gives access to something | passwords, authenticator secrets, session cookies, `LADDRIX_SECRET_KEY`, the broker's API secret and daily tokens, webhook signing keys, one-time passwords | never in a log (§2), never in git (`test_security_surface.py`, gitleaks); stored hashed (passwords: argon2id; sessions: SHA-256) or encrypted (authenticator secrets: the secret key), or kept out of the data folder entirely (`.env`, password manager) |
 
 ## 2. Logs never hold a secret
 
-- `mocktrade/logsafe.py` filters every log line the server writes, including the web server's
+- `laddrix/logsafe.py` filters every log line the server writes, including the web server's
   access log. That log would otherwise show the broker login's `request_token` in a URL.
 - It hides:
   - secret-named parameters and JSON fields;
@@ -34,28 +34,28 @@ holds is listed here with its class, where it lives, who can read it, and how lo
 
 | What | Where | Kept | Why |
 | --- | --- | --- | --- |
-| Audit trail (every order event, fill, STOP, admin change, login) | `events.db` | **at least 5 years; never deleted by MockTrade** | SEBI requires stock brokers to preserve their books and records for at least five years, and longer while any investigation or case about them is open (SEBI (Stock Brokers) Regulations, reg. 18; SEBI circular MRD/DoP/SE/Cir-21/2009). MockTrade is not the broker, but the firm using it must be able to show what it did. **The firm's compliance officer confirms the period** before going live. |
+| Audit trail (every order event, fill, STOP, admin change, login) | `events.db` | **at least 5 years; never deleted by Laddrix** | SEBI requires stock brokers to preserve their books and records for at least five years, and longer while any investigation or case about them is open (SEBI (Stock Brokers) Regulations, reg. 18; SEBI circular MRD/DoP/SE/Cir-21/2009). Laddrix is not the broker, but the firm using it must be able to show what it did. **The firm's compliance officer confirms the period** before going live. |
 | End-of-day reports | `reports/` | as the audit trail | they are built from it, and are what an auditor reads first |
 | Risk limits, MTM rules, alerts, spreads, users and accounts | `users.db`, `rules/`, `alerts/`, `spreads/` | while in use | current configuration; every change is in the audit trail |
 | Sessions | `users.db` | 2 h idle, 12 h at most; ended by logout, password change, disabling, revoke | access, not records |
-| Backups | the volume / `/var/backups/mocktrade` | 14 days / 30 days | recovery, not archiving: for older history, the audit trail itself is kept |
+| Backups | the volume / `/var/backups/laddrix` | 14 days / 30 days | recovery, not archiving: for older history, the audit trail itself is kept |
 | Broker tokens | `kite_token_*.json` | until 6 AM the next day (they expire) | never backed up |
 | Recorded ticks, imported candles, backtests | `ticks/`, `candles/`, `backtests/` | until someone deletes them | research data, not records |
 
 **Archiving the audit trail:** `events.db` grows by roughly what a day's orders take. When it
 grows too large, copy it whole (a backup does exactly that), check the copy with
-`python -m mocktrade.tools.audit verify --data <copy>`, and keep the copy for the period above.
-MockTrade itself never deletes from it.
+`python -m laddrix.tools.audit verify --data <copy>`, and keep the copy for the period above.
+Laddrix itself never deletes from it.
 
 ## 4. One person's data
 
-- **Export:** `python -m mocktrade.tools.users export-user <id> > <id>.json`.
+- **Export:** `python -m laddrix.tools.users export-user <id> > <id>.json`.
   - It contains their profile, their accounts (as owner or trader), settings, layouts and
     sessions, their alerts and webhook address, their spread definitions, their backtests,
     and every audit entry that names them.
   - It never contains a secret: the password hash, the authenticator secret and the webhook's
     signing key are named as held, not given.
-- **Erase:** `python -m mocktrade.tools.users erase-user <id> --confirm <id>`, with the server
+- **Erase:** `python -m laddrix.tools.users erase-user <id> --confirm <id>`, with the server
   stopped.
   - **Refused** if they own an account (give it another owner first), if they are the last
     admin, or while a server holds the data folder.
@@ -73,13 +73,13 @@ MockTrade itself never deletes from it.
 - risk and admin, all of it (`/api/accounts/{id}/audit-export`, #291);
 - the server's operator, the file itself.
 
-**Who may change or delete it:** no one, through MockTrade. The writer only ever appends, and
+**Who may change or delete it:** no one, through Laddrix. The writer only ever appends, and
 no endpoint or tool deletes or edits a row. The operator (root on the server) can, by editing
 the file. That is what tamper evidence is for.
 
 **Tamper evidence (hash chain):**
 - **How it works:** each row stores a `chain`, the SHA-256 of that row together with the chain
-  of the row before it. `python -m mocktrade.tools.audit verify` recomputes them all.
+  of the row before it. `python -m laddrix.tools.audit verify` recomputes them all.
 - **What it catches:**
   - a row that was **changed**;
   - a row **removed** from the middle;

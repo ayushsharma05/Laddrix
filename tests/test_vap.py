@@ -1,8 +1,8 @@
 """Volume at price for the ladder (marketdata/vap.py): volume between ticks on the newer price."""
 
-from mocktrade.domain.ticks import Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.marketdata.vap import VolumeAtPrice
+from laddrix.domain.ticks import Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.marketdata.vap import VolumeAtPrice
 
 A = "NFO:NIFTY26OCTFUT"
 

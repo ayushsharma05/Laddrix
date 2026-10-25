@@ -2,7 +2,7 @@
 
 ## Versions
 
-- **One version** lives in `src/mocktrade/version.py`. `pyproject.toml` holds the same number in Python's form (`1.0.0rc1`), and `ui/package.json`, `ui/desktop/package.json` and their lockfiles hold it too (`mocktrade.__version__` reads `version.py`). `tests/test_release.py` fails if they differ, or if the version has no release notes or changelog entry.
+- **One version** lives in `src/laddrix/version.py`. `pyproject.toml` holds the same number in Python's form (`1.0.0rc1`), and `ui/package.json`, `ui/desktop/package.json` and their lockfiles hold it too (`laddrix.__version__` reads `version.py`). `tests/test_release.py` fails if they differ, or if the version has no release notes or changelog entry.
 - **Semantic versions:** MAJOR.MINOR.PATCH. A fix is a PATCH; a feature that changes nothing for existing data or screens is a MINOR; a change that needs action from you is a MAJOR. A release candidate is `-rc.N`.
 - **The running server says its version** at `/api/health` (`version`, plus `build`, the commit the image was made from). The screens show it in the status bar, bottom right, with the build on hover.
 
@@ -12,7 +12,7 @@
 2. **Write the notes:** `docs/releases/vX.Y.Z.md` (what changed, data migrations, known limits) and a short entry at the top of `CHANGELOG.md`.
 3. **Run the release scenarios:** those in [the test plan](../test/README.md#scenarios-that-must-pass-before-a-release).
 4. **Merge,** then check that CI is green on `main`.
-5. **Tag `main`:** `git tag -a vX.Y.Z -m "MockTrade X.Y.Z"` and `git push origin vX.Y.Z`. For **v1.0.0**, only after Ayush has run the live steps of the [go-live checklist](go-live.md) and recorded his acceptance on #240.
+5. **Tag `main`:** `git tag -a vX.Y.Z -m "Laddrix X.Y.Z"` and `git push origin vX.Y.Z`. For **v1.0.0**, only after Ayush has run the live steps of the [go-live checklist](go-live.md) and recorded his acceptance on #240.
 6. **Keep the SBOMs** (#365): the tag's CI run makes `sbom-vX.Y.Z`, the CycloneDX lists of every package in the server, the screens and the desktop app. Download it from the run's page and keep it with the release notes. When a new advisory comes out, it answers "were we shipping that?" for any past release.
 
 ## The desktop app (#365)
@@ -31,7 +31,7 @@ The desktop app isn't distributed today: it is built from source, and it has no 
 **Outside market hours only:** not 09:00–15:45 India time on a trading day. The script enforces this. Run it **from the release being deployed**, inside the server's checkout:
 
 ```bash
-cd /opt/mocktrade
+cd /opt/laddrix
 git fetch --tags
 git show vX.Y.Z:deploy/deploy.sh >/tmp/deploy.sh
 sudo bash /tmp/deploy.sh vX.Y.Z
@@ -40,12 +40,12 @@ sudo bash /tmp/deploy.sh vX.Y.Z
 **What `deploy.sh` does:**
 - **Before:**
   - the tag must exist and the checkout must have no local changes;
-  - the market-hours rule, taken from the release itself (`deploy/window.sh`, with `MOCKTRADE_HOLIDAYS` from `deploy/.env`);
+  - the market-hours rule, taken from the release itself (`deploy/window.sh`, with `LADDRIX_HOLIDAYS` from `deploy/.env`);
   - a **backup** of all state;
-  - the running image is kept as `mocktrade:previous`, and `deploy/.previous` records the commit and the backup.
+  - the running image is kept as `laddrix:previous`, and `deploy/.previous` records the commit and the backup.
 - **Then:** check out the tag, build the image (stamped with its commit), and start it.
 - **After:** the app must be healthy and `/api/health` must report the tag's version. If either check fails, it **rolls back at once by itself**.
-- **Log:** every step is written to `/var/log/mocktrade-deploy.log` with who ran it.
+- **Log:** every step is written to `/var/log/laddrix-deploy.log` with who ran it.
 
 **Emergency fix in market hours:** `sudo bash /tmp/deploy.sh vX.Y.Z --emergency "what and why"`. It goes ahead, and the log records `EMERGENCY … by <who>: <reason>`. Use it only for a fix that can't wait for 15:45.
 
@@ -57,7 +57,7 @@ sudo bash /tmp/deploy.sh vX.Y.Z
 ## Rollback
 
 ```bash
-cd /opt/mocktrade
+cd /opt/laddrix
 sudo bash deploy/rollback.sh                   # the previous version, data as it is now
 sudo bash deploy/rollback.sh --restore-data    # …and the data as it was before the deploy
 ```

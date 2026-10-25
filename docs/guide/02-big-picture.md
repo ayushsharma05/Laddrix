@@ -4,12 +4,12 @@
 
 ---
 
-## 2.1 MockTrade is a restaurant
+## 2.1 Laddrix is a restaurant
 
 The easiest way to see the whole system is as a restaurant.
 
 ```
- ┌─────────────────────── THE RESTAURANT (the MockTrade server) ───────────────────────┐
+ ┌─────────────────────── THE RESTAURANT (the Laddrix server) ───────────────────────┐
  │                                                                                      │
  │  DINING ROOM            WAITER               KITCHEN MANAGER        SAFETY INSPECTOR │
  │  (the screens in   ◄──► (server/routes: ──► (orders/manager.py:  ──► (risk/: checks │
@@ -28,27 +28,27 @@ The easiest way to see the whole system is as a restaurant.
  └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| In the restaurant | In MockTrade | Folder |
+| In the restaurant | In Laddrix | Folder |
 | --- | --- | --- |
 | Dining room | The screens (React) | `ui/src/` |
-| Waiter | The web API and the live stream | `src/mocktrade/server/` |
-| Kitchen manager | The order manager | `src/mocktrade/orders/` |
-| Safety inspector | Risk checks, STOP, limits | `src/mocktrade/risk/` |
-| The supplier's phone | The broker: Kite, or paper | `src/mocktrade/broker/` |
-| Notice board | Live prices | `src/mocktrade/marketdata/` |
-| Accountant | Positions and P&L | `src/mocktrade/positions/` |
-| Ledger | The audit trail (`events.db`) | `src/mocktrade/store/` |
-| Robot helpers | Algos | `src/mocktrade/algos/` |
-| Alarm system | Operational alerts, the bands | `src/mocktrade/ops/` |
-| The building plan | Wires everything together | `src/mocktrade/platform.py` |
+| Waiter | The web API and the live stream | `src/laddrix/server/` |
+| Kitchen manager | The order manager | `src/laddrix/orders/` |
+| Safety inspector | Risk checks, STOP, limits | `src/laddrix/risk/` |
+| The supplier's phone | The broker: Kite, or paper | `src/laddrix/broker/` |
+| Notice board | Live prices | `src/laddrix/marketdata/` |
+| Accountant | Positions and P&L | `src/laddrix/positions/` |
+| Ledger | The audit trail (`events.db`) | `src/laddrix/store/` |
+| Robot helpers | Algos | `src/laddrix/algos/` |
+| Alarm system | Operational alerts, the bands | `src/laddrix/ops/` |
+| The building plan | Wires everything together | `src/laddrix/platform.py` |
 
 ## 2.2 The same thing as a real diagram
 
-![MockTrade overview](../../context/images/kite-overview.png)
+![Laddrix overview](../../context/images/kite-overview.png)
 
 And everything on one page:
 
-![MockTrade on one chart](../../context/images/mocktrade-one-chart.png)
+![Laddrix on one chart](../../context/images/laddrix-one-chart.png)
 
 ## 2.3 Two separate programs that talk
 
@@ -56,7 +56,7 @@ And everything on one page:
  ┌───────────────────────────┐          ┌──────────────────────────────────┐
  │ SCREENS (your browser)     │          │ SERVER (one Python program)       │
  │ TypeScript + React         │  ◄────►  │ Python 3.13 + FastAPI             │
- │ ui/src/                    │  REST +  │ src/mocktrade/                    │
+ │ ui/src/                    │  REST +  │ src/laddrix/                    │
  │ only SHOWS things          │  stream  │ DECIDES everything                │
  └───────────────────────────┘          └──────────────────────────────────┘
 ```
@@ -70,7 +70,7 @@ And everything on one page:
 
 ## 2.4 Every part can be swapped (the "plug" idea)
 
-Each big part is like an appliance with a standard plug. MockTrade only knows the plug shape,
+Each big part is like an appliance with a standard plug. Laddrix only knows the plug shape,
 not the appliance behind it.
 
 ```
@@ -83,7 +83,7 @@ not the appliance behind it.
      against live prices                            what the test scripts
 ```
 
-So to trade for real instead of on paper, MockTrade changes one object. The order manager, risk
+So to trade for real instead of on paper, Laddrix changes one object. The order manager, risk
 checks and screens don't change at all. The same idea applies to prices (live Kite or the
 simulator), charges, and storage.
 
@@ -94,7 +94,7 @@ simulator), charges, and storage.
 ```
  your browser ──https──► a small server in Mumbai (Amazon Lightsail, fixed IP address)
                               │  Caddy (the front door: https, certificates)
-                              │  MockTrade (one Docker container)
+                              │  Laddrix (one Docker container)
                               │  /data (the database files, backups)
                               ▼
                          Zerodha Kite (orders must come from a fixed IP: a SEBI rule)
@@ -119,7 +119,7 @@ order manager, risk checks, position book, algos and so on, so accounts can neve
   ├── shared: prices, the instrument list, the firm-wide STOP switch, the ledger
 ```
 
-Read `Platform.add_account` in `src/mocktrade/platform.py`: it is the building plan, and it
+Read `Platform.add_account` in `src/laddrix/platform.py`: it is the building plan, and it
 creates each part in order and connects them.
 
 ---

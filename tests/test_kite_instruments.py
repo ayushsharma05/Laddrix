@@ -5,9 +5,9 @@ maps.
 from datetime import date
 from pathlib import Path
 
-from mocktrade.broker.kite.instruments import load_kite_instruments
-from mocktrade.domain.instruments import InstrumentKind
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.broker.kite.instruments import load_kite_instruments
+from laddrix.domain.instruments import InstrumentKind
+from laddrix.refdata.store import InstrumentStore
 
 SAMPLE = (Path(__file__).parent / "data" / "kite_instruments_sample.csv").read_text()
 

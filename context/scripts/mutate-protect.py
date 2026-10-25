@@ -1,7 +1,7 @@
 """#200 mutation check (equivalent mutants left out: the OCO wait for the target cancel is
 also enforced by the engine's never-over-send rule): break one protection rule, tests/test_protect.py must notice."""
 import subprocess
-F = "src/mocktrade/algos/protect.py"
+F = "src/laddrix/algos/protect.py"
 M = [
  (F, "    return ltp <= stop if exit_side is Side.SELL else ltp >= stop", "    return ltp < stop if exit_side is Side.SELL else ltp > stop"),
  (F, "        if self.best is None or (ltp > self.best if selling else ltp < self.best):", "        if True:"),
@@ -16,9 +16,9 @@ M = [
  (F, "        return entered > 0 and entry_over and exited >= entered and not ctx.working()", "        return entered > 0 and exited >= entered"),
  (F, "        self.target = down(target) if up else upward(target)", "        self.target = target"),
  (F, "        if open_qty > 0:\n            return f\"UNPROTECTED", "        if False:\n            return f\"UNPROTECTED"),
- ("src/mocktrade/algos/engine.py", "    return request.instrument_id == p.instrument_id and request.side is p.side", "    return request.instrument_id == p.instrument_id"),
- ("src/mocktrade/platform.py", "                if e.extra.get(\"family\") == \"protection\":", "                if True:"),
- ("src/mocktrade/platform.py", "            log.record_note(\"ALGO_LOST\"", "            (lambda *a: None)(\"ALGO_LOST\""),
+ ("src/laddrix/algos/engine.py", "    return request.instrument_id == p.instrument_id and request.side is p.side", "    return request.instrument_id == p.instrument_id"),
+ ("src/laddrix/platform.py", "                if e.extra.get(\"family\") == \"protection\":", "                if True:"),
+ ("src/laddrix/platform.py", "            log.record_note(\"ALGO_LOST\"", "            (lambda *a: None)(\"ALGO_LOST\""),
 ]
 caught = 0
 for f, a, b in M:

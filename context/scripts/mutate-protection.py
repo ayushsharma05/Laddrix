@@ -3,8 +3,8 @@ counts as protected again, waiting for recovery, the restart list, the band's wo
 the tests must notice. Restores each file in `finally`; a hang counts as caught. Run alone."""
 import subprocess
 
-G = "src/mocktrade/ops/protection.py"
-P = "src/mocktrade/platform.py"
+G = "src/laddrix/ops/protection.py"
+P = "src/laddrix/platform.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_protection_guard.py",
          "tests/test_protect.py"]
 MUTANTS = [

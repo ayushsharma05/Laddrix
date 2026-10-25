@@ -5,7 +5,7 @@ Each section: what you see, what it means, what to do. The first rule always app
 
 ## Login failed
 
-**You see:** after Zerodha's page, MockTrade shows "Broker login failed", and the strip still
+**You see:** after Zerodha's page, Laddrix shows "Broker login failed", and the strip still
 says "not logged in to Kite".
 
 1. Look at the reason in the audit trail (`BROKER_LOGIN_FAILED`) or the server log
@@ -17,9 +17,9 @@ says "not logged in to Kite".
    `docker compose -f deploy/compose.yaml up -d`.
 4. **The page says the redirect URL doesn't match**: in the developer console, set the
    redirect URL to exactly `https://<your domain>/kite/callback`.
-5. **"Log in to Kite" says only the account holder can log in**: sign in to MockTrade as the
+5. **"Log in to Kite" says only the account holder can log in**: sign in to Laddrix as the
    user who owns that account.
-6. Still failing at 09:10? Trade from the Kite app directly for now. MockTrade's other accounts
+6. Still failing at 09:10? Trade from the Kite app directly for now. Laddrix's other accounts
    (paper) keep working.
 
 ## WebSocket down
@@ -27,7 +27,7 @@ says "not logged in to Kite".
 **You see:** the band "No prices for over a minute", or PRICES n s OLD on the screens; the
 Prices light is amber or red.
 
-1. Is it only you? If the Server light is red too, your own connection to MockTrade dropped.
+1. Is it only you? If the Server light is red too, your own connection to Laddrix dropped.
    The screen reconnects by itself, and order clicks stay paused until it does.
 2. Server side: `docker compose -f deploy/compose.yaml logs --since 10m app | grep -i ticker`.
    - `kite ticker dropped … reconnect`: the server is already retrying (1 s, 2 s, 4 s … up to
@@ -37,31 +37,31 @@ Prices light is amber or red.
 3. While prices are stale, **don't click prices on the ladder**: what you see is old. Working
    orders at the exchange are not affected. After the feed comes back, orders are
    reconciled from Kite's order book automatically.
-4. Need to act now? Use the Kite app, then let reconcile bring MockTrade up to date.
+4. Need to act now? Use the Kite app, then let reconcile bring Laddrix up to date.
 
 ## Reconcile mismatch
 
-**You see:** the band **POSITION DIFFERS · CONTRACT**: MockTrade's position differs from
+**You see:** the band **POSITION DIFFERS · CONTRACT**: Laddrix's position differs from
 Kite's. The Recon light is red.
 
 1. Don't trade that contract until it is resolved: you can't trust either number yet.
-2. Open the Kite app → Positions, and compare with MockTrade's Positions widget.
+2. Open the Kite app → Positions, and compare with Laddrix's Positions widget.
 3. Common causes:
-   - an order placed outside MockTrade (Kite app, another tool);
-   - a fill MockTrade missed while disconnected;
+   - an order placed outside Laddrix (Kite app, another tool);
+   - a fill Laddrix missed while disconnected;
    - an exchange-side adjustment.
 
-   The audit trail for that contract shows what MockTrade saw.
-4. **A trade made outside MockTrade** (#355; risk or admin): ask MockTrade what explains it,
+   The audit trail for that contract shows what Laddrix saw.
+4. **A trade made outside Laddrix** (#355; risk or admin): ask Laddrix what explains it,
    `GET /api/accounts/<account>/external-trades?instrument_id=<id>&product=<NRML|MIS|CNC>`.
-   It lists the broker's trades in that position that no MockTrade order placed, and says
+   It lists the broker's trades in that position that no Laddrix order placed, and says
    whether they explain the difference **exactly**. If they do, check them with whoever
    traded, then adopt them: `POST` the same URL with
    `{"instrument_id", "product", "acknowledgement": "what you checked"}`. Each trade goes into
    the position at its own price, in the audit trail with your name, your words and the
    broker's trade id (EXTERNAL_ADOPTED); it is never adopted twice and survives a restart.
    The band clears. If they don't explain it, nothing can be adopted: go on below.
-5. If Kite is right (it usually is), MockTrade takes Kite's orders as the truth on its next
+5. If Kite is right (it usually is), Laddrix takes Kite's orders as the truth on its next
    resync, after a reconnect or a restart (`docker compose -f deploy/compose.yaml restart app`).
    The band clears by itself once the positions agree.
 6. If they still differ after a restart, keep the screenshots and the audit trail CSV and
@@ -94,7 +94,7 @@ Kite's. The Recon light is red.
   **Flatten (N)** in the red band, then **Confirm**. It closes with orders that can only
   reduce (never reverse), through the exit desk; nothing else gets through the stop. Pressing
   it twice is safe: the second finds nothing left. Who may: the account's traders, risk, admin.
-- **"size not known, close it at the broker":** MockTrade and the broker disagree on that
+- **"size not known, close it at the broker":** Laddrix and the broker disagree on that
   position (a reconcile alert, or a difference being re-checked). Flatten won't guess a size;
   close it in the broker's own app, then check [Reconcile mismatch](#reconcile-mismatch).
 - **A Flatten message in red** means something wasn't fully closed: a refused order (its
@@ -108,7 +108,7 @@ failure an ERROR alert "trading stays paused after a restart". `GET /api/account
 shows `recovery: {state, reason}`.
 
 **Why:** at start each account rebuilds its orders and positions from the audit trail and
-checks them against the broker before taking new orders (`src/mocktrade/recovery.py`).
+checks them against the broker before taking new orders (`src/laddrix/recovery.py`).
 Cancels always go through.
 
 | `recovery.state` | Meaning | Do |
@@ -118,7 +118,7 @@ Cancels always go through.
 | `failed` | a working order the broker doesn't list, or a position that differs | below |
 
 **When it failed:** compare the broker's own order book and positions (Kite console) with
-MockTrade's order book and the reason. A difference means a trade made outside MockTrade,
+Laddrix's order book and the reason. A difference means a trade made outside Laddrix,
 or a lost update. Settle it at the broker if needed (cancel the stray order, close or
 match the position), then **restart the server**: recovery runs again from the start.
 Nothing is adopted silently: a person decides.
@@ -146,14 +146,14 @@ cancelled. Check its legs by hand.
     (TRAILING_STOP SELL 75 NFO:NIFTY26OCTFUT (A1, demo)) was running when the server stopped
     and is not running now. Start a stop for it, or close it.
 
-**Why:** a trailing stop, OCO or bracket is held by MockTrade, not by the exchange. It stops
+**Why:** a trailing stop, OCO or bracket is held by Laddrix, not by the exchange. It stops
 protecting when:
 - the server restarts (these algos don't survive one);
 - someone pauses or stops it;
 - it fails;
 - it ends while the position is still open.
 
-The server's protection guard (`src/mocktrade/ops/protection.py`, V1.2 #328) then keeps one band per position.
+The server's protection guard (`src/laddrix/ops/protection.py`, V1.2 #328) then keeps one band per position.
 - **When it decides:** after the account's recovery has finished, so a half-rebuilt book is never taken for flat.
 - **What it flags:** only positions that *had* protection and lost it. A position you chose never to protect is left alone.
 
@@ -173,11 +173,11 @@ It is refused, saying why, when it could duplicate an exit:
   for its cancel to settle;
 - another stop on it is still there, perhaps paused: resume or stop that one instead;
 - the position has flipped or closed;
-- MockTrade and the broker disagree on its size (see [Reconcile mismatch](#reconcile-mismatch)).
+- Laddrix and the broker disagree on its size (see [Reconcile mismatch](#reconcile-mismatch)).
 
 **The band survives restarts (#264):** each lost stop is written to the audit trail
 (UNPROTECTED) and so is its resolution (PROTECTION_RESOLVED, with how). After any number of
-restarts, an unresolved one comes back. A stop you restored is itself held by MockTrade, so a
+restarts, an unresolved one comes back. A stop you restored is itself held by Laddrix, so a
 later restart loses it too, and the band says so again. **Only a stop-loss order or a GTT held
 by the broker survives an outage.**
 
@@ -208,32 +208,32 @@ Run it before going live and after any change to recovery, orders or positions. 
 
 **What you see:** an order in the order book with the status **Unconfirmed**, and in Messages "no answer from broker".
 
-**Why:** the broker didn't answer when the order was sent (a timeout or a dropped connection), so MockTrade doesn't know whether it exists. It is **never retried**, and its risk stays counted, so you can't accidentally double it.
+**Why:** the broker didn't answer when the order was sent (a timeout or a dropped connection), so Laddrix doesn't know whether it exists. It is **never retried**, and its risk stays counted, so you can't accidentally double it.
 
-**It usually settles itself:** MockTrade asks the broker again for about three minutes.
+**It usually settles itself:** Laddrix asks the broker again for about three minutes.
 - If the broker lists the order, it continues as normal.
 - If 3 of the broker's lists over at least 60 seconds don't show it, it is marked **REJECTED: the broker never received this order**, with the times it checked.
 
 **If it stays Unconfirmed** (the audit trail says "still not settled after asking the broker 7 times"):
 1. Open the broker's own order book (the Kite app or console). Look for the order by its tag, which is our order id (for example `D2610161`).
 2. **If it's there,** do nothing here: the next order update or reconnect settles it. A restart also does.
-3. **If it isn't there,** press **Not placed?** in MockTrade's order book, then **Confirm: not in the broker's book**. The order becomes REJECTED, with your name in the reason and the audit trail.
+3. **If it isn't there,** press **Not placed?** in Laddrix's order book, then **Confirm: not in the broker's book**. The order becomes REJECTED, with your name in the reason and the audit trail.
 
-**A status MockTrade doesn't know:** if Kite reports one, the order is kept (not dropped), and the audit trail shows "the broker reports a status MockTrade doesn't know: …". Tell Claude, so the status can be added (`broker/kite/orders.py`, `STATUS_MAP`).
+**A status Laddrix doesn't know:** if Kite reports one, the order is kept (not dropped), and the audit trail shows "the broker reports a status Laddrix doesn't know: …". Tell Claude, so the status can be added (`broker/kite/orders.py`, `STATUS_MAP`).
 
 ## A change or a cancel got no answer
 
 **What you see:** the order book says **Pending change** or **Pending cancel**. Messages say the broker didn't answer, and the audit trail shows **Replace unconfirmed** or "no clear answer".
 
-**Why:** the broker didn't answer in time, so MockTrade can't know whether the change or cancel happened. It never guesses:
+**Why:** the broker didn't answer in time, so Laddrix can't know whether the change or cancel happened. It never guesses:
 - **A change:** risk counts the **larger** quantity of the old and the new until the broker's own terms say. A second change is refused meanwhile.
 - **A cancel:** the order stays "cancel on its way".
 
-**It settles itself:** MockTrade asks the broker for about three minutes.
+**It settles itself:** Laddrix asks the broker for about three minutes.
 - **A change:** the order takes the broker's real terms.
 - **A cancel:** the order becomes CANCELLED, or, if the broker still has it working, goes back to working with the message "the cancel didn't go through". You can then cancel again; pressing cancel again is always allowed in this state.
 
-**If it stays pending** (the audit trail says "the change/cancel is still not settled after asking the broker 7 times"): look at the order in the broker's own app. A reconnect or a restart then brings MockTrade in line from the broker's order list.
+**If it stays pending** (the audit trail says "the change/cancel is still not settled after asking the broker 7 times"): look at the order in the broker's own app. A reconnect or a restart then brings Laddrix in line from the broker's order list.
 
 ## A close says "left to orders already closing it" (#261)
 
@@ -259,7 +259,7 @@ reached, with its state.
 1. **Blocked:** read the reason (a risk refusal, a broker reject, a failure, or a restart while
    closing). Fix what it names if you can (e.g. trading stopped: use Flatten), then press
    **Retry**, then **Confirm**. It closes only what is still open.
-2. **Unclear:** an order the broker hasn't answered, or MockTrade and the broker disagree on the
+2. **Unclear:** an order the broker hasn't answered, or Laddrix and the broker disagree on the
    size. Don't retry. Check the broker's own order book and positions; see
    [An order says Unconfirmed](#an-order-says-unconfirmed) or [Reconcile mismatch](#reconcile-mismatch).
 3. The band clears itself once the position is closed and the broker agrees.
@@ -285,8 +285,8 @@ log has fallen behind (N events waiting)". New orders come back refused with "no
 couldn't be recorded on disk first (…)".
 
 **Why:** every order is written to disk **before** it is sent, so that after any crash
-MockTrade still knows it and never reuses its id. If the disk is full or broken, or writing
-has stalled, MockTrade refuses new orders rather than send ones it couldn't record.
+Laddrix still knows it and never reuses its id. If the disk is full or broken, or writing
+has stalled, Laddrix refuses new orders rather than send ones it couldn't record.
 
 1. **Cancels always work.** Flatten and the other forced closes still go, because they only
    reduce risk; they are logged as sent without a record on disk.
@@ -327,14 +327,14 @@ so memory stays bounded.
 
 ## An order's fills don't match the broker's trades (#352)
 
-**What you see:** the audit trail has TRADES_DIFFER ("order MT… : MockTrade has 150 filled,
+**What you see:** the audit trail has TRADES_DIFFER ("order MT… : Laddrix has 150 filled,
 the broker's trades 100"), or a CORRECTED row ("the broker's trade list corrected what its
 fills traded for by +₹0.50").
 
 **What it means:**
 - **CORRECTED:** the quantities agree, but the value didn't. The broker's trades are the
   authority, so the order was corrected and positions and charges followed. Nothing to do.
-- **TRADES_DIFFER:** the quantities differ on two reads in a row. MockTrade changes nothing by
+- **TRADES_DIFFER:** the quantities differ on two reads in a row. Laddrix changes nothing by
   itself.
 
 **Steps:**
@@ -353,7 +353,7 @@ restarting in 2 s; new orders paused until it runs`. If it keeps failing:
 `… keeps failing (…): stopped trying; new orders paused. Restart the server once the cause is
 fixed`.
 
-**What it means:** one of MockTrade's background loops crashed. They are an account's broker
+**What it means:** one of Laddrix's background loops crashed. They are an account's broker
 updates, recovery, GTT watch, position reconciling and algos, plus marking positions to prices.
 - **While it restarts** (1 s, 2 s, 4 s … up to 30 s): new orders and changes on that account
   wait, and say why. **Cancels still go.**
@@ -371,10 +371,10 @@ updates, recovery, GTT watch, position reconciling and algos, plus marking posit
    needs a restart (`docker compose -f deploy/compose.yaml restart app`). Recovery then
    rebuilds and reconciles before orders open.
 
-## "Another MockTrade server owns data/" (#273)
+## "Another Laddrix server owns data/" (#273)
 
 **What you see:** the server refuses to start:
-`another MockTrade server owns /data (pid 1234 since …): only one may trade its accounts`.
+`another Laddrix server owns /data (pid 1234 since …): only one may trade its accounts`.
 
 **What it means:** a second server was started on the same data folder. Two servers would
 trade the same accounts as the same owner, so the second refuses. The lock belongs to the
@@ -392,24 +392,24 @@ purpose: it might wake up and send orders.
 Do these in order. Speed matters more than understanding. The order is: **contain → stop new risk →
 reconcile → keep the evidence → rotate → restore without the old sessions**. In the commands
 below, `users` means
-`docker compose -f deploy/compose.yaml run --rm app python -m mocktrade.tools.users`.
+`docker compose -f deploy/compose.yaml run --rm app python -m laddrix.tools.users`.
 
 | What leaked | Contain at once |
 | --- | --- |
 | **A session** (a laptop left logged in, a cookie copied) | The user can end it themselves: menu bar **Sessions** → **End**. A stolen session alone can't make privileged changes (they need a fresh code, #363). Or `users revoke-sessions --user <id>`: their open screens close within 2 s, and logging in again needs the password **and** the authenticator. Then `users password <id>` (ends sessions too). |
 | **A password and authenticator** (a phone and password both) | Admin screen: turn the user **off** (ends their sessions; their running algos stop and opening GTTs are deleted, #366). Then reset the password and the authenticator. |
-| **`MOCKTRADE_SECRET_KEY` or `deploy/.env`** | Everything below, including both rotations. Assume the attacker can open every authenticator secret in any copy of `users.db` they also have. |
+| **`LADDRIX_SECRET_KEY` or `deploy/.env`** | Everything below, including both rotations. Assume the attacker can open every authenticator secret in any copy of `users.db` they also have. |
 | **The Kite API secret** | Rotate it (below), then log every Kite account in again. |
-| **A Kite token file** (`kite_token_*.json`) | It works for the rest of the day (until 6 AM). Log that account out at the broker, which ends the token, and log in again through MockTrade. If unsure, STOP the account until 6 AM. |
+| **A Kite token file** (`kite_token_*.json`) | It works for the rest of the day (until 6 AM). Log that account out at the broker, which ends the token, and log in again through Laddrix. If unsure, STOP the account until 6 AM. |
 
 1. **Contain.** Use the table above. If you don't know who: `users revoke-sessions` (everyone).
 2. **Stop new risk.** Press STOP for the firm (or the account). Working orders are cancelled,
    algos stop, and opening GTTs are deleted. Closing is still allowed: see [Kill switch](#kill-switch).
 3. **Reconcile with the broker.** In the broker's own app, compare orders, trades and positions
-   with MockTrade's. Anything MockTrade didn't place shows as a reconcile alert or under
-   "trades made outside MockTrade" (#355). Don't adopt it until you know who placed it.
+   with Laddrix's. Anything Laddrix didn't place shows as a reconcile alert or under
+   "trades made outside Laddrix" (#355). Don't adopt it until you know who placed it.
 4. **Keep the evidence.** Before changing anything else:
-   - make a backup (`python -m mocktrade.tools.backup`);
+   - make a backup (`python -m laddrix.tools.backup`);
    - export the audit trail of each affected account (the auditor's export, risk or admin);
    - save the server log (`docker compose ... logs app > incident-<date>.log`).
    Write down the times. Logins, orders and every admin change are in the audit trail with who
@@ -417,8 +417,8 @@ below, `users` means
 5. **Rotate what leaked.**
    - **The secret key:** `users new-key` and save it in the password manager. Stop the server
      (`docker compose ... stop app`). Then run
-     `users rotate-key --check` and `users rotate-key`, with `MOCKTRADE_NEW_SECRET_KEY=<new>`
-     added for that one command (`run --rm -e MOCKTRADE_NEW_SECRET_KEY=... app ...`). It
+     `users rotate-key --check` and `users rotate-key`, with `LADDRIX_NEW_SECRET_KEY=<new>`
+     added for that one command (`run --rm -e LADDRIX_NEW_SECRET_KEY=... app ...`). It
      refuses while the server runs, and changes nothing unless every secret re-encrypts and reads
      back. Put the new key in `deploy/.env` and start the server. **Keep the old key** with the
      backups made before today: restoring one of them needs it. After a restore, run

@@ -3,8 +3,8 @@ manifest, half backups, checking a backup, never overwriting or deleting, stale 
 the restore says, moving aside in place); the tests must notice. Restores each file in `finally`. Run alone."""
 import subprocess
 
-B = "src/mocktrade/tools/backup.py"
-R = "src/mocktrade/tools/restore.py"
+B = "src/laddrix/tools/backup.py"
+R = "src/laddrix/tools/restore.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_backup.py"]
 MUTANTS = [
  (B, 'FOLDERS = ("rules", "reports", "alerts", "spreads", "candles", "backtests")', 'FOLDERS = ("rules", "reports", "spreads", "candles", "backtests")'),

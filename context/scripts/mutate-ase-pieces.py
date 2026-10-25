@@ -5,10 +5,10 @@ wiring); the tests must notice. Restores each file in `finally`; a hang counts a
 Run alone from the repo root."""
 import subprocess
 
-A = "src/mocktrade/algos/autospreader.py"
-R = "src/mocktrade/risk/checks.py"
-E = "src/mocktrade/algos/engine.py"
-P = "src/mocktrade/platform.py"
+A = "src/laddrix/algos/autospreader.py"
+R = "src/laddrix/risk/checks.py"
+E = "src/laddrix/algos/engine.py"
+P = "src/laddrix/platform.py"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_autospreader.py", "tests/test_risk_checks.py",
        "tests/test_spread_api.py"], ".")
 MUTANTS = [

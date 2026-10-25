@@ -1,9 +1,10 @@
 # ruff: noqa: E501  (the scene list and the HTML/CSS templates read best one item per line)
-"""Builds the MockTrade advert (#455): about three minutes of the posters, the real screens and
+"""Builds the Laddrix advert (#455): about three minutes of the posters, the real screens and
 title cards, with music.
 
     node context/showcase/render.cjs              # the posters first, if they changed
-    python3 context/showcase/video/make_video.py
+    python3 context/showcase/video/make_video.py          # the advert  → laddrix-advert.mp4
+    python3 context/showcase/video/make_video.py short    # one minute  → laddrix-showcase.mp4
 
 1. draws the title cards and the framed screenshots (HTML pages, photographed by Playwright);
 2. films each scene with a slow camera move: a zoom, or a glide from one part of the picture
@@ -11,7 +12,7 @@ title cards, with music.
 3. writes the soundtrack from plain sine waves and noise (numpy), so there is nothing to
    license: a chord pad, then bass, a beat and an arpeggio as the advert builds, a whoosh on
    every cut, and a calm ending;
-4. puts the two together in context/showcase/video/mocktrade-showcase.mp4.
+4. puts the two together in context/showcase/video/laddrix-showcase.mp4.
 """
 
 import html
@@ -27,8 +28,8 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 SHOWCASE = HERE.parent
 POSTERS = SHOWCASE.parent / "images" / "showcase"
-SHOTS = SHOWCASE.parent / "images"
-OUT = HERE / "mocktrade-showcase.mp4"
+SHOTS = SHOWCASE.parent / "images" / "showcase" / "screens"  # context/scripts/shoot-showcase.cjs
+OUT = {"advert": HERE / "laddrix-advert.mp4", "short": HERE / "laddrix-showcase.mp4"}
 FPS = 30
 FADE = 0.8  # seconds each transition takes
 RATE = 44100
@@ -58,45 +59,45 @@ SCENES = [
     # 2. the screens
     Scene("card:PART ONE|Meet the terminal|Everything a trader needs, on one screen.", 3.5, act=2),
     Scene(
-        "shot:k5-5-screens.png|THE TRADING PAGE|Watch, ladders, orders, positions, audit: live",
+        "shot:trading.png|THE TRADING PAGE|Watch, ladders, orders, positions, audit: live",
         5.5,
         (0.5, 0.52, 1.0),
         (0.5, 0.52, 1.12),
         2,
     ),
     Scene(
-        "shot:k5-4-ladder.png|THE PRICE LADDER|Click a price. Trade it. See the queue.",
+        "shot:ladder.png|THE PRICE LADDER|Click a price. Trade it. See the queue.",
         5.0,
         (0.5, 0.55, 1.05),
         (0.42, 0.6, 1.35),
         2,
     ),
     Scene(
-        "shot:k5-ticket.png|THE ORDER TICKET|It knows the rules: the server tells it what is allowed",
+        "shot:ticket.png|THE ORDER TICKET|It knows the rules: the server tells it what is allowed",
         5.0,
         act=2,
     ),
     Scene(
-        "shot:14-chain.png|OPTION CHAIN|Every strike, every Greek, live",
+        "shot:chain.png|OPTION CHAIN|Every strike, every Greek, live",
         5.0,
         (0.5, 0.55, 1.0),
         (0.5, 0.6, 1.18),
         2,
     ),
     Scene(
-        "shot:15-strategy.png|STRATEGY BUILDER|Build multi-leg option strategies in seconds",
+        "shot:strategy.png|STRATEGY BUILDER|Build multi-leg option strategies in seconds",
         5.0,
         act=2,
     ),
     Scene(
-        "shot:mocktrade-one-chart.png|CHARTS|Candles from one minute to one day",
+        "shot:depth.png|MARKET DEPTH|Every level of the book, live",
         5.0,
         (0.5, 0.55, 1.0),
         (0.55, 0.5, 1.15),
         2,
     ),
     Scene(
-        "shot:autospreader-live.png|AUTOSPREADER|Quote one leg, hedge the rest the moment it fills",
+        "shot:autospreader.png|AUTOSPREADER|Quote one leg, hedge the rest the moment it fills",
         5.5,
         (0.5, 0.55, 1.0),
         (0.5, 0.45, 1.15),
@@ -107,17 +108,12 @@ SCENES = [
     ),
     Scene("shot:structures.png|STRUCTURES|Spreads you hold, with their own P&L", 4.5, act=2),
     Scene(
-        "shot:11-algos.png|ALGOS|Slicer · iceberg · POV · TWAP · VWAP · protect",
+        "shot:algos.png|ALGOS|Slicer · iceberg · POV · TWAP · VWAP · protect",
         5.0,
         (0.5, 0.55, 1.0),
         (0.45, 0.5, 1.15),
         2,
     ),
-    Scene("shot:free-canvas-page.png|YOUR LAYOUT|Any widget, any size, anywhere", 4.5, act=2),
-    Scene(
-        "shot:k5-6-desktop-popout.png|DESKTOP APP|Pop windows out onto every monitor", 4.5, act=2
-    ),
-    Scene("shot:k13-5-theme-light.png|THEMES|Dark, light, and colour-blind safe", 4.5, act=2),
     # 3. under the hood
     Scene("card:PART TWO|Under the hood|Engineered like the systems big desks run on.", 3.5, act=3),
     Scene("02-architecture", 5.0, (*C, 1.0), (*C, 1.04), 3),
@@ -134,14 +130,8 @@ SCENES = [
         3.5,
         act=4,
     ),
-    Scene(
-        "shot:k13-2-admin-users.png|ADMIN|Firms and users, each firm sees only its own", 4.5, act=4
-    ),
-    Scene(
-        "shot:k13-2-admin-limits.png|RISK LIMITS|Loss limits, kill switch, per account", 4.5, act=4
-    ),
-    Scene("shot:grafana-dashboard.png|MONITORING|Every part measured, live", 4.5, act=4),
-    Scene("shot:status-page.png|STATUS|Health at a glance", 4.0, act=4),
+    Scene("shot:admin.png|ADMIN|Firms, users and limits: each firm sees only its own", 4.5, act=4),
+    Scene("02-architecture", 6.0, (0.86, 0.3, 1.9), (0.86, 0.72, 1.9), 4),
     # 5. quality and the finale
     Scene("card:|Every order checked.|Every price live. Every rule from the server.", 4.0, act=5),
     Scene(
@@ -380,19 +370,32 @@ def soundtrack(seconds: float, cuts: list[float], acts: list[tuple[float, int]],
         w.writeframes(stereo.tobytes())
 
 
-def main() -> None:
+# the short one (about a minute): the nine posters, the journey timeline among them, then the
+# end card; each glides in or out, and the music builds as it goes
+SHORT = [
+    Scene(name, 6.0, (*C, 1.0) if i % 2 else (*C, 1.07), (*C, 1.07) if i % 2 else (*C, 1.0), act)
+    for i, (name, act) in enumerate(
+        [("01-hero", 1), ("02-architecture", 2), ("03-order-journey", 2), ("04-price-path", 3),
+         ("05-safety", 3), ("06-journey", 3), ("07-screens", 4), ("08-quality", 4),
+         ("09-algos", 4), ("outro", 5)]
+    )
+]  # fmt: skip
+
+
+def main(kind: str = "advert") -> None:
+    scenes = SCENES if kind == "advert" else SHORT
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        pngs = draw_pages(SCENES, work)
+        pngs = draw_pages(scenes, work)
         clips = []
-        for i, (png, s) in enumerate(zip(pngs, SCENES, strict=True)):
+        for i, (png, s) in enumerate(zip(pngs, scenes, strict=True)):
             c = work / f"clip{i:02}.mp4"
             film(png, s, c)
             clips.append(c)
         video = work / "video.mp4"
-        total, *cuts = join(clips, SCENES, video)
+        total, *cuts = join(clips, scenes, video)
         starts, at = [], 0.0
-        for s in SCENES:
+        for s in scenes:
             starts.append((at, s.act))
             at += s.seconds - FADE
         wav = work / "music.wav"
@@ -416,12 +419,14 @@ def main() -> None:
                 "-shortest",
                 "-movflags",
                 "+faststart",
-                str(OUT),
+                str(OUT[kind]),
             ],
             check=True,
         )
-    print(f"wrote {OUT} ({total:.0f} s, {len(SCENES)} scenes)")
+    print(f"wrote {OUT[kind]} ({total:.0f} s, {len(scenes)} scenes)")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    main(sys.argv[1] if len(sys.argv) > 1 else "advert")  # "advert" or "short"

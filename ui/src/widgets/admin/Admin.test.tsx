@@ -6,7 +6,7 @@ import { ME } from "../../test/fixtures";
 import { Admin } from "./Admin";
 import { LIMITS, SPEC } from "./testdata";
 
-const URI = "otpauth://totp/MockTrade:meera?secret=JBSWY3DPEHPK3PXP&issuer=MockTrade";
+const URI = "otpauth://totp/Laddrix:meera?secret=JBSWY3DPEHPK3PXP&issuer=Laddrix";
 const ROLES = [
   { name: "admin", help: "manage users, accounts and limits; stop trading" },
   { name: "trader", help: "place and manage orders" },

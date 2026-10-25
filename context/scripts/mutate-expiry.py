@@ -7,12 +7,12 @@ off; search and the chain drop expired contracts); the tests must notice. Runs t
 unmutated first. Restores each file. Run alone."""
 import subprocess
 
-E = "src/mocktrade/refdata/expiry.py"
-C = "src/mocktrade/risk/checks.py"
-P = "src/mocktrade/platform.py"
-R = "src/mocktrade/recovery.py"
-S = "src/mocktrade/refdata/store.py"
-O = "src/mocktrade/options/chain.py"
+E = "src/laddrix/refdata/expiry.py"
+C = "src/laddrix/risk/checks.py"
+P = "src/laddrix/platform.py"
+R = "src/laddrix/recovery.py"
+S = "src/laddrix/refdata/store.py"
+O = "src/laddrix/options/chain.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_expiry.py", "tests/test_server.py"]
 MUTANTS = [
  (E, "        expired = now >= expires_at", "        expired = now > expires_at"),

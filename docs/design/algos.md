@@ -17,7 +17,7 @@ pause ─► pull working children        stop / kill switch ─► pull every c
   against the same description (backend provides, frontend displays). Unknown settings are
   refused.
 - **AlgoType**: spec + factory + the exchange's algo id once registered (SEBI framework; set
-  with `MOCKTRADE_ALGO_IDS`). Its children carry it (`algo_id`); without one they are marked
+  with `LADDRIX_ALGO_IDS`). Its children carry it (`algo_id`); without one they are marked
   as algo orders by `parent_id`, and the algo can't start if the account may send more than
   10 orders a second ([compliance.md](compliance.md#the-exchange-algo-id), #291).
 
@@ -185,9 +185,9 @@ The screen needed no change for any of them beyond one new setting kind (`minute
 figure units by name (`…_pct`, `…_bps`, `…_at`). Specs now carry a `family` ("execution";
 K9.2 adds "protection") for the screens to group by.
 
-## Protection held by MockTrade (K9.2): trailing stop, OCO exit, bracket
+## Protection held by Laddrix (K9.2): trailing stop, OCO exit, bracket
 `algos/protect.py`, family `"protection"` in the spec (screens group by it). Each one's
-stop is **synthetic**: MockTrade watches the last traded price and sends the exit only when
+stop is **synthetic**: Laddrix watches the last traded price and sends the exit only when
 the stop is touched. Nothing sits at the exchange for it before, so a stop and a target can
 never both fill and turn an exit into a new position the other way.
 
@@ -205,7 +205,7 @@ never both fill and turn an exit into a new position the other way.
   never-over-send rule refuses it).
 - Pause or stop pulls every child: the screen shows the position as unprotected. A bracket
   that ends with a position open says `UNPROTECTED: n of …` in its reason and the audit.
-- **Honest about restarts**: these are held by MockTrade, so they work only while the server
+- **Honest about restarts**: these are held by Laddrix, so they work only while the server
   runs (a broker GTT, K9.3, survives our outages). At start, any protection algo that was
   running when the server stopped raises an ERROR alert naming it, and is noted
   `ALGO_LOST` in the audit (`Platform.lost_protection`).

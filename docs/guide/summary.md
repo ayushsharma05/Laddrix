@@ -1,6 +1,6 @@
 # The guide on one page
 
-The whole guide in one page: what MockTrade is, how the parts fit, how one order travels
+The whole guide in one page: what Laddrix is, how the parts fit, how one order travels
 through the code, how each safety system works. Read it with the code open beside you. For
 the slower version, with pictures and from zero, read the [chapters](README.md).
 
@@ -8,7 +8,7 @@ If a word is new, look it up in [the glossary](../design/glossary.md).
 
 ---
 
-## 1. What MockTrade is
+## 1. What Laddrix is
 
 A trading platform for the Indian market (NSE, BSE, and their futures and options), built as
 its own product. It talks to **Zerodha Kite Connect**: Kite's WebSocket for live prices,
@@ -18,7 +18,7 @@ It also has a **paper broker**: a pretend broker that fills your orders against 
 prices, so everything can be tried without money.
 
 ```
-                 ┌──────────────── MockTrade server (Python) ────────────────┐
+                 ┌──────────────── Laddrix server (Python) ────────────────┐
  live prices ───►│ market data ──► paper broker (fills against live prices)   │
  (Kite WebSocket)│      │                                                    │
                  │      ▼                                                    │
@@ -44,8 +44,8 @@ prices, so everything can be tried without money.
 | | Server | Screens |
 | --- | --- | --- |
 | Language | Python 3.13 | TypeScript + React |
-| Folder | `src/mocktrade/` | `ui/src/` |
-| Starts with | `python -m mocktrade.tools.serve` (real) or `python -m mocktrade.tools.demo` (practice) | built by Vite into `ui/dist`, served by the server |
+| Folder | `src/laddrix/` | `ui/src/` |
+| Starts with | `python -m laddrix.tools.serve` (real) or `python -m laddrix.tools.demo` (practice) | built by Vite into `ui/dist`, served by the server |
 | Tests | `tests/` (pytest, about 1,250) | `*.test.tsx` next to each file (vitest, about 400) |
 
 The screens talk to the server in two ways:
@@ -278,10 +278,10 @@ a real failure, and each has tests that break on purpose to prove they work.
 | **Changes and cancels in doubt** | A change with no answer counts its larger size; a cancel with no answer stays "on its way" and can be pressed again. | `orders/manager.py` |
 | **Reconcile** | Every few minutes, our positions are compared with the broker's. A difference raises a band. | `positions/reconcile.py` |
 | **Recovery after a restart** | Trading stays shut until orders and positions are rebuilt from the audit log and the broker. | `recovery.py` |
-| **Lost stops** | A stop held by MockTrade that stops running while its position is open (restart, pause, failure) raises an UNPROTECTED band. | `ops/protection.py` |
+| **Lost stops** | A stop held by Laddrix that stops running while its position is open (restart, pause, failure) raises an UNPROTECTED band. | `ops/protection.py` |
 | **Backups** | All state copied with checksums; restore keeps what it replaces. | `tools/backup.py`, `tools/restore.py` |
 
-**One important limit to remember:** stops held by MockTrade (trailing stop, OCO, bracket)
+**One important limit to remember:** stops held by Laddrix (trailing stop, OCO, bracket)
 work only while the server runs. For protection that survives an outage, use a stop-loss
 order or a GTT held by the broker.
 
@@ -421,8 +421,8 @@ Used by MTM auto-close, square-off and Flatten (`risk/closing.py`).
      ▼
  check again soon (it may just be a fill on its way)
      │
- still different? ──► band: "NIFTY MIS: MockTrade +75, broker +150 (a missed fill, or a
-                       trade made outside MockTrade)"; Flatten refuses that position
+ still different? ──► band: "NIFTY MIS: Laddrix +75, broker +150 (a missed fill, or a
+                       trade made outside Laddrix)"; Flatten refuses that position
 ```
 
 ### A lost stop
@@ -520,7 +520,7 @@ never committed.
  healthy, and says the right version? ──no──► roll back to "previous" by itself
         │ yes
         ▼
- done; every step in /var/log/mocktrade-deploy.log
+ done; every step in /var/log/laddrix-deploy.log
 ```
 
 ---

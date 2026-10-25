@@ -1,4 +1,4 @@
-"""Trades made outside MockTrade (#355, part of #276).
+"""Trades made outside Laddrix (#355, part of #276).
 
 The failure before: a trade made in the broker's own app moved the broker's position but not
 ours. Reconciling raised an alert, and nothing could resolve it: the only ways out were to
@@ -15,12 +15,12 @@ from datetime import UTC, datetime
 
 import pytest
 
-from mocktrade.broker.base import BrokerPosition
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import Product, Side
-from mocktrade.domain.portfolio import Trade
-from mocktrade.positions.book import PositionBook
-from mocktrade.positions.external import ExternalError, ExternalTrades
+from laddrix.broker.base import BrokerPosition
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import Product, Side
+from laddrix.domain.portfolio import Trade
+from laddrix.positions.book import PositionBook
+from laddrix.positions.external import ExternalError, ExternalTrades
 
 FUT = "NFO:NIFTY26OCTFUT"
 T = datetime(2026, 10, 23, 5, 0, tzinfo=UTC)
@@ -87,7 +87,7 @@ async def test_trades_that_dont_explain_it_are_never_adopted(desk):
     preview = await tool.preview(FUT, Product.NRML)
     assert not preview.explains
     assert (
-        "a difference of +150; the broker's trades made outside MockTrade come to +75"
+        "a difference of +150; the broker's trades made outside Laddrix come to +75"
         in preview.words
     )
     with pytest.raises(ExternalError, match="don't explain it"):
@@ -97,7 +97,7 @@ async def test_trades_that_dont_explain_it_are_never_adopted(desk):
 
 async def test_our_own_trades_and_repeated_rows_dont_count(desk):
     book, broker, _, tool = desk
-    book.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)  # ours, through MockTrade
+    book.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)  # ours, through Laddrix
     broker.broker_positions = held(100)
     broker.broker_trades = [
         outside("T0", Side.BUY, 75, 2501000, client_order_id="MT1"),  # ours: not outside
@@ -118,13 +118,13 @@ async def test_a_reason_is_required(desk):
 
 
 async def test_adopted_trades_come_back_after_a_restart(tmp_path, nifty_fut):
-    from mocktrade.domain.accounts import BrokerAccount
-    from mocktrade.marketdata.service import MarketData
-    from mocktrade.orders.model import ClientIds
-    from mocktrade.platform import Platform
-    from mocktrade.refdata.store import InstrumentStore
-    from mocktrade.risk.kill_switch import KillSwitch
-    from mocktrade.store.events import EventLog
+    from laddrix.domain.accounts import BrokerAccount
+    from laddrix.marketdata.service import MarketData
+    from laddrix.orders.model import ClientIds
+    from laddrix.platform import Platform
+    from laddrix.refdata.store import InstrumentStore
+    from laddrix.risk.kill_switch import KillSwitch
+    from laddrix.store.events import EventLog
 
     store = InstrumentStore()
     store.add(nifty_fut)

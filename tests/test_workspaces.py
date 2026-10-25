@@ -14,13 +14,13 @@ import pytest
 from fastapi.routing import APIRoute
 from test_server import FUT, ORDER, ORIGIN, PASSWORD, World
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.accounts import BrokerAccount, Role, User, can_manage, can_trade, can_view
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.ops.alerts import Alerts
-from mocktrade.orders.model import ClientIds
-from mocktrade.server.app import ServerSettings, create_app
+from laddrix.algos.builtin import BUILTIN
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.accounts import BrokerAccount, Role, User, can_manage, can_trade, can_view
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.ops.alerts import Alerts
+from laddrix.orders.model import ClientIds
+from laddrix.server.app import ServerSettings, create_app
 
 ACME = "acme"
 THEIRS = (
@@ -284,18 +284,18 @@ async def test_the_stream_carries_nothing_of_another_firm(tmp_path, nifty_fut):
 
 
 def test_only_the_operator_makes_a_firm_from_the_terminal(tmp_path, capsys):
-    from mocktrade.server.security import SecretBox
-    from mocktrade.server.users import UserStore
-    from mocktrade.tools import users as users_tool
+    from laddrix.server.security import SecretBox
+    from laddrix.server.users import UserStore
+    from laddrix.tools import users as users_tool
 
-    env = {"MOCKTRADE_SECRET_KEY": SecretBox.new_key(),
-           "MOCKTRADE_USERS_DB": str(tmp_path / "users.db")}  # fmt: skip
+    env = {"LADDRIX_SECRET_KEY": SecretBox.new_key(),
+           "LADDRIX_USERS_DB": str(tmp_path / "users.db")}  # fmt: skip
     assert users_tool.main(["add-workspace", ACME, "Acme Capital", "--admin", "ravi"], env,
                            lambda: PASSWORD) == 0  # fmt: skip
     assert "Created workspace acme (Acme Capital) with its admin ravi" in capsys.readouterr().out
     users_tool.main(["add-user", "tara", "Tara", "--workspace", ACME], env, lambda: PASSWORD)
     users_tool.main(["add-account", "acc-ravi", "paper", "P1", "--owner", "ravi"], env)
-    store = UserStore(tmp_path / "users.db", SecretBox(env["MOCKTRADE_SECRET_KEY"]))
+    store = UserStore(tmp_path / "users.db", SecretBox(env["LADDRIX_SECRET_KEY"]))
     assert store.get_user("ravi").roles == {Role.ADMIN} and store.get_user("ravi").workspace == ACME
     assert store.get_user("tara").workspace == ACME
     assert store.get_account("acc-ravi").workspace == ACME  # its owner's firm
@@ -315,7 +315,7 @@ async def test_an_admin_never_sees_another_firms_backtests(tmp_path, nifty_fut):
     admin gets "no backtest", exactly as for one that doesn't exist."""
     from test_backtest import DAY, MODEL, day_ticks
 
-    from mocktrade.research.backtest import Backtests
+    from laddrix.research.backtest import Backtests
 
     w = TwoFirms(tmp_path, nifty_fut)
     runs = Backtests(tmp_path / "bt", w.platform.instruments, MODEL,

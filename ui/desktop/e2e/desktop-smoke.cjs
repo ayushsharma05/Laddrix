@@ -13,7 +13,7 @@ const { _electron: electron } = require(process.env.PLAYWRIGHT || '/opt/node22/l
     executablePath: require('electron'),
     // a fresh profile each run: no session or saved window place left from the last one
     args: [path.join(__dirname, '..'), '--no-sandbox', '--server=http://localhost:8000',
-      `--user-data-dir=${require('node:fs').mkdtempSync(path.join(require('node:os').tmpdir(), 'mocktrade-desktop-'))}`],
+      `--user-data-dir=${require('node:fs').mkdtempSync(path.join(require('node:os').tmpdir(), 'laddrix-desktop-'))}`],
   });
   const main = await app.firstWindow();
   await main.getByLabel('Username').fill('demo');
@@ -21,11 +21,11 @@ const { _electron: electron } = require(process.env.PLAYWRIGHT || '/opt/node22/l
   // Codes work once (replay protection): wait for one this script hasn't used yet.
   const fs = require('node:fs');
   const os = require('node:os');
-  const usedFile = path.join(os.tmpdir(), 'mocktrade-desktop-smoke-code');
+  const usedFile = path.join(os.tmpdir(), 'laddrix-desktop-smoke-code');
   const used = fs.existsSync(usedFile) ? fs.readFileSync(usedFile, 'utf8') : '';
   let code;
   for (;;) {
-    code = execSync('python3 -m mocktrade.tools.demo --code', { cwd: path.join(__dirname, '..', '..', '..') }).toString().trim();
+    code = execSync('python3 -m laddrix.tools.demo --code', { cwd: path.join(__dirname, '..', '..', '..') }).toString().trim();
     if (code !== used) break;
     await new Promise((r) => setTimeout(r, 2000));
   }

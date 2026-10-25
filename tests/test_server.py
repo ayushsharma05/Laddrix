@@ -10,23 +10,23 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import pytest
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.accounts import BrokerAccount, Role
-from mocktrade.domain.orders import OrderStatus, OrderUpdate, Product, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.protection import ProtectionGuard
-from mocktrade.orders.model import ClientIds
-from mocktrade.platform import Platform
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.server import security
-from mocktrade.server.app import ServerSettings, create_app
-from mocktrade.server.security import SecretBox
-from mocktrade.server.users import UserStore
-from mocktrade.store.events import EventLog
+from laddrix.algos.builtin import BUILTIN
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.accounts import BrokerAccount, Role
+from laddrix.domain.orders import OrderStatus, OrderUpdate, Product, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.ops.alerts import Alerts
+from laddrix.ops.protection import ProtectionGuard
+from laddrix.orders.model import ClientIds
+from laddrix.platform import Platform
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.server import security
+from laddrix.server.app import ServerSettings, create_app
+from laddrix.server.security import SecretBox
+from laddrix.server.users import UserStore
+from laddrix.store.events import EventLog
 
 ORIGIN = "https://trade.example.in"
 FUT = "NFO:NIFTY26OCTFUT"
@@ -754,7 +754,7 @@ async def test_layouts_are_saved_per_user(world):
 
 
 async def test_layout_count_is_capped(world, monkeypatch):
-    from mocktrade.server import users as users_module
+    from laddrix.server import users as users_module
 
     monkeypatch.setattr(users_module, "MAX_LAYOUTS_PER_USER", 2)
     c = await world.logged_in()
@@ -768,7 +768,7 @@ async def test_layout_count_is_capped(world, monkeypatch):
 async def test_the_built_screens_are_served_without_shadowing_the_api(world, tmp_path):
     ui = tmp_path / "dist"
     (ui / "assets").mkdir(parents=True)
-    (ui / "index.html").write_text("<!doctype html><title>MockTrade</title>")
+    (ui / "index.html").write_text("<!doctype html><title>Laddrix</title>")
     (ui / "assets" / "app-abc123.js").write_text("console.log(1)")
     (ui / "popout.html").write_text("<!doctype html><body></body>")
     (tmp_path / "secret.txt").write_text("not for the web")
@@ -776,8 +776,8 @@ async def test_the_built_screens_are_served_without_shadowing_the_api(world, tmp
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="https://testserver"
     ) as c:
-        assert "MockTrade" in (await c.get("/")).text
-        assert "MockTrade" in (await c.get("/workspace/main")).text  # app routes → index
+        assert "Laddrix" in (await c.get("/")).text
+        assert "Laddrix" in (await c.get("/workspace/main")).text  # app routes → index
         asset = await c.get("/assets/app-abc123.js")
         assert asset.text == "console.log(1)" and "immutable" in asset.headers["cache-control"]
         assert "not for the web" not in (await c.get("/../secret.txt")).text
@@ -791,7 +791,7 @@ async def test_the_built_screens_are_served_without_shadowing_the_api(world, tmp
 
 
 async def test_metrics_are_for_admin_and_risk_and_time_each_step(world):
-    from mocktrade.metrics import METRICS
+    from laddrix.metrics import METRICS
 
     METRICS.reset()
     riya = await world.logged_in("riya")
@@ -807,7 +807,7 @@ async def test_metrics_are_for_admin_and_risk_and_time_each_step(world):
     assert hist["broker_ms{op=place,broker=fake}"]["count"] == 1
     assert {"stream_connections", "ticks_received", "process_rss_mb"} <= set(snap["gauges"])
     text = (await risk.get("/api/metrics?format=prometheus")).text
-    assert 'mocktrade_broker_ms_count{op="place",broker="fake"} 1' in text
+    assert 'laddrix_broker_ms_count{op="place",broker="fake"} 1' in text
     for c in (riya, ayush, risk):
         await c.aclose()
 

@@ -1,12 +1,12 @@
 # Design
 
-How MockTrade is built. Each doc is checked against the code; the diagrams' sources are in `context/images/*.mmd`.
+How Laddrix is built. Each doc is checked against the code; the diagrams' sources are in `context/images/*.mmd`.
 
 **Start here**
 
 | Doc | What it covers |
 |---|---|
-| [product-vision.md](product-vision.md) | What MockTrade is for, and its rules ("backend provides, frontend displays", every part replaceable) |
+| [product-vision.md](product-vision.md) | What Laddrix is for, and its rules ("backend provides, frontend displays", every part replaceable) |
 | [kite-architecture.md](kite-architecture.md) | The whole system on Kite Connect: the parts, the price path, the order path, deployment |
 | [glossary.md](glossary.md) | Every term, in plain words |
 | [tenancy.md](tenancy.md) | Several firms on one server (#368): workspaces, the one rule every check applies, each trader's own price source, the operator only on the terminal, the leak tests |

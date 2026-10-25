@@ -2,7 +2,7 @@
 
 import pytest
 
-from mocktrade.metrics import BOUNDS, Histogram, Metrics
+from laddrix.metrics import BOUNDS, Histogram, Metrics
 
 
 def test_bounds_are_1_2_5_per_decade():
@@ -74,11 +74,11 @@ def test_snapshot_and_prometheus_text():
     assert snap["counters"] == {"kite_ticks": 3}
     assert snap["gauges"] == {"broken": None, "connections": 2}  # a failing gauge reads None
     text = m.prometheus()
-    assert 'mocktrade_http_us_bucket{route="/api/orders",le="1000"} 1' in text
-    assert 'mocktrade_http_us_bucket{route="/api/orders",le="500"} 0' in text
-    assert "mocktrade_kite_frame_us_count 1" in text
-    assert "mocktrade_kite_ticks_total 3" in text
-    assert "mocktrade_connections 2" in text
+    assert 'laddrix_http_us_bucket{route="/api/orders",le="1000"} 1' in text
+    assert 'laddrix_http_us_bucket{route="/api/orders",le="500"} 0' in text
+    assert "laddrix_kite_frame_us_count 1" in text
+    assert "laddrix_kite_ticks_total 3" in text
+    assert "laddrix_connections 2" in text
     m.reset()
     assert m.snapshot()["histograms"]["kite_frame_us"]["count"] == 0
 
@@ -94,8 +94,8 @@ def test_prometheus_says_each_metrics_type_once_before_its_samples():
     m.gauge("ops_alerts{level=ERROR}", lambda: 0)
     lines = m.prometheus().splitlines()
     types = [line.split()[2] for line in lines if line.startswith("# TYPE")]
-    assert sorted(types) == ["mocktrade_http_responses_total", "mocktrade_http_us",
-                             "mocktrade_ops_alerts"]  # fmt: skip
+    assert sorted(types) == ["laddrix_http_responses_total", "laddrix_http_us",
+                             "laddrix_ops_alerts"]  # fmt: skip
     for metric in types:
         typed_at = next(i for i, x in enumerate(lines) if x.startswith(f"# TYPE {metric} "))
         first_sample = next(i for i, x in enumerate(lines) if x.startswith(metric))

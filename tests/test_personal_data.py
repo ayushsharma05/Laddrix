@@ -13,15 +13,15 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from mocktrade.alerts.store import AlertStore
-from mocktrade.domain.accounts import BrokerAccount, Role
-from mocktrade.ops.fence import DataFence
-from mocktrade.server import security
-from mocktrade.server.security import SecretBox
-from mocktrade.server.users import LastAdmin, LoginFailed, UserStore
-from mocktrade.spreads.store import SpreadBook
-from mocktrade.store.events import EventLog, verify_chain
-from mocktrade.tools import users as users_tool
+from laddrix.alerts.store import AlertStore
+from laddrix.domain.accounts import BrokerAccount, Role
+from laddrix.ops.fence import DataFence
+from laddrix.server import security
+from laddrix.server.security import SecretBox
+from laddrix.server.users import LastAdmin, LoginFailed, UserStore
+from laddrix.spreads.store import SpreadBook
+from laddrix.store.events import EventLog, verify_chain
+from laddrix.tools import users as users_tool
 
 PASSWORD = "a long enough password"
 NOW = datetime(2026, 10, 23, 9, 0, tzinfo=UTC)
@@ -59,7 +59,7 @@ async def world(tmp_path):
     log.record_note("STEP_UP_OK", "-", "ayush confirmed", {"user_id": "ayush"})
     await log.flush()
     await log.aclose()
-    env = {"MOCKTRADE_SECRET_KEY": key, "MOCKTRADE_USERS_DB": str(tmp_path / "users.db")}
+    env = {"LADDRIX_SECRET_KEY": key, "LADDRIX_USERS_DB": str(tmp_path / "users.db")}
     return store, env, secrets
 
 

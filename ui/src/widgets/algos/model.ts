@@ -212,7 +212,7 @@ export function familyOf(specs: AlgoSpec[] | null, code: string): string | undef
 
 const FAMILY_LABELS: Record<string, string> = {
   execution: "Execution: work an order",
-  protection: "Protection: held by MockTrade",
+  protection: "Protection: held by Laddrix",
 };
 
 /** A family's heading; an unknown family shows its own name, capitalised. */

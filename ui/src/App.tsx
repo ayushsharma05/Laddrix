@@ -34,7 +34,7 @@ export function App() {
   if (!booted) {
     return (
       <div className="splash" role="status">
-        {error ? `Waiting for the MockTrade server… (${error})` : "Loading MockTrade…"}
+        {error ? `Waiting for the Laddrix server… (${error})` : "Loading Laddrix…"}
       </div>
     );
   }

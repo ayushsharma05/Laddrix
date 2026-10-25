@@ -4,8 +4,8 @@ import os
 import stat
 from datetime import datetime
 
-from mocktrade.broker.kite import token_store
-from mocktrade.broker.kite.session import KiteSession
+from laddrix.broker.kite import token_store
+from laddrix.broker.kite.session import KiteSession
 
 IST = token_store.IST
 

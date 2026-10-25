@@ -1,7 +1,7 @@
-# Running and testing MockTrade on your own computer
+# Running and testing Laddrix on your own computer
 
 Everything here runs on one computer, with no broker account and no money, unless a step says
-otherwise. Commands are typed in a terminal, from the repo's main folder (`MockTrade/`), unless
+otherwise. Commands are typed in a terminal, from the repo's main folder (`Laddrix/`), unless
 a step says `cd` somewhere.
 
 ```
@@ -37,7 +37,7 @@ make setup                                            # the server, its tools, t
 ## 2. The demo: the whole platform with simulated prices
 
 ```bash
-python3 -m mocktrade.tools.demo --ui ui/dist     # leave this running
+python3 -m laddrix.tools.demo --ui ui/dist     # leave this running
 ```
 
 Open <http://localhost:8000> and sign in:
@@ -46,7 +46,7 @@ Open <http://localhost:8000> and sign in:
 | --- | --- |
 | User | `demo` |
 | Password | `demo-password-123` |
-| Authenticator code | in a **second** terminal: `python3 -m mocktrade.tools.demo --code` (a new code every 30 s) |
+| Authenticator code | in a **second** terminal: `python3 -m laddrix.tools.demo --code` (a new code every 30 s) |
 
 - **What you get:** a paper account, simulated NIFTY/BANKNIFTY futures, options and stocks, and
   every screen: ladder, ticket, order book, positions, algos, options, charts, alerts, research,
@@ -58,7 +58,7 @@ Open <http://localhost:8000> and sign in:
 screen lists the day and shows the exact command, for example:
 
 ```bash
-python3 -m mocktrade.tools.demo --replay 2026-10-23 --port 8001
+python3 -m laddrix.tools.demo --replay 2026-10-23 --port 8001
 ```
 
 **The desktop app** (pop-out windows), with the demo running:
@@ -93,7 +93,7 @@ cd ui/desktop && npm ci && npm run typecheck && npm run lint && npm test && cd .
 **CI's two other jobs, `image` and `supply-chain`, can be run too:**
 
 ```bash
-docker build -t mocktrade:local . && deploy/smoke.sh mocktrade:local   # the image starts, answers, stops cleanly
+docker build -t laddrix:local . && deploy/smoke.sh laddrix:local   # the image starts, answers, stops cleanly
 pip install pip-audit && pip-audit -r requirements.lock --no-deps --disable-pip --strict   # no known-vulnerable dependency
 ```
 
@@ -120,19 +120,19 @@ This is the production setup on your own computer: HTTPS through Caddy, a locked
 container, and your own users. Prices are simulated.
 
 ```bash
-cp deploy/.env.example deploy/.env          # then set MOCKTRADE_DOMAIN=localhost in it
+cp deploy/.env.example deploy/.env          # then set LADDRIX_DOMAIN=localhost in it
 docker compose -f deploy/compose.yaml build
-docker compose -f deploy/compose.yaml run --rm app python -m mocktrade.tools.users new-key
-#   copy the printed MOCKTRADE_SECRET_KEY=... line into deploy/.env (and into your password manager)
+docker compose -f deploy/compose.yaml run --rm app python -m laddrix.tools.users new-key
+#   copy the printed LADDRIX_SECRET_KEY=... line into deploy/.env (and into your password manager)
 docker compose -f deploy/compose.yaml up -d
-docker compose -f deploy/compose.yaml run --rm -it app python -m mocktrade.tools.users add-user ayush "Ayush" --roles admin,trader
+docker compose -f deploy/compose.yaml run --rm -it app python -m laddrix.tools.users add-user ayush "Ayush" --roles admin,trader
 #   it prints an otpauth:// link once: open it as a QR code in an authenticator app; it asks for a password
-docker compose -f deploy/compose.yaml run --rm app python -m mocktrade.tools.users add-account acc-paper paper PAPER1 --owner ayush
+docker compose -f deploy/compose.yaml run --rm app python -m laddrix.tools.users add-account acc-paper paper PAPER1 --owner ayush
 docker compose -f deploy/compose.yaml restart app
 ```
 
 Open <https://localhost>; the browser warns once about Caddy's local certificate. All the
-settings are listed at the top of `src/mocktrade/tools/serve.py`. The operator's tools
+settings are listed at the top of `src/laddrix/tools/serve.py`. The operator's tools
 (`users`, `backup`, `audit`) are described in [runbooks/](runbooks/README.md).
 
 ## 6. Live Kite prices (needs your Zerodha Kite Connect app)
@@ -141,13 +141,13 @@ Only with your own Kite Connect app (API key and secret). **Never commit them.**
 `kite` account are real: keep to paper accounts until the go-live checklist is done
 ([runbooks/go-live.md](runbooks/go-live.md)).
 
-1. In Kite's developer console, set the app's redirect URL to `<MOCKTRADE_ORIGIN>/kite/callback`.
-2. In `deploy/.env`, add `MOCKTRADE_PRICES=kite`, `KITE_API_KEY=...` and `KITE_API_SECRET=...`.
+1. In Kite's developer console, set the app's redirect URL to `<LADDRIX_ORIGIN>/kite/callback`.
+2. In `deploy/.env`, add `LADDRIX_PRICES=kite`, `KITE_API_KEY=...` and `KITE_API_SECRET=...`.
 3. Add a Kite account (`users add-account acc-me kite <your Zerodha client id> --owner ayush`), plus
    a paper account for the same user. The paper one fills against your live prices.
 4. Optional, before real orders: the exchange's freeze quantities (the most one order may carry).
    Make a file of `underlying,qty` lines (for example `NIFTY,1800`) from NSE's latest freeze
-   list and set `MOCKTRADE_FREEZE_FILE` to it (`deploy/.env.example` shows how). The demo
+   list and set `LADDRIX_FREEZE_FILE` to it (`deploy/.env.example` shows how). The demo
    has sample ones built in.
 5. Restart, sign in, and press **Log in to Kite** on the band. You do this once a day; the
    morning routine is in [runbooks/morning.md](runbooks/morning.md).
@@ -155,17 +155,17 @@ Only with your own Kite Connect app (API key and secret). **Never commit them.**
 To watch raw prices in a terminal instead:
 
 ```bash
-python3 -m mocktrade.tools.login                    # Kite login, once a day
-python3 -m mocktrade.tools.watch NFO:NIFTY26OCTFUT  # a live ladder in the terminal
+python3 -m laddrix.tools.login                    # Kite login, once a day
+python3 -m laddrix.tools.watch NFO:NIFTY26OCTFUT  # a live ladder in the terminal
 ```
 
 ## When something goes wrong
 
 | You see | Do |
 | --- | --- |
-| `ModuleNotFoundError: mocktrade` | the virtual environment is off: `source .venv/bin/activate` |
+| `ModuleNotFoundError: laddrix` | the virtual environment is off: `source .venv/bin/activate` |
 | the page at :8000 shows only an API, no screens | the screens aren't built: `cd ui && npm run build` |
 | `address already in use` | another demo is still running: stop it, or use `--port 8010` |
-| "another MockTrade server owns data/demo" | one is already running on that folder: stop it first (one server per data folder, by design) |
+| "another Laddrix server owns data/demo" | one is already running on that folder: stop it first (one server per data folder, by design) |
 | the login code is refused | codes last 30 s: get a fresh one with `--code` |
 | a browser check can't find Chromium | `npx playwright install chromium`, or set `CHROMIUM_PATH` |

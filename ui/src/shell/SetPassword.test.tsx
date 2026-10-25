@@ -44,7 +44,7 @@ beforeAll(() => {
 describe("Set your password (after an admin's reset)", () => {
   it("is all a user with a one-time password sees, and the live stream waits", async () => {
     const { calls } = setup(() => ({ status: 204 }));
-    await screen.findByText("MockTrade · Set your password");
+    await screen.findByText("Laddrix · Set your password");
     expect(screen.queryByRole("button", { name: "Widgets ▾" })).toBeNull(); // no terminal yet
     expect(FakeSocket.all).toHaveLength(0); // no stream was opened (the server would refuse it anyway)
     expect(calls.map((c) => c.path)).toEqual(["/api/me"]);
@@ -52,7 +52,7 @@ describe("Set your password (after an admin's reset)", () => {
 
   it("the two new passwords must match before anything is sent", async () => {
     const { fill, calls } = setup(() => ({ status: 204 }));
-    await screen.findByText("MockTrade · Set your password");
+    await screen.findByText("Laddrix · Set your password");
     fill("k7Q2mXv9pLr4tWa8", "my own long password", "my own long passwort");
     expect(screen.getByRole("status").textContent).toBe("The two new passwords differ.");
     expect((screen.getByRole("button", { name: "Set password" }) as HTMLButtonElement).disabled).toBe(true);
@@ -63,7 +63,7 @@ describe("Set your password (after an admin's reset)", () => {
   it("shows the server's rule in its words; on success the terminal opens", async () => {
     let refuse = true;
     const { fill, calls, app } = setup(() => (refuse ? { status: 422, body: { detail: "password must be at least 12 characters" } } : { status: 204 }));
-    await screen.findByText("MockTrade · Set your password");
+    await screen.findByText("Laddrix · Set your password");
     fill("k7Q2mXv9pLr4tWa8", "short");
     fireEvent.click(screen.getByRole("button", { name: "Set password" }));
     expect((await screen.findByRole("alert")).textContent).toBe("password must be at least 12 characters");
@@ -72,13 +72,13 @@ describe("Set your password (after an admin's reset)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Set password" }));
     await vi.waitFor(() => expect(app.store.getState().me?.user.must_change_password).toBeFalsy());
     expect(calls.filter((c) => c.method === "POST").at(-1)!.body).toEqual({ old: "k7Q2mXv9pLr4tWa8", new: "my own long password" });
-    expect(screen.queryByText("MockTrade · Set your password")).toBeNull();
+    expect(screen.queryByText("Laddrix · Set your password")).toBeNull();
     expect(FakeSocket.all).toHaveLength(1); // now the live stream starts
   });
 
   it("can sign out instead", async () => {
     const { app, calls } = setup(() => ({ status: 204 }));
-    await screen.findByText("MockTrade · Set your password");
+    await screen.findByText("Laddrix · Set your password");
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     await vi.waitFor(() => expect(app.store.getState().me).toBeNull());
     expect(calls.some((c) => c.method === "DELETE" && c.path === "/api/session")).toBe(true);

@@ -35,7 +35,7 @@ export function SetPassword() {
       <section className="window login-box" aria-labelledby="set-password-title">
         <div className="window-bar">
           <span id="set-password-title" className="strong">
-            MockTrade · Set your password
+            Laddrix · Set your password
           </span>
         </div>
         <form className="login-form" aria-label="Set your password" onSubmit={submit}>

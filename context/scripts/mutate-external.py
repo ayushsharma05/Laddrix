@@ -1,13 +1,13 @@
-"""#355 mutation check: break one rule of adopting trades made outside MockTrade (only the
+"""#355 mutation check: break one rule of adopting trades made outside Laddrix (only the
 broker's trades no order of ours placed, each trade id once, never one already adopted; only
 when they explain the difference exactly; a reason required; at each trade's own price;
 audited; re-applied after a restart; risk or admin only); the tests must notice. Runs the
 tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-X = "src/mocktrade/positions/external.py"
-R = "src/mocktrade/recovery.py"
-ROUTES_RISK = "src/mocktrade/server/routes/risk.py"
+X = "src/laddrix/positions/external.py"
+R = "src/laddrix/recovery.py"
+ROUTES_RISK = "src/laddrix/server/routes/risk.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_external.py"]
 MUTANTS = [
  (X, "        if (t.instrument_id, t.product) == (instrument_id, product) and not t.client_order_id:", "        if (t.instrument_id, t.product) == (instrument_id, product):"),

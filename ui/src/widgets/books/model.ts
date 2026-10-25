@@ -131,7 +131,7 @@ export function averagePrice(avgPaiseText: string): string {
   return price(Math.round(paise));
 }
 
-/** The positions title bar: is MockTrade's view the same as the broker's? */
+/** The positions title bar: is Laddrix's view the same as the broker's? */
 export function reconcileState(
   r: PositionsSnapshot["reconcile"] | null,
   alerts: number,

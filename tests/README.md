@@ -6,7 +6,7 @@ the tests whose names match with `-k cancel`. CI runs them on every pull request
 
 ## How they are laid out
 
-- **One file per part, named after it:** `test_<part>.py` tests `src/mocktrade/.../<part>.py`
+- **One file per part, named after it:** `test_<part>.py` tests `src/laddrix/.../<part>.py`
   (for example `test_order_manager.py` → `orders/manager.py`). A file that tests one issue's
   behaviour across several parts is named after the behaviour (`test_spread_charts.py`,
   `test_operations.py`).

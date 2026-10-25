@@ -16,7 +16,7 @@ const os = require('os');
 const path = require('path');
 const REPO = path.resolve(__dirname, '../..');
 const IMAGES = `${__dirname}/../images`;
-const HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'mocktrade-firms-'));
+const HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'laddrix-firms-'));
 const DATA = `${HOME}/data/demo`;
 const PORT = 8768;
 const BASE = `http://localhost:${PORT}`;
@@ -25,14 +25,14 @@ const FUT = 'NFO:NIFTY26OCTFUT';
 const PASSWORD = 'acme-password-123';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const py = (code) => execFileSync('python3', ['-c', code], { env: ENV, cwd: HOME }).toString().trim();
-const codeOf = (file) => py(`import time; from mocktrade.server import security; print(security.totp_code(open('${file}').read().strip(), time.time()))`);
+const codeOf = (file) => py(`import time; from laddrix.server import security; print(security.totp_code(open('${file}').read().strip(), time.time()))`);
 const freshWindow = async () => {
   const w = Math.floor(Date.now() / 30000);
   while (Math.floor(Date.now() / 30000) === w) await sleep(500); // each code works once per user
 };
 
 async function startDemo() {
-  const demo = spawn('python3', ['-m', 'mocktrade.tools.demo', '--port', String(PORT), '--ui', `${REPO}/ui/dist`], { cwd: HOME, env: ENV, stdio: 'ignore' });
+  const demo = spawn('python3', ['-m', 'laddrix.tools.demo', '--port', String(PORT), '--ui', `${REPO}/ui/dist`], { cwd: HOME, env: ENV, stdio: 'ignore' });
   for (let i = 0; i < 60; i++) {
     try {
       execSync(`curl -sf http://127.0.0.1:${PORT}/api/health >/dev/null`);
@@ -54,8 +54,8 @@ async function stopDemo(demo) {
 function addAcme() {
   py(`
 import contextlib, io, re
-from mocktrade.tools import users
-env = {"MOCKTRADE_SECRET_KEY": open("data/demo/secret.key").read().strip(), "MOCKTRADE_USERS_DB": "data/demo/users.db"}
+from laddrix.tools import users
+env = {"LADDRIX_SECRET_KEY": open("data/demo/secret.key").read().strip(), "LADDRIX_USERS_DB": "data/demo/users.db"}
 def run(*argv):
     out = io.StringIO()
     with contextlib.redirect_stdout(out):

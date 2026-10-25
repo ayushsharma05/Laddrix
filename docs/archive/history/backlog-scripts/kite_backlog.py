@@ -1,4 +1,4 @@
-"""MockTrade Kite track: milestones and code-first issues, in build order."""
+"""Laddrix Kite track: milestones and code-first issues, in build order."""
 
 DESIGN = "docs/design/kite-architecture.md"
 FOOTER = (
@@ -46,26 +46,26 @@ I = []  # (milestone, labels, title, body)
 # ---------------- K0 ----------------
 K0 = "K0 · Foundations"
 I.append((K0, ["type:setup", "comp:common"], "Python package skeleton for the Kite track", body(
-    "Turn the repo into a proper Python package (`src/mocktrade`) with tests and a code-style checker running in CI.",
+    "Turn the repo into a proper Python package (`src/laddrix`) with tests and a code-style checker running in CI.",
     "Professional Python projects keep code in `src/<name>/`, configure everything in one `pyproject.toml`, and let a linter (**ruff**) catch style and bug patterns automatically, so reviews focus on logic.",
     [
         "Delete the old placeholder folders from the COMEX design: `services/`, `common/` (the `docs/` history stays).",
         "Add `pyproject.toml` (project name, Python ≥ 3.12, pytest and ruff settings).",
-        "Add `src/mocktrade/__init__.py` with `__version__` and `src/mocktrade/domain/__init__.py`.",
+        "Add `src/laddrix/__init__.py` with `__version__` and `src/laddrix/domain/__init__.py`.",
         "`requirements-dev.txt`: `pytest` and `ruff`, one per line, ending with a newline.",
-        "Rewrite `tests/test_smoke.py` to import `mocktrade` (4-space indentation).",
+        "Rewrite `tests/test_smoke.py` to import `laddrix` (4-space indentation).",
         "CI: add a `ruff check .` step before `pytest`.",
         "README: one paragraph describing the Kite track, linking the design doc.",
     ],
-    ["`test_package_imports`: `mocktrade.__version__` is set"],
+    ["`test_package_imports`: `laddrix.__version__` is set"],
     ["Old placeholder folders gone", "CI runs ruff and pytest"],
 )))
 I.append((K0, ["type:build", "comp:common"], "Money in paise and instruments with tick and lot rules", body(
     "Represent every price as whole paise and describe instruments with the tick-size and lot-size rules the exchange enforces.",
     "Kite already sends prices as whole paise (₹2501.05 → 250105). Keeping ints everywhere avoids float errors (same lesson as MockCME #4). An instrument knows its own rules, so a bad price or quantity is caught before it ever reaches Kite.",
     [
-        "`src/mocktrade/domain/money.py`: `to_paise(rupees)` and `to_rupees(paise)`.",
-        "`src/mocktrade/domain/instruments.py`: enums `Exchange` (NSE, BSE, NFO, BFO) and `InstrumentKind` (EQ, FUT, CE, PE) using Kite's codes as values; frozen dataclass `Instrument` (token, exchange, symbol, kind, tick_paise, lot_size, expiry, strike_paise).",
+        "`src/laddrix/domain/money.py`: `to_paise(rupees)` and `to_rupees(paise)`.",
+        "`src/laddrix/domain/instruments.py`: enums `Exchange` (NSE, BSE, NFO, BFO) and `InstrumentKind` (EQ, FUT, CE, PE) using Kite's codes as values; frozen dataclass `Instrument` (token, exchange, symbol, kind, tick_paise, lot_size, expiry, strike_paise).",
         "Methods `check_price(price_paise)` and `check_quantity(qty)` that raise `ValueError` with a clear message.",
     ],
     [
@@ -122,7 +122,7 @@ I.append((K1, ["type:build", "comp:sor"], "Kite login: request token to access t
     [
         "Create the Kite Connect app (₹500/month plan) at developers.kite.trade; set the redirect URL; store `KITE_API_KEY` and `KITE_API_SECRET` in a local `.env` (git-ignored).",
         "`broker/kite_session.py`: build the login URL; `checksum(api_key, request_token, api_secret)`; exchange the token using the official `kiteconnect` SDK.",
-        "A tiny command `python -m mocktrade.tools.login` that prints the login URL, waits for you to paste the redirected URL, and saves the token to a git-ignored file.",
+        "A tiny command `python -m laddrix.tools.login` that prints the login URL, waits for you to paste the redirected URL, and saves the token to a git-ignored file.",
         "Never log the secret or the token.",
     ],
     [
@@ -143,7 +143,7 @@ I.append((K1, ["type:build", "comp:common"], "Instrument list: load Kite's daily
         "Skip segments we don't trade (currency, commodities) with a count in the log.",
     ],
     ["A 10-line sample CSV in `tests/data/` loads into the right Instruments", "Tick size `0.05` becomes `5` paise", "Unknown symbol lookup returns `None`"],
-    ["Loading the real dump works (`python -m mocktrade.tools.instruments`)"],
+    ["Loading the real dump works (`python -m laddrix.tools.instruments`)"],
     depends="#K1.1",
 )))
 I.append((K1, ["type:build", "comp:mds"], "Binary tick decoder (ltp, quote, full + 5-level depth)", body(
@@ -185,7 +185,7 @@ I.append((K1, ["type:build", "comp:mds"], "Market data service: latest state per
     [
         "`marketdata/service.py`: `MarketData` with `on_tick(tick)`, `latest(token)`, `subscribe(token, callback)`.",
         "A conflating queue per subscriber: if updates arrive faster than it reads, older unread ones are replaced.",
-        "`python -m mocktrade.tools.watch NIFTY26OCTFUT` shows a live 5-level ladder in the terminal.",
+        "`python -m laddrix.tools.watch NIFTY26OCTFUT` shows a live 5-level ladder in the terminal.",
     ],
     ["`latest` returns the newest tick", "A slow subscriber receives only the newest of 3 quick ticks", "Unsubscribed instruments don't notify anyone"],
     ["Live terminal ladder works during market hours"],
@@ -374,7 +374,7 @@ I.append((K7, ["type:build", "comp:deploy"], "Docker Compose and Caddy", body(
     depends="#K6.4",
 )))
 I.append((K7, ["type:setup", "comp:deploy"], "Mumbai server, static IP and hardening", body(
-    "Run MockTrade on AWS Lightsail (Mumbai) with a static IP registered in Kite.",
+    "Run Laddrix on AWS Lightsail (Mumbai) with a static IP registered in Kite.",
     "Real orders must come from the registered IP. The server is reachable only on 443 (and 22 with SSH keys).",
     ["Create Lightsail 2 GB instance in Mumbai; attach a static IP.", "Register the IP in the Kite developer console (IP Whitelist).", "Firewall, SSH keys only, automatic security updates, daily SQLite backup."],
     ["Checklist in `docs/runbooks/server.md`"],

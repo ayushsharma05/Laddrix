@@ -2,8 +2,8 @@
 
 import pytest
 
-from mocktrade.server import security
-from mocktrade.server.security import SecretBox
+from laddrix.server import security
+from laddrix.server.security import SecretBox
 
 NOW = 1_760_400_000.0  # a fixed moment (seconds since 1970)
 
@@ -43,7 +43,7 @@ def test_malformed_codes_are_refused(bad):
 
 def test_totp_uri_is_for_authenticator_apps():
     uri = security.totp_uri("JBSWY3DPEHPK3PXP", "ayush")
-    assert uri.startswith("otpauth://totp/MockTrade:ayush?") and "issuer=MockTrade" in uri
+    assert uri.startswith("otpauth://totp/Laddrix:ayush?") and "issuer=Laddrix" in uri
 
 
 def test_session_tokens_are_random_and_stored_only_as_digests():
@@ -56,7 +56,7 @@ def test_secret_box_round_trip_and_wrong_key():
     box = SecretBox(SecretBox.new_key())
     sealed = box.seal("JBSWY3DPEHPK3PXP")
     assert "JBSWY3DP" not in sealed and box.open(sealed) == "JBSWY3DPEHPK3PXP"
-    with pytest.raises(ValueError, match="wrong MOCKTRADE_SECRET_KEY"):
+    with pytest.raises(ValueError, match="wrong LADDRIX_SECRET_KEY"):
         SecretBox(SecretBox.new_key()).open(sealed)
     with pytest.raises(ValueError, match="not a valid key"):
         SecretBox("short")

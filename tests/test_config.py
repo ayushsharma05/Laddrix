@@ -4,7 +4,7 @@ ones named.
 
 import pytest
 
-from mocktrade.config import ConfigError, KiteSettings, environment, read_dotenv
+from laddrix.config import ConfigError, KiteSettings, environment, read_dotenv
 
 
 def test_dotenv_parsing(tmp_path):

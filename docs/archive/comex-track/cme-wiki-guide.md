@@ -1,6 +1,6 @@
-# CME Wiki Explained for MockTrade
+# CME Wiki Explained for Laddrix
 
-Written 12 Oct 2026 for MockTrade issues #15 and #16. Originally a Claude Doc; this is the repo copy.
+Written 12 Oct 2026 for Laddrix issues #15 and #16. Originally a Claude Doc; this is the repo copy.
 
 ## Start here
 
@@ -11,7 +11,7 @@ Think of the exchange as a shop with two windows:
 - **The notice board (MDP 3.0).** The exchange shouts every price change to everyone at once. You listen, and you can't talk back. Issue #15 covers this.
 - **The counter (iLink 3).** You walk up alone, hand over an order slip and get a receipt back. It's a private two-way conversation. Issue #16 covers this.
 
-MockTrade needs both. Your **MockCME** will shout prices and serve the counter, your **MDS** will listen to the board, and your **ROM** will stand at the counter.
+Laddrix needs both. Your **MockCME** will shout prices and serve the counter, your **MDS** will listen to the board, and your **ROM** will stand at the counter.
 
 ![The two pipes: MDP 3.0 out, iLink 3 in](images/cme-two-pipes.png)
 
@@ -48,7 +48,7 @@ This is the most important basic idea, because the two specs use different ones.
 
 Why CME picked these: prices must reach every firm at the same moment, so they're broadcast. Orders are private and must never be lost, so they go over a call.
 
-**For MockTrade:** you don't need real multicast on your laptop. Your MockCME can publish prices over any channel (for example a local socket or a queue). Copy the *ideas* (sequence numbers, gaps, recovery), not the network wiring.
+**For Laddrix:** you don't need real multicast on your laptop. Your MockCME can publish prices over any channel (for example a local socket or a queue). Copy the *ideas* (sequence numbers, gaps, recovery), not the network wiring.
 
 ## MDP 3.0, part 1: how prices reach you
 
@@ -56,11 +56,11 @@ MDP 3.0 (Market Data Platform, version 3) is CME's broadcast of every price chan
 
 ### Channels: one radio station per product group
 
-CME splits products into channels, so you only listen to what you trade. COMEX metals (GC, SI, HG and their spreads) sit together on a metals channel. MockTrade can start with one channel.
+CME splits products into channels, so you only listen to what you trade. COMEX metals (GC, SI, HG and their spreads) sit together on a metals channel. Laddrix can start with one channel.
 
 ### Three feeds per channel
 
-| Feed | What it says | When you listen | MockTrade part |
+| Feed | What it says | When you listen | Laddrix part |
 | --- | --- | --- | --- |
 | **Incremental** | Every change, as it happens: "level 2 bid is now 7 lots", "trade at 2400.5 for 3" | All day. This is the main feed. | MockCME publishes it, MDS reads it |
 | **Market Recovery** (snapshot) | A full photo of each book, repeated on a loop | Only at startup or after you've lost packets | MockCME loops snapshots, MDS uses them to recover |
@@ -70,7 +70,7 @@ The picture to remember: **incremental = the live commentary, snapshot = the sco
 
 ### Feed A and Feed B: the same broadcast, twice
 
-Every feed is sent on two separate network paths with identical content. You listen to both and take whichever copy of each packet arrives first. If one path drops a packet, the other usually has it. This is called **A/B arbitration**. For MockTrade it's a "later" feature (v0.6 failure work), not a day-one need.
+Every feed is sent on two separate network paths with identical content. You listen to both and take whichever copy of each packet arrives first. If one path drops a packet, the other usually has it. This is called **A/B arbitration**. For Laddrix it's a "later" feature (v0.6 failure work), not a day-one need.
 
 ### Inside a packet
 
@@ -94,7 +94,7 @@ One UDP packet carries one or more messages:
 
 ### Prices are whole numbers
 
-To avoid decimal rounding errors, CME sends prices as a whole number with a fixed number of decimal places implied. For example 2400.5 is sent as 2400500000000 with exponent −9, meaning "divide by one billion". **Copy this idea:** store prices in MockTrade as integer ticks or fixed decimals, never as floats.
+To avoid decimal rounding errors, CME sends prices as a whole number with a fixed number of decimal places implied. For example 2400.5 is sent as 2400500000000 with exponent −9, meaning "divide by one billion". **Copy this idea:** store prices in Laddrix as integer ticks or fixed decimals, never as floats.
 
 ## MDP 3.0, part 2: building the book
 
@@ -180,9 +180,9 @@ Startup works the same way: you start with no books, so you take snapshots for e
 
 ### Natural refresh: a cheaper option
 
-Some firms skip snapshots and just wait: every level gets rewritten eventually as the market moves. It's simpler, but the book can stay wrong for minutes in a quiet market. **For MockTrade, use snapshots.** Your brief says no wrong prices.
+Some firms skip snapshots and just wait: every level gets rewritten eventually as the market moves. It's simpler, but the book can stay wrong for minutes in a quiet market. **For Laddrix, use snapshots.** Your brief says no wrong prices.
 
-### For MockTrade
+### For Laddrix
 
 - Number your MockCME packets and per-instrument edits the same way.
 - Add a test switch to MockCME that drops a packet on purpose. Your MDS must catch it, mark stale, recover and go live. This is a great v0.6 failure test.
@@ -227,7 +227,7 @@ Two kinds of spread to know:
 - **Exchange-listed spreads:** CME creates and lists them, and they come on the definition feed.
 - **User-defined spreads (UDS):** a trader asks CME to create a new combination through iLink 3, and it appears on the feed afterwards.
 
-Your **synthetic** spreads (#61) are a third kind: they exist only inside MockTrade, built by your spreader from the legs. The exchange never knows about them.
+Your **synthetic** spreads (#61) are a third kind: they exist only inside Laddrix, built by your spreader from the legs. The exchange never knows about them.
 
 ### Trading states (Security Status)
 
@@ -282,7 +282,7 @@ The session layer follows a standard called **FIXP** (FIX Performance). It's a l
 
 TCP doesn't lose bytes *while* connected. But if the connection drops and you reconnect, messages sent during the drop are gone. On reconnect, both sides compare numbers ("I'm expecting 46 from you"). If someone is behind, they ask for a retransmission. **That's how no execution report is ever lost**, which is your brief's "no accepted order is lost" rule.
 
-### For MockTrade
+### For Laddrix
 
 Your ROM ↔ MockCME line should copy this, simplified:
 
@@ -346,7 +346,7 @@ Every report carries the running totals: `CumQty` (filled so far), `LeavesQty` (
 
 You send a cancel at the same moment your order fills. The fill wins. You get a **Trade** report and then a **Cancel Reject**. Your ROM must never assume a cancel worked until the Cancel report arrives. This is the #1 beginner bug in order management.
 
-### For MockTrade
+### For Laddrix
 
 This section *is* the contract between your ROM and MockCME (#28 message dictionary). Use the same names (New, Reject, Trade, Cancel, Elimination) in your own neutral messages, keep both IDs (yours and the exchange's) on every order, and write a test for the cancel-vs-fill race.
 
@@ -354,7 +354,7 @@ This section *is* the contract between your ROM and MockCME (#28 message diction
 
 The exchange protects itself and you with five tools. Each one is a small feature you can copy into MockCME or your ROM, and each makes a good issue on its own.
 
-| Feature | What it does | Why it exists | Where in MockTrade |
+| Feature | What it does | Why it exists | Where in Laddrix |
 | --- | --- | --- | --- |
 | **Cancel on Disconnect (CoD)** | If your session goes silent past the keep-alive time, CME cancels all your working orders | A crashed trading system can't leave orders it no longer knows about | MockCME, triggered by heartbeat timeout |
 | **Throttle** | Limits messages per second per session. Extra messages are rejected. | One runaway algo can't flood the exchange | MockCME rejects; your ROM should also self-limit first |
@@ -362,11 +362,11 @@ The exchange protects itself and you with five tools. Each one is a small featur
 | **Mass cancel / Kill switch** | One message (or a firm-level button) cancels everything | Emergency stop | Your admin panel and ROM (#96) |
 | **Price banding** (from section 6) | Rejects orders too far from the market | Fat-finger protection | MockCME |
 
-**Connect to your brief:** "No order reaches an exchange without passing risk checks." CME's checks are the *last* line of defence. Your ROM's checks (max size, max position) are the *first*. Real firms have both, so MockTrade should too.
+**Connect to your brief:** "No order reaches an exchange without passing risk checks." CME's checks are the *last* line of defence. Your ROM's checks (max size, max position) are the *first*. Real firms have both, so Laddrix should too.
 
 ### One more related service: Drop Copy
 
-CME also sends a firm a **copy of every execution report** on a separate line, called Drop Copy. Back offices and risk teams use it to rebuild positions independently of the trading system. That's the stream an accounts office reads to build positions and P&L. In MockTrade, MockCME can publish a drop copy stream that your accounts and P&L service reads. You can read the Drop Copy page on the wiki at overview level only.
+CME also sends a firm a **copy of every execution report** on a separate line, called Drop Copy. Back offices and risk teams use it to rebuild positions independently of the trading system. That's the stream an accounts office reads to build positions and P&L. In Laddrix, MockCME can publish a drop copy stream that your accounts and P&L service reads. You can read the Drop Copy page on the wiki at overview level only.
 
 ## SBE encoding: just the idea
 
@@ -378,11 +378,11 @@ Both MDP 3.0 and iLink 3 use **SBE (Simple Binary Encoding)** to turn messages i
 
 Compare: the text `35=D|44=2400.5|38=3|` (classic FIX) must be scanned character by character, while SBE puts the price at byte N as an integer. That's why SBE is much faster.
 
-**For MockTrade:** start with plain JSON or Python dataclasses between your services, because it's easy to debug. Your CME adapter is the only place that would ever speak SBE. Later, swapping your internal format to a binary one is a good latency exercise for v0.6.
+**For Laddrix:** start with plain JSON or Python dataclasses between your services, because it's easy to debug. Your CME adapter is the only place that would ever speak SBE. Later, swapping your internal format to a binary one is a good latency exercise for v0.6.
 
 ## Generic vs CME-only: where each idea goes
 
-Most of what you just read works on *every* exchange. Put that in MockTrade's core. Only names, numbers and byte formats are CME's own, and they belong in the CME adapter alone. Use this table as the template for your notes in #15 and #16.
+Most of what you just read works on *every* exchange. Put that in Laddrix's core. Only names, numbers and byte formats are CME's own, and they belong in the CME adapter alone. Use this table as the template for your notes in #15 and #16.
 
 | Idea | Generic, so it goes in the core | CME-only, so it goes in the adapter |
 | --- | --- | --- |

@@ -3,7 +3,7 @@ Restores each file in `finally`; a mutant that hangs the tests counts as caught.
 Run alone (two runs at once overwrite each other's files). Anchor each mutant so its text is
 unique: a shorter line can hide inside a more indented one earlier in the file."""
 import subprocess
-R, P = "src/mocktrade/research/replay.py", "src/mocktrade/broker/paper.py"
+R, P = "src/laddrix/research/replay.py", "src/laddrix/broker/paper.py"
 M = [
  (R, "                    await self._sleep(min(gap / self.speed, MAX_WAIT_S))", "                    await self._sleep(min(gap, MAX_WAIT_S))"),
  (R, "                    await self._sleep(min(gap / self.speed, MAX_WAIT_S))", "                    await self._sleep(gap / self.speed)"),

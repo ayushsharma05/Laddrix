@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from kiteconnect import KiteConnect
 
-from mocktrade.broker.kite.orders import (
+from laddrix.broker.kite.orders import (
     STATUS_MAP,
     modify_params,
     place_params,
@@ -15,7 +15,7 @@ from mocktrade.broker.kite.orders import (
     to_paise,
     to_update,
 )
-from mocktrade.domain.orders import (
+from laddrix.domain.orders import (
     OrderRequest,
     OrderStatus,
     OrderType,
@@ -233,7 +233,7 @@ def test_ioc_cancelled_after_a_part_fill_keeps_the_fill():
 def test_tag_from_the_newer_tags_list_or_missing():
     no_tag = {k: v for k, v in KITE_ORDER.items() if k != "tag"}
     assert to_update({**no_tag, "tags": ["MT9"]}).client_order_id == "MT9"
-    assert to_update(no_tag).client_order_id == ""  # an order placed outside MockTrade
+    assert to_update(no_tag).client_order_id == ""  # an order placed outside Laddrix
 
 
 def test_timestamps_from_the_sdk_parsed_form_or_missing():

@@ -1,12 +1,12 @@
 # Performance: measured, not guessed
 
-How fast MockTrade is, how it is measured, and what changed because of the measurements.
+How fast Laddrix is, how it is measured, and what changed because of the measurements.
 
 ## How it is measured
 
 - **`/api/metrics`** (admin and risk; add `?format=prometheus` for a monitoring system, which
-  reads it with its own key, `MOCKTRADE_METRICS_TOKEN`, #287): histograms with p50, p90, p99 and
-  max for every step (`src/mocktrade/metrics.py`). Counters and gauges beside them: answers by
+  reads it with its own key, `LADDRIX_METRICS_TOKEN`, #287): histograms with p50, p90, p99 and
+  max for every step (`src/laddrix/metrics.py`). Counters and gauges beside them: answers by
   status class (`http_responses`), order events by kind (`order_events`), readiness (`ready`),
   active alerts (`ops_alerts`). The Grafana dashboard that draws them:
   [runbooks/monitoring.md](../runbooks/monitoring.md#the-dashboard-optional).
@@ -24,7 +24,7 @@ How fast MockTrade is, how it is measured, and what changed because of the measu
   | `gc_pause_ms{gen}` | garbage-collector pauses |
 
   Gauges: connections, ticks received, contracts watched, CPU seconds, memory.
-- **`python -m mocktrade.tools.loadtest`** runs the real server (`tools/serve.py`, kite mode)
+- **`python -m laddrix.tools.loadtest`** runs the real server (`tools/serve.py`, kite mode)
   in its own process, fed by a **fake Kite** that sends real 184-byte "full" frames over a
   WebSocket and answers the REST calls. Screen-like WebSocket clients and HTTP orders run in a
   second process. Every round gives every contract a new price, so the clients time each

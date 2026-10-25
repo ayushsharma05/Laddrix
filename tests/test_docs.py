@@ -33,7 +33,7 @@ def test_every_code_file_is_in_the_reading_order_in_its_own_folder():
 
 def test_every_server_folder_is_in_the_code_map():
     code_map = (ROOT / "docs/guide/07-code-map.md").read_text(encoding="utf-8")
-    folders = sorted(p.name for p in (ROOT / "src/mocktrade").iterdir()
+    folders = sorted(p.name for p in (ROOT / "src/laddrix").iterdir()
                      if p.is_dir() and (p / "__init__.py").exists())  # fmt: skip
     missing = [f for f in folders if f"`{f}/" not in code_map]
     assert missing == [], f"the code map (docs/guide/07-code-map.md) has no {missing}"

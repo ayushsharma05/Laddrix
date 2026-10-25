@@ -2,7 +2,7 @@
 // calendar to quote in the Autospreader form, see it kept, sell 2 spread lots above the market
 // (each leg quotes 1 lot, its role "quote"), see both quotes in the Algos screen's details, stop.
 //
-//   python3 -m mocktrade.tools.demo --port 8000 --ui ui/dist      (saved layouts and
+//   python3 -m laddrix.tools.demo --port 8000 --ui ui/dist      (saved layouts and
 //   data/demo/spreads cleared)
 //   node context/scripts/e2e-multi-quote.cjs <folder for screenshots>
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -24,7 +24,7 @@ const check = (name, ok, detail = '') => {
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByLabel('Authenticator code').fill(execFileSync('python3', ['-m', 'mocktrade.tools.demo', '--code']).toString().trim());
+  await page.getByLabel('Authenticator code').fill(execFileSync('python3', ['-m', 'laddrix.tools.demo', '--code']).toString().trim());
   await page.keyboard.press('Enter');
   await page.locator('.frame .ladder .price.last').first().waitFor({ timeout: 20000 });
   const api = (path, init) => page.evaluate(async ([p, i]) => {

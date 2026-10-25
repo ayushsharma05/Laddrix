@@ -19,15 +19,15 @@ from test_unconfirmed import (
 )
 from test_unconfirmed import req as unanswered_request
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-from mocktrade.orders.codec import request_from_dict, request_to_dict
-from mocktrade.orders.model import Pending
-from mocktrade.positions.reconcile import Mismatch
-from mocktrade.risk.closing import CloseResult
-from mocktrade.risk.flatten import Flatten
-from mocktrade.risk.kill_switch import stop_trading
-from mocktrade.risk.loss_watch import DailyLossWatch
+from laddrix.algos.builtin import BUILTIN
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.orders.codec import request_from_dict, request_to_dict
+from laddrix.orders.model import Pending
+from laddrix.positions.reconcile import Mismatch
+from laddrix.risk.closing import CloseResult
+from laddrix.risk.flatten import Flatten
+from laddrix.risk.kill_switch import stop_trading
+from laddrix.risk.loss_watch import DailyLossWatch
 
 S = OrderStatus
 
@@ -153,7 +153,7 @@ async def test_a_position_whose_size_is_not_known_is_never_flattened(day):
 
 
 async def test_a_difference_being_rechecked_is_also_unknown(day):
-    from mocktrade.positions.reconcile import CheckResult
+    from laddrix.positions.reconcile import CheckResult
 
     p = day
     await p.buy(FUT, 75, 2501010, Product.MIS)
@@ -231,7 +231,7 @@ async def test_stop_keeps_an_unanswered_order_unconfirmed_and_says_so(world):  #
 
 
 async def test_a_stopped_unanswered_order_the_broker_never_had_is_still_rejected(world):  # noqa: F811
-    from mocktrade.orders.manager import UNSEEN_AFTER, UNSEEN_CHECKS
+    from laddrix.orders.manager import UNSEEN_AFTER, UNSEEN_CHECKS
 
     view = await world.om.submit(unanswered_request())
     await world.om.cancel(view.client_order_id)

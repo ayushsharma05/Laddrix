@@ -8,9 +8,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-from mocktrade.orders.model import EventKind, OrderEvent, OrderView, Pending
-from mocktrade.risk.surveillance import BURST, CHURN, LARGE, SELF_TRADE, Surveillance
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.orders.model import EventKind, OrderEvent, OrderView, Pending
+from laddrix.risk.surveillance import BURST, CHURN, LARGE, SELF_TRADE, Surveillance
 
 FUT = "NFO:NIFTY26OCTFUT"
 T0 = datetime(2026, 10, 23, 4, 0, tzinfo=UTC)  # 09:30 India time
@@ -129,7 +129,7 @@ def test_an_alert_is_kept_and_acknowledged_with_a_note(w):
 
 
 def test_alerts_and_acknowledgements_come_back_after_a_restart(w):
-    from mocktrade.risk.surveillance import alert_to_dict
+    from laddrix.risk.surveillance import alert_to_dict
 
     w.order(Side.BUY, price=2501000)
     w.order(Side.SELL, price=2500000)

@@ -5,14 +5,14 @@ from decimal import Decimal
 
 import pytest
 
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.rules import order_spec
-from mocktrade.domain.order_spec import Need, Rule, spec_problem, spec_to_dict, standard_spec
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side, Validity
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, EventKind
-from mocktrade.platform import spec_of
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.rules import order_spec
+from laddrix.domain.order_spec import Need, Rule, spec_problem, spec_to_dict, standard_spec
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side, Validity
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, EventKind
+from laddrix.platform import spec_of
+from laddrix.refdata.store import InstrumentStore
 
 FUT = "NFO:NIFTY26OCTFUT"
 

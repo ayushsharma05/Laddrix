@@ -5,7 +5,7 @@ import struct
 NSE_TOKEN = 738561  # low byte 1 = NSE segment
 NFO_TOKEN = 13368834  # low byte 2 = NFO segment
 INDEX_TOKEN = 256265  # low byte 9 = indices (NIFTY 50)
-CDS_TOKEN = 412675  # low byte 3 = currency segment, skipped by MockTrade
+CDS_TOKEN = 412675  # low byte 3 = currency segment, skipped by Laddrix
 
 
 def ltp_packet(token: int, ltp: int) -> bytes:

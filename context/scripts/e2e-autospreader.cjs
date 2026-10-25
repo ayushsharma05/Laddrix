@@ -2,7 +2,7 @@
 // from the widget, see its live implied bid and ask, check them against the legs' own best
 // prices, rename it, survive a reload and a server restart, and delete it.
 //
-//   python3 -m mocktrade.tools.demo --port 8000 --ui ui/dist      (saved layouts cleared)
+//   python3 -m laddrix.tools.demo --port 8000 --ui ui/dist      (saved layouts cleared)
 //   node context/scripts/e2e-autospreader.cjs <folder for screenshots>
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execFileSync } = require('child_process');
@@ -27,7 +27,7 @@ const rupees = (text) => Number(text.replace(/[(].*$/, '').replace(/,/g, '').rep
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByLabel('Authenticator code').fill(execFileSync('python3', ['-m', 'mocktrade.tools.demo', '--code']).toString().trim());
+  await page.getByLabel('Authenticator code').fill(execFileSync('python3', ['-m', 'laddrix.tools.demo', '--code']).toString().trim());
   await page.keyboard.press('Enter');
   await page.locator('.frame .ladder .price.last').first().waitFor({ timeout: 20000 });
 

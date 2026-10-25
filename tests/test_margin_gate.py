@@ -6,9 +6,9 @@ from fractions import Fraction
 
 import pytest
 
-from mocktrade.broker.base import BasketMargin, BrokerError
-from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
-from mocktrade.risk.margin import MarginGate
+from laddrix.broker.base import BasketMargin, BrokerError
+from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
+from laddrix.risk.margin import MarginGate
 
 FUT = "NFO:NIFTY26OCTFUT"
 
@@ -89,7 +89,7 @@ async def test_no_answer_fails_open_with_a_warning(quoter, available, why):
 async def test_modify_checks_only_an_increase_and_cancel_always_goes():
     from datetime import UTC, datetime
 
-    from mocktrade.orders.model import OrderStatus, OrderView, Pending
+    from laddrix.orders.model import OrderStatus, OrderView, Pending
 
     now = datetime.now(UTC)
     q = Quoter(final=10_000_000)
@@ -126,8 +126,8 @@ async def test_paper_quotes_the_extra_margin_and_an_exit_adds_nothing(nifty_fut)
 async def test_a_paper_account_with_the_check_on(nifty_fut):
     from test_portfolio import Paper
 
-    from mocktrade.domain.accounts import BrokerAccount
-    from mocktrade.orders.model import ClientIds, OrderStatus
+    from laddrix.domain.accounts import BrokerAccount
+    from laddrix.orders.model import ClientIds, OrderStatus
 
     p = Paper(nifty_fut)
     p.platform.accounts.clear()

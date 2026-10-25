@@ -1,5 +1,5 @@
-# MockTrade server image: the screens are built with Node, then served by the Python app.
-#   docker build -t mocktrade .          (or: docker compose -f deploy/compose.yaml build)
+# Laddrix server image: the screens are built with Node, then served by the Python app.
+#   docker build -t laddrix .          (or: docker compose -f deploy/compose.yaml build)
 
 # --- 1. the screens --------------------------------------------------------------------------
 FROM node:22-slim AS screens
@@ -21,25 +21,25 @@ COPY src ./src
 # exactly the reviewed versions, each checked against its hash (#365); then our own code
 RUN pip install --require-hashes -r requirements.lock \
     && pip install --no-deps . \
-    && useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin mocktrade \
-    && mkdir /data && chown mocktrade /data
+    && useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin laddrix \
+    && mkdir /data && chown laddrix /data
 COPY --from=screens /ui/dist ./ui/dist
 
 # the commit this image is built from (deploy/deploy.sh passes it), shown by /api/health
-ARG MOCKTRADE_BUILD=unknown
+ARG LADDRIX_BUILD=unknown
 # no secrets here: they come from the environment at run time (deploy/.env)
-ENV MOCKTRADE_BUILD=$MOCKTRADE_BUILD \
-    MOCKTRADE_HOST=0.0.0.0 \
-    MOCKTRADE_PORT=8000 \
-    MOCKTRADE_DATA=/data \
-    MOCKTRADE_USERS_DB=/data/users.db \
-    MOCKTRADE_UI=/app/ui/dist
-USER mocktrade
+ENV LADDRIX_BUILD=$LADDRIX_BUILD \
+    LADDRIX_HOST=0.0.0.0 \
+    LADDRIX_PORT=8000 \
+    LADDRIX_DATA=/data \
+    LADDRIX_USERS_DB=/data/users.db \
+    LADDRIX_UI=/app/ui/dist
+USER laddrix
 VOLUME /data
 EXPOSE 8000
-# healthy = ready (#287): no part starting or down (GET /api/ready, src/mocktrade/ops/status.py).
+# healthy = ready (#287): no part starting or down (GET /api/ready, src/laddrix/ops/status.py).
 # A restart's recovery may ask the broker for a while: the start period allows for it.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --retries=3 \
     CMD ["python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/ready', timeout=2)"]
 STOPSIGNAL SIGTERM
-CMD ["python", "-m", "mocktrade.tools.serve"]
+CMD ["python", "-m", "laddrix.tools.serve"]
