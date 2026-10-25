@@ -54,7 +54,7 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   1. #287 operations: JSON logs with ids, one status of every part (readiness, Docker's
      health, the Admin screen's Status tab), Prometheus's own key, an optional Prometheus +
      Grafana dashboard ([docs/runbooks/monitoring.md](../docs/runbooks/monitoring.md)): merged (PR #437).
-  2. The repo review, #438, in four parts, one PR each:
+  2. The repo review, #438, in six parts, one PR each (done; #438 closed):
      - #439 setup (accurate facts, project files, a contributor guide, one guide, the reading
        order kept complete by a test): merged (PR #443, merged by Ayush);
      - #440 types (mypy clean, in CI): merged (PR #447);
@@ -65,10 +65,8 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
      - #448 checks that still check (every mutant matches its code, checked in CI; every
        browser script runs on the free pages): merged (PR #452);
      - #450 React's compiler-readiness lint rules (49 places, each reworked; two exceptions with
-       their reasons): in its PR.
-- **Next in the review:** once #450 merges, #438 is done (close it, and tell Ayush in plain
-  words what the review changed).
-- **Pull requests:** the #450 PR.
+       their reasons; 17 tests for guards that had none): merged (PR #453).
+- **Pull requests:** none open.
 
 ## What's next
 
