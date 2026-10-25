@@ -14,7 +14,7 @@ M = [
  (P, "        rising = trigger > self.placed_at_paise", "        rising = True"),
  (P, "                gtt.status, gtt.fired_leg = GttStatus.TRIGGERED, leg", "                gtt.fired_leg = leg"),
  (P, "        if gtt.status is not GttStatus.ACTIVE:\n            raise BrokerError(f\"GTT {gtt_id} is", "        if False:\n            raise BrokerError(f\"GTT {gtt_id} is"),
- (S, "            if theirs.status is GttStatus.TRIGGERED and theirs.order_id:\n                self._adopt(theirs)", "            if False:\n                self._adopt(theirs)"),
+ (S, '            if theirs.status is GttStatus.TRIGGERED and theirs.order_id:\n                adopted = self._adopt(theirs)', '            if False:\n                adopted = self._adopt(theirs)'),
  (S, "                reason = await self._risk.admit_at(order, leg.trigger_paise)", "                reason = None"),
  (S, "        if request.account_id != self.account_id:", "        if False:"),
  (S, "        except Exception as exc:  # no clear answer", "        except ZeroDivisionError as exc:  # no clear answer"),

@@ -7,8 +7,8 @@ B = "src/mocktrade/tools/backup.py"
 R = "src/mocktrade/tools/restore.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_backup.py"]
 MUTANTS = [
- (B, 'FOLDERS = ("rules", "reports", "alerts", "candles", "backtests")', 'FOLDERS = ("rules", "reports", "candles", "backtests")'),
- (B, 'FOLDERS = ("rules", "reports", "alerts", "candles", "backtests")', 'FOLDERS = ("reports", "alerts", "candles", "backtests")'),
+ (B, 'FOLDERS = ("rules", "reports", "alerts", "spreads", "candles", "backtests")', 'FOLDERS = ("rules", "reports", "spreads", "candles", "backtests")'),
+ (B, 'FOLDERS = ("rules", "reports", "alerts", "spreads", "candles", "backtests")', 'FOLDERS = ("reports", "alerts", "spreads", "candles", "backtests")'),
  (B, 'NEVER = ("kite_token_*.json", "*.key", ".env", "*.tmp", "*.part")', 'NEVER = ("*.key", ".env", "*.tmp", "*.part")'),
  (B, 'NEVER = ("kite_token_*.json", "*.key", ".env", "*.tmp", "*.part")', 'NEVER = ("kite_token_*.json", "*.key", ".env", "*.part")'),
  (B, "        if path.is_file() and not path.is_symlink() and not never(path):", "        if path.is_file() and not path.is_symlink():"),

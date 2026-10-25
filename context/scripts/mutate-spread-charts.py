@@ -21,7 +21,7 @@ MUTANTS = [
  (C, "\"h\": max(o, cl), \"l\": min(o, cl)", "\"h\": max(o, cl), \"l\": max(o, cl)", PY),
  (C, "\"c\": cl, \"v\": 0,", "\"c\": cl, \"v\": 10,", PY),
  (C, "        if candle is None:\n            gaps += 1", "        if candle is None:\n            pass", PY),
- (C, "        \"live_from\": None if None in lives else max(lives),", "        \"live_from\": max((x for x in lives if x), default=None),", PY),
+ (C, '        "live_from": max(known) if len(known := [x for x in lives if x]) == len(lives) else None,', '        "live_from": max((x for x in lives if x), default=None),', PY),
  (C, "    return combine([(leg.multiplier, charts.forming(leg.instrument_id, code))", "    return combine([(1, charts.forming(leg.instrument_id, code))", PY),
  (C, "    per_leg = await asyncio.gather(\n        *(charts.candles(leg.instrument_id, code, start, end) for leg in spread.legs)\n    )", "    per_leg = [await charts.candles(leg.instrument_id, code, start, end) for leg in spread.legs]", PY),
  (ROUTES_MARKET, "                spread = book.visible(user, instrument_id)\n                if spread is None:", "                spread = book.of_instrument(instrument_id)\n                if spread is None:", PY),

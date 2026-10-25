@@ -16,10 +16,10 @@ const IMAGES = `${__dirname}/../images`;
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   await page.evaluate(async () => { await fetch('/api/me/settings/theme', { method: 'PUT', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ value: null }) }); });
   await page.reload();
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   await page.waitForTimeout(1500);
   await page.getByRole('button', { name: 'Widgets ▾' }).click();  // a chart, to see it repaint
   await page.getByRole('menuitem', { name: /^Chart/ }).click();
@@ -44,11 +44,16 @@ const IMAGES = `${__dirname}/../images`;
     await pick.selectOption(value);
     await page.waitForTimeout(800);
     const now = await shown();
-    console.log(`${value}:`, JSON.stringify(now), '| same page (no reload):', page.url() === url, '| chart repainted:', before !== (await paint()));
+    // dark and light change the chart's background, so its pixels must change. Colour-blind
+    // keeps dark's background and the candles are blue and orange in every theme, so there
+    // nothing on the chart has to change (a change there is only new prices arriving)
+    const repainted = before !== (await paint());
+    const verdict = value === 'cb' ? '(not checked: looks like dark)' : repainted ? '(as expected)' : '(NOT as expected)';
+    console.log(`${value}:`, JSON.stringify(now), '| same page (no reload):', page.url() === url, '| chart repainted:', repainted, verdict);
     await page.screenshot({ path: `${IMAGES}/k13-5-theme-${file}.png` });
   }
   await page.reload();
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   await page.waitForTimeout(1000);
   const saved = await page.evaluate(async () => (await (await fetch('/api/me/settings/theme', { credentials: 'same-origin' })).json()).value);
   console.log('after a reload:', JSON.stringify(await shown()), 'saved:', JSON.stringify(saved), 'picker:', await pick.inputValue());

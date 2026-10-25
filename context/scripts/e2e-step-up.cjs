@@ -39,7 +39,7 @@ const freshWindow = async () => {
       await page.getByLabel('Password').fill('demo-password-123');
       await page.getByLabel('Authenticator code').fill(code());
       await page.keyboard.press('Enter');
-      await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+      await page.locator('section.frame').first().waitFor({ timeout: 20000 });
     };
     const admin = await browser.newPage({ viewport: { width: 1500, height: 950 } });
     const errors = [];

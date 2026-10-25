@@ -61,11 +61,12 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
      - #441 routes (`server/app.py` split by area: `server/routes/`, `context.py`, `bodies.py`;
        [context/images/server-api-layout.png](images/server-api-layout.png)): merged (PR #449);
      - #442 screens lint (ESLint with the TypeScript rules and React's two hooks rules, in CI and
-       `make lint`): in its PR;
-     - found on the way: #448 (every mutant applies, every browser script runs on the free
-       pages) and #450 (React's compiler-readiness lint rules, 49 places).
-- **Next in the review:** #448, then #450; then #438 is done.
-- **Pull requests:** the #442 PR.
+       `make lint`): merged (PR #451);
+     - #448 checks that still check (every mutant matches its code, checked in CI; every
+       browser script runs on the free pages): in its PR;
+     - #450 React's compiler-readiness lint rules (49 places): next.
+- **Next in the review:** #450; then #438 is done.
+- **Pull requests:** the #448 PR.
 
 ## What's next
 

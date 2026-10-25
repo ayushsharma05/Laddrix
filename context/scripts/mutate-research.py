@@ -19,7 +19,7 @@ MUTANTS = [
  (B, '                if "skipped" in d:\n                    raise LookupError', '                if False:\n                    raise LookupError', PY),
  (B, '        if run.result is None:\n            raise LookupError', '        if False:\n            raise LookupError', PY),
  (B, '        "days": [x.isoformat() for x in reversed(ticks_days)],  # newest first', '        "days": [x.isoformat() for x in ticks_days],  # newest first', PY),
- (B, '        return sorted((p.stem for p in folder.glob("*.json")), reverse=True)', '        return sorted(p.stem for p in folder.glob("*.json"))', PY),
+ (B, '        return sorted((p.stem for p in folder.glob("*.json") if _DAY_FILE.match(p.stem)),\n                      reverse=True)', '        return sorted((p.stem for p in folder.glob("*.json") if _DAY_FILE.match(p.stem)),\n                      reverse=False)', PY),
  (A, '        if own is not None and instrument_id:\n            out["candle_days"]', '        if own is not None:\n            out["candle_days"]', PY),
  (A, '        if format == "csv":\n            return Response(await asyncio.to_thread(report_csv, data),', '        if format == "csv":\n            return Response(await asyncio.to_thread(report_pdf, data),', PY),
  # the screens' model
@@ -36,7 +36,7 @@ MUTANTS = [
  # the screens
  (W, '    if (!going) return;\n    const t = setTimeout', '    const t = setTimeout', UI),
  (W, '  const version = `${run.run_id}|${run.state}|${run.progress}`;', '  const version = run.run_id;', UI),
- (W, '  useEffect(() => setDays((old) => old.filter((d) => offered.includes(d))), [offered.join(",")]);', '', UI),
+ (W, '  useEffect(() => setDays((old) => (old.every((d) => offered.includes(d)) ? old : old.filter((d) => offered.includes(d)))), [offered]);', '', UI),
  (W, '                    disabled={!r.summary || full}', '                    disabled={false}', UI),
  (W, '      setParams({ mode: "runs" });\n      refresh();', '      refresh();', UI),
  (W, '        if (e instanceof ApiError && e.status === 404) setOff(e.message);', '        if (false) setOff(e.message);', UI),

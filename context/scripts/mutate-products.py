@@ -27,7 +27,7 @@ MUTANTS = [
  (RV, "    different = differences(book.qty_by_product(), broker_positions)", "    different = differences({(i, None): q for i, q in book.net_by_instrument().items()}, broker_positions)"),
  (PB, "round(p.avg_price_paise) if p.qty else 0, product=p.product", "round(p.avg_price_paise) if p.qty else 0, product=None"),
  (CK, "        now = self._product_position(request.instrument_id, request.product)", "        now = self._position(request.instrument_id)"),
- (CK, "            and o.request.product is request.product", "            and True"),
+ (CK, 'if o.request.instrument_id == request.instrument_id and o.request.side is request.side\n            and o.request.product is request.product', 'if o.request.instrument_id == request.instrument_id and o.request.side is request.side\n            and True'),
  (PF, "            product_position=book.qty,\n", "\n"),
  (PF, "            book.qty_by_product, broker, account_id=account.id, clock=clock", "            lambda: {(i, None): q for i, q in book.net_by_instrument().items()}, broker, account_id=account.id, clock=clock"),
  (BK, "        return position.qty if position else 0", "        return self.net_qty(instrument_id)"),

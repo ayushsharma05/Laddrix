@@ -3,6 +3,7 @@
 // with an MTM loss limit of ₹1 and auto-close set from the MTM Limits tab, closed on the next
 // price, and the message it leaves. Run against a fresh demo with ui/dist rebuilt.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { openWidget } = require('./e2e-lib.cjs');
 const { execSync } = require('child_process');
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
@@ -12,7 +13,7 @@ const { execSync } = require('child_process');
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   const api = (m, p, b) => page.evaluate(async ([m, p, b]) => {
     const r = await fetch(p, { method: m, credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: b ? JSON.stringify(b) : undefined });
     return { status: r.status, body: await r.json().catch(() => null) };
@@ -23,7 +24,7 @@ const { execSync } = require('child_process');
   const buy = await api('POST', `${A}/orders`, { instrument_id: FUT, side: 'BUY', qty: 75, order_type: 'MARKET', product: 'MIS', market_protection: -1 });
   console.log('buy MIS:', buy.status, buy.body.status);
   await page.waitForTimeout(1500);
-  await page.locator('.dv-tab', { hasText: 'Positions' }).first().click();
+  await openWidget(page, 'Positions');
   const button = page.getByRole('button', { name: /Square off MIS \(1\)/ });
   await button.waitFor({ timeout: 35000 }); // the button asks the server (every 30 s, and on changes)
   console.log('button:', await button.textContent(), '|', await button.getAttribute('title'));
@@ -35,7 +36,7 @@ const { execSync } = require('child_process');
   const nrml = await api('POST', `${A}/orders`, { instrument_id: FUT, side: 'BUY', qty: 75, order_type: 'MARKET', product: 'NRML', market_protection: -1 });
   console.log('buy NRML:', nrml.status, nrml.body.status);
   await page.waitForTimeout(1500);
-  await page.locator('.dv-tab', { hasText: 'MTM Limits' }).click();
+  await openWidget(page, 'MTM Limits');
   await page.getByLabel('NIFTY26OCTFUT loss limit').fill('1');
   await page.getByLabel('NIFTY26OCTFUT auto-close').check();
   await page.getByRole('grid', { name: 'Position limits' }).getByRole('button', { name: 'Set' }).click();
@@ -43,7 +44,7 @@ const { execSync } = require('child_process');
   console.log('NRML after the MTM limit:', await net('NRML'));
   const rules = await api('GET', `${A}/mtm`);
   console.log('rule:', JSON.stringify(rules.body.positions[0]));
-  await page.locator('.dv-tab', { hasText: 'Messages' }).click();
+  await openWidget(page, 'Messages');
   console.log('message:', (await page.getByRole('grid', { name: 'Messages' }).getByText(/reached the loss limit/).first().textContent()).slice(0, 160));
   await page.screenshot({ path: '/tmp/claude-0/e2e-mtm.png' });
   await browser.close();

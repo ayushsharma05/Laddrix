@@ -2,6 +2,7 @@
 // over REST and on screen. Buys 75 futures, then reads Funds, the Trades tab and Holdings.
 // Run against a fresh demo (rm -rf data/demo) with ui/dist rebuilt.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { openWidget } = require('./e2e-lib.cjs');
 const { execSync } = require('child_process');
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
@@ -11,7 +12,7 @@ const { execSync } = require('child_process');
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   const api = (m, p, b) => page.evaluate(async ([m, p, b]) => {
     const r = await fetch(p, { method: m, credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: b ? JSON.stringify(b) : undefined });
     return { status: r.status, body: await r.json().catch(() => null) };
@@ -35,11 +36,11 @@ const { execSync } = require('child_process');
   await page.getByRole('button', { name: /^Trades/ }).click();
   const tradeRow = page.getByRole('grid', { name: 'Trades' }).getByRole('row').first();
   console.log('trades tab:', (await tradeRow.textContent()).replace(/\s+/g, ' '));
-  await page.locator('.dv-tab', { hasText: 'Funds' }).click();
+  await openWidget(page, 'Funds');
   const seg = page.getByRole('region', { name: 'equity funds' });
   await seg.waitFor({ timeout: 5000 });
   console.log('funds screen:', (await seg.textContent()).replace(/\s+/g, ' ').slice(0, 160));
-  await page.locator('.dv-tab', { hasText: 'Holdings' }).click();
+  await openWidget(page, 'Holdings');
   console.log('holdings screen:', (await page.getByRole('grid', { name: 'Holdings' }).textContent()).trim());
   await page.screenshot({ path: '/tmp/claude-0/e2e-portfolio.png' });
   await browser.close();

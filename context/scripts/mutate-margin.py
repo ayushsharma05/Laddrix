@@ -17,7 +17,7 @@ M = [
  (G, "            available = None\n        note", "            raise\n        note"),
  (P, "        return BasketMargin(initial_paise=initial, final_paise=max(0, used(True) - used(False)))", "        return BasketMargin(initial_paise=initial, final_paise=used(True))"),
  (P, "            row[1] += r.side.sign * r.qty", "            row[1] += r.qty"),
- (L, "        checks = (recovery, risk, margin if margin_check else None, throttle)", "        checks = (recovery, risk, None, throttle)"),
+ (L, '        checks = (pause, rights, recovery, risk, margin if margin_check else None, throttle)', '        checks = (pause, rights, recovery, risk, None, throttle)'),
  (L, "            equity = [f for f in funds if f.segment == \"equity\"] or list(funds)\n            return equity[0].available_paise if equity else None", "            return None"),
 ]
 caught = 0

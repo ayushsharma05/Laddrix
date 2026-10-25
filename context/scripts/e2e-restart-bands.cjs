@@ -36,13 +36,13 @@ const pid = () => execSync(`pgrep -f "${PATTERN}"`).toString().trim().split('\n'
   const signIn = async () => {
     await page.goto('http://localhost:8000/');
     const form = page.getByLabel('Username');
-    await Promise.race([form.waitFor({ timeout: 20000 }), page.locator('.dv-tab').first().waitFor({ timeout: 20000 })]);
+    await Promise.race([form.waitFor({ timeout: 20000 }), page.locator('section.frame').first().waitFor({ timeout: 20000 })]);
     if (!(await form.count())) return 'still signed in';  // the session outlived the restart
     await form.fill('demo');
     await page.getByLabel('Password').fill('demo-password-123');
     await page.getByLabel('Authenticator code').fill(await freshCode());
     await page.keyboard.press('Enter');
-    await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+    await page.locator('section.frame').first().waitFor({ timeout: 20000 });
     return 'signed in';
   };
   const api = (method, path, body) => page.evaluate(async ([m, p, b]) => {

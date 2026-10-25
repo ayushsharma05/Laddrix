@@ -36,7 +36,8 @@ needs time to pass moves its clock, so most never wait for real seconds.
 ## Beyond these tests
 
 - **Mutation scripts** (`context/scripts/mutate-*.py`) break one rule at a time and check that a
-  test here fails. Each must end "N/N caught".
+  test here fails. Each must end "N/N caught". `test_mutants.py` checks that each mutant still matches its code
+  (a stale one would quietly check nothing).
 - **Browser checks** (`context/scripts/e2e-*.cjs`) drive the real screens on the demo.
 - **Drills** (`context/scripts/drill-*.py`) crash, restore and roll back for real.
 

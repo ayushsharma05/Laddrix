@@ -12,11 +12,11 @@ MUTANTS = [
  (G, "        return all(_reduces(leg, held) for leg in view.request.legs)", "        return True"),
  (G, "        return all(_reduces(leg, held) for leg in view.request.legs)", "        return False"),
  (G, "    return held != 0 and leg.side.sign == -(1 if held > 0 else -1) and leg.qty <= abs(held)", "    return held != 0"),
- (G, "        if why is None:\n            return []", "        if True:\n            return []"),
+ (G, '            if why is None:\n                continue\n            try:\n                await self._broker.delete_gtt', '            if True:\n                continue\n            try:\n                await self._broker.delete_gtt'),
  (G, "                done.append(words)\n                continue", "                raise"),
  (G, "            await self._orders.cancel(adopted.client_order_id)", "            pass"),
  (G, "        await self.sweep()\n", "\n"),
- (P, "s.name for s in (self.firm_switch, switch)", "s.name for s in (switch,)"),
+ (P, 'return next((s.state.reason or s.name for s in (firm, switch) if s.engaged), None)', 'return next((s.state.reason or s.name for s in (switch,) if s.engaged), None)'),
 ]
 if subprocess.run(TESTS, capture_output=True, timeout=300).returncode != 0:
     raise SystemExit("the tests fail (or a test file is missing) before any mutation: fix that first")

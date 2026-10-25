@@ -18,7 +18,7 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   await page.evaluate(async () => {
     await fetch('/api/layouts/current', { method: 'DELETE', credentials: 'same-origin' });
   });
