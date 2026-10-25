@@ -55,6 +55,21 @@ describe("the STOP band", () => {
     await vi.waitFor(() => expect(app.store.getState().messages[0]).toMatchObject({ level: "INFO", text: `Flatten: closing +150 ${FUT} MIS: sent MT9` }));
   });
 
+  it("a confirmation is only for the positions it was shown with: a change asks again", async () => {
+    const { calls, app } = setup({ [`GET ${BASE}`]: STATUS });
+    fireEvent.click(await screen.findByRole("button", { name: "Flatten (1)" }));
+    expect(screen.getByRole("button", { name: "Confirm: close 1 position" })).toBeTruthy();
+    act(() =>
+      app.store.applyPositions("acc-a", {
+        positions: [{ instrument_id: FUT, product: "MIS", qty: 300, avg_price_paise: "2500000", ltp_paise: 2501000, realised_paise: 0, unrealised_paise: 0, pnl_paise: 0, buy_qty: 300, sell_qty: 0, buy_value_paise: 0, sell_value_paise: 0, updated_at: "2026-10-14T04:41:00+00:00" }],
+        realised_paise: 0, unrealised_paise: 0, day_pnl_paise: 0, reconcile: { checked_at: null, ok: null, error: "", alerts: [] },
+      }),
+    ); // a fill meanwhile: what was confirmed is not what is open now
+    expect(screen.queryByRole("button", { name: /Confirm/ })).toBeNull();
+    await screen.findByRole("button", { name: "Flatten (1)" });
+    expect(posts(calls)).toHaveLength(0);
+  });
+
   it("a position whose size isn't known is shown and never offered for flattening", async () => {
     const unknown = { ...STATUS, can_flatten: false, positions: [{ ...STATUS.positions[0]!, unknown: "MockTrade shows +150, the broker shows +225" }] };
     setup({ [`GET ${BASE}`]: unknown });

@@ -23,12 +23,10 @@ export function StepUpDialog() {
   const { rest } = useApp();
   const [asking, setAsking] = useState<Asking | null>(null);
 
-  useEffect(() => {
-    rest.stepUp = (reason, confirm) => new Promise<boolean>((done) => setAsking({ reason, confirm, done }));
-    return () => {
-      rest.stepUp = null;
-    };
-  }, [rest]);
+  useEffect(
+    () => rest.askStepUpWith((reason, confirm) => new Promise<boolean>((done) => setAsking({ reason, confirm, done }))),
+    [rest],
+  );
 
   if (!asking) return null;
   const finish = (ok: boolean) => {

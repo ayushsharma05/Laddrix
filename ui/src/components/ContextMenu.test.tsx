@@ -17,6 +17,17 @@ describe("the right-click menu", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("a click outside calls the newest close handler, even one given after it opened", () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const items = [{ label: "One", onSelect: () => {} }];
+    const view = render(<ContextMenu x={40} y={50} items={items} onClose={first} />);
+    view.rerender(<ContextMenu x={40} y={50} items={items} onClose={second} />);
+    fireEvent.pointerDown(document.body);
+    expect(second).toHaveBeenCalledOnce();
+    expect(first).not.toHaveBeenCalled();
+  });
+
   it("is drawn where the pointer is", () => {
     setup([{ label: "One", onSelect: () => {} }]);
     const menu = screen.getByRole("menu");

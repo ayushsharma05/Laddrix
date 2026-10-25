@@ -11,7 +11,7 @@ M = [
  (M_, "  if (parsed.length === 2 && parsed[0]!.trigger_paise >= parsed[1]!.trigger_paise) {", "  if (false) {"),
  (M_, "    const activeFirst = Number(b.status === \"active\") - Number(a.status === \"active\");", "    const activeFirst = 0;"),
  (M_, "  if (g.status === \"triggered\") return g.order_id ? \"good\" : \"buy\";", "  if (g.status === \"triggered\") return \"buy\";"),
- (B, "setLegs((old) => (old.every((l) => l.trigger === \"\") ? defaultLegs(spec, kind, ltp, side) : old));", "setLegs(defaultLegs(spec, kind, ltp, side));"),
+ (B, 'if (ltp !== null && legs.every((l) => l.trigger === "")) setLegs(defaultLegs(spec, kind, ltp, side));', 'if (ltp !== null) setLegs(defaultLegs(spec, kind, ltp, side));'),
  (B, "disabled={!current || current.status !== \"active\"}", "disabled={!current}"),
  (A, "    const family = s.family ?? \"execution\";", "    const family = \"execution\";"),
  (T, "  if (gtt) tabs.push([\"gtt\", \"GTT\",", "  if (true) tabs.push([\"gtt\", \"GTT\","),

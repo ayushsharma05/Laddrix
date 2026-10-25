@@ -69,9 +69,9 @@ export function FreeCanvas({ controller, empty }: { controller: WorkspaceControl
   // a window just added: scroll to it if it is out of sight
   const reveal = controller.reveal;
   useEffect(() => {
-    if (!reveal) return;
-    controller.reveal = null;
-    const w = controller.canvas?.windows.find((x) => x.id === reveal);
+    const id = reveal ? controller.takeReveal() : null;
+    if (!id) return;
+    const w = controller.canvas?.windows.find((x) => x.id === id);
     const el = scroller.current;
     if (!w || !el) return;
     const v = readView();
@@ -79,10 +79,10 @@ export function FreeCanvas({ controller, empty }: { controller: WorkspaceControl
     if (!seen) el.scrollTo?.({ left: Math.max(0, w.x - GRID * 2), top: Math.max(0, w.y - GRID * 2) });
   }, [controller, reveal, readView]);
 
-  // a closed or gone window can't stay maximized
-  useEffect(() => {
-    if (maximized && !windows.some((w) => w.id === maximized)) setMaximized(null);
-  }, [maximized, windows]);
+  // a closed or gone window can't stay maximized, nor come back maximized (another page, and
+  // back): forgotten while drawing, the moment it is gone
+  if (maximized && !windows.some((w) => w.id === maximized)) setMaximized(null);
+  const maxId = maximized && windows.some((w) => w.id === maximized) ? maximized : null;
 
   /** Scroll the page when the pointer is held near its edge during a drag. */
   const edgeScroll = useCallback((clientX: number, clientY: number) => {
@@ -110,7 +110,7 @@ export function FreeCanvas({ controller, empty }: { controller: WorkspaceControl
             locked={controller.locked}
             live={live?.id === w.id ? live.box : null}
             setLive={setLive}
-            maxBox={maximized === w.id ? view : null}
+            maxBox={maxId === w.id ? view : null}
             toggleMax={setMaximized}
             surface={surface}
             edgeScroll={edgeScroll}
@@ -310,7 +310,9 @@ function TitleBar({ win, controller, locked = controller.locked, popped, onPoint
 function PopoutPortal({ target, title, onClosed, children }: { target: Window; title: string; onClosed: () => void; children: ReactNode }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
   const closed = useRef(onClosed);
-  closed.current = onClosed;
+  useLayoutEffect(() => {
+    closed.current = onClosed; // the newest, for the watcher set up once
+  });
   useEffect(() => {
     let ready = false;
     const setup = () => {
@@ -342,6 +344,7 @@ function PopoutPortal({ target, title, onClosed, children }: { target: Window; t
     };
   }, [target]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- the popped-out browser window's own title: outside React, set from an effect as it should be
     if (host) host.ownerDocument.title = `${title} · MockTrade`;
   }, [host, title]);
   return host ? createPortal(children, host) : null;

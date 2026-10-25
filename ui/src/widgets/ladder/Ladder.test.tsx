@@ -195,6 +195,18 @@ describe("Ladder", () => {
     expect(posts(calls)[1]).toMatchObject({ method: "DELETE", path: "/api/accounts/acc-a/orders/w1" });
   });
 
+  it("a selection whose orders are gone is dropped: a new order at that price is never selected by it", async () => {
+    const { push, app } = setup();
+    await ready();
+    push();
+    act(() => app.store.applyOrders("acc-a", [order("w1", "OPEN", "2026-10-14T04:41:00+00:00")])); // BUY 75 @ 25,010.00
+    fireEvent.click(screen.getByLabelText("Select my orders at 25,010.00"));
+    expect(screen.getByLabelText("Cancel my orders at 25,010.00")).toBeTruthy(); // selected: a click cancels
+    act(() => app.store.applyOrders("acc-a", [order("w1", "FILLED", "2026-10-14T04:42:00+00:00", { filled_qty: 75 })])); // it filled
+    act(() => app.store.applyOrders("acc-a", [order("w2", "OPEN", "2026-10-14T04:43:00+00:00")])); // a new one, same price
+    expect(screen.getByLabelText("Select my orders at 25,010.00")).toBeTruthy(); // w2 was never selected: a click selects, never cancels
+  });
+
   it("CXL ALL cancels only this contract's working orders, even while trading is stopped", async () => {
     const routes = {
       "DELETE /api/accounts/acc-a/orders/w1": order("w1", "CANCELLED", "2026-10-14T04:42:00+00:00"),

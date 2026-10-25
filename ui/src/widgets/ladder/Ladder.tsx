@@ -106,8 +106,9 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
   const messages = useStore((s) => s.messages);
 
   // --- prices, queue estimates, volume at price -----------------------------------------------
-  const queue = useRef(new QueueTracker()).current;
-  const vap = useRef(new VapCounter()).current;
+  // one queue tracker and one volume counter for the ladder's life (they count tick by tick)
+  const [queue] = useState(() => new QueueTracker());
+  const [vap] = useState(() => new VapCounter());
   const [tick, setTick] = useState<Tick | null>(null);
   const [vapVersion, setVapVersion] = useState(0);
   const lastLtp = useRef<number | null>(null);
@@ -165,10 +166,9 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
   const [centre, setCentre] = useState<number | null>(null);
   const [auto, setAuto] = useState(true);
   const ltp = tick?.ltp_paise ?? instrument.ltp_paise ?? null;
-  useEffect(() => {
-    if (ltp === null) return;
-    if (centre === null || (auto && needsRecentre(centre, ltp, rowCount, tickSize))) setCentre(snap(ltp, tickSize));
-  }, [ltp, centre, auto, rowCount, tickSize]);
+  // centred on the price once it is known, and again when it walks off (while drawing: the
+  // new centre is never one frame late)
+  if (ltp !== null && (centre === null || (auto && needsRecentre(centre, ltp, rowCount, tickSize)))) setCentre(snap(ltp, tickSize));
 
   const working = useMemo(() => (spread ? spreadWorking(algos ?? {}, id) : workingOrders(orders ?? {}, id)), [spread, algos, orders, id]);
   const rows = useMemo(
@@ -197,7 +197,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
   // --- the trading actions -----------------------------------------------------------------------
   // what a click can place, from the server's order spec (nothing hard-coded here)
   const spec = useOrderSpec(accountId, spread ? undefined : id); // a spread's legs are the server's
-  const types = clickTypes(spec);
+  const types = useMemo(() => clickTypes(spec), [spec]); // the same objects while the spec stands
   const orderType = types.find((t) => t.code === params.type || t.label === params.type) ?? types[0] ?? null;
   const tifs = orderType?.validities ?? [];
   const tif = params.tif && tifs.includes(params.tif) ? params.tif : (tifs[0] ?? "DAY");
@@ -207,10 +207,8 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
   const [selected, setSelected] = useState<number | null>(null);
   const [armed, setArmed] = useState<Armed | null>(null);
 
-  // a selection whose orders are gone (filled, cancelled) is dropped
-  useEffect(() => {
-    if (selected !== null && !working.some((o) => priceOf(o) === selected)) setSelected(null);
-  }, [selected, working]);
+  // a selection whose orders are gone (filled, cancelled) is dropped (while drawing)
+  if (selected !== null && !working.some((o) => priceOf(o) === selected)) setSelected(null);
 
   /** A spread: buy or sell `lots` spread lots at `at` (the ASE algo quotes and hedges). */
   const sendSpread = useCallback(

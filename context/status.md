@@ -63,10 +63,12 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
      - #442 screens lint (ESLint with the TypeScript rules and React's two hooks rules, in CI and
        `make lint`): merged (PR #451);
      - #448 checks that still check (every mutant matches its code, checked in CI; every
-       browser script runs on the free pages): in its PR;
-     - #450 React's compiler-readiness lint rules (49 places): next.
-- **Next in the review:** #450; then #438 is done.
-- **Pull requests:** the #448 PR.
+       browser script runs on the free pages): merged (PR #452);
+     - #450 React's compiler-readiness lint rules (49 places, each reworked; two exceptions with
+       their reasons): in its PR.
+- **Next in the review:** once #450 merges, #438 is done (close it, and tell Ayush in plain
+  words what the review changed).
+- **Pull requests:** the #450 PR.
 
 ## What's next
 

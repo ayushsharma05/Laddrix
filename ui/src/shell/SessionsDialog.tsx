@@ -31,7 +31,20 @@ export function SessionsDialog({ onClose }: { onClose: () => void }) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
   }, [rest]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => {
+    let live = true; // the dialog may close before the answer comes
+    rest.get<SessionRow[]>("/api/me/sessions").then(
+      (found) => {
+        if (!live) return;
+        setRows(found);
+        setError("");
+      },
+      (err: unknown) => live && setError(err instanceof ApiError ? err.message : String(err)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [rest]);
 
   const end = async (id: string) => {
     try {

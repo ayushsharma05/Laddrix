@@ -3,7 +3,7 @@
 // in step.
 
 import type { IDockviewPanelHeaderProps, IDockviewPanelProps } from "dockview-react";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type FunctionComponent } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type FunctionComponent } from "react";
 import { useApp } from "../app/context";
 import type { WorkspaceController } from "./controller";
 import { LINK_COLOURS, nextLink, type LinkGroup } from "./links";
@@ -60,7 +60,9 @@ export function WidgetBody({ id, kind, params, update }: { id: string; kind: str
   const { links } = useApp();
   const controller = useController();
   const latest = useRef(params);
-  latest.current = params;
+  useLayoutEffect(() => {
+    latest.current = params; // the saved params; two changes in a row build on each other
+  });
 
   const setParams = useCallback(
     (change: Partial<BaseParams>) => {
@@ -122,13 +124,13 @@ function useLocation(api: IDockviewPanelHeaderProps<BaseParams>["api"]): string 
 
 /** The panel's title, kept current (a linked widget renames its tab when it switches). */
 function useTitle(api: IDockviewPanelHeaderProps<BaseParams>["api"]): string {
-  const [title, setTitle] = useState(api.title ?? "");
+  // kept with the panel it is for (another panel starts from its own title)
+  const [seen, setSeen] = useState({ api, title: api.title ?? "" });
   useEffect(() => {
-    setTitle(api.title ?? "");
-    const sub = api.onDidTitleChange((e) => setTitle(e.title));
+    const sub = api.onDidTitleChange((e) => setSeen({ api, title: e.title }));
     return () => sub.dispose();
   }, [api]);
-  return title;
+  return seen.api === api ? seen.title : (api.title ?? "");
 }
 
 /** The tab: link colour (click to change group), title, close. Acts as the window title bar. */

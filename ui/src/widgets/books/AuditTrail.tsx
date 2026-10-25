@@ -35,9 +35,14 @@ export const PAGE = 200;
 export const CATCH_UP_MS = [300, 2000];
 export const POLL_MS = 5000;
 
-export function AuditTrail({ params, setParams, publish }: WidgetProps<AuditParams>) {
-  const { rest, stream } = useApp();
+export function AuditTrail(props: WidgetProps<AuditParams>) {
   const accountId = useStore((s) => s.accountId);
+  // made afresh for each account: its events, pages and newest seq never carry over
+  return <AccountAudit key={accountId ?? ""} {...props} accountId={accountId} />;
+}
+
+function AccountAudit({ params, setParams, publish, accountId }: WidgetProps<AuditParams> & { accountId: string | null }) {
+  const { rest, stream } = useApp();
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [older, setOlder] = useState(true); // more pages behind the last one?
   const [error, setError] = useState("");
@@ -52,11 +57,8 @@ export function AuditTrail({ params, setParams, publish }: WidgetProps<AuditPara
     setEvents((current) => mergeEvents(current, page));
   }, []);
 
-  // the newest page, again whenever the account changes
+  // the newest page (a new account is a new AccountAudit: it starts empty)
   useEffect(() => {
-    setEvents([]);
-    setOlder(true);
-    newest.current = 0;
     if (!base) return;
     let alive = true;
     rest

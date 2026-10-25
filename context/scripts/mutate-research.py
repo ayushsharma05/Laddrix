@@ -36,7 +36,7 @@ MUTANTS = [
  # the screens
  (W, '    if (!going) return;\n    const t = setTimeout', '    const t = setTimeout', UI),
  (W, '  const version = `${run.run_id}|${run.state}|${run.progress}`;', '  const version = run.run_id;', UI),
- (W, '  useEffect(() => setDays((old) => (old.every((d) => offered.includes(d)) ? old : old.filter((d) => offered.includes(d)))), [offered]);', '', UI),
+ (W, '  const days = useMemo(() => picked.filter((d) => offered.includes(d)), [picked, offered]);', '  const days = picked;', UI),
  (W, '                    disabled={!r.summary || full}', '                    disabled={false}', UI),
  (W, '      setParams({ mode: "runs" });\n      refresh();', '      refresh();', UI),
  (W, '        if (e instanceof ApiError && e.status === 404) setOff(e.message);', '        if (false) setOff(e.message);', UI),

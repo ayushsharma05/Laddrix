@@ -88,14 +88,21 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
   const code = interval?.code;
   const base = `/api/charts/${encodeURIComponent(id)}/candles`;
 
+  // another interval starts empty, at once (React's "adjusting state when a prop changes":
+  // done while drawing, so not one frame shows the old interval's candles)
+  const [shownCode, setShownCode] = useState(code);
+  if (shownCode !== code) {
+    setShownCode(code);
+    setCandles([]);
+    setView(DEFAULT_VIEW);
+    setOlderState("wait");
+  }
+
   // the candles: a fresh load for each instrument and interval
   useEffect(() => {
     if (!code) return;
     let live = true;
     load.current += 1;
-    setCandles([]);
-    setView(DEFAULT_VIEW);
-    setOlderState("wait");
     rest
       .get<CandlesAnswer>(`${base}?interval=${code}`)
       .then((a) => {
@@ -148,6 +155,7 @@ function ChartBody({ params, setParams, instrumentId: id }: WidgetProps<ChartPar
   // older candles as the view nears the left edge
   useEffect(() => {
     if (!interval || !candles.length || olderState !== "idle" || !needsOlder(view, candles.length, plotW)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- marked at once: the next run (the view moves on every drag) must not ask for this page again
     setOlderState("loading");
     const mine = load.current;
     const end = candles[0]!.t;

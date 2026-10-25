@@ -77,9 +77,12 @@ export function useTick(instrumentId: string | undefined): Tick | null {
   const { stream } = useApp();
   const [tick, setTick] = useState<Tick | null>(null);
   useEffect(() => {
-    setTick(null);
     if (!instrumentId) return;
-    return stream.subscribeTicks(instrumentId, setTick);
+    const stop = stream.subscribeTicks(instrumentId, setTick);
+    return () => {
+      stop();
+      setTick(null); // switching back later never shows this instrument's old price
+    };
   }, [stream, instrumentId]);
   // never the previous instrument's tick, even for the one render before the effect runs
   return tick && tick.instrument_id === instrumentId ? tick : null;
@@ -88,21 +91,10 @@ export function useTick(instrumentId: string | undefined): Tick | null {
 /** Instrument details, or null while loading / if unknown. */
 export function useInstrument(instrumentId: string | undefined): Instrument | null {
   const { instruments } = useApp();
-  const [found, setFound] = useState<Instrument | null>(() =>
-    instrumentId ? (instruments.peek(instrumentId) ?? null) : null,
-  );
+  const [found, setFound] = useState<Instrument | null>(null); // fetched (the cache is read first)
   useEffect(() => {
+    if (!instrumentId || instruments.peek(instrumentId)) return; // known: read while drawing
     let live = true;
-    if (!instrumentId) {
-      setFound(null);
-      return;
-    }
-    const known = instruments.peek(instrumentId);
-    if (known) {
-      setFound(known);
-      return;
-    }
-    setFound(null);
     void instruments.get(instrumentId).then((i) => {
       if (live) setFound(i);
     });
@@ -112,27 +104,18 @@ export function useInstrument(instrumentId: string | undefined): Instrument | nu
   }, [instruments, instrumentId]);
   // never the previous instrument (a ticket that switched would start at its price)
   if (!instrumentId) return null;
-  if (found && found.id === instrumentId) return found;
-  return instruments.peek(instrumentId) ?? null;
+  return instruments.peek(instrumentId) ?? (found && found.id === instrumentId ? found : null);
 }
 
 /** What can be ordered on an instrument through an account, or null while loading / unavailable. */
 export function useOrderSpec(accountId: string | null | undefined, instrumentId: string | undefined): OrderSpec | null {
   const { specs } = useApp();
   const key = accountId && instrumentId ? `${accountId}|${instrumentId}` : null;
-  // kept with the account and instrument it is for: never another pair's rules
-  const [found, setFound] = useState<{ key: string; spec: OrderSpec | null } | null>(() =>
-    key ? { key, spec: specs.peek(accountId!, instrumentId!) ?? null } : null,
-  );
+  // fetched, kept with the account and instrument it is for: never another pair's rules
+  const [found, setFound] = useState<{ key: string; spec: OrderSpec | null } | null>(null);
   useEffect(() => {
+    if (!key || specs.peek(accountId!, instrumentId!)) return; // known: read while drawing
     let live = true;
-    if (!key) {
-      setFound(null);
-      return;
-    }
-    const known = specs.peek(accountId!, instrumentId!);
-    setFound({ key, spec: known ?? null });
-    if (known) return;
     void specs.get(accountId!, instrumentId!).then((s) => {
       if (live) setFound({ key, spec: s });
     });
@@ -141,8 +124,7 @@ export function useOrderSpec(accountId: string | null | undefined, instrumentId:
     };
   }, [specs, key, accountId, instrumentId]);
   if (!key) return null;
-  if (found && found.key === key) return found.spec;
-  return specs.peek(accountId!, instrumentId!) ?? null;
+  return specs.peek(accountId!, instrumentId!) ?? (found && found.key === key ? found.spec : null);
 }
 
 /** Re-render every `ms` (clocks, "x seconds ago"). */

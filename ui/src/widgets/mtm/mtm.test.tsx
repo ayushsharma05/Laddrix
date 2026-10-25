@@ -64,6 +64,16 @@ describe("square-off assistant", () => {
     await vi.waitFor(() => expect(app.store.getState().messages[0]!.text).toBe(`Square-off ${FUT}: sent MT9`));
   });
 
+  it("a confirmation is only for the positions it was shown with: another MIS opening asks again", async () => {
+    const { calls, app } = setup(<SquareOffButton />);
+    fireEvent.click(await screen.findByRole("button", { name: "Square off MIS (1) · 15:25" }));
+    expect(screen.getByRole("button", { name: "Confirm: close 1 MIS" })).toBeTruthy();
+    const another = { ...POSITION, instrument_id: "NFO:NIFTY26NOVFUT" } as Position;
+    act(() => app.store.applyPositions("acc-a", { positions: [POSITION, another], day_pnl_paise: -150750, reconcile: { checked_at: null, ok: true, error: "", alerts: [] } } as never));
+    expect(screen.queryByRole("button", { name: /Confirm/ })).toBeNull();
+    expect(calls.filter((c) => c.method === "POST")).toHaveLength(0);
+  });
+
   it("says in the server's words what the close did, including what it left to other closes", async () => {
     const summary = `closing +75 ${FUT} MIS: sent MT9; cancelled MT4; 0 left`;
     const { app } = setup(<SquareOffButton />, {

@@ -25,20 +25,22 @@ const errorText = (e: unknown) => (e instanceof ApiError || e instanceof Error ?
 /** The broker's GTT spec for one contract; `unsupported` when the broker holds no GTTs. */
 export function useGttSpec(accountId: string | null, instrumentId: string | null | undefined) {
   const { rest } = useApp();
-  const [state, setState] = useState<{ spec: GttSpec | null; error: string }>({ spec: null, error: "" });
+  // kept with the account and contract it is for: never another contract's rules
+  const key = accountId && instrumentId ? `${accountId}|${instrumentId}` : "";
+  const [state, setState] = useState<{ key: string; spec: GttSpec | null; error: string } | null>(null);
   useEffect(() => {
-    setState({ spec: null, error: "" });
     if (!accountId || !instrumentId) return;
+    const key = `${accountId}|${instrumentId}`;
     let live = true;
     rest
       .get<GttSpec>(`/api/accounts/${encodeURIComponent(accountId)}/gtt-spec?instrument_id=${encodeURIComponent(instrumentId)}`)
-      .then((spec) => live && setState({ spec, error: "" }))
-      .catch((e: unknown) => live && setState({ spec: null, error: errorText(e) }));
+      .then((spec) => live && setState({ key, spec, error: "" }))
+      .catch((e: unknown) => live && setState({ key, spec: null, error: errorText(e) }));
     return () => {
       live = false;
     };
   }, [rest, accountId, instrumentId]);
-  return state;
+  return state && state.key === key ? state : { spec: null, error: "" };
 }
 
 export function GttBook({ params, publish }: WidgetProps<GttParams>) {
@@ -186,11 +188,13 @@ function GttLegsForm({ accountId, spec, defaultSide, defaultLots, onPlaced, onCa
 
   // start from the market once its price is known, and again when the kind or side changes
   const restart = (k: string, s: Side) => setLegs(defaultLegs(spec, k, ltp, s));
-  useEffect(() => {
-    if (ltp === null) return;
-    // decided on the newest legs, not this render's: what the trader typed is never overwritten
-    setLegs((old) => (old.every((l) => l.trigger === "") ? defaultLegs(spec, kind, ltp, side) : old));
-  }, [ltp, spec, kind, side]);
+  // (while drawing, when the price, the kind or the side changes: what the trader typed is
+  // never overwritten, only empty legs are filled)
+  const [basis, setBasis] = useState({ ltp, spec, kind, side });
+  if (basis.ltp !== ltp || basis.spec !== spec || basis.kind !== kind || basis.side !== side) {
+    setBasis({ ltp, spec, kind, side });
+    if (ltp !== null && legs.every((l) => l.trigger === "")) setLegs(defaultLegs(spec, kind, ltp, side));
+  }
 
   const setLeg = (i: number, field: "trigger" | "price", value: string) => setLegs((old) => old.map((l, n) => (n === i ? { ...l, [field]: value } : l)));
 

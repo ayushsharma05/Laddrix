@@ -201,7 +201,10 @@ function RunDetail({ run, publish, onChanged }: { run: BacktestRun; publish: (id
   const { rest } = useApp();
   const [stopping, setStopping] = useState(false);
   const [full, setFull] = useState<BacktestRun | null>(null);
-  const [day, setDay] = useState<string | null>(null);
+  // the day picked, kept with its run: another run starts with none picked
+  const [chosen, setChosen] = useState<{ run: string; day: string } | null>(null);
+  const day = chosen && chosen.run === run.run_id ? chosen.day : null;
+  const setDay = (d: string | null) => setChosen(d === null ? null : { run: run.run_id, day: d });
   const [error, setError] = useState<string | null>(null);
   const version = `${run.run_id}|${run.state}|${run.progress}`; // read again as the run moves on
 
@@ -220,7 +223,6 @@ function RunDetail({ run, publish, onChanged }: { run: BacktestRun; publish: (id
     };
   }, [rest, version, run.run_id]);
 
-  useEffect(() => setDay(null), [run.run_id]);
 
   const s = run.spec;
   const summary = full?.run_id === run.run_id ? full.summary : undefined;
@@ -430,7 +432,7 @@ function NewRun({ defaultInstrument, onStarted }: { defaultInstrument: string | 
   const [lots, setLots] = useState("1");
   const [product, setProduct] = useState("");
   const [candles, setCandles] = useState(false);
-  const [days, setDays] = useState<string[]>([]);
+  const [picked, setDays] = useState<string[]>([]); // as clicked; `days` below: those offered
   const [start, setStart] = useState("");
   const [capital, setCapital] = useState("");
   const [name, setName] = useState("");
@@ -455,9 +457,11 @@ function NewRun({ defaultInstrument, onStarted }: { defaultInstrument: string | 
     };
   }, [rest, instrumentId]);
 
-  // the first form: the server's defaults and its first algo (kept when the contract changes)
-  useEffect(() => {
-    if (!form || algo) return;
+  // the first form: the server's defaults and its first algo (kept when the contract changes);
+  // filled while drawing, once per form that arrives with no algo picked yet
+  const [filledFrom, setFilledFrom] = useState<typeof form>(null);
+  if (form && !algo && filledFrom !== form) {
+    setFilledFrom(form);
     const first = form.algos[0];
     if (first) {
       setAlgo(first.code);
@@ -466,11 +470,11 @@ function NewRun({ defaultInstrument, onStarted }: { defaultInstrument: string | 
     setStart(form.defaults.start);
     setCapital(rupeeText(form.defaults.capital_paise));
     setProduct(form.defaults.product);
-  }, [form, algo]);
+  }
 
   const offered = useMemo(() => offeredDays(form, candles), [form, candles]);
-  // days no longer offered (another instrument's candles) are dropped
-  useEffect(() => setDays((old) => (old.every((d) => offered.includes(d)) ? old : old.filter((d) => offered.includes(d)))), [offered]);
+  // days no longer offered (another instrument's candles) don't count
+  const days = useMemo(() => picked.filter((d) => offered.includes(d)), [picked, offered]);
 
   if (error && !form) return <div className="empty-note tone-bad">{error}</div>;
   if (form && !form.algos.length) return <div className="empty-note">This server offers no algos to backtest.</div>;

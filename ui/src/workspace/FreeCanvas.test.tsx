@@ -57,7 +57,7 @@ async function setup(windows = [start("a", 8, 8, 1), { ...start("b", 600, 1400, 
   const controller = new WorkspaceController({
     layouts: new LayoutStore(fakeRest({}).rest, null, "ayush"),
     buildDefault: () => {},
-    buildDefaultCanvas: () => windows,
+    buildDefaultCanvas: (page) => (page === "Main" ? windows : []), // as in the app: other pages start empty
     notify: () => {},
     setTimer: () => 0 as unknown as ReturnType<typeof setTimeout>,
     clearTimer: () => {},
@@ -139,6 +139,15 @@ describe("a free page", () => {
     fireEvent.doubleClick(title);
     expect(frame("Probe 1").className).toContain("maximized");
     fireEvent.doubleClick(title);
+    expect(frame("Probe 1").className).not.toContain("maximized");
+  });
+
+  it("a window that left the page doesn't come back maximized (another page, then back)", async () => {
+    const { frame, controller } = await setup();
+    fireEvent.doubleClick(frame("Probe 1").querySelector(".frame-title")!);
+    expect(frame("Probe 1").className).toContain("maximized");
+    await act(() => controller.addPage("Second")); // its windows go away with the page
+    await act(() => controller.switchTo(0)); // and come back, the same windows
     expect(frame("Probe 1").className).not.toContain("maximized");
   });
 

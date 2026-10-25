@@ -269,7 +269,7 @@ describe("Order ticket", () => {
         realised_paise: 0, unrealised_paise: 0, day_pnl_paise: 0, reconcile: { checked_at: null, ok: null, error: "", alerts: [] },
       });
     });
-    expect(screen.getByLabelText("Order summary").textContent).toContain("Worst position +300");
+    await vi.waitFor(() => expect(screen.getByLabelText("Order summary").textContent).toContain("Worst position +300"));
   });
 
   it("has Order | Algo | GTT tabs: Algo starts an algo here, GTT appears only when the broker holds GTTs", async () => {

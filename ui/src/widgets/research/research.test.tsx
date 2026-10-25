@@ -209,6 +209,24 @@ describe("Backtests", () => {
     expect(within(detail).queryByRole("region", { name: "Day 2026-10-14" })).toBeNull();
   });
 
+  it("another run starts with no day open, even one with the same days", async () => {
+    mount(<Backtests {...props()} />, {
+      "GET /api/research/backtests": [run("BT1"), run("BT2")],
+      "GET /api/research/backtests/BT1": run("BT1", { daily: DAILY }),
+      "GET /api/research/backtests/BT2": run("BT2", { daily: DAILY }),
+    });
+    const [first, second] = await screen.findAllByText("SLICER BUY 150 NIFTY26OCTFUT");
+    fireEvent.click(first!);
+    const detail = await screen.findByRole("region", { name: "Backtest BT1" });
+    const days = await within(detail).findByRole("grid", { name: "Backtest days" });
+    fireEvent.click(within(days).getAllByRole("row")[1]!);
+    expect(within(detail).getByRole("region", { name: "Day 2026-10-15" })).toBeTruthy();
+    fireEvent.click(second!);
+    const other = await screen.findByRole("region", { name: "Backtest BT2" });
+    await within(other).findByRole("grid", { name: "Backtest days" });
+    expect(within(other).queryByRole("region", { name: "Day 2026-10-15" })).toBeNull(); // BT1's pick stays with BT1
+  });
+
   it("the picked run is read again as it moves on, so its results appear when it finishes", async () => {
     let n = 0;
     const running = run("BT1", { state: "running", progress: 1, summary: undefined });

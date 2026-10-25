@@ -159,6 +159,24 @@ describe("Strategy builder", () => {
     });
   });
 
+  it("other legs never show the previous legs' analysis while theirs is asked", async () => {
+    const { rerender } = setup({ legs: [{ instrument_id: CE(25000), side: "BUY", lots: 1 }] });
+    await screen.findByLabelText("Strategy figures");
+    rerender({ legs: [{ instrument_id: CE(25200), side: "SELL", lots: 1 }] });
+    expect(screen.queryByLabelText("Strategy figures")).toBeNull(); // not the old legs' figures
+    await screen.findByLabelText("Strategy figures"); // then the new legs' own
+  });
+
+  it("a change after the check (here the price choice) needs a new check before anything is sent", async () => {
+    const { app } = setup({ legs: [{ instrument_id: CE(25000), side: "BUY", lots: 1 }, { instrument_id: CE(25200), side: "SELL", lots: 1 }] });
+    app.store.setStream("open");
+    await screen.findByLabelText("Strategy figures");
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+    await screen.findByRole("button", { name: "Send 2 orders" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Price" }), { target: { value: "mid" } });
+    expect(screen.queryByRole("button", { name: /^Send/ })).toBeNull(); // the check was for "touch"
+  });
+
   it("a leg that fails the check is named, and there is no Send", async () => {
     const { app } = setup({ legs: [{ instrument_id: CE(25200), side: "SELL", lots: 1 }] });
     app.store.setStream("open");

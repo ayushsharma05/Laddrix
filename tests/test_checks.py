@@ -56,6 +56,7 @@ def test_each_package_lints_its_own_code():
 
 def test_the_hooks_rules_are_errors_not_warnings():
     text = (ROOT / "ui/eslint.config.js").read_text()
+    assert "reactHooks.configs.flat.recommended.rules" in text  # with the compiler's rules (#450)
     assert '"react-hooks/rules-of-hooks": "error"' in text
     assert '"react-hooks/exhaustive-deps": "error"' in text  # the plugin's default is a warning
 

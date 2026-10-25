@@ -70,7 +70,8 @@ describe("the Autospreader", () => {
     const { socket } = setup([CAL]);
     expect(await screen.findByText("NIFTY Nov/Dec")).toBeTruthy();
     expect(screen.getByText("+1 NIFTY26NOVFUT −1 NIFTY26DECFUT")).toBeTruthy();
-    expect(socket().sent).toContainEqual({ op: "subscribe", instruments: ["SPREAD:s1"] });
+    // (sent from an effect: a moment after the row shows)
+    await vi.waitFor(() => expect(socket().sent).toContainEqual({ op: "subscribe", instruments: ["SPREAD:s1"] }));
     expect(screen.getByLabelText("NIFTY Nov/Dec bid").textContent).toBe("–"); // no price yet
     act(() => socket().receive({ type: "ticks", ticks: [tick("SPREAD:s1", -15000, { bids: [[-15200, 10, 0]], asks: [[-14900, 2, 0]] })] }));
     expect(screen.getByLabelText("NIFTY Nov/Dec bid").textContent).toBe("−152.00 (10)");

@@ -26,10 +26,11 @@ export function useMarginCheck(accountId: string | null, order: EstimateOrder): 
 
 function useEstimate<T>(accountId: string | null, path: string, order: EstimateOrder): T | null {
   const { rest } = useApp();
-  const [bill, setBill] = useState<T | null>(null);
   const { instrumentId, side, qty, pricePaise, product } = order;
+  // kept with the order it is for: never the charges of a different order
+  const key = JSON.stringify([accountId, path, instrumentId, side, qty, pricePaise, product]);
+  const [bill, setBill] = useState<{ key: string; bill: T } | null>(null);
   useEffect(() => {
-    setBill(null); // never show the charges of a different order
     if (!accountId || !qty || !pricePaise || pricePaise <= 0 || !product) return;
     let live = true;
     const timer = setTimeout(() => {
@@ -42,7 +43,7 @@ function useEstimate<T>(accountId: string | null, path: string, order: EstimateO
           product,
         })
         .then((b) => {
-          if (live) setBill(b);
+          if (live) setBill({ key, bill: b });
         })
         .catch(() => undefined); // a nicety: the order can still be sent
     }, ESTIMATE_DELAY_MS);
@@ -50,8 +51,8 @@ function useEstimate<T>(accountId: string | null, path: string, order: EstimateO
       live = false;
       clearTimeout(timer);
     };
-  }, [rest, accountId, path, instrumentId, side, qty, pricePaise, product]);
-  return bill;
+  }, [rest, key, accountId, path, instrumentId, side, qty, pricePaise, product]);
+  return bill && bill.key === key ? bill.bill : null;
 }
 
 /** "Brokerage 20.00 · STT 9.41 · …" for a tooltip (lines that cost something). */
