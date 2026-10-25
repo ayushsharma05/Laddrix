@@ -183,7 +183,7 @@ describe("Algo manager", () => {
     await vi.waitFor(() => expect(within(form).getByRole("alert").textContent).toContain("Slices must be at most 100"));
   });
 
-  it("a protection algo is marked as held by MockTrade", async () => {
+  it("a protection algo is marked as held by Laddrix", async () => {
     const trail = { code: "TRAILING_STOP", name: "Trailing stop", help: "", family: "protection", params: [] };
     const { app } = setup({ "GET /api/accounts/acc-a/algo-specs": [...SPECS, trail] });
     act(() => app.store.applyAlgos("acc-a", [algo("A0001", { code: "TRAILING_STOP" }), algo("A0002")]));

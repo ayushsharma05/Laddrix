@@ -124,7 +124,7 @@ export function SessionsDialog({ onClose }: { onClose: () => void }) {
 export function browserName(agent: string): string {
   if (!agent) return "unknown";
   const app = /Electron\//.test(agent)
-    ? "MockTrade desktop"
+    ? "Laddrix desktop"
     : /Edg\//.test(agent)
       ? "Edge"
       : /Firefox\//.test(agent)

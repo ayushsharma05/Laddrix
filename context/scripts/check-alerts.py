@@ -1,4 +1,4 @@
-"""#233: market alerts on a running demo (python -m mocktrade.tools.demo): the spec, an alert
+"""#233: market alerts on a running demo (python -m laddrix.tools.demo): the spec, an alert
 just above the live price that fires on the stream, one that is already true (and says so), a
 spread alert, the audit trail, and a real signed webhook to a public echo service (when the
 network allows it), its signature checked by recomputing it.
@@ -22,7 +22,7 @@ ECHO = sys.argv[1] if len(sys.argv) > 1 else "https://postman-echo.com/post"
 
 
 async def main() -> None:
-    code = subprocess.check_output(["python3", "-m", "mocktrade.tools.demo", "--code"]).decode().strip()
+    code = subprocess.check_output(["python3", "-m", "laddrix.tools.demo", "--code"]).decode().strip()
     async with httpx.AsyncClient(base_url=BASE, headers={"origin": BASE}, timeout=30) as c:
         (await c.post("/api/session", json={"username": "demo", "password": "demo-password-123", "code": code})).raise_for_status()
         spec = (await c.get("/api/alerts/spec")).json()
@@ -63,8 +63,8 @@ async def main() -> None:
             # send one more ourselves with the same signing, through the echo, and check it comes back intact
             body = json.dumps({"type": "check"}, separators=(",", ":")).encode()
             sig = "sha256=" + hmac.new(hook["secret"].encode(), b"1." + body, hashlib.sha256).hexdigest()
-            echoed = httpx.post(ECHO, content=body, headers={"content-type": "application/json", "x-mocktrade-timestamp": "1", "x-mocktrade-signature": sig}, timeout=15).json()
-            print("echo saw our signature header:", echoed["headers"].get("x-mocktrade-signature") == sig)
+            echoed = httpx.post(ECHO, content=body, headers={"content-type": "application/json", "x-laddrix-timestamp": "1", "x-laddrix-signature": sig}, timeout=15).json()
+            print("echo saw our signature header:", echoed["headers"].get("x-laddrix-signature") == sig)
         db = sqlite3.connect("data/demo/events.db")
         rows = db.execute("SELECT kind, detail FROM events WHERE kind LIKE 'ALERT_%' ORDER BY seq DESC LIMIT 6").fetchall()
         for kind, detail in reversed(rows):

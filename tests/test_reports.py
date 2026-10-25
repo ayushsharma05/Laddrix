@@ -16,17 +16,17 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from mocktrade.charges.model import ScheduleCharges, executed
-from mocktrade.charges.schedules import KITE_STANDARD
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-from mocktrade.domain.ticks import Tick
-from mocktrade.orders.model import EventKind, Fill, OrderEvent, OrderView, Pending
-from mocktrade.reports.daily import build_day, report_to_dict
-from mocktrade.reports.export import report_csv, report_lines, report_pdf, rupees
-from mocktrade.reports.history import pnl_history
-from mocktrade.reports.pdf import LINES_PER_PAGE
-from mocktrade.reports.store import ReportStore
-from mocktrade.store.events import EventLog
+from laddrix.charges.model import ScheduleCharges, executed
+from laddrix.charges.schedules import KITE_STANDARD
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.domain.ticks import Tick
+from laddrix.orders.model import EventKind, Fill, OrderEvent, OrderView, Pending
+from laddrix.reports.daily import build_day, report_to_dict
+from laddrix.reports.export import report_csv, report_lines, report_pdf, rupees
+from laddrix.reports.history import pnl_history
+from laddrix.reports.pdf import LINES_PER_PAGE
+from laddrix.reports.store import ReportStore
+from laddrix.store.events import EventLog
 
 IST = ZoneInfo("Asia/Kolkata")
 FUT = "NFO:NIFTY26OCTFUT"
@@ -76,7 +76,7 @@ async def log(tmp_path, nifty_fut):
     fill(events, "T1", Side.SELL, 150, 25100, at(TUE, 10),
          fills=[(75, 2510000), (75, 2510000)])  # fmt: skip  # two fills, one order
     rejected(events, "T2", at(TUE, 10, 5), "position limit: at most 20 lots")
-    events.record_note("POSITION_MISMATCH_RAISED", "acc", "MockTrade shows +150, the broker 0",
+    events.record_note("POSITION_MISMATCH_RAISED", "acc", "Laddrix shows +150, the broker 0",
                        ts=at(TUE, 10, 6))  # fmt: skip
     events.record_note("ALGO_STARTED", "acc", "not an alert", ts=at(TUE, 10, 7))
     await events.flush()
@@ -196,8 +196,8 @@ async def test_the_close_of_day_job_keeps_a_report_and_the_api_serves_it(tmp_pat
     from test_server import ORIGIN
     from test_server import World as ServerWorld
 
-    from mocktrade.reports.service import Reports
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.reports.service import Reports
+    from laddrix.server.app import ServerSettings, create_app
 
     w = ServerWorld(tmp_path, nifty_fut)
     store = ReportStore(tmp_path / "reports")
@@ -217,7 +217,7 @@ async def test_the_close_of_day_job_keeps_a_report_and_the_api_serves_it(tmp_pat
     assert r.status_code == 200 and r.json()["final"] is True
     csv_ = await c.get(f"/api/accounts/acc-ayush/reports/{today}?format=csv")
     assert csv_.headers["content-type"].startswith("text/csv")
-    assert f'filename="mocktrade-acc-ayush-{today}.csv"' in csv_.headers["content-disposition"]
+    assert f'filename="laddrix-acc-ayush-{today}.csv"' in csv_.headers["content-disposition"]
     pdf = await c.get(f"/api/accounts/acc-ayush/reports/{today}?format=pdf")
     assert pdf.headers["content-type"] == "application/pdf" and pdf.content.startswith(b"%PDF")
     assert (await c.get("/api/accounts/acc-ayush/reports/2099-01-01")).status_code == 422

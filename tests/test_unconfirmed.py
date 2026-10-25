@@ -8,12 +8,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.kite.orders import to_update
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
-from mocktrade.orders.manager import UNSEEN_AFTER, UNSEEN_CHECKS, OrderManager
-from mocktrade.orders.model import ClientIds, EventKind, OrderError, Pending
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.kite.orders import to_update
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
+from laddrix.orders.manager import UNSEEN_AFTER, UNSEEN_CHECKS, OrderManager
+from laddrix.orders.model import ClientIds, EventKind, OrderError, Pending
+from laddrix.refdata.store import InstrumentStore
 
 S = OrderStatus
 FUT = "NFO:NIFTY26OCTFUT"
@@ -212,7 +212,7 @@ async def test_a_person_settles_what_stays_unclear(world):
     await world.om.aclose()
 
 
-# --- a status the broker uses that MockTrade doesn't know ------------------------------------
+# --- a status the broker uses that Laddrix doesn't know ------------------------------------
 
 
 def kite_row(status, tag="MT1", order_id="250101"):
@@ -224,7 +224,7 @@ def test_an_unknown_kite_status_is_kept_as_proof_the_order_exists():
     update = to_update(kite_row("SOMETHING NEW"))
     assert (update.client_order_id, update.broker_order_id, update.status) == (
         "MT1", "250101", S.PENDING)  # fmt: skip
-    assert update.reason == "the broker reports a status MockTrade doesn't know: SOMETHING NEW"
+    assert update.reason == "the broker reports a status Laddrix doesn't know: SOMETHING NEW"
     assert "(none)" in to_update(kite_row("")).reason
 
 

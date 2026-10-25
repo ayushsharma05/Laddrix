@@ -5,8 +5,8 @@ day; acknowledge with a note, once; the auditor's export is risk-only); the test
 notice. Runs the tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-S = "src/mocktrade/risk/surveillance.py"
-ROUTES_RISK = "src/mocktrade/server/routes/risk.py"
+S = "src/laddrix/risk/surveillance.py"
+ROUTES_RISK = "src/laddrix/server/routes/risk.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_surveillance.py"]
 MUTANTS = [
  (S, "            if buy is None or sell is None or buy >= sell:", "            if True:"),

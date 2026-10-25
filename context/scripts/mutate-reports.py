@@ -2,9 +2,9 @@
 Restores each file in `finally`; a mutant that hangs the tests counts as caught.
 Run alone (two runs at once overwrite each other's files)."""
 import subprocess
-D, H, X = "src/mocktrade/reports/daily.py", "src/mocktrade/reports/history.py", "src/mocktrade/reports/export.py"
-P, S, E = "src/mocktrade/reports/pdf.py", "src/mocktrade/reports/store.py", "src/mocktrade/store/events.py"
-V = "src/mocktrade/reports/service.py"
+D, H, X = "src/laddrix/reports/daily.py", "src/laddrix/reports/history.py", "src/laddrix/reports/export.py"
+P, S, E = "src/laddrix/reports/pdf.py", "src/laddrix/reports/store.py", "src/laddrix/store/events.py"
+V = "src/laddrix/reports/service.py"
 M = [
  (D, "    before = [e for e in fills if e.ts < start]", "    before = [e for e in fills if e.ts <= start and False]"),
  (D, "        reference = tick.close_paise if tick and tick.close_paise else None", "        reference = tick.ltp_paise if tick else None"),

@@ -8,13 +8,13 @@ from zoneinfo import ZoneInfo
 import pytest
 from test_ticks_recorder import full
 
-from mocktrade.broker.paper import PaperBroker
-from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.research.replay import MAX_WAIT_S, TURNS, ReplayClock, ReplayFeed
-from mocktrade.research.ticks import FileTickStore
+from laddrix.broker.paper import PaperBroker
+from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.refdata.store import InstrumentStore
+from laddrix.research.replay import MAX_WAIT_S, TURNS, ReplayClock, ReplayFeed
+from laddrix.research.ticks import FileTickStore
 
 IST = ZoneInfo("Asia/Kolkata")
 FUT = "NFO:NIFTY26OCTFUT"
@@ -156,7 +156,7 @@ async def test_the_replay_api(tmp_path, nifty_fut):
     from test_server import ORIGIN
     from test_server import World as ServerWorld
 
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.server.app import ServerSettings, create_app
 
     w = ServerWorld(tmp_path, nifty_fut)
     c = await w.logged_in()
@@ -187,13 +187,13 @@ async def test_the_replay_api(tmp_path, nifty_fut):
 
 
 async def test_the_demo_refuses_a_day_that_was_not_recorded(tmp_path, monkeypatch):
-    from mocktrade.tools import demo
+    from laddrix.tools import demo
 
     monkeypatch.setattr(demo, "REPLAYS", tmp_path / "replay")
     with pytest.raises(SystemExit, match="nothing recorded on 2026-10-16"):
         await demo.main(8999, "http://localhost:8999", None, replay_day=T0.date(),
                         ticks_dir=tmp_path / "none")  # fmt: skip
-    from mocktrade.ops.alerts import Alerts
+    from laddrix.ops.alerts import Alerts
 
     alerts = Alerts()
     demo._replay_band(alerts, {"day": "2026-10-16", "state": "playing", "speed": 0})

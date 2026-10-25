@@ -1,5 +1,5 @@
 // Funds: what the account can still use, what is blocked, and why, per segment, as the broker
-// reports it (paper: worked out by MockTrade, marked "estimate").
+// reports it (paper: worked out by Laddrix, marked "estimate").
 //
 //   EQUITY                                   as of 10:31:05  ↻
 //   Available  ₹9,72,505.05     Used ₹27,494.95     Opening ₹10,00,000.00
@@ -35,7 +35,7 @@ export function FundsPanel(_props: WidgetProps) {
             <h3>
               {f.segment.toUpperCase()}
               {f.estimate && (
-                <span className="algo-family" title="Paper money: worked out by MockTrade with plain margin rates, not a broker's figures">
+                <span className="algo-family" title="Paper money: worked out by Laddrix with plain margin rates, not a broker's figures">
                   estimate
                 </span>
               )}

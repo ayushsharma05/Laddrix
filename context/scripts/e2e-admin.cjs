@@ -19,7 +19,7 @@ const shots = '/tmp/claude-0';
   await admin.goto('http://localhost:8000/');
   await admin.getByLabel('Username').fill('demo');
   await admin.getByLabel('Password').fill('demo-password-123');
-  await admin.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
+  await admin.getByLabel('Authenticator code').fill(execSync('python3 -m laddrix.tools.demo --code').toString().trim());
   await admin.keyboard.press('Enter');
   await admin.locator('section.frame').first().waitFor({ timeout: 20000 });
   const api = (page, m, p, b) => page.evaluate(async ([m, p, b]) => {
@@ -56,7 +56,7 @@ const shots = '/tmp/claude-0';
   await them.getByLabel('Password').fill(temp);
   await them.getByLabel('Authenticator code').fill(totp(key));
   await them.keyboard.press('Enter');
-  await them.getByText('MockTrade · Set your password').waitFor({ timeout: 10000 });
+  await them.getByText('Laddrix · Set your password').waitFor({ timeout: 10000 });
   console.log('their page:', flat(await them.locator('.window-bar').textContent()), '| terminal shown:', await them.getByRole('button', { name: 'Widgets ▾' }).count());
   await them.getByLabel('One-time password').fill(temp);
   await them.getByLabel('New password', { exact: true }).fill('short');

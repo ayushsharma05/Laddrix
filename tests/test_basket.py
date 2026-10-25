@@ -7,13 +7,13 @@ from datetime import date
 import httpx
 import pytest
 
-from mocktrade.broker.base import BasketMargin
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.kite.broker import KiteBroker
-from mocktrade.broker.kite.http import KiteHttp
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.orders import (
+from laddrix.broker.base import BasketMargin
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.kite.broker import KiteBroker
+from laddrix.broker.kite.http import KiteHttp
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.orders import (
     OrderRequest,
     OrderStatus,
     OrderType,
@@ -21,15 +21,15 @@ from mocktrade.domain.orders import (
     Product,
     Side,
 )
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders.basket import BasketError, LegIn
-from mocktrade.orders.model import ClientIds
-from mocktrade.platform import Platform
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.risk.limits import RiskLimits
-from mocktrade.store.events import EventLog
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.orders.basket import BasketError, LegIn
+from laddrix.orders.model import ClientIds
+from laddrix.platform import Platform
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.limits import RiskLimits
+from laddrix.store.events import EventLog
 
 K = InstrumentKind
 EXP = date(2026, 10, 27)
@@ -335,7 +335,7 @@ async def test_selling_the_long_that_protects_a_short_is_refused(tmp_path):
 
 
 async def test_growing_a_covered_short_past_its_cover_is_refused(tmp_path):
-    from mocktrade.orders.model import OrderError
+    from laddrix.orders.model import OrderError
 
     runtime, broker, log = world(tmp_path)
     hold(runtime, {opt(25100, K.CALL).id: 75})

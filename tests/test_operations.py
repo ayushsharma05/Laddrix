@@ -20,18 +20,18 @@ import pytest
 from test_order_manager import req
 from test_server import ORIGIN, World
 
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.logsafe import Redact
-from mocktrade.ops import logs
-from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.status import Status, worst
-from mocktrade.ops.supervisor import Supervisor
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds
-from mocktrade.recovery import RecoveryGate
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.server.app import ServerSettings, create_app
-from mocktrade.tools.serve import ConfigError, ServeSettings
+from laddrix.broker.fake import FakeBroker
+from laddrix.logsafe import Redact
+from laddrix.ops import logs
+from laddrix.ops.alerts import Alerts
+from laddrix.ops.status import Status, worst
+from laddrix.ops.supervisor import Supervisor
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds
+from laddrix.recovery import RecoveryGate
+from laddrix.refdata.store import InstrumentStore
+from laddrix.server.app import ServerSettings, create_app
+from laddrix.tools.serve import ConfigError, ServeSettings
 
 T0 = datetime(2026, 10, 24, 4, 0, tzinfo=UTC)
 KEY = "k" * 40
@@ -53,7 +53,7 @@ def captured():
 
 
 def test_a_line_carries_the_ids_bound_while_it_was_logged(captured):
-    log = logging.getLogger("mocktrade.test")
+    log = logging.getLogger("laddrix.test")
     with logs.bound(account_id="acc-1", client_order_id="MT7", broker_order_id=None):
         log.warning("place %s: no answer", "MT7")
     log.info("after", extra={"user": "ayush"})
@@ -61,7 +61,7 @@ def test_a_line_carries_the_ids_bound_while_it_was_logged(captured):
     assert first["msg"] == "place MT7: no answer" and first["level"] == "WARNING"
     assert (first["account_id"], first["client_order_id"]) == ("acc-1", "MT7")
     assert "broker_order_id" not in first  # None is left out, not written as null
-    assert first["logger"] == "mocktrade.test" and first["ts"].endswith("Z")
+    assert first["logger"] == "laddrix.test" and first["ts"].endswith("Z")
     assert "account_id" not in second and second["user"] == "ayush"  # unbound after the block
 
 
@@ -69,7 +69,7 @@ def test_an_error_keeps_its_traceback_and_secrets_stay_hidden(captured):
     try:
         raise ValueError("bad https://hooks.example.com/services/T0/B0/secretpart")
     except ValueError:
-        logging.getLogger("mocktrade.test").exception("login with password=hunter2 failed")
+        logging.getLogger("laddrix.test").exception("login with password=hunter2 failed")
     (line,) = captured()
     assert "hunter2" not in json.dumps(line) and "secretpart" not in json.dumps(line)
     assert "password=[redacted]" in line["msg"] and "ValueError" in line["error"]
@@ -100,19 +100,19 @@ async def test_an_orders_log_lines_carry_its_account_and_id(captured, nifty_fut)
 
 
 def test_the_log_format_setting(tmp_path):
-    env = {"MOCKTRADE_SECRET_KEY": _key(), "MOCKTRADE_ORIGIN": "https://t.example.in"}
+    env = {"LADDRIX_SECRET_KEY": _key(), "LADDRIX_ORIGIN": "https://t.example.in"}
     assert ServeSettings.from_env(env).log_format == "json"  # the default
-    assert ServeSettings.from_env({**env, "MOCKTRADE_LOG_FORMAT": "text"}).log_format == "text"
-    with pytest.raises(ConfigError, match="MOCKTRADE_LOG_FORMAT must be json or text"):
-        ServeSettings.from_env({**env, "MOCKTRADE_LOG_FORMAT": "xml"})
-    with pytest.raises(ConfigError, match="MOCKTRADE_METRICS_TOKEN must be at least 32"):
-        ServeSettings.from_env({**env, "MOCKTRADE_METRICS_TOKEN": "short"})
-    made = ServeSettings.from_env({**env, "MOCKTRADE_METRICS_TOKEN": KEY})
+    assert ServeSettings.from_env({**env, "LADDRIX_LOG_FORMAT": "text"}).log_format == "text"
+    with pytest.raises(ConfigError, match="LADDRIX_LOG_FORMAT must be json or text"):
+        ServeSettings.from_env({**env, "LADDRIX_LOG_FORMAT": "xml"})
+    with pytest.raises(ConfigError, match="LADDRIX_METRICS_TOKEN must be at least 32"):
+        ServeSettings.from_env({**env, "LADDRIX_METRICS_TOKEN": "short"})
+    made = ServeSettings.from_env({**env, "LADDRIX_METRICS_TOKEN": KEY})
     assert made.metrics_token == KEY and KEY not in repr(made)
 
 
 def _key():
-    from mocktrade.server.security import SecretBox
+    from laddrix.server.security import SecretBox
 
     return SecretBox.new_key()
 
@@ -293,7 +293,7 @@ async def test_ready_counts_whats_in_the_way_and_the_status_page_says_what(ops):
 
 
 async def test_every_answer_names_its_request_and_errors_are_counted(ops):
-    from mocktrade.metrics import METRICS
+    from laddrix.metrics import METRICS
 
     c = ops.client()
     r = await c.get("/api/health", headers={"X-Request-ID": "support-42"})
@@ -310,8 +310,8 @@ async def test_the_monitoring_key_reads_the_prometheus_text_and_nothing_else(ops
     c = ops.client()
     key = {"Authorization": f"Bearer {KEY}"}
     r = await c.get("/api/metrics", params={"format": "prometheus"}, headers=key)
-    assert r.status_code == 200 and "# TYPE mocktrade_ready gauge" in r.text
-    assert 'mocktrade_ops_alerts{level="ERROR"} 0' in r.text
+    assert r.status_code == 200 and "# TYPE laddrix_ready gauge" in r.text
+    assert 'laddrix_ops_alerts{level="ERROR"} 0' in r.text
     assert (await c.get("/api/metrics", headers=key)).status_code == 401  # JSON: sign in
     wrong = {"Authorization": f"Bearer {KEY[:-1]}x"}
     r = await c.get("/api/metrics", params={"format": "prometheus"}, headers=wrong)

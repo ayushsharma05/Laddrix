@@ -10,7 +10,7 @@ import { FreeCanvas } from "./FreeCanvas";
 import { ControllerContext, WidgetTab, panelFor } from "./Panel";
 import { allWidgets } from "./registry";
 
-const theme: DockviewTheme = { name: "mocktrade", className: "dockview-theme-mocktrade", gap: 4 };
+const theme: DockviewTheme = { name: "laddrix", className: "dockview-theme-laddrix", gap: 4 };
 
 export function Workspace({ controller, footer }: { controller: WorkspaceController; footer?: ReactNode }) {
   useSyncExternalStore(controller.subscribe, controller.getVersion);

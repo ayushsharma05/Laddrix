@@ -42,7 +42,7 @@ Imagine one giant fruit stall where everyone in India buys and sells mangoes.
 ```
 
 **Zerodha** is our broker. **Kite Connect** is the door Zerodha gives to programs (like
-MockTrade) instead of people. Through it a program can:
+Laddrix) instead of people. Through it a program can:
 - **hear prices** as they change (a "WebSocket": a phone line that stays open and keeps talking);
 - **send orders** and hear what happened to them (a "REST API": you ask, it answers once).
 
@@ -109,12 +109,12 @@ what you sold.
 
 A program can send orders much faster than a person, and so it can make mistakes much faster too.
 A bug can turn a ₹1,500 loss into a ₹1,50,000 loss in a second. That's why so much of
-MockTrade is checks, limits and "what if the line goes dead?" The safety parts get their own
+Laddrix is checks, limits and "what if the line goes dead?" The safety parts get their own
 chapter, [Chapter 5](05-safety.md).
 
 ## 1.7 Paper trading: a practice stall
 
-MockTrade has a **paper broker**: a pretend broker inside MockTrade. It hears the real prices, but
+Laddrix has a **paper broker**: a pretend broker inside Laddrix. It hears the real prices, but
 fills your orders in pretend money. You can learn and test with zero risk.
 
 ```

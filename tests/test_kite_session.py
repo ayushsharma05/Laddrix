@@ -8,8 +8,8 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import pytest
 
-from mocktrade.broker.kite.http import KiteHttp
-from mocktrade.broker.kite.session import (
+from laddrix.broker.kite.http import KiteHttp
+from laddrix.broker.kite.session import (
     checksum,
     create_session,
     login_url,
@@ -33,7 +33,7 @@ def test_login_url_carries_version_key_and_state():
 
 
 def test_request_token_is_read_from_the_redirect():
-    url = "https://mocktrade.example/kite/callback?action=login&status=success&request_token=XYZ"
+    url = "https://laddrix.example/kite/callback?action=login&status=success&request_token=XYZ"
     assert request_token_from_redirect(url) == "XYZ"
 
 

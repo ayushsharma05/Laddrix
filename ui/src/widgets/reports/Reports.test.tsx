@@ -47,7 +47,7 @@ const TUE: DayReport = {
   ],
   trades: [{ ts: "2026-10-13T04:30:00+00:00", client_order_id: "T1", instrument_id: FUT, side: "SELL", product: "NRML", qty: 150, price_paise: 2510000, value_paise: 376500000, strategy: "manual" }],
   rejects: [{ ts: "2026-10-13T04:35:00+00:00", detail: "T2 BUY 750 NFO:NIFTY26OCTFUT: position limit" }],
-  alerts: [{ ts: "2026-10-13T04:36:00+00:00", kind: "POSITION_MISMATCH_RAISED", detail: "MockTrade shows +150, the broker 0" }],
+  alerts: [{ ts: "2026-10-13T04:36:00+00:00", kind: "POSITION_MISMATCH_RAISED", detail: "Laddrix shows +150, the broker 0" }],
 };
 const TODAY: DayReport = { ...TUE, day: "2026-10-15", final: false, totals: { ...TUE.totals, gross_paise: 0, net_paise: 0 }, positions: [], strategies: [], trades: [], rejects: [], alerts: [] };
 const HISTORY: PnlHistory = {

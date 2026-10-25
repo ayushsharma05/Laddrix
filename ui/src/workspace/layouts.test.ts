@@ -75,7 +75,7 @@ describe("LayoutStore", () => {
     const server = layoutServer();
     const storage = new MemoryStorage();
     server.saved.set(CURRENT, { version: 2, pages: [] });
-    storage.setItem("mocktrade.layout.ayush.current", "{not json");
+    storage.setItem("laddrix.layout.ayush.current", "{not json");
     await expect(new LayoutStore(server.rest, storage, "ayush").load(CURRENT)).resolves.toBeNull();
   });
 

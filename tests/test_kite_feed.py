@@ -4,10 +4,10 @@ never a crash.
 
 import pytest
 
-from mocktrade.broker.kite.decoder import KiteTick
-from mocktrade.broker.kite.feed import KiteFeed
-from mocktrade.marketdata.service import MarketData
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.broker.kite.decoder import KiteTick
+from laddrix.broker.kite.feed import KiteFeed
+from laddrix.marketdata.service import MarketData
+from laddrix.refdata.store import InstrumentStore
 
 
 @pytest.fixture

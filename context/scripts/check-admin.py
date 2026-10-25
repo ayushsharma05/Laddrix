@@ -1,4 +1,4 @@
-"""#281: the admin API on a running demo (python -m mocktrade.tools.demo). As the demo admin:
+"""#281: the admin API on a running demo (python -m laddrix.tools.demo). As the demo admin:
 add a user, who logs in with the one-time password and must set their own first; add a paper
 account for them, which runs at once and takes their order; tighten a limit (a preview first,
 then for real) that their next order meets; turn the account off (opening refused, cancel
@@ -25,7 +25,7 @@ STATE = Path("/tmp/claude-0/check-admin.json")  # what the restart check looks f
 
 
 def demo_code() -> str:
-    return subprocess.check_output(["python3", "-m", "mocktrade.tools.demo", "--code"]).decode().strip()
+    return subprocess.check_output(["python3", "-m", "laddrix.tools.demo", "--code"]).decode().strip()
 
 
 async def admin() -> httpx.AsyncClient:

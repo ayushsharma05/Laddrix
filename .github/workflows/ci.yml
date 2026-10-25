@@ -67,13 +67,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: shellcheck deploy/*.sh
-      - run: docker build -t mocktrade:ci .
+      - run: docker build -t laddrix:ci .
       - name: compose file is valid
         run: |
-          printf 'MOCKTRADE_DOMAIN=localhost\nMOCKTRADE_SECRET_KEY=placeholder\n' > deploy/.env
+          printf 'LADDRIX_DOMAIN=localhost\nLADDRIX_SECRET_KEY=placeholder\n' > deploy/.env
           docker compose -f deploy/compose.yaml config --quiet
       - name: image starts locked down, answers, and stops cleanly
-        run: deploy/smoke.sh mocktrade:ci
+        run: deploy/smoke.sh laddrix:ci
 
   supply-chain:
     # #365: known vulnerabilities in what we ship, secrets in the history, and the SBOMs
@@ -103,10 +103,10 @@ jobs:
       - name: SBOMs (CycloneDX) of the server, the screens and the desktop app
         run: |
           mkdir sbom
-          cyclonedx-py requirements requirements.lock --output-format JSON -o sbom/mocktrade-server.cdx.json
-          (cd ui && npm ci --no-audit --no-fund && npm sbom --sbom-format cyclonedx --omit dev) > sbom/mocktrade-screens.cdx.json
+          cyclonedx-py requirements requirements.lock --output-format JSON -o sbom/laddrix-server.cdx.json
+          (cd ui && npm ci --no-audit --no-fund && npm sbom --sbom-format cyclonedx --omit dev) > sbom/laddrix-screens.cdx.json
           # all of it: Electron (a dev dependency to npm) is inside the installer
-          (cd ui/desktop && npm ci --no-audit --no-fund && npm sbom --sbom-format cyclonedx) > sbom/mocktrade-desktop.cdx.json
+          (cd ui/desktop && npm ci --no-audit --no-fund && npm sbom --sbom-format cyclonedx) > sbom/laddrix-desktop.cdx.json
       - uses: actions/upload-artifact@v4
         with:
           # a release: sbom-vX.Y.Z; otherwise the commit (a PR's ref has a '/', not allowed here)

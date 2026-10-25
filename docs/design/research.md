@@ -8,10 +8,10 @@ feed ─► MarketData.on_tick ─► subscribers (screens, algos, positions)
 every 1 s, in a worker thread ─► FileTickStore.append(batch)
     <data>/ticks/<YYYY-MM-DD>/<segment>.ticks.gz   one gzip member per flush, India day
     <data>/ticks/<YYYY-MM-DD>/index.json           ticks per instrument
-16:30 IST daily ─► rotate(): keep the newest MOCKTRADE_RECORD_DAYS days (default 30; 0 = off)
+16:30 IST daily ─► rotate(): keep the newest LADDRIX_RECORD_DAYS days (default 30; 0 = off)
 ```
 
-- **What is recorded:** every tick MockTrade receives, exactly as `MarketData` saw it, with every
+- **What is recorded:** every tick Laddrix receives, exactly as `MarketData` saw it, with every
   field (depth, volume, OI, both times) and the moment it was recorded. The feed only streams
   watched instruments (screens, algos, positions), so that is what gets recorded. To always
   record more, the recorder takes a `record(instrument_id)` choice.
@@ -27,7 +27,7 @@ every 1 s, in a worker thread ─► FileTickStore.append(batch)
   - at about one tick a second for a 6¼-hour session, that is **≈ 2 MB per instrument-day**;
   - for 100 instruments, about 195 MB a day and about 6 GB for 30 days.
 
-  Choose `MOCKTRADE_RECORD_DAYS` for your disk; the disk check warns before it fills.
+  Choose `LADDRIX_RECORD_DAYS` for your disk; the disk check warns before it fills.
 - **Reading speed:** about 43,000 ticks a second, decoding every field. A 100-instrument day
   (≈ 2.25 M ticks) reads in under a minute: fine for replay (K11.2) and backtests (K11.3).
 
@@ -43,8 +43,8 @@ every 1 s, in a worker thread ─► FileTickStore.append(batch)
 ## K11.2 Replay a recorded day into paper trading (#224)
 
 ```
-python -m mocktrade.tools.demo --replay 2026-10-16 [--ticks data/demo/ticks] [--speed 10] --port 8001
-python -m mocktrade.tools.demo --replay 2026-10-16 --code        # its login code
+python -m laddrix.tools.demo --replay 2026-10-16 [--ticks data/demo/ticks] [--speed 10] --port 8001
+python -m laddrix.tools.demo --replay 2026-10-16 --code        # its login code
 
 FileTickStore.read_timed(day) ─► ReplayFeed ─► ReplayClock.now = the tick's recorded time
                                             ─► MarketData.on_tick ─► paper broker, algos, screens
@@ -249,7 +249,7 @@ Checks:
 
 - **What is saved:** `<day>/instruments.json` holds, for each instrument recorded that day: exchange, symbol, kind, tick, lot, expiry, strike and underlying (`instrument_record()` in `refdata/store.py`). Each instrument is described once a day, before its first ticks are written, so a crash can't leave ticks nobody can describe.
 - **After a restart:** the list on disk is added to, not replaced. An instrument the master doesn't know yet is left out and asked about again later.
-- **Replaying** (`python -m mocktrade.tools.demo --replay <day> --ticks <folder>`):
+- **Replaying** (`python -m laddrix.tools.demo --replay <day> --ticks <folder>`):
   - The server is built from the day's own list (`replay_instruments()` in `research/replay.py`). It needs no broker login and no live list.
   - Days recorded before this change have no list. They still replay if every instrument is one of the demo's own.
   - Otherwise the replay refuses to start, naming the day and the instruments with no details (the first five, then "and N more"), and creates nothing. Refusing is better than trading prices you can't place orders on.

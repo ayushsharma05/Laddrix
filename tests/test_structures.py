@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 from test_autospreader import AYUSH, NOV, OCT, W
 
-from mocktrade.domain.orders import (
+from laddrix.domain.orders import (
     OrderRequest,
     OrderStatus,
     OrderType,
@@ -22,8 +22,8 @@ from mocktrade.domain.orders import (
     Product,
     Side,
 )
-from mocktrade.orders.model import EventKind
-from mocktrade.structures.book import StructureBook, StructureError, StructureLeg
+from laddrix.orders.model import EventKind
+from laddrix.structures.book import StructureBook, StructureError, StructureLeg
 
 CALENDAR = [StructureLeg(OCT, 1, 1), StructureLeg(NOV, -1, -1)]
 
@@ -232,7 +232,7 @@ def test_a_structure_needs_a_name_and_legs(w):
 async def test_structures_come_back_after_a_restart(tmp_path, nifty_fut):
     from test_algo_restore import Server, as_broker_lists
 
-    from mocktrade.broker.fake import FakeBroker
+    from laddrix.broker.fake import FakeBroker
 
     s = Server(tmp_path, nifty_fut, FakeBroker())
     await s.ready()

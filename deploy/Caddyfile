@@ -1,4 +1,4 @@
-# HTTPS in front of MockTrade. Caddy gets and renews the certificate for MOCKTRADE_DOMAIN
+# HTTPS in front of Laddrix. Caddy gets and renews the certificate for LADDRIX_DOMAIN
 # by itself (Let's Encrypt; for "localhost" it uses its own local authority).
 {
 	servers {
@@ -9,7 +9,7 @@
 	}
 }
 
-{$MOCKTRADE_DOMAIN} {
+{$LADDRIX_DOMAIN} {
 	encode zstd gzip
 	header -Server
 

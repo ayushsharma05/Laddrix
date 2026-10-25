@@ -4,10 +4,10 @@ open streams closed within seconds, backups hold no session); the tests must not
 tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-U = "src/mocktrade/server/users.py"
-T = "src/mocktrade/tools/users.py"
-S = "src/mocktrade/server/stream.py"
-B = "src/mocktrade/tools/backup.py"
+U = "src/laddrix/server/users.py"
+T = "src/laddrix/tools/users.py"
+S = "src/laddrix/server/stream.py"
+B = "src/laddrix/tools/backup.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_key_rotation.py"]
 MUTANTS = [
  (U, "            db.executemany(\"UPDATE users SET totp_secret = ? WHERE id = ?\", sealed)", "            pass"),
@@ -16,7 +16,7 @@ MUTANTS = [
  (U, "                return db.execute(\"DELETE FROM sessions\").rowcount", "                return 0"),
  (U, "            return db.execute(\"DELETE FROM sessions WHERE user_id = ?\", (user_id,)).rowcount", "            return db.execute(\"DELETE FROM sessions\").rowcount"),
  (U, "                bad.append(row[\"id\"])", "                pass"),
- (T, "    if new == env.get(\"MOCKTRADE_SECRET_KEY\"):", "    if False:"),
+ (T, "    if new == env.get(\"LADDRIX_SECRET_KEY\"):", "    if False:"),
  (T, '    fence = DataFence(store.path.parent)  # the server holds this while it runs (#273)\n    try:\n        fence.acquire()', '    fence = DataFence(store.path.parent)  # the server holds this while it runs (#273)\n    try:\n        pass'),
  (T, "    if check:\n", "    if False:\n"),
  (T, "    if bad := store.check_key():", "    if False:"),

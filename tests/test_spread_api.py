@@ -7,11 +7,11 @@ from datetime import date
 from test_server import ORIGIN, World
 from test_stream import Live, next_of
 
-from mocktrade.algos.autospreader import algo_type as ase_type
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.server.app import ServerSettings, create_app
-from mocktrade.spreads.store import SpreadBook
+from laddrix.algos.autospreader import algo_type as ase_type
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.server.app import ServerSettings, create_app
+from laddrix.spreads.store import SpreadBook
 
 FUT = "NFO:NIFTY26OCTFUT"
 NOV = "NFO:NIFTY26NOVFUT"

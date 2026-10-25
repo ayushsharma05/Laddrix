@@ -8,7 +8,7 @@
 
 ```
  ┌───────────────────────────────────────────────────────────────────────────────┐
- │ MockTrade   Account [acc-paper ▾]                       Theme · you · Log out │ ← top
+ │ Laddrix   Account [acc-paper ▾]                       Theme · you · Log out │ ← top
  │ [Widgets ▾] [Search /]     ● Server ● Prices ● Recon   Day ₹0  10:14  [STOP]  │ ← toolbar
  │ ▓▓ red/yellow bands: only when something needs you (STOP, alerts, old prices) │ ← bands
  ├──────────────┬────────────────────┬──────────────────┬────────────────────────┤

@@ -9,9 +9,9 @@ from test_backtest import DAY, MODEL, day_ticks
 from test_server import ORIGIN
 from test_server import World as ServerWorld
 
-from mocktrade.ops.alerts import Alerts, alert_to_dict
-from mocktrade.research.backtest import Backtests, CandleStore
-from mocktrade.server.app import ServerSettings, create_app
+from laddrix.ops.alerts import Alerts, alert_to_dict
+from laddrix.research.backtest import Backtests, CandleStore
+from laddrix.server.app import ServerSettings, create_app
 
 
 async def test_backtests_are_their_owners_and_an_admin_sees_all(tmp_path, nifty_fut):
@@ -58,7 +58,7 @@ async def test_the_shared_candle_dataset_is_imported_by_admins_only(tmp_path, ni
 
 
 def test_backtests_kept_from_before_have_no_owner_and_only_admins_see_them(tmp_path):
-    from mocktrade.research.backtest import BacktestSpec, Run
+    from laddrix.research.backtest import BacktestSpec, Run
 
     old = Run("BT1", BacktestSpec(("2026-10-16",), "SLICER", "X", "BUY", 75, {}), False)
     assert old.owner == "" and not old.may_see("riya", admin=False) and old.may_see("a", True)
@@ -88,7 +88,7 @@ def test_the_kite_login_reminder_belongs_to_its_account():
 def test_a_lost_stop_band_belongs_to_its_account():
     from test_protection_guard import FUT, algo, setup
 
-    from mocktrade.algos.engine import AlgoState
+    from laddrix.algos.engine import AlgoState
 
     p, alerts, _ = setup()
     p.accounts["acc"].positions.net[FUT] = 75
@@ -101,9 +101,9 @@ async def test_mtm_and_square_off_bands_belong_to_their_account(nifty_fut, tmp_p
     from test_mtm import Clock, move
     from test_portfolio import FUT, Paper
 
-    from mocktrade.domain.orders import Product
-    from mocktrade.ops.guards import DayGuards
-    from mocktrade.risk.mtm import PositionRule
+    from laddrix.domain.orders import Product
+    from laddrix.ops.guards import DayGuards
+    from laddrix.risk.mtm import PositionRule
 
     clock = Clock(15, 5)
     p = Paper(nifty_fut, tmp_path, clock=clock)
@@ -121,7 +121,7 @@ async def test_mtm_and_square_off_bands_belong_to_their_account(nifty_fut, tmp_p
 
 
 def test_a_failed_restart_band_belongs_to_its_account():
-    from mocktrade.tools.serve import _recovery_alert
+    from laddrix.tools.serve import _recovery_alert
 
     alerts = Alerts()
     _recovery_alert(alerts, "acc-riya", "failed", "the broker can't be reached")

@@ -6,7 +6,7 @@ Issue #275. Code: `orders/manager.py` (`_filled_value`, `_fill_from`), `broker/k
 ## The problem it fixes
 
 Kite tells us an order's **average price**, not each fill's price, and the average has
-fractions of a paisa (₹25,010.0333…). MockTrade used to round it to whole paise and then
+fractions of a paisa (₹25,010.0333…). Laddrix used to round it to whole paise and then
 work out each new fill's price from the rounded averages:
 
 ```
@@ -67,7 +67,7 @@ Charges are worked out on the exact value, again after a correction. The daily r
 fills and corrections from the audit trail, so it agrees with positions. Runbook:
 [incidents.md](../runbooks/incidents.md#an-orders-fills-dont-match-the-brokers-trades-352).
 
-## Trades made outside MockTrade (#355)
+## Trades made outside Laddrix (#355)
 
 A trade made in the broker's own app moves the broker's position, not ours: reconciling
 raises a mismatch. `positions/external.py` resolves it, never by setting our number to the

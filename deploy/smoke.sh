@@ -2,16 +2,16 @@
 # Smoke test of a built image: starts it locked down (read-only, no capabilities), checks
 # that it becomes healthy (= ready, #287), answers and serves the screens, logs JSON lines,
 # then stops it and expects a clean exit 0.
-#   deploy/smoke.sh [image]        (default mocktrade:ci; used by CI)
+#   deploy/smoke.sh [image]        (default laddrix:ci; used by CI)
 set -euo pipefail
-IMAGE=${1:-mocktrade:ci}
+IMAGE=${1:-laddrix:ci}
 # whole outputs are read before filtering: `cmd | head`/`grep -q` can stop reading early,
 # and with pipefail the writer's "broken pipe" would fail the script at random
-out=$(docker run --rm "$IMAGE" python -m mocktrade.tools.users new-key)
+out=$(docker run --rm "$IMAGE" python -m laddrix.tools.users new-key)
 key=$(printf '%s\n' "$out" | sed -n '1s/^[^=]*=//p')
 docker rm -f mt >/dev/null 2>&1 || true
 docker run -d --name mt --read-only --tmpfs /tmp --cap-drop ALL \
-  -e MOCKTRADE_SECRET_KEY="$key" -e MOCKTRADE_ORIGIN=https://localhost -p 8000:8000 "$IMAGE"
+  -e LADDRIX_SECRET_KEY="$key" -e LADDRIX_ORIGIN=https://localhost -p 8000:8000 "$IMAGE"
 for _ in $(seq 1 30); do [ "$(docker inspect -f '{{.State.Health.Status}}' mt)" = healthy ] && break; sleep 1; done
 docker inspect -f 'health={{.State.Health.Status}}' mt
 curl -fsS --noproxy '*' localhost:8000/api/health; echo

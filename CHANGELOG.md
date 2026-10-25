@@ -23,7 +23,7 @@ The production-hardening pass (#257) and the security gate (#279). Each item's P
   - backups of all state, and a proven restore (#272);
   - critical loops supervised, and one trading server per data folder (#273);
   - exact fill economics and broker corrections (#275, #352);
-  - broker-held triggers and trades made outside MockTrade (#276, #355);
+  - broker-held triggers and trades made outside Laddrix (#276, #355);
   - F&O expiry day (#290);
   - surveillance alerts and the SEBI algo id (#291).
 - **Security:**
@@ -44,7 +44,7 @@ The production-hardening pass (#257) and the security gate (#279). Each item's P
 - **Autospreader, part 1 (#414):** multi-leg spread definitions (2 to 6 legs, ratios, price multipliers, a quoting leg, pay-up) and their live implied bid and ask, priced from each trader's own leg prices; the Autospreader widget. Execution (#415) and the spread ladder (#416) follow.
 - **Autospreader, part 3 (#416): the spread ladder.** The normal ladder on a spread's implied prices: a click buys or sells spread lots (the ASE algo works the legs), Work shows and cancels or moves running spread orders, and right-click offers "Autospreader settings…".
 - **Autospreader, part 2 (#415):** the ASE algo trades any of your spreads: it quotes the quoting leg where the spread equals your price and hedges every other leg the moment it fills (whole lots, each leg's own pay-up), keeps hedges on stop, and names every leg left short. A route takes the spread's side, lots and price; the server works out the legs.
-- **Operations (#287):** JSON log lines with the request, user, account and order ids (every answer names its request in `X-Request-ID`); one status of every part of the server (ready, starting, degraded, down; why; since when) behind `GET /api/ready`, Docker's health check and a new **Status** tab in the Admin screen; Prometheus reads the metrics with its own key, and an optional Prometheus and Grafana with a MockTrade dashboard (`--profile monitoring`). Fixed on the way: the Prometheus text said a labelled metric's type more than once, which Prometheus refuses.
+- **Operations (#287):** JSON log lines with the request, user, account and order ids (every answer names its request in `X-Request-ID`); one status of every part of the server (ready, starting, degraded, down; why; since when) behind `GET /api/ready`, Docker's health check and a new **Status** tab in the Admin screen; Prometheus reads the metrics with its own key, and an optional Prometheus and Grafana with a Laddrix dashboard (`--profile monitoring`). Fixed on the way: the Prometheus text said a labelled metric's type more than once, which Prometheus refuses.
 - **Right-click menus (#412):** the app's own menu everywhere: the page's settings and every widget on empty space, a widget's own settings (and open-for-this-contract, link group, duplicate, pop out, close) on a widget.
 
 ## 1.0.0-rc.1 (16 Oct 2026)

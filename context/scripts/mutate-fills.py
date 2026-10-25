@@ -6,10 +6,10 @@ corrections are read back after a restart); the tests must notice. Runs the test
 first. Restores each file. Run alone."""
 import subprocess
 
-M = "src/mocktrade/orders/manager.py"
-K = "src/mocktrade/broker/kite/orders.py"
-B = "src/mocktrade/positions/book.py"
-E = "src/mocktrade/store/events.py"
+M = "src/laddrix/orders/manager.py"
+K = "src/laddrix/broker/kite/orders.py"
+B = "src/laddrix/positions/book.py"
+E = "src/laddrix/store/events.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_exact_fills.py", "tests/test_order_manager.py", "tests/test_positions.py"]
 MUTANTS = [
  (K, "            avg_price_exact=exact_paise(order.get(\"average_price\")),\n            reason=f", "            reason=f"),

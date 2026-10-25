@@ -274,7 +274,7 @@ describe("Order ticket", () => {
 
   it("has Order | Algo | GTT tabs: Algo starts an algo here, GTT appears only when the broker holds GTTs", async () => {
     const SLICER = { code: "SLICER", name: "Slicer", help: "slices", family: "execution", params: [] };
-    const TRAIL = { code: "TRAILING_STOP", name: "Trailing stop", help: "held by MockTrade", family: "protection", params: [] };
+    const TRAIL = { code: "TRAILING_STOP", name: "Trailing stop", help: "held by Laddrix", family: "protection", params: [] };
     const { setParams, rerender } = setup({}, { "GET /api/accounts/acc-a/algo-specs": [SLICER, TRAIL] });
     const tabs = () => screen.getAllByRole("tab").map((t) => t.textContent);
     await vi.waitFor(() => expect(tabs()).toEqual(["Order", "Algo"])); // no GTT: the spec answers 404
@@ -283,7 +283,7 @@ describe("Order ticket", () => {
     rerender({ mode: "algo" });
     const form = await screen.findByRole("form", { name: "Start an algo" });
     expect(form.textContent).toContain("NIFTY26OCTFUT"); // the ticket's contract
-    expect([...form.querySelectorAll("optgroup")].map((g) => g.label)).toEqual(["Execution: work an order", "Protection: held by MockTrade"]);
+    expect([...form.querySelectorAll("optgroup")].map((g) => g.label)).toEqual(["Execution: work an order", "Protection: held by Laddrix"]);
     expect((screen.getByRole("textbox", { name: "Lots" }) as HTMLInputElement).value).toBe("2"); // the ticket's lots
   });
 

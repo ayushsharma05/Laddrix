@@ -78,7 +78,7 @@ export class LayoutStore {
   ) {}
 
   private key(name: string): string {
-    return `mocktrade.layout.${this.userId}.${name}`;
+    return `laddrix.layout.${this.userId}.${name}`;
   }
 
   /** The saved workspace, or null if there is none (or it is damaged). */
@@ -141,7 +141,7 @@ export class LayoutStore {
 export function browserStorage(): StorageLike | null {
   try {
     const storage = window.localStorage;
-    const probe = "mocktrade.probe";
+    const probe = "laddrix.probe";
     storage.setItem(probe, "1");
     storage.removeItem(probe);
     return storage;

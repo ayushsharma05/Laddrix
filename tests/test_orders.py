@@ -7,7 +7,7 @@ from decimal import Decimal
 
 import pytest
 
-from mocktrade.domain.orders import (
+from laddrix.domain.orders import (
     OrderRequest,
     OrderStatus,
     OrderType,

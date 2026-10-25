@@ -68,7 +68,7 @@ def test_the_image_and_ci_install_only_what_is_locked():
     assert "gitleaks git" in ci and "sha256sum --check" in ci  # a checked download
     assert "fetch-depth: 0" in ci  # gitleaks sees every commit, not the last one
     for sbom in ("server", "screens", "desktop"):
-        assert f"sbom/mocktrade-{sbom}.cdx.json" in ci
+        assert f"sbom/laddrix-{sbom}.cdx.json" in ci
     assert 'tags: ["v*"]' in ci  # a release tag runs it: its SBOMs are the release's
     assert "github.ref_type == 'tag' && github.ref_name || github.sha" in ci  # a valid name
 

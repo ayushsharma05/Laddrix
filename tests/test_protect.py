@@ -1,23 +1,23 @@
-"""Protection held by MockTrade: trailing stop, OCO exit and bracket (#200)."""
+"""Protection held by Laddrix: trailing stop, OCO exit and bracket (#200)."""
 
 import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.algos.engine import AlgoEngine, AlgoError, AlgoState
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.domain.orders import OrderStatus, OrderType, OrderUpdate, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds
-from mocktrade.platform import Platform
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.store.events import EventLog
+from laddrix.algos.builtin import BUILTIN
+from laddrix.algos.engine import AlgoEngine, AlgoError, AlgoState
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.domain.orders import OrderStatus, OrderType, OrderUpdate, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds
+from laddrix.platform import Platform
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.store.events import EventLog
 
 FUT = "NFO:NIFTY26OCTFUT"
 T0 = datetime(2026, 10, 14, 4, 0, tzinfo=UTC)
@@ -280,7 +280,7 @@ async def test_protection_algos_are_published_as_their_own_family():
     families = {t.spec.code: t.spec.family for t in BUILTIN}
     assert {families[c] for c in ("TRAILING_STOP", "OCO", "BRACKET")} == {"protection"}
     held = [t.spec.help for t in BUILTIN if t.spec.family == "protection"]
-    assert all("Held by MockTrade" in h for h in held)
+    assert all("Held by Laddrix" in h for h in held)
 
 
 # --- a restart: what was protecting is named, once ---

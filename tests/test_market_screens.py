@@ -13,10 +13,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.movers import MAX_LIMIT, Movers, MoversError
-from mocktrade.marketdata.prints import TimeAndSales, print_to_dict
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.movers import MAX_LIMIT, Movers, MoversError
+from laddrix.marketdata.prints import TimeAndSales, print_to_dict
 
 FUT = "NFO:NIFTY26OCTFUT"
 T0 = datetime(2026, 10, 16, 4, 0, tzinfo=UTC)

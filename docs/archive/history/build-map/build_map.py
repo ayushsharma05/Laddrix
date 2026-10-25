@@ -12,5 +12,5 @@ data = dict(issues=issues, boxes=boxes, containerDesign=CONTAINER_DESIGN, whole=
 
 html = open(os.path.join(D, 'map_template.html')).read().replace('__DATA__', json.dumps(data, ensure_ascii=False))
 os.makedirs(os.path.join(D, 'out'), exist_ok=True)
-open(os.path.join(D, 'out', 'MockTrade-Build-Map.html'), 'w').write(html)
+open(os.path.join(D, 'out', 'Laddrix-Build-Map.html'), 'w').write(html)
 print('ok', len(html))

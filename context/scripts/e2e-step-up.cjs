@@ -13,18 +13,18 @@ const os = require('os');
 const path = require('path');
 const REPO = path.resolve(__dirname, '../..');
 const IMAGES = `${__dirname}/../images`;
-const HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'mocktrade-stepup-'));
+const HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'laddrix-stepup-'));
 const DATA = `${HOME}/data/demo`;
 const BASE = 'http://localhost:8766';
 const ENV = { ...process.env, PYTHONPATH: `${REPO}/src` };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const code = (offset = 0) => execSync(`python3 -c "import time; from mocktrade.server import security; print(security.totp_code(open('${DATA}/demo_totp.txt').read().strip(), time.time() + ${offset}))"`, { env: ENV }).toString().trim();
+const code = (offset = 0) => execSync(`python3 -c "import time; from laddrix.server import security; print(security.totp_code(open('${DATA}/demo_totp.txt').read().strip(), time.time() + ${offset}))"`, { env: ENV }).toString().trim();
 const freshWindow = async () => {
   const w = Math.floor(Date.now() / 30000);
   while (Math.floor(Date.now() / 30000) === w) await sleep(500);  // each code works once
 };
 (async () => {
-  const demo = spawn('python3', ['-m', 'mocktrade.tools.demo', '--port', '8766', '--ui', `${REPO}/ui/dist`], { cwd: HOME, env: ENV, stdio: 'ignore' });
+  const demo = spawn('python3', ['-m', 'laddrix.tools.demo', '--port', '8766', '--ui', `${REPO}/ui/dist`], { cwd: HOME, env: ENV, stdio: 'ignore' });
   for (let i = 0; i < 60; i++) {
     try { execSync('curl -sf http://127.0.0.1:8766/api/health >/dev/null'); break; } catch { await sleep(500); }
   }

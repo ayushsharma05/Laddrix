@@ -14,14 +14,14 @@ from test_stream import Live, next_of
 from test_users import PASSWORD, secret_of
 from websockets.exceptions import ConnectionClosed
 
-from mocktrade.config import ConfigError
-from mocktrade.domain.accounts import Role
-from mocktrade.ops.fence import DataFence
-from mocktrade.server import security
-from mocktrade.server.security import SecretBox
-from mocktrade.server.stream import CLOSE_NOT_LOGGED_IN
-from mocktrade.server.users import UserStore
-from mocktrade.tools import users as users_tool
+from laddrix.config import ConfigError
+from laddrix.domain.accounts import Role
+from laddrix.ops.fence import DataFence
+from laddrix.server import security
+from laddrix.server.security import SecretBox
+from laddrix.server.stream import CLOSE_NOT_LOGGED_IN
+from laddrix.server.users import UserStore
+from laddrix.tools import users as users_tool
 
 NOW = datetime(2026, 10, 14, 9, 0, tzinfo=UTC)
 
@@ -93,15 +93,15 @@ def test_a_failure_part_way_changes_nothing(tmp_path, how):
 
 
 def env_for(tmp_path, key, new=None):
-    env = {"MOCKTRADE_SECRET_KEY": key, "MOCKTRADE_USERS_DB": str(tmp_path / "users.db")}
-    return env | ({"MOCKTRADE_NEW_SECRET_KEY": new} if new else {})
+    env = {"LADDRIX_SECRET_KEY": key, "LADDRIX_USERS_DB": str(tmp_path / "users.db")}
+    return env | ({"LADDRIX_NEW_SECRET_KEY": new} if new else {})
 
 
 def test_the_tool_checks_first_and_refuses_while_a_server_runs(tmp_path, capsys):
     old, new = SecretBox.new_key(), SecretBox.new_key()
     store, secrets = three_users(tmp_path, old)
     before = raw(store)
-    with pytest.raises(ConfigError, match="set MOCKTRADE_NEW_SECRET_KEY"):
+    with pytest.raises(ConfigError, match="set LADDRIX_NEW_SECRET_KEY"):
         users_tool.main(["rotate-key"], env_for(tmp_path, old))
     with pytest.raises(ConfigError, match="the key in use"):
         users_tool.main(["rotate-key"], env_for(tmp_path, old, old))
@@ -172,7 +172,7 @@ async def test_open_streams_close_within_seconds_of_a_revoke(live):
 
 
 def test_a_backup_never_carries_a_session_so_a_restore_brings_none_back(tmp_path):
-    from mocktrade.tools.backup import backup_one
+    from laddrix.tools.backup import backup_one
 
     store, _ = three_users(tmp_path, SecretBox.new_key())
     token = store.start_session(store.get_user("ayush"))

@@ -17,10 +17,10 @@ setup:
 
 demo:
 	cd ui && npm run build
-	$(PYTHON) -m mocktrade.tools.demo --ui ui/dist
+	$(PYTHON) -m laddrix.tools.demo --ui ui/dist
 
 code:
-	$(PYTHON) -m mocktrade.tools.demo --code
+	$(PYTHON) -m laddrix.tools.demo --code
 
 check: lint test
 
@@ -45,8 +45,8 @@ format:
 	ruff check --fix .
 
 image:
-	docker build -t mocktrade:local .
-	deploy/smoke.sh mocktrade:local
+	docker build -t laddrix:local .
+	deploy/smoke.sh laddrix:local
 
 clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache build src/*.egg-info ui/dist ui/desktop/dist

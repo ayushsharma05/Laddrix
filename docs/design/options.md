@@ -1,6 +1,6 @@
 # Options: pricing, chain, strategies
 
-## Pricing (`src/mocktrade/options/`, #189)
+## Pricing (`src/laddrix/options/`, #189)
 
 - **Black-76 on the future.** NSE and BSE index and stock options are European. The future's
   price already includes interest and expected dividends, so pricing off it needs no guess

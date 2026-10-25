@@ -1,4 +1,4 @@
-<title>MockTrade One Chart</title>
+<title>Laddrix One Chart</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -59,7 +59,7 @@ button:focus-visible, .bx:focus-visible { outline: 2px solid var(--accent); outl
 
 <div class="wrap">
   <header>
-    <h1>MockTrade One Chart</h1>
+    <h1>Laddrix One Chart</h1>
     <p class="lede">The whole multi-user, broker-agnostic platform on one page. Orders flow left to right (blue), prices right to left (green), and everything is recorded in the careful lane (amber). Click any box for what it does, its tools and how it scales.</p>
   </header>
   <div class="gates"><b>Before other users go live</b>
@@ -71,7 +71,7 @@ button:focus-visible, .bx:focus-visible { outline: 2px solid var(--accent); outl
     <span><span class="dash"></span>later or needs registration</span>
   </div>
   <div class="main">
-    <div class="mapbox"><svg id="chart" role="img" aria-label="MockTrade architecture"></svg></div>
+    <div class="mapbox"><svg id="chart" role="img" aria-label="Laddrix architecture"></svg></div>
     <aside id="panel" aria-live="polite"></aside>
   </div>
 </div>
@@ -127,7 +127,7 @@ const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 let s = `<defs>${['o', 'p', 'c'].map(k => `<marker id="m${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--${{ o: 'order', p: 'price', c: 'careful' }[k]})"/></marker>`).join('')}</defs>`;
 const zone = (x, y, w, h, t, sub) => `<g class="zone"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10"/><text class="zt" x="${x + 12}" y="${y + 20}">${esc(t)}</text><text class="zs" x="${x + 12}" y="${y + 35}">${esc(sub)}</text></g>`;
 s += zone(X0 - 10, rowO - 52, cx(1) + CW - X0 + 20, rowP + BH - rowO + 68, 'Users', 'anyone with a login');
-s += zone(cx(2) - 10, rowO - 52, cx(8) + CW - cx(2) + 20, rowP + BH - rowO + 68, 'MockTrade platform (our servers)', 'broker-agnostic core: fast lanes');
+s += zone(cx(2) - 10, rowO - 52, cx(8) + CW - cx(2) + 20, rowP + BH - rowO + 68, 'Laddrix platform (our servers)', 'broker-agnostic core: fast lanes');
 s += zone(cx(9) - 10, rowO - 52, CW + 20, rowP + BH - rowO + 68, 'Outside', 'brokers, exchanges, vendors');
 s += zone(X0 - 10, bandY1 - 44, W - 2 * X0 + 20, bandH + 44, 'Careful lane', 'records everything, never loses anything, checks the fast lanes');
 s += zone(X0 - 10, bandY2 - 6, W - 2 * X0 + 20, bandH - 30, '', '');

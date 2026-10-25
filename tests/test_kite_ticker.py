@@ -8,8 +8,8 @@ import pytest
 from kite_packets import NFO_TOKEN, NSE_TOKEN, frame, ltp_packet
 from websockets.asyncio.server import serve
 
-from mocktrade.broker.kite.http import KiteAuthError
-from mocktrade.broker.kite.ticker import MAX_TOKENS_PER_CONNECTION, KiteTicker
+from laddrix.broker.kite.http import KiteAuthError
+from laddrix.broker.kite.ticker import MAX_TOKENS_PER_CONNECTION, KiteTicker
 
 
 class FakeKite:
@@ -229,7 +229,7 @@ async def test_prices_in_order_messages_stay_exact():
 
 async def test_a_big_frame_is_decoded_in_chunks_but_handed_on_whole():
     """Other work (an order click) runs between chunks; screens get the frame in one go."""
-    from mocktrade.broker.kite.ticker import CHUNK
+    from laddrix.broker.kite.ticker import CHUNK
 
     delivered: list[int] = []
     ticker = KiteTicker("k", "t", lambda ticks: delivered.append(len(ticks)))

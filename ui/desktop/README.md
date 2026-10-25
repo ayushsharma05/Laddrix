@@ -1,7 +1,7 @@
-# MockTrade desktop app
+# Laddrix desktop app
 
-The same MockTrade screens in a desktop window, with widgets that pop out into **real windows
-on any monitor**. The app ships no screens of its own: it opens your MockTrade server, so the
+The same Laddrix screens in a desktop window, with widgets that pop out into **real windows
+on any monitor**. The app ships no screens of its own: it opens your Laddrix server, so the
 desktop and the browser are always the same version.
 
 ```
@@ -16,12 +16,12 @@ main window ── our server's page (login, workspace)
 ```bash
 cd ui/desktop
 npm ci
-npm start -- --server=https://trade.example.in    # or set MOCKTRADE_URL, or settings.json
+npm start -- --server=https://trade.example.in    # or set LADDRIX_URL, or settings.json
 ```
 
 Without `--server` it opens `http://localhost:8000` (the demo server: `python -m
-mocktrade.tools.demo --ui ui/dist`). The server address can also be saved in
-`settings.json` in the app's data folder (Windows: `%APPDATA%\MockTrade\settings.json`):
+laddrix.tools.demo --ui ui/dist`). The server address can also be saved in
+`settings.json` in the app's data folder (Windows: `%APPDATA%\Laddrix\settings.json`):
 
 ```json
 { "server": "https://trade.example.in" }
@@ -32,7 +32,7 @@ Only `https` is accepted, except `http://localhost` for development.
 ## Windows installer
 
 ```bash
-npm run dist:win     # → release/MockTrade Setup <version>.exe
+npm run dist:win     # → release/Laddrix Setup <version>.exe
 ```
 
 Run it on Windows (or anywhere with wine). Pop-outs, window places and the session are kept

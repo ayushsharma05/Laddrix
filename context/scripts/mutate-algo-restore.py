@@ -5,9 +5,9 @@ never repeat across runs); the tests must notice. Restores each file in `finally
 counts as caught. Run alone from the repo root."""
 import subprocess
 
-E = "src/mocktrade/algos/engine.py"
-A = "src/mocktrade/algos/autospreader.py"
-P = "src/mocktrade/platform.py"
+E = "src/laddrix/algos/engine.py"
+A = "src/laddrix/algos/autospreader.py"
+P = "src/laddrix/platform.py"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_algo_restore.py", "tests/test_autospreader.py",
        "tests/test_ase_controls.py", "tests/test_protect.py"], ".")
 MUTANTS = [

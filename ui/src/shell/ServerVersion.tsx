@@ -23,7 +23,7 @@ export function ServerVersion() {
   }, [rest]);
   if (!health?.version) return null;
   return (
-    <span className="page-status server-version" title={`MockTrade ${health.version}, build ${health.build ?? "unknown"}`}>
+    <span className="page-status server-version" title={`Laddrix ${health.version}, build ${health.build ?? "unknown"}`}>
       v{health.version}
     </span>
   );

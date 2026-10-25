@@ -22,15 +22,15 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from test_server import FUT, ORDER, PASSWORD, World
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.algos.spec import check_params
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.accounts import BrokerAccount, Role, User, can_manage, can_trade
-from mocktrade.domain.instruments import Exchange, InstrumentKind
-from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
-from mocktrade.orders.model import ClientIds
-from mocktrade.risk.limits import RiskLimits
-from mocktrade.risk.limits_spec import (
+from laddrix.algos.builtin import BUILTIN
+from laddrix.algos.spec import check_params
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.accounts import BrokerAccount, Role, User, can_manage, can_trade
+from laddrix.domain.instruments import Exchange, InstrumentKind
+from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
+from laddrix.orders.model import ClientIds
+from laddrix.risk.limits import RiskLimits
+from laddrix.risk.limits_spec import (
     BAND,
     LIMITS_SPEC,
     changes,
@@ -40,11 +40,11 @@ from mocktrade.risk.limits_spec import (
     stored_limits,
     warnings,
 )
-from mocktrade.server import security
-from mocktrade.server.admin import CallbackStarter
-from mocktrade.server.app import ServerSettings, create_app
-from mocktrade.server.security import SecretBox
-from mocktrade.server.users import LastAdmin, UserStore
+from laddrix.server import security
+from laddrix.server.admin import CallbackStarter
+from laddrix.server.app import ServerSettings, create_app
+from laddrix.server.security import SecretBox
+from laddrix.server.users import LastAdmin, UserStore
 
 # --- the limits spec ------------------------------------------------------------------------
 
@@ -550,7 +550,7 @@ async def test_the_running_account_compares_with_the_broker_by_product(world):
     running = world.platform.account("acc-ayush")
     running.positions.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)
     running.positions.apply_fill(FUT, Product.MIS, Side.SELL, 75, 2501000)
-    from mocktrade.broker.base import BrokerPosition
+    from laddrix.broker.base import BrokerPosition
 
     world.brokers["acc-ayush"].broker_positions = [
         BrokerPosition(FUT, 75, 0, product=Product.NRML),

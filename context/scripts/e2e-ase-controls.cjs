@@ -3,7 +3,7 @@
 // so the quote rests (max unhedged 1: a 3-lot order quotes 1 lot), open the algo screen,
 // preview Flatten and Hedge now (the server says why not, in words), and stop it.
 //
-//   python3 -m mocktrade.tools.demo --port 8000 --ui ui/dist      (saved layouts and
+//   python3 -m laddrix.tools.demo --port 8000 --ui ui/dist      (saved layouts and
 //   data/demo/spreads cleared)
 //   node context/scripts/e2e-ase-controls.cjs <folder for screenshots>
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -27,7 +27,7 @@ const check = (name, ok, detail = '') => {
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByLabel('Authenticator code').fill(execFileSync('python3', ['-m', 'mocktrade.tools.demo', '--code']).toString().trim());
+  await page.getByLabel('Authenticator code').fill(execFileSync('python3', ['-m', 'laddrix.tools.demo', '--code']).toString().trim());
   await page.keyboard.press('Enter');
   await page.locator('.frame .ladder .price.last').first().waitFor({ timeout: 20000 });
   const api = (path, init) => page.evaluate(async ([p, i]) => {

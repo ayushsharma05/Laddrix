@@ -1,7 +1,7 @@
 """Files and jobs per firm and per subscription (#396, docs/design/tenancy.md §3, §5).
 
 recorded ticks    one folder per Kite subscription: data/ticks/@<account>   (the simulator:
-                  data/ticks, MockTrade's own data, everyone's)
+                  data/ticks, Laddrix's own data, everyone's)
 imported candles  one folder per firm: data/candles (main), data/candles/@<workspace>
 a backtest        replays its owner's own subscription's days and their firm's candles
 reports           marked at the account's own prices; one folder per account
@@ -17,17 +17,17 @@ from test_server import World as ServerWorld
 from test_ticks_recorder import full
 from test_workspaces import ACME, TwoFirms
 
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-from mocktrade.domain.ticks import Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.marketdata.sources import PriceSources
-from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.checks import PRICES_SILENT_S, Checks, PriceFeed, PriceOverload
-from mocktrade.orders.model import EventKind, Fill, OrderEvent, OrderView, Pending
-from mocktrade.reports.service import Reports
-from mocktrade.research.backtest import BacktestError, Backtests, CandleStores
-from mocktrade.research.ticks import FileTickStore
-from mocktrade.server.app import ServerSettings, create_app
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.domain.ticks import Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.marketdata.sources import PriceSources
+from laddrix.ops.alerts import Alerts
+from laddrix.ops.checks import PRICES_SILENT_S, Checks, PriceFeed, PriceOverload
+from laddrix.orders.model import EventKind, Fill, OrderEvent, OrderView, Pending
+from laddrix.reports.service import Reports
+from laddrix.research.backtest import BacktestError, Backtests, CandleStores
+from laddrix.research.ticks import FileTickStore
+from laddrix.server.app import ServerSettings, create_app
 
 CANDLES = [{"time": (T0 + timedelta(minutes=m)).isoformat(), "open": 2500000, "high": 2500300,
             "low": 2499800, "close": 2500200} for m in range(5)]  # fmt: skip
@@ -222,10 +222,10 @@ async def test_a_report_values_open_positions_at_the_accounts_own_prices(tmp_pat
 async def test_a_kite_server_records_each_subscription_in_its_own_folder(tmp_path):
     from test_serve import KEY, env
 
-    from mocktrade.domain.accounts import BrokerAccount, Role
-    from mocktrade.server.security import SecretBox
-    from mocktrade.server.users import UserStore
-    from mocktrade.tools.serve import ServeSettings, build
+    from laddrix.domain.accounts import BrokerAccount, Role
+    from laddrix.server.security import SecretBox
+    from laddrix.server.users import UserStore
+    from laddrix.tools.serve import ServeSettings, build
 
     data = tmp_path / "data"
     data.mkdir()
@@ -235,7 +235,7 @@ async def test_a_kite_server_records_each_subscription_in_its_own_folder(tmp_pat
     users.create_user("ravi", "Ravi", "a-long-password-1", {Role.TRADER}, workspace=ACME)
     users.add_account(BrokerAccount("acc-a", "kite", "AB1234", "ayush"))
     users.add_account(BrokerAccount("acc-r", "kite", "RV0001", "ravi"))
-    built = build(ServeSettings.from_env(env(MOCKTRADE_DATA=str(data), MOCKTRADE_PRICES="kite",
+    built = build(ServeSettings.from_env(env(LADDRIX_DATA=str(data), LADDRIX_PRICES="kite",
                                              KITE_API_KEY="k", KITE_API_SECRET="s")))  # fmt: skip
     try:
         assert set(built.recorders) == {"acc-a", "acc-r"}  # nobody's shared recording

@@ -12,8 +12,8 @@ import httpx
 import pytest
 from test_market_alerts import sender_with
 
-from mocktrade.alerts import webhook
-from mocktrade.alerts.webhook import (
+from laddrix.alerts import webhook
+from laddrix.alerts.webhook import (
     MAX_IN_FLIGHT,
     MAX_PENDING,
     WebhookError,
@@ -22,8 +22,8 @@ from mocktrade.alerts.webhook import (
     pinned,
     public,
 )
-from mocktrade.ops.alerts import Alert
-from mocktrade.ops.notify import WebhookNotifier
+from laddrix.ops.alerts import Alert
+from laddrix.ops.notify import WebhookNotifier
 
 URL = "https://hooks.example.com/in"
 
@@ -144,7 +144,7 @@ async def test_direct_and_queued_sends_stay_bounded():
 
 
 async def test_the_operators_alert_webhook_never_piles_up():
-    from mocktrade.ops import notify
+    from laddrix.ops import notify
 
     gate = asyncio.Event()
     calls = []

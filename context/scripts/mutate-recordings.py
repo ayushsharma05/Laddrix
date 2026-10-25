@@ -3,8 +3,8 @@ must notice. Restores each file in `finally`; a hang counts as caught. Run alone
 unique (checked before each mutant)."""
 import subprocess
 
-T = "src/mocktrade/research/ticks.py"
-ROUTES_RESEARCH = "src/mocktrade/server/routes/research.py"
+T = "src/laddrix/research/ticks.py"
+ROUTES_RESEARCH = "src/laddrix/server/routes/research.py"
 R = "ui/src/widgets/research/Recordings.tsx"
 PY = ["python3", "-m", "pytest", "-q", "-x", "tests/test_ticks_recorder.py"]
 UI = ["npx", "vitest", "run", "src/widgets/research"]

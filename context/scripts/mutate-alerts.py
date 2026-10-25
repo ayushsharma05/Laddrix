@@ -6,10 +6,10 @@ Not mutants (no wrong answer, only cost): reading leg B's price from the tick vs
 latest price (MarketData stores the tick before its taps run, so both are the same tick)."""
 import subprocess
 
-E = "src/mocktrade/alerts/engine.py"
-W = "src/mocktrade/alerts/webhook.py"
-S = "src/mocktrade/alerts/service.py"
-H = "src/mocktrade/server/stream.py"
+E = "src/laddrix/alerts/engine.py"
+W = "src/laddrix/alerts/webhook.py"
+S = "src/laddrix/alerts/service.py"
+H = "src/laddrix/server/stream.py"
 CMD = ["python3", "-m", "pytest", "-q", "-x", "tests/test_market_alerts.py"]
 MUTANTS = [
  (E, "            true = t.ltp_paise >= level if up else t.ltp_paise <= level", "            true = t.ltp_paise > level if up else t.ltp_paise < level"),

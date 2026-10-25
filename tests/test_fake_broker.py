@@ -4,9 +4,9 @@ told.
 
 import pytest
 
-from mocktrade.broker.base import Broker, BrokerError
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import OrderStatus, OrderUpdate
+from laddrix.broker.base import Broker, BrokerError
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import OrderStatus, OrderUpdate
 
 
 def test_fake_broker_follows_the_interface():

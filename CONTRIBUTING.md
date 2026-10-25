@@ -1,4 +1,4 @@
-# Contributing to MockTrade
+# Contributing to Laddrix
 
 How a change gets made here. The project is a trading platform, so every change must show
 that it is right. Saying so is not enough.
@@ -40,7 +40,7 @@ run each tool: [docs/running-locally.md](docs/running-locally.md).
   whole history for them.
 - **Never commit anything from an employer:** no names, systems, code or screenshots. Use
   generic names.
-- **Never name or copy another vendor's product.** MockTrade is its own product.
+- **Never name or copy another vendor's product.** Laddrix is its own product.
 - **The backend provides, the frontend displays.** Market rules (lot sizes, order types,
   cut-offs, why an order was refused) come from the server. The screens hard-code none.
 - **No live order** without the go-live checklist ([docs/runbooks/go-live.md](docs/runbooks/go-live.md)).
@@ -51,7 +51,7 @@ run each tool: [docs/running-locally.md](docs/running-locally.md).
 
 | Folder | What |
 | --- | --- |
-| `src/mocktrade/` | the server ([code map](docs/guide/07-code-map.md)) |
+| `src/laddrix/` | the server ([code map](docs/guide/07-code-map.md)) |
 | `ui/` | the screens (React); `ui/desktop/` the desktop app (Electron) |
 | `tests/` | the server's tests ([README](tests/README.md)) |
 | `deploy/` | Docker, Caddy, the deploy scripts, monitoring |

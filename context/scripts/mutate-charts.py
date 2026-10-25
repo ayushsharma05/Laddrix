@@ -7,11 +7,11 @@ interval, but the "only when it changed" check still sends nothing new: a cost, 
 """
 import subprocess
 
-C = "src/mocktrade/charts/candles.py"
-S = "src/mocktrade/charts/service.py"
-H = "src/mocktrade/charts/history.py"
-W = "src/mocktrade/server/stream.py"
-ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
+C = "src/laddrix/charts/candles.py"
+S = "src/laddrix/charts/service.py"
+H = "src/laddrix/charts/history.py"
+W = "src/laddrix/server/stream.py"
+ROUTES_MARKET = "src/laddrix/server/routes/market.py"
 CMD = ["python3", "-m", "pytest", "-q", "-x", "tests/test_charts.py", "tests/test_kite_live.py"]
 MUTANTS = [
  (C, "    n = (local - opens) // timedelta(seconds=interval.seconds)", "    n = int((local - opens).total_seconds() / interval.seconds)"),

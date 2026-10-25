@@ -1,7 +1,7 @@
 # Security: threat model and control map
 
 Issue #279. It is a release gate, not a checklist that proves security. This page says:
-- what MockTrade protects, from whom, and where the trust boundaries are;
+- what Laddrix protects, from whom, and where the trust boundaries are;
 - for each control, the **evidence** that it works (code and tests), or the **gap** and the
   child issue that will close it.
 
@@ -38,7 +38,7 @@ Zerodha's answer (#278).
                                          │          ├─► events.db (audit trail) ─► backups ─► off-machine
                                          │          └─► data/ (rules, reports, alerts, …)
                                          └─ /kite/callback ◄── Kite login (state bound to user + account)
- operator (SSH, compose) ── .env / MOCKTRADE_SECRET_KEY ── password manager
+ operator (SSH, compose) ── .env / LADDRIX_SECRET_KEY ── password manager
 ```
 
 - **Assets:** broker credentials and daily tokens; the secret key; user passwords and TOTP
@@ -57,7 +57,7 @@ Zerodha's answer (#278).
 | Firm-wide STOP / resume | no | STOP | STOP and resume |
 | Users, accounts, limits | no | no | yes |
 | Surveillance alerts, auditor's export | no | yes | yes |
-| Adopt trades made outside MockTrade (#355) | no | yes | yes |
+| Adopt trades made outside Laddrix (#355) | no | yes | yes |
 | Backtests | own | own | all |
 
 Each row is enforced on the server for REST **and** the stream (#270). Hiding a button is never
@@ -77,7 +77,7 @@ the control.
 | 8 | SSRF via webhooks | https only, private addresses refused | #271, `test_alerts*.py` |
 | 9 | Key or credential compromised | `users revoke-sessions` (open screens close within 2 s), `users rotate-key` (refused while the server runs; all or nothing), backups hold no session, the playbook in `incidents.md` ("A credential is stolen") | `test_key_rotation.py`; the drill on the demo, 15/15 (`context/evidence/h-364-credential-drill.txt`) |
 | 10 | Dependency or update compromised | `npm audit` and `pip-audit` (on the lock) in CI; Python pinned by hash (`requirements.lock`, the image installs `--require-hashes`), npm by `package-lock.json`; Dependabot; gitleaks over the whole history; CycloneDX SBOMs at each release; patch times in `patching.md`; the desktop app has no update path until it is signed (#365) | `test_supply_chain.py`; the **supply-chain** CI job |
-| 11 | Logs leak secrets; retention; a changed audit trail | every log line filtered (`logsafe.py`), JSON lines too (#287), objects holding secrets don't print them; the monitoring key (`MOCKTRADE_METRICS_TOKEN`) reads only the Prometheus text, compared in constant time, and never appears in a repr; data classes and retention in [data.md](data.md); a person's data exported or erased (`users export-user` / `erase-user`); the audit trail hash-chained, its head kept in every backup's manifest (#367) | `test_log_redaction.py`, `test_audit_chain.py`, `test_personal_data.py` |
+| 11 | Logs leak secrets; retention; a changed audit trail | every log line filtered (`logsafe.py`), JSON lines too (#287), objects holding secrets don't print them; the monitoring key (`LADDRIX_METRICS_TOKEN`) reads only the Prometheus text, compared in constant time, and never appears in a repr; data classes and retention in [data.md](data.md); a person's data exported or erased (`users export-user` / `erase-user`); the audit trail hash-chained, its head kept in every backup's manifest (#367) | `test_log_redaction.py`, `test_audit_chain.py`, `test_personal_data.py` |
 | 12 | Storage, audit or feed outage | orders refused unless on disk first (#265); stale prices refuse risk-adding orders (#267); critical loops watched, new orders pause, cancels go (#273); STOP + Flatten work through it (#262) | those PRs' tests |
 
 ## 5. Mapped to OWASP ASVS 4.0.3 (selected chapters, target Level 2)
@@ -90,7 +90,7 @@ This is not certification: it only shows where each requirement area stands.
 | V3 Session management | server-side sessions, rotation on login, timeouts, revocation (one user or everyone, live streams included, #364); each user lists and ends their own sessions (device, address, times) (#363) |
 | V4 Access control | default-deny per account and on the stream (#270); delayed actions re-checked at the moment they act (#366) |
 | V5 Validation | strict request models (`_Strict`, field limits); path checks (#269) |
-| V6 Stored cryptography | Fernet (SecretBox) for the authenticator secrets in `users.db`. The broker's API secret is in `.env` and its daily tokens in owner-only files, not encrypted by MockTrade. Key rotation is all or nothing: `users rotate-key` (#364) |
+| V6 Stored cryptography | Fernet (SecretBox) for the authenticator secrets in `users.db`. The broker's API secret is in `.env` and its daily tokens in owner-only files, not encrypted by Laddrix. Key rotation is all or nothing: `users rotate-key` (#364) |
 | V7 Errors and logging | audit trail of every order event and privileged action, tamper-evident (hash chain); logs filtered of secrets (#367) |
 | V8 Data protection | owner-only backups; data classified, retention set, a person's data exported or erased ([data.md](data.md), #367) |
 | V9 Communications | HTTPS via Caddy; HSTS and security headers (`test_server.py`) |

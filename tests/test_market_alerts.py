@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 
-from mocktrade.alerts.engine import (
+from laddrix.alerts.engine import (
     COOLDOWN,
     MAX_ALERTS,
     AlertEngine,
@@ -19,9 +19,9 @@ from mocktrade.alerts.engine import (
     alert_to_dict,
     spec,
 )
-from mocktrade.alerts.service import MarketAlerts
-from mocktrade.alerts.store import AlertStore
-from mocktrade.alerts.webhook import (
+from laddrix.alerts.service import MarketAlerts
+from laddrix.alerts.store import AlertStore
+from laddrix.alerts.webhook import (
     BACKOFF_S,
     MAX_PENDING,
     WebhookError,
@@ -29,7 +29,7 @@ from mocktrade.alerts.webhook import (
     check_url,
     sign,
 )
-from mocktrade.domain.ticks import Tick
+from laddrix.domain.ticks import Tick
 
 FUT = "NFO:NIFTY26OCTFUT"
 NOV = "NFO:NIFTY26NOVFUT"
@@ -350,8 +350,8 @@ async def test_a_webhook_is_signed_and_retried_on_server_errors():
     result = await sender.deliver_now("https://hooks.example.com/x", "s3cret", {"text": "hi"})
     assert result == "" and len(seen) == 3 and waits == [BACKOFF_S[0], BACKOFF_S[1]]
     r = seen[0]
-    assert r.headers["x-mocktrade-timestamp"] == "1760598000"
-    assert r.headers["x-mocktrade-signature"] == sign("s3cret", 1760598000, r.content)
+    assert r.headers["x-laddrix-timestamp"] == "1760598000"
+    assert r.headers["x-laddrix-signature"] == sign("s3cret", 1760598000, r.content)
     assert (
         json.loads(r.content) == {"text": "hi"} and r.headers["content-type"] == "application/json"
     )
@@ -463,7 +463,7 @@ async def live(tmp_path, nifty_fut):
     """A running server with alerts; webhooks go to a fake receiver."""
     from test_stream import Live
 
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.server.app import ServerSettings, create_app
 
     server = Live(tmp_path, nifty_fut)
     server.received = []
@@ -531,7 +531,7 @@ async def test_the_webhook_api_shows_the_secret_once_and_tests_it(live):
     test = (await a.post("/api/alerts/webhook/test", json={})).json()
     assert test == {"ok": True, "error": ""}
     (req,) = live.received
-    assert req.headers["x-mocktrade-signature"] == sign(secret, 1760598000, req.content)
+    assert req.headers["x-laddrix-signature"] == sign(secret, 1760598000, req.content)
     assert json.loads(req.content)["type"] == "test"
     assert (await a.delete("/api/alerts/webhook")).status_code == 204
     assert (await a.get("/api/alerts/webhook")).json()["set"] is False
@@ -560,11 +560,11 @@ async def test_a_fired_alert_reaches_its_users_screens_only(live):
 
 
 async def test_the_server_keeps_alert_instruments_watched_so_their_prices_come(tmp_path, nifty_fut):
-    from mocktrade.alerts.service import build_market_alerts
-    from mocktrade.marketdata.service import MarketData
-    from mocktrade.platform import Platform
-    from mocktrade.refdata.store import InstrumentStore
-    from mocktrade.risk.kill_switch import KillSwitch
+    from laddrix.alerts.service import build_market_alerts
+    from laddrix.marketdata.service import MarketData
+    from laddrix.platform import Platform
+    from laddrix.refdata.store import InstrumentStore
+    from laddrix.risk.kill_switch import KillSwitch
 
     store = InstrumentStore()
     store.add(nifty_fut)

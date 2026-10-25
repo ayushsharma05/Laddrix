@@ -1,12 +1,12 @@
-# Prometheus for MockTrade (#287): reads the app's metrics every 15 s on the private network.
-# The app answers only with its key (MOCKTRADE_METRICS_TOKEN in deploy/.env), handed to
+# Prometheus for Laddrix (#287): reads the app's metrics every 15 s on the private network.
+# The app answers only with its key (LADDRIX_METRICS_TOKEN in deploy/.env), handed to
 # Prometheus as a Compose secret, never written into this file.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: mocktrade
+  - job_name: laddrix
     metrics_path: /api/metrics
     params:
       format: [prometheus]

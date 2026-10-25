@@ -23,12 +23,12 @@ import httpx
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
-from mocktrade.server import security  # noqa: E402
-from mocktrade.store.events import link  # noqa: E402
+from laddrix.server import security  # noqa: E402
+from laddrix.store.events import link  # noqa: E402
 
 PORT = 8767
 BASE, ORIGIN = f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"
-HOME = Path(tempfile.mkdtemp(prefix="mocktrade-data-"))
+HOME = Path(tempfile.mkdtemp(prefix="laddrix-data-"))
 DATA = HOME / "data" / "demo"
 ENV = os.environ | {"PYTHONPATH": str(REPO / "src")}
 HOOK = "https://hooks.example.com/services/T1/B2/drillSecretPath77"
@@ -47,7 +47,7 @@ def py(*args):
 
 def main():
     log = open(HOME / "server.log", "w")
-    proc = subprocess.Popen([sys.executable, "-m", "mocktrade.tools.demo", "--port", str(PORT),
+    proc = subprocess.Popen([sys.executable, "-m", "laddrix.tools.demo", "--port", str(PORT),
                              "--ui", str(REPO / "ui" / "dist")], cwd=HOME, env=ENV,
                             stdout=log, stderr=log)  # fmt: skip
     try:
@@ -80,7 +80,7 @@ def main():
         time.sleep(1.5)
 
         backups = HOME / "backups"
-        b = py("mocktrade.tools.backup", "--data", str(DATA), "--to", str(backups))
+        b = py("laddrix.tools.backup", "--data", str(DATA), "--to", str(backups))
         manifest = sorted(backups.glob("2*"))[-1] / "manifest.json"
         import json
 
@@ -88,7 +88,7 @@ def main():
         check(b.returncode == 0 and head["rows"] > 0 and head["broken_at"] is None,
               f"2. a backup while running records the head (row {head['head_seq']} of "
               f"{head['rows']})")  # fmt: skip
-        v = py("mocktrade.tools.audit", "verify", "--data", str(DATA), "--against", str(manifest))
+        v = py("laddrix.tools.audit", "verify", "--data", str(DATA), "--against", str(manifest))
         check(v.returncode == 0 and "matches the head" in v.stdout, "3. verify: whole, matches")
     finally:
         proc.send_signal(signal.SIGINT)
@@ -97,7 +97,7 @@ def main():
     events = DATA / "events.db"
     with sqlite3.connect(events) as db:
         db.execute("UPDATE events SET detail = 'nothing to see' WHERE seq = 2")
-    v = py("mocktrade.tools.audit", "verify", "--data", str(DATA))
+    v = py("laddrix.tools.audit", "verify", "--data", str(DATA))
     check(v.returncode == 1 and "BROKEN at row 2" in v.stderr, "4. an edited row is named: "
           + v.stderr.strip())  # fmt: skip
     with sqlite3.connect(events) as db:  # the edit hidden: every chain recomputed
@@ -106,8 +106,8 @@ def main():
                                     "payload FROM events ORDER BY seq").fetchall():  # fmt: skip
             previous = link(previous, tuple(row))
             db.execute("UPDATE events SET chain = ? WHERE seq = ?", (previous, seq))
-    alone = py("mocktrade.tools.audit", "verify", "--data", str(DATA))
-    against = py("mocktrade.tools.audit", "verify", "--data", str(DATA), "--against",
+    alone = py("laddrix.tools.audit", "verify", "--data", str(DATA))
+    against = py("laddrix.tools.audit", "verify", "--data", str(DATA), "--against",
                  str(manifest))  # fmt: skip
     check(alone.returncode == 0 and against.returncode == 1 and "rewritten" in against.stderr,
           "4. a recomputed chain passes alone, fails against the backup: "

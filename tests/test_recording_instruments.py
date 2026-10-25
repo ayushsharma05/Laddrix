@@ -11,20 +11,20 @@ from zoneinfo import ZoneInfo
 import pytest
 from test_ticks_recorder import full
 
-from mocktrade.broker.paper import PaperBroker
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.marketdata.sim_universe import INSTRUMENTS as DEMO
-from mocktrade.refdata.store import InstrumentStore, instrument_from_record, instrument_record
-from mocktrade.research.replay import (
+from laddrix.broker.paper import PaperBroker
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.marketdata.sim_universe import INSTRUMENTS as DEMO
+from laddrix.refdata.store import InstrumentStore, instrument_from_record, instrument_record
+from laddrix.research.replay import (
     ReplayClock,
     ReplayFeed,
     ReplayInstrumentsError,
     replay_instruments,
 )
-from mocktrade.research.ticks import INSTRUMENTS, FileTickStore, NoInstrumentList
+from laddrix.research.ticks import INSTRUMENTS, FileTickStore, NoInstrumentList
 
 IST = ZoneInfo("Asia/Kolkata")
 T0 = datetime(2025, 1, 20, 9, 15, tzinfo=IST)
@@ -184,7 +184,7 @@ def test_a_day_that_can_t_be_described_is_refused_naming_what_is_missing(tmp_pat
 
 
 async def test_the_demo_refuses_such_a_day_before_starting(tmp_path, monkeypatch):
-    from mocktrade.tools import demo
+    from laddrix.tools import demo
 
     FileTickStore(tmp_path / "ticks").append(ticks_of(BANK.id))
     monkeypatch.setattr(demo, "REPLAYS", tmp_path / "replay")

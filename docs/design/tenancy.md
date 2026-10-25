@@ -1,6 +1,6 @@
-# Several firms on one MockTrade (#368)
+# Several firms on one Laddrix (#368)
 
-Ayush decided on 23 Oct 2026 (#278) that MockTrade will be offered to other firms:
+Ayush decided on 23 Oct 2026 (#278) that Laddrix will be offered to other firms:
 - each trader brings their own Zerodha subscription;
 - each trader sees only prices from their own subscription;
 - orders go out through one shared IP or each account's own (#372).
@@ -21,10 +21,10 @@ One server is one firm:
 
 | Word | Meaning |
 | --- | --- |
-| **Workspace** | one firm (or one person using MockTrade alone). Every user and every broker account belongs to exactly one, for life. |
+| **Workspace** | one firm (or one person using Laddrix alone). Every user and every broker account belongs to exactly one, for life. |
 | **Workspace admin** | today's `admin` role, inside its own workspace only: users, accounts, limits, STOP and resume for that workspace. |
 | **Platform operator** | whoever runs the server. **Not a role on the screens at all.** They act only from the server's terminal (the `users` tool): create a workspace and its first admin, rotate keys, revoke sessions, back up. No web request can ever act as the operator, so no workspace admin can become one. |
-| **Price source** | one broker connection that carries prices: one Kite account's ticker under its own subscription, or the simulator / a replay (MockTrade's own data, shareable). |
+| **Price source** | one broker connection that carries prices: one Kite account's ticker under its own subscription, or the simulator / a replay (Laddrix's own data, shareable). |
 
 ## 3. The rule
 
@@ -60,7 +60,7 @@ thing in the asker's workspace?**
     Ayush's rule.
   - **Open question for Zerodha (in the email):** may a risk user or a delegated trader in
     the same firm see the prices of an account they supervise? Until Zerodha answers, the
-    setting `MOCKTRADE_PRICES_VISIBLE=owner` keeps every trader to their own accounts'
+    setting `LADDRIX_PRICES_VISIBLE=owner` keeps every trader to their own accounts'
     sources. `viewers` is the other value.
 - **Paper accounts** name the source they fill against: their owner's Kite account. The
   demo and replays use the simulator, our own data, shared freely.

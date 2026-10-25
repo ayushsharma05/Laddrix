@@ -8,8 +8,8 @@
 #      band say no loss limits are watched, and the damaged file is kept aside.
 set -u
 OUT=${OUT:-$(mktemp -d)}
-stop() { pkill -f "^python3? -m mocktrade[.]tools[.]demo" 2>/dev/null; sleep 2; }
-start() { python3 -m mocktrade.tools.demo > "$OUT/demo-$1.log" 2>&1 & sleep 12; }
+stop() { pkill -f "^python3? -m laddrix[.]tools[.]demo" 2>/dev/null; sleep 2; }
+start() { python3 -m laddrix.tools.demo > "$OUT/demo-$1.log" 2>&1 & sleep 12; }
 stop; rm -rf data/demo
 start 1
 cat > "$OUT/check.py" <<'PY'
@@ -17,7 +17,7 @@ import subprocess, sys, time, httpx
 step = sys.argv[1]
 if step != "1":
     time.sleep(31 - time.time() % 30)  # a fresh code: each one works only once
-code = subprocess.run(["python3", "-m", "mocktrade.tools.demo", "--code"],
+code = subprocess.run(["python3", "-m", "laddrix.tools.demo", "--code"],
                       capture_output=True, text=True).stdout.strip()
 c = httpx.Client(base_url="http://127.0.0.1:8000", headers={"origin": "http://localhost:8000"})
 assert c.post("/api/session", json={"username": "demo", "password": "demo-password-123",

@@ -16,7 +16,7 @@ const out = process.argv[2] || '.';
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
+  await page.getByLabel('Authenticator code').fill(execSync('python3 -m laddrix.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
   await page.locator('.ladder .price.last').first().waitFor({ timeout: 20000 });
   const ladders = await page.locator('.ladder').count();

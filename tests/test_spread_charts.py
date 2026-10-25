@@ -16,11 +16,11 @@ from datetime import UTC, date, datetime
 import pytest
 from test_charts import FakeHistory, t, tick
 
-from mocktrade.charts.candles import CandleBuilder
-from mocktrade.charts.service import SPREAD_NOTE, Charts, combine, spread_candles, spread_forming
-from mocktrade.domain.accounts import User
-from mocktrade.spreads.model import SpreadDef, SpreadLeg
-from mocktrade.spreads.store import SpreadBook
+from laddrix.charts.candles import CandleBuilder
+from laddrix.charts.service import SPREAD_NOTE, Charts, combine, spread_candles, spread_forming
+from laddrix.domain.accounts import User
+from laddrix.spreads.model import SpreadDef, SpreadLeg
+from laddrix.spreads.store import SpreadBook
 
 OCT, NOV, DEC = "NFO:NIFTY26OCTFUT", "NFO:NIFTY26NOVFUT", "NFO:NIFTY26DECFUT"
 
@@ -116,7 +116,7 @@ async def live(tmp_path, nifty_fut):
     """A running server with charts and spreads: the builder taps every tick."""
     from test_stream import Live
 
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.server.app import ServerSettings, create_app
 
     server = Live(tmp_path, nifty_fut)
     server.store.add(replace(nifty_fut, symbol="NIFTY26NOVFUT", expiry=date(2026, 11, 24)))

@@ -3,7 +3,7 @@ Restores each file in `finally`; a mutant that hangs the tests counts as caught.
 Run alone (two runs at once overwrite each other's files). Anchor each mutant so its text is
 unique: a shorter line can hide inside a more indented one earlier in the file."""
 import subprocess
-B = "src/mocktrade/research/backtest.py"
+B = "src/laddrix/research/backtest.py"
 M = [
  (B, "        if not state[\"started\"] and now >= start_at:", "        if not state[\"started\"]:"),
  (B, "        while state[\"next_beat\"] <= now:\n            rt.algos.heartbeat()", "        if False:\n            rt.algos.heartbeat()"),

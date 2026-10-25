@@ -21,8 +21,15 @@
   flex: 0 0 auto;
 }
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 700;
   color: var(--text);
+}
+.brand-mark {
+  width: 16px;
+  height: 16px;
 }
 .account-pick {
   display: flex;

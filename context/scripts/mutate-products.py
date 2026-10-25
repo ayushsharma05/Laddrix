@@ -4,12 +4,12 @@ alerts); the Python or UI tests must notice. Restores each file in `finally`; a 
 caught. Run alone. Every anchor is checked to be unique first."""
 import subprocess
 
-RC = "src/mocktrade/positions/reconcile.py"
-RV = "src/mocktrade/recovery.py"
-PB = "src/mocktrade/broker/paper.py"
-CK = "src/mocktrade/risk/checks.py"
-PF = "src/mocktrade/platform.py"
-BK = "src/mocktrade/positions/book.py"
+RC = "src/laddrix/positions/reconcile.py"
+RV = "src/laddrix/recovery.py"
+PB = "src/laddrix/broker/paper.py"
+CK = "src/laddrix/risk/checks.py"
+PF = "src/laddrix/platform.py"
+BK = "src/laddrix/positions/book.py"
 ST = "ui/src/state/store.ts"
 PO = "ui/src/widgets/books/Positions.tsx"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_reconcile_positions.py", "tests/test_recovery.py",

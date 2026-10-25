@@ -21,12 +21,12 @@ from test_backtest import DAY, MODEL, T0, spec, store  # noqa: F401 (fixture)
 from test_server import ORIGIN
 from test_workspaces import TwoFirms
 
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.ops.scheduler import IST, Scheduler
-from mocktrade.reports.service import Reports
-from mocktrade.reports.store import ReportStore
-from mocktrade.research import backtest
-from mocktrade.research.backtest import (
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.ops.scheduler import IST, Scheduler
+from laddrix.reports.service import Reports
+from laddrix.reports.store import ReportStore
+from laddrix.research import backtest
+from laddrix.research.backtest import (
     MAX_PER_USER,
     MAX_WAITING,
     BacktestBusy,
@@ -36,8 +36,8 @@ from mocktrade.research.backtest import (
     RecordedDay,
     Worker,
 )
-from mocktrade.research.ticks import FileTickStore
-from mocktrade.server.app import ServerSettings, create_app
+from laddrix.research.ticks import FileTickStore
+from laddrix.server.app import ServerSettings, create_app
 
 # a slicer firing a slice a second for a minute: more than the order rate allows, so the
 # throttle makes orders wait their turn (in replayed time)
@@ -86,7 +86,7 @@ async def test_an_order_waits_its_turn_in_replayed_time(
     the replay goes on meanwhile, never stuck re-checking a waiting order."""
     import functools
 
-    from mocktrade.risk.throttle import OrderThrottle, RateRule
+    from laddrix.risk.throttle import OrderThrottle, RateRule
 
     tight = (RateRule("per 5 s", 5.0, limit=1, cancel_limit=10),)
     monkeypatch.setattr(backtest, "OrderThrottle", functools.partial(OrderThrottle, rules=tight))
@@ -272,7 +272,7 @@ async def test_a_slow_job_never_holds_up_the_others():
 
 
 def backtest_wait():
-    from mocktrade.ops import scheduler
+    from laddrix.ops import scheduler
 
     return scheduler.WAIT_S
 

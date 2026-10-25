@@ -7,13 +7,13 @@ the tests must notice. Restores each file in `finally`; a hang counts as caught.
 from the repo root."""
 import subprocess
 
-L = "src/mocktrade/ops/logs.py"
-S = "src/mocktrade/ops/status.py"
-A = "src/mocktrade/server/app.py"
-ROUTES_OPS = "src/mocktrade/server/routes/ops.py"
-O = "src/mocktrade/orders/manager.py"
-M = "src/mocktrade/metrics.py"
-V = "src/mocktrade/tools/serve.py"
+L = "src/laddrix/ops/logs.py"
+S = "src/laddrix/ops/status.py"
+A = "src/laddrix/server/app.py"
+ROUTES_OPS = "src/laddrix/server/routes/ops.py"
+O = "src/laddrix/orders/manager.py"
+M = "src/laddrix/metrics.py"
+V = "src/laddrix/tools/serve.py"
 U = "ui/src/widgets/admin/Admin.tsx"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_operations.py", "tests/test_metrics.py",
        "tests/test_supervisor.py", "tests/test_workspaces.py"], ".")

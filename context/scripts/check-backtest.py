@@ -9,12 +9,12 @@ import tempfile
 import time
 from pathlib import Path
 
-from mocktrade.charges.model import ScheduleCharges
-from mocktrade.charges.schedules import KITE_STANDARD
-from mocktrade.marketdata.sim_universe import INSTRUMENTS
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.research.backtest import Backtests, BacktestSpec
-from mocktrade.research.ticks import IST, FileTickStore
+from laddrix.charges.model import ScheduleCharges
+from laddrix.charges.schedules import KITE_STANDARD
+from laddrix.marketdata.sim_universe import INSTRUMENTS
+from laddrix.refdata.store import InstrumentStore
+from laddrix.research.backtest import Backtests, BacktestSpec
+from laddrix.research.ticks import IST, FileTickStore
 
 
 async def main() -> None:
@@ -26,7 +26,7 @@ async def main() -> None:
         store.add(i)
     days = ticks.days()
     first_us, _ = next(ticks.read_timed(days[0]))
-    from mocktrade.research.replay import EPOCH
+    from laddrix.research.replay import EPOCH
     from datetime import timedelta
 
     start = (EPOCH + timedelta(microseconds=first_us)).astimezone(IST).strftime("%H:%M")

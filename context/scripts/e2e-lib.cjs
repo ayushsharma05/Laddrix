@@ -11,11 +11,11 @@ const { execFileSync } = require('child_process');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..', '..'); // the demo's data folder is found from here
-const BASE = process.env.MOCKTRADE_URL || 'http://localhost:8000/';
+const BASE = process.env.LADDRIX_URL || 'http://localhost:8000/';
 
 /** The demo's current authenticator code (a new one every 30 s). */
 function code() {
-  return execFileSync('python3', ['-m', 'mocktrade.tools.demo', '--code'], { cwd: ROOT }).toString().trim();
+  return execFileSync('python3', ['-m', 'laddrix.tools.demo', '--code'], { cwd: ROOT }).toString().trim();
 }
 
 /** Sign in as `user` and wait until the page's widgets are drawn. */

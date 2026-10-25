@@ -4,10 +4,10 @@ bad schemes refused); the tests must notice. Runs the tests unmutated first. Res
 file. Run alone."""
 import subprocess
 
-H = "src/mocktrade/broker/kite/http.py"
-L = "src/mocktrade/broker/kite/live.py"
-D = "src/mocktrade/broker/kite/daily_login.py"
-V = "src/mocktrade/tools/serve.py"
+H = "src/laddrix/broker/kite/http.py"
+L = "src/laddrix/broker/kite/live.py"
+D = "src/laddrix/broker/kite/daily_login.py"
+V = "src/laddrix/tools/serve.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_egress.py"]
 MUTANTS = [
  (H, "            proxy=proxy,", ""),

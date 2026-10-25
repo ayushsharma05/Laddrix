@@ -1,4 +1,4 @@
-"""MockTrade backlog: milestones, labels, issues. Rendered into GitHub by create_backlog.py."""
+"""Laddrix backlog: milestones, labels, issues. Rendered into GitHub by create_backlog.py."""
 
 LATER = ("\n\n> 🧭 **Detailed steps come later.** The exact step-by-step instructions for this issue are added "
          "when we reach it, because they depend on decisions made in earlier issues. The goal and the "
@@ -27,7 +27,7 @@ MILESTONES = [
  ("Phase 2 · Hard numbers", "Speed, load, reliability, recovery and audit rules with real numbers."),
  ("Phase 3 · Study CME", "Read the real exchange's specs and rules; get one day of real COMEX data."),
  ("Phase 4 · Business model", "Define every noun (order, fill, position…), how they relate, and the ID scheme."),
- ("Phase 5 · Architecture", "MockTrade's components and the big technology decisions, each recorded as an ADR."),
+ ("Phase 5 · Architecture", "Laddrix's components and the big technology decisions, each recorded as an ADR."),
  ("Phase 6 · Contracts", "Every message, the order life story, the step-by-step journeys, the UI API."),
  ("Phase 7 · Failures & budgets", "What can break and what we do; time and capacity budgets."),
  ("Phase 8 · Test strategy", "MockCME design and the test scenarios for v0.1."),
@@ -71,10 +71,10 @@ issue("Create the GitHub Projects board", 0, ["type:setup", "comp:ci"], body(
  "Create the board that shows every issue and where it is: Backlog → To do → In progress → Review → Done.",
  "The board is how you (and anyone reading your portfolio) see the whole project at a glance. Real teams run their week from it.",
  ["An **issue** is one piece of work. A **milestone** groups issues into a phase or release. The **board** shows their status."],
- ["In the MockTrade repo click **Projects → Link a project → New project**.",
-  "Choose the **Board** template and name it `MockTrade`.",
+ ["In the Laddrix repo click **Projects → Link a project → New project**.",
+  "Choose the **Board** template and name it `Laddrix`.",
   "Rename the columns to: `Backlog`, `To do`, `In progress`, `Review`, `Done`.",
-  "Open the board's **⋯ → Workflows**. Turn on **Auto-add to project** for repository `MockTrade` with filter `is:issue is:open`. New issues now appear on the board automatically.",
+  "Open the board's **⋯ → Workflows**. Turn on **Auto-add to project** for repository `Laddrix` with filter `is:issue is:open`. New issues now appear on the board automatically.",
   "Click **+ Add item** at the bottom of Backlog, type `#`, and add every existing open issue (or use the auto-add workflow above).",
   "Move this issue to **In progress** while you do it, then to **Done**."],
  ["The board exists with the five columns", "All open issues appear on it", "Auto-add is on"]))
@@ -93,7 +93,7 @@ issue("Set up your Windows laptop: Git, Python and VS Code", 0, ["type:setup"], 
   "Tell Git who you are (it stamps this on every commit):\n   ```\n   git config --global user.name \"Ayush Sharma\"\n   git config --global user.email \"<the email on your GitHub account>\"\n   ```"],
  ["All three `--version` commands print a version", "`git config --global user.name` prints your name"]))
 
-issue("Clone MockTrade and run the tests on your laptop", 0, ["type:setup", "type:test"], body(
+issue("Clone Laddrix and run the tests on your laptop", 0, ["type:setup", "type:test"], body(
  "Copy the repo onto your laptop, create a private Python environment for it, and see `1 passed` locally.",
  "This is the loop you will repeat thousands of times: change code → run tests locally → push. Running tests locally first is faster than waiting for CI.",
  ["**Clone** = download the repo with its full history.",
@@ -103,7 +103,7 @@ issue("Clone MockTrade and run the tests on your laptop", 0, ["type:setup", "typ
   "Create and switch on the virtual environment:\n   ```\n   python -m venv .venv\n   .venv\\Scripts\\Activate.ps1\n   ```\n   Your prompt now starts with `(.venv)`. If PowerShell says scripts are disabled, run once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` and try again.",
   "Install the test tool and run the tests:\n   ```\n   pip install pytest\n   pytest\n   ```\n   You should see `1 passed`.",
   "Open the project in VS Code: `code .` — then press Ctrl+Shift+P → \"Python: Select Interpreter\" → choose the one inside `.venv`."],
- ["`pytest` prints `1 passed` on your laptop", "VS Code opens MockTrade using the `.venv` interpreter"], deps=["#5"]))
+ ["`pytest` prints `1 passed` on your laptop", "VS Code opens Laddrix using the `.venv` interpreter"], deps=["#5"]))
 
 issue("Your first pull request from the laptop: fix test style and add requirements-dev.txt", 0, ["type:setup", "type:test", "comp:ci"], body(
  "Make your first change entirely from your laptop: branch → edit → test → commit → push → pull request → merge.",
@@ -175,7 +175,7 @@ issue("Learn: latency, throughput, availability and recovery", 2, ["type:learn"]
  ["You can explain all four and what p99 means"]))
 
 issue("Write the hard numbers (docs/requirements/hard-numbers.md)", 2, ["type:design"], body(
- "Set target numbers for MockTrade, each with a one-line reason.",
+ "Set target numbers for Laddrix, each with a one-line reason.",
  "Numbers turn \"fast\" into something we can test. Phase 7 splits them into per-component budgets.",
  None,
  ["Create `docs/requirements/hard-numbers.md` with a table: Area · Target · Reason · How we measure.",
@@ -235,7 +235,7 @@ issue("Get one day of real COMEX data (Databento) and describe it", 3, ["type:se
   "PR (for `.gitignore` + `data.md`) → review → merge."],
  ["Data file on your laptop, not in Git", "`data.md` describes every column"], deps=["#15", "#17"]))
 
-issue("ADR-0001: which products MockTrade supports first", 3, ["type:design"], body(
+issue("ADR-0001: which products Laddrix supports first", 3, ["type:design"], body(
  "Write our first Architecture Decision Record: the products and contract months for v0.1 → v1.0.",
  "An ADR records a decision, the options, and why — so future-you knows why things are the way they are.",
  ["**ADR format**: Title · Status · Context · Options · Decision · Consequences. One page."],
@@ -246,7 +246,7 @@ issue("ADR-0001: which products MockTrade supports first", 3, ["type:design"], b
 
 # ============================ PHASE 4 ============================
 issue("Write the glossary (docs/design/glossary.md)", 4, ["type:design"], body(
- "One-line definitions for every word used in MockTrade: order, fill, leg, tick, position, session…",
+ "One-line definitions for every word used in Laddrix: order, fill, leg, tick, position, session…",
  "Teams lose weeks when two people mean different things by one word.",
  None,
  ["Collect every noun from the user stories and the CME notes.",
@@ -255,7 +255,7 @@ issue("Write the glossary (docs/design/glossary.md)", 4, ["type:design"], body(
  ["Every noun in the stories is defined"], deps=["#10", "#16"], later=True))
 
 issue("Domain model: entities, fields and relationships", 4, ["type:design"], body(
- "Define MockTrade's core data: Instrument, Product, Spread, Account, Trader, Order, Fill, Position, RiskLimit.",
+ "Define Laddrix's core data: Instrument, Product, Spread, Account, Trader, Order, Fill, Position, RiskLimit.",
  "These become the data classes in `common/` — the shared language of every service.",
  ["**Entity** = a thing with an identity (an order). **Relationship** = how things connect (an order has many fills)."],
  ["For each entity list its fields with type and meaning.",
@@ -273,8 +273,8 @@ issue("ADR-0002: the ID scheme", 4, ["type:design"], body(
  ["ADR merged"], deps=["#21"], later=True))
 
 # ============================ PHASE 5 ============================
-issue("Architecture document for MockTrade", 5, ["type:design"], body(
- "Adapt the reference architecture into MockTrade's own: components, where each runs (London/Aurora groups), who talks to whom.",
+issue("Architecture document for Laddrix", 5, ["type:design"], body(
+ "Adapt the reference architecture into Laddrix's own: components, where each runs (London/Aurora groups), who talks to whom.",
  "This is the map every later issue builds against. Every box must trace to a story or a hard number.",
  None,
  ["Draw the component diagram (Mermaid) and a table: component · job · talks to · story IDs.",
@@ -341,7 +341,7 @@ issue("UI ↔ App Server API", 6, ["type:design", "comp:appserver", "comp:ui"], 
 
 # ============================ PHASE 7 ============================
 issue("Failure catalogue", 7, ["type:design"], body(
- "List at least 15 things that can break and what MockTrade does for each.",
+ "List at least 15 things that can break and what Laddrix does for each.",
  "This is what separates expert designs from amateur ones.",
  ["Examples: MockCME disconnects; duplicate fill; guard crashes mid-order; slow browser; clock jumps; replay file ends."],
  ["Table: failure · how we detect it · what we do · how we test it.", "Create `docs/design/failures.md`; PR → merge."],

@@ -5,8 +5,8 @@ nothing without STOP); the tests must notice. Runs the tests unmutated first. Re
 file. Run alone."""
 import subprocess
 
-G = "src/mocktrade/orders/gtt.py"
-P = "src/mocktrade/platform.py"
+G = "src/laddrix/orders/gtt.py"
+P = "src/laddrix/platform.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_gtt_stop.py", "tests/test_gtt.py"]
 MUTANTS = [
  (G, "        return all(_reduces(leg, held) for leg in view.request.legs)", "        return True"),

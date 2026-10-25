@@ -12,29 +12,29 @@ from datetime import date
 
 import pytest
 
-from mocktrade.algos.autospreader import algo_type
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.algos.engine import AlgoState
-from mocktrade.broker.base import BrokerError
-from mocktrade.broker.paper import PaperBroker
-from mocktrade.config import ConfigError
-from mocktrade.domain.accounts import BrokerAccount, User
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.order_spec import spec_to_dict, standard_spec
-from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders.model import ClientIds
-from mocktrade.platform import Platform
-from mocktrade.refdata.freeze import apply_freeze, parse_freeze
-from mocktrade.refdata.store import InstrumentStore, instrument_from_record, instrument_record
-from mocktrade.risk.checks import RiskGate
-from mocktrade.risk.closing import close_position
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.risk.limits import RiskLimits
-from mocktrade.spreads.model import SpreadLeg
-from mocktrade.spreads.store import SpreadBook
-from mocktrade.tools.serve import ServeSettings
+from laddrix.algos.autospreader import algo_type
+from laddrix.algos.builtin import BUILTIN
+from laddrix.algos.engine import AlgoState
+from laddrix.broker.base import BrokerError
+from laddrix.broker.paper import PaperBroker
+from laddrix.config import ConfigError
+from laddrix.domain.accounts import BrokerAccount, User
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.order_spec import spec_to_dict, standard_spec
+from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.orders.model import ClientIds
+from laddrix.platform import Platform
+from laddrix.refdata.freeze import apply_freeze, parse_freeze
+from laddrix.refdata.store import InstrumentStore, instrument_from_record, instrument_record
+from laddrix.risk.checks import RiskGate
+from laddrix.risk.closing import close_position
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.limits import RiskLimits
+from laddrix.spreads.model import SpreadLeg
+from laddrix.spreads.store import SpreadBook
+from laddrix.tools.serve import ServeSettings
 
 FUT, NOV = "NFO:NIFTY26OCTFUT", "NFO:NIFTY26NOVFUT"
 
@@ -88,11 +88,11 @@ def test_a_bad_file_never_stops_the_server_but_is_logged(tmp_path, nifty_fut, ca
 def test_the_setting_must_name_a_file_that_can_be_read(tmp_path):
     from test_serve import env
 
-    with pytest.raises(ConfigError, match="MOCKTRADE_FREEZE_FILE can't be read"):
-        ServeSettings.from_env(env(MOCKTRADE_FREEZE_FILE=str(tmp_path / "gone.csv")))
+    with pytest.raises(ConfigError, match="LADDRIX_FREEZE_FILE can't be read"):
+        ServeSettings.from_env(env(LADDRIX_FREEZE_FILE=str(tmp_path / "gone.csv")))
     path = tmp_path / "freeze.csv"
     path.write_text("NIFTY,1800\n")
-    assert ServeSettings.from_env(env(MOCKTRADE_FREEZE_FILE=str(path))).freeze_file == path
+    assert ServeSettings.from_env(env(LADDRIX_FREEZE_FILE=str(path))).freeze_file == path
 
 
 # --- the instruments ------------------------------------------------------------------------
@@ -245,7 +245,7 @@ async def test_on_the_paper_broker_an_ase_hedge_is_split_at_the_freeze(nifty_fut
 
 
 def test_demo_and_simulated_servers_carry_sample_limits():
-    from mocktrade.marketdata.sim_universe import FREEZE, INSTRUMENTS
+    from laddrix.marketdata.sim_universe import FREEZE, INSTRUMENTS
 
     store = InstrumentStore()
     for instrument, _ in INSTRUMENTS:
@@ -256,7 +256,7 @@ def test_demo_and_simulated_servers_carry_sample_limits():
 
 
 def test_an_instrument_with_a_freeze_says_it_over_the_api():
-    from mocktrade.server.formats import instrument_to_dict as _instrument
+    from laddrix.server.formats import instrument_to_dict as _instrument
 
     nifty = Instrument(Exchange.NFO, "NIFTY26OCTFUT", InstrumentKind.FUTURE, 10, 75,
                        date(2026, 10, 27), None, "NIFTY", freeze_qty=1800)  # fmt: skip

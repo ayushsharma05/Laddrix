@@ -4,9 +4,9 @@ ids); the tests must notice. Restores each file in `finally`; a hang counts as c
 Every anchor is checked to be unique first."""
 import subprocess
 
-BT = "src/mocktrade/research/backtest.py"
-ROUTES_RESEARCH = "src/mocktrade/server/routes/research.py"
-US = "src/mocktrade/server/users.py"
+BT = "src/laddrix/research/backtest.py"
+ROUTES_RESEARCH = "src/laddrix/server/routes/research.py"
+US = "src/laddrix/server/users.py"
 CMD = ["python3", "-m", "pytest", "-q", "-x", "tests/test_safe_storage.py", "tests/test_backtest.py",
        "tests/test_users.py"]
 MUTANTS = [

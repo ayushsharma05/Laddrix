@@ -273,7 +273,7 @@ function LadderBody({ params, setParams, instrument }: WidgetProps<LadderParams>
         .then((view) => store.applyOrders(accountId, [view]))
         .catch((e: unknown) => {
           if (e instanceof ApiError && e.status === 0) {
-            warn(`${what}: no answer from MockTrade, check the order book before sending again`);
+            warn(`${what}: no answer from Laddrix, check the order book before sending again`);
           } else {
             warn(`${what} refused: ${e instanceof Error ? e.message : String(e)}`);
           }

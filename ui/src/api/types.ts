@@ -522,7 +522,7 @@ export interface Funds {
   collateral_paise: number;
   available_lines: FundsLine[];
   used_lines: FundsLine[];
-  estimate: boolean; // worked out by MockTrade (paper), not the broker's own figures
+  estimate: boolean; // worked out by Laddrix (paper), not the broker's own figures
 }
 
 export interface Holding {
@@ -543,7 +543,7 @@ export interface Holding {
 export interface Trade {
   trade_id: string;
   broker_order_id: string;
-  client_order_id: string; // "" for orders placed outside MockTrade
+  client_order_id: string; // "" for orders placed outside Laddrix
   instrument_id: string;
   side: Side;
   product: string;

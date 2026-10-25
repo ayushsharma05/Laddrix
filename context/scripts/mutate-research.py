@@ -5,8 +5,8 @@ Run alone (two runs at once overwrite each other's files). Anchor each mutant so
 unique: a shorter line can hide inside a more indented one earlier in the file."""
 import subprocess
 
-B = "src/mocktrade/research/backtest.py"
-A = "src/mocktrade/server/routes/research.py"
+B = "src/laddrix/research/backtest.py"
+A = "src/laddrix/server/routes/research.py"
 M = "ui/src/widgets/research/model.ts"
 W = "ui/src/widgets/research/Backtests.tsx"
 R = "ui/src/widgets/research/Recordings.tsx"

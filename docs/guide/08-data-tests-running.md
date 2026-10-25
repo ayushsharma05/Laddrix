@@ -11,7 +11,7 @@
   ├── users.db              people: names, password hashes, authenticator secrets (encrypted),
   │                         accounts, settings
   ├── events.db             THE LEDGER: every order event, fill, STOP, note, in order.
-  │                         After a crash, MockTrade rebuilds itself from this.
+  │                         After a crash, Laddrix rebuilds itself from this.
   ├── rules/                your MTM limits, and what they did today
   ├── ticks/<day>/          recorded prices, for replay and research
   ├── reports/ alerts/ candles/ backtests/
@@ -20,7 +20,7 @@
 
 - **A database** (SQLite) is a file that holds tables, like a spreadsheet that programs can
   search quickly.
-- **A password hash** is a one-way scramble of a password. MockTrade can check a password
+- **A password hash** is a one-way scramble of a password. Laddrix can check a password
   against it, but can never get the password back from it, so even a stolen `users.db` doesn't
   reveal passwords.
 
@@ -98,9 +98,9 @@ cd ui && npm install && npm run build && cd ..
 **The demo** (pretend money, made-up prices):
 
 ```bash
-python3 -m mocktrade.tools.demo --ui ui/dist    # leave it running
+python3 -m laddrix.tools.demo --ui ui/dist    # leave it running
 # in a second terminal:
-python3 -m mocktrade.tools.demo --code          # prints a 6-digit login code
+python3 -m laddrix.tools.demo --code          # prints a 6-digit login code
 # open http://localhost:8000
 #   username: demo     password: demo-password-123     code: from the line above
 # a code works once; wait 30 s for the next one if you log in again
@@ -116,8 +116,8 @@ cd ui && npx vitest run                          # the screens' tests
 **Watch a live ladder in the terminal** (needs a Kite login):
 
 ```bash
-python3 -m mocktrade.tools.login
-python3 -m mocktrade.tools.watch NFO:NIFTY26OCTFUT
+python3 -m laddrix.tools.login
+python3 -m laddrix.tools.watch NFO:NIFTY26OCTFUT
 ```
 
 ---

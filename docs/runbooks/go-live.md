@@ -4,7 +4,7 @@ Use this before the first live session, and again after any change to orders, re
 
 There are two columns of evidence, and they are never mixed up:
 
-- **Paper**: the paper broker filling against simulated prices. It proves MockTrade's own logic. **It proves nothing about Kite.** Run it with `python3 context/scripts/golive-paper.py`; the last run is in `context/evidence/v1-4-golive-paper.txt` (19/19).
+- **Paper**: the paper broker filling against simulated prices. It proves Laddrix's own logic. **It proves nothing about Kite.** Run it with `python3 context/scripts/golive-paper.py`; the last run is in `context/evidence/v1-4-golive-paper.txt` (19/19).
 - **Live**: a real Kite account on the Mumbai server. **Only Ayush runs these steps. No live order is placed without his explicit go-ahead.** The live steps use the smallest size the exchange allows, prefer a cheap, liquid stock (one share) to a futures lot, and are run in market hours. Record the date, time and outcome in the last column of each table.
 
 The steps marked "test" point to automated tests that check the same logic against a fake Kite. Those are not live evidence either.
@@ -15,14 +15,14 @@ The steps marked "test" point to automated tests that check the same logic again
 |---|---|---|---|
 | Server set up as in [server.md](server.md): static IP, hardening, HTTPS | `https://<name>/api/health` answers; SSH only from home | — | ☐ |
 | Kite app's IP whitelist has the server's static IP (SEBI: orders only from a registered IP) | `server.md` § "Check that orders work": the laptop is refused, the server isn't | — | ☐ |
-| `MOCKTRADE_SECRET_KEY`, `deploy/.env` and the Kite API secret are in the password manager | you can read all three from it | — | ☐ |
+| `LADDRIX_SECRET_KEY`, `deploy/.env` and the Kite API secret are in the password manager | you can read all three from it | — | ☐ |
 | Backups run and a restore works | `server.md` § Restore, step 1 (into `/tmp/check`) succeeds on last night's backup | drill 19/19: `context/evidence/v1-3-backup-restore-drill.txt` | ☐ |
 | A crash loses nothing | `incidents.md` § Crash-and-restart drill | drill 17/17 (#328) | — (never crash a live server on purpose) |
-| Holidays set | `MOCKTRADE_HOLIDAYS` has NSE's list for the year | — | ☐ |
-| Freeze quantities set (#424) | `MOCKTRADE_FREEZE_FILE` names a file made from NSE's latest freeze list (`underlying,qty` lines); the start log says how many underlyings and no warnings; the ticket shows "max … per order" on a NIFTY future | orders above it refused in words, algos and closes split to fit (tests: `test_freeze.py`) | ☐ |
-| Alerts reach your phone | set `MOCKTRADE_ALERT_WEBHOOK`, restart, stop the price feed briefly (or wait for the 08:30 login reminder): the message arrives | private and plain-http addresses refused (paper) | ☐ |
+| Holidays set | `LADDRIX_HOLIDAYS` has NSE's list for the year | — | ☐ |
+| Freeze quantities set (#424) | `LADDRIX_FREEZE_FILE` names a file made from NSE's latest freeze list (`underlying,qty` lines); the start log says how many underlyings and no warnings; the ticket shows "max … per order" on a NIFTY future | orders above it refused in words, algos and closes split to fit (tests: `test_freeze.py`) | ☐ |
+| Alerts reach your phone | set `LADDRIX_ALERT_WEBHOOK`, restart, stop the price feed briefly (or wait for the 08:30 login reminder): the message arrives | private and plain-http addresses refused (paper) | ☐ |
 | Limits are right | Admin → Limits: max order value, max lots, daily loss, OPS ≤ 10/s | — | ☐ |
-| SEBI algo rules re-checked (#291) | `docs/design/compliance.md`: the 10 orders/s line and the static IP still hold; if any algo runs above 10/s, it is registered, `MOCKTRADE_ALGO_IDS` set, and Kite's field name for the algo id confirmed with Zerodha | algos refuse to start above 10/s without an id (tests) | ☐ |
+| SEBI algo rules re-checked (#291) | `docs/design/compliance.md`: the 10 orders/s line and the static IP still hold; if any algo runs above 10/s, it is registered, `LADDRIX_ALGO_IDS` set, and Kite's field name for the algo id confirmed with Zerodha | algos refuse to start above 10/s without an id (tests) | ☐ |
 
 ## 1. Login and session expiry
 
@@ -40,9 +40,9 @@ Before each live order: check the size, the price and the account in the ticket.
 | Step | Pass | Paper | Live (Ayush) |
 |---|---|---|---|
 | A limit order rests | OPEN in the order book, and in Kite's own order book with the same price and quantity | ✔ rests at 2% under | ☐ |
-| Modify price and quantity | both show in MockTrade and in Kite | ✔ 150 at the new price | ☐ |
+| Modify price and quantity | both show in Laddrix and in Kite | ✔ 150 at the new price | ☐ |
 | Cancel | CANCELLED in both | ✔ | ☐ |
-| A refused order says why | off the tick grid or not a whole lot: refused in words, before it reaches Kite | ✔ both | ☐ (optional: MockTrade refuses it first) |
+| A refused order says why | off the tick grid or not a whole lot: refused in words, before it reaches Kite | ✔ both | ☐ (optional: Laddrix refuses it first) |
 | A market order fills (only with the go-ahead: it trades) | FILLED; the position shows; `market_protection` was set | ✔ +75 | ☐ |
 | The broker check agrees | Positions → "broker now": no POSITION DIFFERS band for 3 checks (about 10 minutes) | ✔ `ok: true`, no alerts | ☐ |
 | A trade made in Kite's own app is noticed | POSITION DIFFERS appears within two checks; nothing is adopted silently (`incidents.md` § Reconcile mismatch) | — | ☐ |
@@ -61,7 +61,7 @@ Before each live order: check the size, the price and the account in the ticket.
 |---|---|---|---|
 | A stop-loss order (SL-M) on the closing side rests | in Kite's order book as TRIGGER PENDING | ✔ rests, cancelled | ☐ |
 | A GTT stop is placed and deleted | listed in Kite's GTT list as active, then deleted | ✔ placed active, deleted | ☐ |
-| A stop held by MockTrade (trailing stop, OCO, bracket) is understood | its help text says "works while the server runs"; a restart raises **UNPROTECTED** (`incidents.md`) | ✔ crash drill (#328) | ☐ (read it; don't crash on purpose) |
+| A stop held by Laddrix (trailing stop, OCO, bracket) is understood | its help text says "works while the server runs"; a restart raises **UNPROTECTED** (`incidents.md`) | ✔ crash drill (#328) | ☐ (read it; don't crash on purpose) |
 
 ## 5. Square-off
 

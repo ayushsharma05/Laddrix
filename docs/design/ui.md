@@ -1,10 +1,10 @@
-# MockTrade UI: the terminal
+# Laddrix UI: the terminal
 
 The screens are a **trading terminal**, not a website: many small windows (widgets) in one
 workspace, dense grids, click-to-trade ladders, fixed-size text. Convenience for the trader
 comes first: the common action is one click, the dangerous one is never one accidental click.
 
-The visual reference is the "MockTrade UI design" canvas (8 boards: ladder, design system,
+The visual reference is the "Laddrix UI design" canvas (8 boards: ladder, design system,
 workspace, order ticket and messages, stopped and alerts, sign-in and session start, audit
 trail, phone). It follows patterns common to professional trading terminals (price ladders,
 dockable widgets, audit trails); it copies no firm's screens or names.
@@ -60,7 +60,7 @@ Sans elsewhere.
 ## 3. The shell
 
 ```
-menu bar      MockTrade · File Edit View Window Help                       user · account
+menu bar      Laddrix · File Edit View Window Help                       user · account
 toolbar       Widgets ▾ · Search product (/) · Explore ▾ ······ Prices● Kite● Recon● 12/350·min
               | Day +₹14,812.50 · Layouts ▾ · 10:14:52 · Save · XLS · Lock · STOP
 env strip     LIVE · KITE · orders go to the exchange      (amber PAPER strip for paper)
@@ -116,7 +116,7 @@ free page: a canvas bigger than the screen when windows sit past its edge
 
 ### The right-click menu (#412)
 
-The browser's own menu never shows in MockTrade (except in text boxes, which keep copy and
+The browser's own menu never shows in Laddrix (except in text boxes, which keep copy and
 paste, and on Shift+right-click). A left click stays for trading: a click on a ladder price
 sends an order, so menus are on the right button, the keyboard's Menu key and Shift+F10.
 

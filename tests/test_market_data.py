@@ -2,8 +2,8 @@
 
 import asyncio
 
-from mocktrade.domain.ticks import Tick
-from mocktrade.marketdata.service import MarketData
+from laddrix.domain.ticks import Tick
+from laddrix.marketdata.service import MarketData
 
 
 def tick(instrument_id, ltp):

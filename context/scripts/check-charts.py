@@ -1,4 +1,4 @@
-"""#231: the chart API on a running demo (python -m mocktrade.tools.demo): the spec, today's
+"""#231: the chart API on a running demo (python -m laddrix.tools.demo): the spec, today's
 1-minute and 5-minute candles (recorded history joined to live), one candle checked against the
 recorded ticks by hand, the forming candle on the stream, and the marks of a real fill.
 
@@ -13,15 +13,15 @@ from datetime import UTC, datetime, timedelta
 import httpx
 from websockets.asyncio.client import connect
 
-from mocktrade.charts.candles import IST, MINUTE, bucket_start
-from mocktrade.research.ticks import EPOCH, FileTickStore
+from laddrix.charts.candles import IST, MINUTE, bucket_start
+from laddrix.research.ticks import EPOCH, FileTickStore
 
 BASE = "http://localhost:8000"
 FUT = sys.argv[1] if len(sys.argv) > 1 else "NFO:NIFTY26OCTFUT"
 
 
 async def main() -> None:
-    code = subprocess.check_output(["python3", "-m", "mocktrade.tools.demo", "--code"]).decode().strip()
+    code = subprocess.check_output(["python3", "-m", "laddrix.tools.demo", "--code"]).decode().strip()
     async with httpx.AsyncClient(base_url=BASE, headers={"origin": BASE}) as c:
         r = await c.post("/api/session", json={"username": "demo", "password": "demo-password-123", "code": code})
         r.raise_for_status()

@@ -1,4 +1,4 @@
-"""The unprotected-position band (V1.2, #328): a position that had a stop held by MockTrade and
+"""The unprotected-position band (V1.2, #328): a position that had a stop held by Laddrix and
 lost it (a restart, a pause, a stop, a failure) gets one ERROR band until it is flat or covered
 again; never-protected positions are left alone; nothing is decided before recovery."""
 
@@ -6,13 +6,13 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from mocktrade.algos.engine import AlgoEvent, AlgoState, AlgoView
-from mocktrade.algos.spec import AlgoSpec
-from mocktrade.domain.gtt import GttStatus
-from mocktrade.domain.orders import OrderType, Side
-from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.protection import ProtectionGuard
-from mocktrade.platform import LostProtection
+from laddrix.algos.engine import AlgoEvent, AlgoState, AlgoView
+from laddrix.algos.spec import AlgoSpec
+from laddrix.domain.gtt import GttStatus
+from laddrix.domain.orders import OrderType, Side
+from laddrix.ops.alerts import Alerts
+from laddrix.ops.protection import ProtectionGuard
+from laddrix.platform import LostProtection
 
 FUT = "NFO:NIFTY26OCTFUT"
 REL = "NSE:RELIANCE"

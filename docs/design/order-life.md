@@ -1,6 +1,6 @@
 # An order's life, and the key journeys
 
-How an order moves from a click to its end, and what happens in the moments that matter: a partial fill, a modify, a cancel, a reject, a restart, the broker disconnecting, and STOP. The code is `src/mocktrade/orders/manager.py`; the words are in the [glossary](glossary.md). The happy path (place and fill) is drawn in [kite-architecture.md](kite-architecture.md).
+How an order moves from a click to its end, and what happens in the moments that matter: a partial fill, a modify, a cancel, a reject, a restart, the broker disconnecting, and STOP. The code is `src/laddrix/orders/manager.py`; the words are in the [glossary](glossary.md). The happy path (place and fill) is drawn in [kite-architecture.md](kite-architecture.md).
 
 ## States
 

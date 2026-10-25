@@ -19,8 +19,8 @@ from kite_packets import (
     quote_packet,
 )
 
-from mocktrade.broker.kite.decoder import DecodeError, decode_frame, decode_packet, split_packets
-from mocktrade.domain.ticks import DepthLevel
+from laddrix.broker.kite.decoder import DecodeError, decode_frame, decode_packet, split_packets
+from laddrix.domain.ticks import DepthLevel
 
 
 def test_ltp_packet():

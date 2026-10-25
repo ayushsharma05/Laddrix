@@ -9,14 +9,14 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import pytest
 
-from mocktrade.broker.kite.daily_login import KiteDailyLogin, WrongKiteUser
-from mocktrade.broker.kite.http import KiteHttp
-from mocktrade.config import ConfigError, KiteSettings
-from mocktrade.domain.accounts import BrokerAccount, Role
-from mocktrade.server import security
-from mocktrade.server.security import SecretBox
-from mocktrade.server.users import LoginFailed, UserStore
-from mocktrade.tools import users as users_tool
+from laddrix.broker.kite.daily_login import KiteDailyLogin, WrongKiteUser
+from laddrix.broker.kite.http import KiteHttp
+from laddrix.config import ConfigError, KiteSettings
+from laddrix.domain.accounts import BrokerAccount, Role
+from laddrix.server import security
+from laddrix.server.security import SecretBox
+from laddrix.server.users import LoginFailed, UserStore
+from laddrix.tools import users as users_tool
 
 PASSWORD = "a long enough password"
 NOW = datetime(2026, 10, 14, 9, 0, tzinfo=UTC)
@@ -124,18 +124,18 @@ async def test_logging_in_as_the_wrong_zerodha_client_is_refused(tmp_path):
 def test_users_tool_end_to_end(tmp_path, capsys):
     assert users_tool.main(["new-key"], {}) == 0
     key = capsys.readouterr().out.splitlines()[0].split("=", 1)[1]
-    env = {"MOCKTRADE_SECRET_KEY": key, "MOCKTRADE_USERS_DB": str(tmp_path / "u.db")}
+    env = {"LADDRIX_SECRET_KEY": key, "LADDRIX_USERS_DB": str(tmp_path / "u.db")}
     users_tool.main(
         ["add-user", "ayush", "Ayush", "--roles", "admin,trader"], env, lambda: PASSWORD
     )
-    assert "otpauth://totp/MockTrade:ayush" in capsys.readouterr().out
+    assert "otpauth://totp/Laddrix:ayush" in capsys.readouterr().out
     users_tool.main(["add-account", "acc-1", "kite", "AB1234", "--owner", "ayush"], env)
     users_tool.main(["password", "ayush"], env, lambda: "another long password")
     users_tool.main(["disable", "ayush"], env)
     store = users_tool.store_from_env(env)
     assert store.get_account("acc-1").broker_client_id == "AB1234"
     assert store.get_user("ayush").active is False
-    with pytest.raises(ConfigError, match="MOCKTRADE_SECRET_KEY"):
+    with pytest.raises(ConfigError, match="LADDRIX_SECRET_KEY"):
         users_tool.store_from_env({})
 
 

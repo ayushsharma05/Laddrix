@@ -1,4 +1,4 @@
-# MockTrade status
+# Laddrix status
 
 As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full history up to
 23 Oct (every milestone's PRs and checks) is kept in
@@ -72,11 +72,19 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   `node context/showcase/render.cjs`.
 - **Bug #458** (two backtests started in the same second could share an id; found by CI):
   fixed in its own PR.
-- **Pull requests:** the showcase PR (#455) and the backtest-id fix (#458).
+- **Renamed to Laddrix (#457, 25 Oct):** other repositories on GitHub already use "MockTrade", so Ayush
+  chose **Laddrix** (after the price ladder). Everything is renamed: the package `laddrix`, `LADDRIX_*`
+  settings, the screens, docs, posters and the advert. There is a new logo in
+  [docs/brand/](../docs/brand/README.md), also shown as the app's icon and in its menu bar. The GitHub
+  repository keeps its old address until Ayush renames it.
+- **Pull requests:** the showcase (#455), the backtest-id fix (#458) and the rename (#457).
 
 ## What's next
 
 Ayush pauses until Thursday (his weekly limit). Then:
+
+0. **Ayush:** rename the GitHub repository to `Laddrix` (Settings → General → Repository name), and
+   rename any `MOCKTRADE_*` keys in a local `.env` to `LADDRIX_*`.
 
 1. **Ayush's to-do list** (one GitHub issue): the steps only he can do, in order.
 2. **The feature issues**, smallest dependency first:

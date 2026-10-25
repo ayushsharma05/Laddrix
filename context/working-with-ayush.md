@@ -3,7 +3,7 @@
 Read this before replying. These are Ayush's own stated preferences, gathered over the first planning conversation (Oct 2026).
 
 ## Who he is (for this project)
-- Works on a COMEX metals trading desk: gold (GC), silver (SI) and copper (HG) calendar spreads, butterflies and condors. He is the "trader" whose needs MockTrade is built for.
+- Works on a COMEX metals trading desk: gold (GC), silver (SI) and copper (HG) calendar spreads, butterflies and condors. He is the "trader" whose needs Laddrix is built for.
 - New to programming. Wants to become an expert who thinks and writes code the way experts do.
 - Uses Windows, VS Code, Git and GitHub (account `ayushsharma05`).
 

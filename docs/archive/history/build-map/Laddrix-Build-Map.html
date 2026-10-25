@@ -1,0 +1,356 @@
+<title>Laddrix Build Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a control-room schematic. Header + "you are here" bar, the architecture map (scrolls sideways on phones), a detail panel beside it on wide screens. */
+:root {
+  --bg: #f4f6f8; --panel: #ffffff; --zone: #e9edf2; --ink: #15202c; --muted: #5a6879;
+  --line: #c3ccd7; --wire: #8795a6; --accent: #c96a00; --accent-soft: #fff1df; --done: #2f8552;
+  --r1: #dbe7f7; --r2: #bfd5f2; --r3: #97bbea; --r4: #6c9fe0; --r5: #4a83d3; --r6: #3569bd; --r7: #2a55a0; --r8: #22457f; --r9: #1a3561;
+  --chip-ink-light: #13243a; --chip-ink-dark: #ffffff;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1319; --panel: #151c24; --zone: #111820; --ink: #e5ebf2; --muted: #95a3b4;
+  --line: #2b3744; --wire: #66778b; --accent: #f29b2c; --accent-soft: #2f2210; --done: #43a86b;
+  --r1: #dbe7f7; --r2: #bfd5f2; --r3: #97bbea; --r4: #6c9fe0; --r5: #4a83d3; --r6: #3569bd; --r7: #2a55a0; --r8: #22457f; --r9: #1a3561;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e1319; --panel: #151c24; --zone: #111820; --ink: #e5ebf2; --muted: #95a3b4;
+  --line: #2b3744; --wire: #66778b; --accent: #f29b2c; --accent-soft: #2f2210; --done: #43a86b;
+  color-scheme: dark; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1680px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 40px; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: end; justify-content: space-between; }
+h1 { font-family: var(--display); font-size: 28px; line-height: 1.1; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); max-width: 64ch; }
+.stat { font-family: var(--mono); font-size: 13px; color: var(--muted); min-width: 220px; }
+.stat b { color: var(--ink); font-size: 20px; }
+.bar { height: 6px; background: var(--zone); border-radius: 3px; overflow: hidden; margin-top: 6px; border: 1px solid var(--line); }
+.bar > i { display: block; height: 100%; background: var(--done); }
+.now { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; }
+.now .tag { font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: 12px; color: var(--accent); }
+.now .what { font-weight: 600; min-width: 0; }
+.now .next { color: var(--muted); font-size: 13px; }
+.now button, .linkish { font: inherit; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.controls label { font-family: var(--display); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: 12px; color: var(--muted); }
+#rel { width: min(420px, 100%); accent-color: var(--accent); }
+#relname { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+.main { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1280px) { .main { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; } }
+.mapbox { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.mapbox svg { display: block; min-width: 1020px; width: 100%; height: auto; }
+aside { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+@media (min-width: 1280px) { aside { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow: auto; } }
+aside h2 { font-family: var(--display); font-size: 20px; margin: 0 0 4px; }
+aside h3 { font-family: var(--display); font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 16px 0 6px; }
+aside p { margin: 0 0 8px; }
+.il { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.il li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 8px; align-items: start; }
+.il .meta { font-size: 12px; color: var(--muted); }
+.il a { color: var(--ink); text-decoration-color: var(--line); text-underline-offset: 3px; }
+.pill { display: inline-flex; justify-content: center; align-items: center; font-family: var(--mono); font-size: 11.5px; font-weight: 600; height: 22px; min-width: 44px; border-radius: 4px; border: 1.5px solid transparent; cursor: pointer; padding: 0 4px; }
+.pill.design { background: transparent; border: 1.5px dashed var(--wire); color: var(--ink); }
+.pill.done { background: var(--done); color: #fff; border-color: var(--done); }
+.pill.isnow { outline: 2px solid var(--accent); outline-offset: 1px; }
+.strip { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; }
+.strip h2 { font-family: var(--display); font-size: 16px; margin: 0; }
+.strip p { margin: 0; color: var(--muted); font-size: 13px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12.5px; color: var(--muted); align-items: center; }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.ramp { display: inline-flex; border-radius: 3px; overflow: hidden; border: 1px solid var(--line); }
+.ramp i { width: 14px; height: 12px; display: block; }
+.boxbtns { display: flex; flex-wrap: wrap; gap: 6px; }
+.boxbtns button { font: inherit; font-size: 13px; background: var(--zone); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+button:focus-visible, a:focus-visible, input:focus-visible, .chip:focus-visible, .bx:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* SVG parts */
+.zone rect { fill: var(--zone); stroke: var(--line); }
+.zone .zt { font-family: var(--display); font-weight: 700; font-size: 15px; fill: var(--ink); letter-spacing: .02em; }
+.zone .zs { font-size: 11.5px; fill: var(--muted); }
+.bx { cursor: pointer; }
+.bx > rect.card { fill: var(--panel); stroke: var(--wire); stroke-width: 1.1; }
+.bx:hover > rect.card { stroke: var(--ink); }
+.bx.sel > rect.card { stroke: var(--ink); stroke-width: 2.2; }
+.bx.notyet > rect.card { stroke-dasharray: 5 4; fill: transparent; }
+.bx.notyet .bn, .bx.notyet .bd { opacity: .45; }
+.bx.now > rect.card { stroke: var(--accent); stroke-width: 2.6; }
+.bx .bn { font-family: var(--body); font-weight: 600; font-size: 13px; fill: var(--ink); }
+.bx .bd { font-size: 11px; fill: var(--muted); }
+.bx .prog-bg { fill: var(--zone); }
+.bx .prog { fill: var(--done); }
+.chip { cursor: pointer; }
+.chip rect { stroke-width: 1.4; }
+.chip text { font-family: var(--mono); font-size: 10.5px; font-weight: 600; text-anchor: middle; }
+.chip.design rect { fill: transparent; stroke: var(--wire); stroke-dasharray: 3 2; }
+.chip.design text { fill: var(--ink); }
+.chip.done rect { fill: var(--done); stroke: var(--done); }
+.chip.done text { fill: #fff; }
+.chip.isnow rect { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: none; }
+.chip.later { opacity: .14; }
+.chip.hit rect { stroke: var(--ink); stroke-width: 2.4; }
+.wire path { fill: none; stroke: var(--wire); stroke-width: 1.4; }
+.wire text { font-size: 10.5px; fill: var(--muted); font-family: var(--body); }
+#arrow path { fill: var(--wire); }
+@media (prefers-reduced-motion: no-preference) {
+  .bx.now > rect.card { animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { stroke-opacity: .35; } }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Laddrix Build Map</h1>
+      <p class="lede">The whole architecture in one flow. Each box shows the issues that design it (dashed outline) and the issues where you program it (filled, coloured by release). Tap any box or number.</p>
+    </div>
+    <div class="stat"><b id="donecount">0</b> of <span id="total">0</span> issues done<div class="bar"><i id="donebar" style="width:0"></i></div></div>
+  </header>
+
+  <div class="now" id="nowbar"></div>
+
+  <div class="controls">
+    <label for="rel">Show the system after</label>
+    <input type="range" id="rel" min="0" max="9" step="1" value="9">
+    <span id="relname"></span>
+  </div>
+
+  <div class="legend">
+    <span><span class="pill" style="background:var(--r3);color:var(--chip-ink-light);cursor:default">#37</span> you program it</span>
+    <span><span class="pill design" style="cursor:default">#34</span> you design it (notes, ADRs, diagrams)</span>
+    <span><span class="pill done" style="cursor:default">✓14</span> done</span>
+    <span><span class="ramp"><i style="background:var(--r1)"></i><i style="background:var(--r3)"></i><i style="background:var(--r5)"></i><i style="background:var(--r7)"></i><i style="background:var(--r9)"></i></span> v0.1 → v1.0</span>
+    <span>Top row arrows: orders go right, receipts come back. Second row: prices flow left to the screen.</span>
+  </div>
+
+  <div class="main">
+    <div class="mapbox"><svg id="map" role="img" aria-label="Laddrix architecture with the issues for each box"></svg></div>
+    <aside id="panel" aria-live="polite"></aside>
+  </div>
+
+  <section class="strip">
+    <h2>Whole-system work</h2>
+    <p>These issues shape everything rather than one box: setup, the trader interview, the glossary, the architecture document, failure and latency budgets, and the test plan.</p>
+    <div class="pills" id="wholepills"></div>
+  </section>
+  <section class="strip">
+    <h2>Release checkpoints</h2>
+    <p>Each release ends with an issue that tests everything together and tags the version.</p>
+    <div class="pills" id="relpills"></div>
+  </section>
+</div>
+
+<script>
+const DATA = {"issues": {"3": {"t": "Clean up merged branches and adopt the pull-request-only rule", "m": "Phase 0 · Setup", "s": "closed"}, "4": {"t": "Create the GitHub Projects board", "m": "Phase 0 · Setup", "s": "closed"}, "5": {"t": "Set up your Windows laptop: Git, Python and VS Code", "m": "Phase 0 · Setup", "s": "closed"}, "6": {"t": "Clone Laddrix and run the tests on your laptop", "m": "Phase 0 · Setup", "s": "closed"}, "7": {"t": "Your first pull request from the laptop: fix test style and add requirements-dev.txt", "m": "Phase 0 · Setup", "s": "closed"}, "8": {"t": "Learn: user stories and how product teams interview users", "m": "Phase 1 · The trader", "s": "closed"}, "9": {"t": "Trader interview: answer the discovery questions", "m": "Phase 1 · The trader", "s": "closed"}, "10": {"t": "Product brief: scope, core stories and hard numbers (docs/requirements/brief.md)", "m": "Phase 1 · The trader", "s": "closed"}, "11": {"t": "Rank the stories and define what each release contains", "m": "Phase 1 · The trader", "s": "closed"}, "12": {"t": "Learn: latency, throughput, availability and recovery", "m": "Phase 2 · Hard numbers", "s": "closed"}, "13": {"t": "Write the hard numbers (docs/requirements/hard-numbers.md)", "m": "Phase 2 · Hard numbers", "s": "closed"}, "14": {"t": "Learn: how an exchange works inside", "m": "Phase 3 · Study CME", "s": "closed"}, "15": {"t": "Read CME MDP 3.0 (market data) and write notes", "m": "Phase 3 · Study CME", "s": "closed"}, "16": {"t": "Read CME iLink 3 (order entry) and write notes", "m": "Phase 3 · Study CME", "s": "closed"}, "17": {"t": "Write product facts for gold, silver and copper futures", "m": "Phase 3 · Study CME", "s": "open"}, "18": {"t": "Get one day of real COMEX data (Databento) and describe it", "m": "Phase 3 · Study CME", "s": "open"}, "19": {"t": "ADR-0001: which products Laddrix supports first", "m": "Phase 3 · Study CME", "s": "open"}, "20": {"t": "Write the glossary (docs/design/glossary.md)", "m": "Phase 4 · Business model", "s": "open"}, "21": {"t": "Domain model: entities, fields and relationships", "m": "Phase 4 · Business model", "s": "open"}, "22": {"t": "ADR-0002: the ID scheme", "m": "Phase 4 · Business model", "s": "open"}, "23": {"t": "Architecture document for Laddrix", "m": "Phase 5 · Architecture", "s": "open"}, "24": {"t": "ADR-0003: programming language and runtime", "m": "Phase 5 · Architecture", "s": "open"}, "25": {"t": "ADR-0004: how services talk to each other", "m": "Phase 5 · Architecture", "s": "open"}, "26": {"t": "ADR-0005: storage", "m": "Phase 5 · Architecture", "s": "open"}, "27": {"t": "ADR-0006: UI technology", "m": "Phase 5 · Architecture", "s": "open"}, "28": {"t": "Message dictionary v1", "m": "Phase 6 · Contracts", "s": "open"}, "29": {"t": "Order life story (state machine)", "m": "Phase 6 · Contracts", "s": "open"}, "30": {"t": "Sequence diagrams for the six key journeys", "m": "Phase 6 · Contracts", "s": "open"}, "31": {"t": "UI ↔ App Server API", "m": "Phase 6 · Contracts", "s": "open"}, "32": {"t": "Failure catalogue", "m": "Phase 7 · Failures & budgets", "s": "open"}, "33": {"t": "Latency and capacity budget", "m": "Phase 7 · Failures & budgets", "s": "open"}, "35": {"t": "Test plan and v0.1 scenarios", "m": "Phase 8 · Test strategy", "s": "open"}, "36": {"t": "common: message classes and tests", "m": "v0.1 · Walking skeleton", "s": "open"}, "39": {"t": "SOR (runner): minimal version", "m": "v0.1 · Walking skeleton", "s": "open"}, "40": {"t": "ROM (guard): minimal version", "m": "v0.1 · Walking skeleton", "s": "open"}, "41": {"t": "App Server (reception desk): minimal version", "m": "v0.1 · Walking skeleton", "s": "open"}, "42": {"t": "UI: order ticket and order list", "m": "v0.1 · Walking skeleton", "s": "open"}, "43": {"t": "End-to-end test and release v0.1", "m": "v0.1 · Walking skeleton", "s": "open"}, "44": {"t": "ROM: static validation", "m": "v0.2 · Safe orders", "s": "open"}, "45": {"t": "ROM: risk limits", "m": "v0.2 · Safe orders", "s": "open"}, "46": {"t": "Cancel and modify, end to end", "m": "v0.2 · Safe orders", "s": "open"}, "47": {"t": "UI: rejects and order states", "m": "v0.2 · Safe orders", "s": "open"}, "48": {"t": "Release v0.2", "m": "v0.2 · Safe orders", "s": "open"}, "50": {"t": "MDS (newsroom): book builder, subscriptions, throttler", "m": "v0.3 · Real market", "s": "open"}, "51": {"t": "UI: price ladder with click-to-trade", "m": "v0.3 · Real market", "s": "open"}, "53": {"t": "Release v0.3", "m": "v0.3 · Real market", "s": "open"}, "54": {"t": "Accounts: positions and P&L from fills", "m": "v0.4 · Books", "s": "open"}, "55": {"t": "Drop copy and reconciliation", "m": "v0.4 · Books", "s": "open"}, "56": {"t": "ROM: persistence and restart recovery", "m": "v0.4 · Books", "s": "open"}, "57": {"t": "UI: positions and P&L", "m": "v0.4 · Books", "s": "open"}, "58": {"t": "Release v0.4", "m": "v0.4 · Books", "s": "open"}, "59": {"t": "Algo engine: event-driven lifecycle", "m": "v0.5 · Robots", "s": "open"}, "60": {"t": "First algo: order slicer", "m": "v0.5 · Robots", "s": "open"}, "61": {"t": "Spread definitions and implied prices", "m": "v0.5 · Robots", "s": "open"}, "62": {"t": "Spread hedger with legging-risk handling", "m": "v0.5 · Robots", "s": "open"}, "63": {"t": "UI: algo control (MASE-style)", "m": "v0.5 · Robots", "s": "open"}, "64": {"t": "Release v0.5", "m": "v0.5 · Robots", "s": "open"}, "65": {"t": "Structured logging in every service", "m": "v1.0 · Production-grade", "s": "open"}, "66": {"t": "Health: running vs ready, plus metrics", "m": "v1.0 · Production-grade", "s": "open"}, "67": {"t": "Grafana dashboard", "m": "v1.0 · Production-grade", "s": "open"}, "68": {"t": "Docker Compose: London and Aurora groups with fake distance", "m": "v1.0 · Production-grade", "s": "open"}, "69": {"t": "Failure drills", "m": "v1.0 · Production-grade", "s": "open"}, "70": {"t": "Runbooks", "m": "v1.0 · Production-grade", "s": "open"}, "71": {"t": "Docs complete and release v1.0", "m": "v1.0 · Production-grade", "s": "open"}, "74": {"t": "Routing table: instrument → exchange → that site's guard", "m": "v0.6 · Multi-site & routing", "s": "open"}, "75": {"t": "Runner: exchange session pool", "m": "v0.6 · Multi-site & routing", "s": "open"}, "76": {"t": "Runner: exchange message throttle", "m": "v0.6 · Multi-site & routing", "s": "open"}, "77": {"t": "Runner: disconnect handling and cancel-on-disconnect", "m": "v0.6 · Multi-site & routing", "s": "open"}, "78": {"t": "Guard: round-robin across several runners", "m": "v0.6 · Multi-site & routing", "s": "open"}, "79": {"t": "Guard: reconcile with the exchange", "m": "v0.6 · Multi-site & routing", "s": "open"}, "80": {"t": "Guard: position reserve", "m": "v0.6 · Multi-site & routing", "s": "open"}, "81": {"t": "Guard: expired contract handling", "m": "v0.6 · Multi-site & routing", "s": "open"}, "82": {"t": "Guard: kill switch, daily loss limit and order-rate limit", "m": "v0.6 · Multi-site & routing", "s": "open"}, "83": {"t": "Guard-to-guard link: firm-wide risk across sites", "m": "v0.6 · Multi-site & routing", "s": "open"}, "84": {"t": "Participant ID registration", "m": "v0.6 · Multi-site & routing", "s": "open"}, "85": {"t": "Release v0.6", "m": "v0.6 · Multi-site & routing", "s": "open"}, "86": {"t": "Reference data service: instruments, products, spreads, strategies", "m": "v0.7 · Platform services", "s": "open"}, "87": {"t": "Newsroom: data store and recent-data cache", "m": "v0.7 · Platform services", "s": "open"}, "88": {"t": "Event log (careful lane)", "m": "v0.7 · Platform services", "s": "open"}, "89": {"t": "Accounts as a stream pipeline", "m": "v0.7 · Platform services", "s": "open"}, "90": {"t": "Drop copy readers per source", "m": "v0.7 · Platform services", "s": "open"}, "91": {"t": "Firm order book copy and query API", "m": "v0.7 · Platform services", "s": "open"}, "92": {"t": "Compliance alerts", "m": "v0.7 · Platform services", "s": "open"}, "93": {"t": "End-of-day jobs", "m": "v0.7 · Platform services", "s": "open"}, "94": {"t": "User setup: users, accounts, permissions and limits", "m": "v0.7 · Platform services", "s": "open"}, "95": {"t": "Reception desk: multi-user login, sessions and permission check", "m": "v0.7 · Platform services", "s": "open"}, "96": {"t": "Admin panel", "m": "v0.7 · Platform services", "s": "open"}, "97": {"t": "Live broadcaster for orders, fills and positions", "m": "v0.7 · Platform services", "s": "open"}, "98": {"t": "Shared settings service", "m": "v0.7 · Platform services", "s": "open"}, "99": {"t": "Release v0.7", "m": "v0.7 · Platform services", "s": "open"}, "100": {"t": "Newsroom feed adapters: two feed formats", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "101": {"t": "Newsroom: gap detection and snapshot recovery", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "102": {"t": "Practice mode: practice runner and simulator", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "103": {"t": "Queue-position estimate on the ladder", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "104": {"t": "FIX gateway and FIX risk adapter", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "105": {"t": "Broker route: mock broker gateway and broker drop copy", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "106": {"t": "Client SDK and an external algo app", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "107": {"t": "Scripted strategies in a sandbox", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "108": {"t": "Strategy upload tool", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "109": {"t": "Spreader: quoting-leg selection and re-pricing", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "110": {"t": "Screens: audit trail and hedge manager", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "111": {"t": "Screens: multi-tab workspace with saved layouts", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "112": {"t": "Release v0.8", "m": "v0.8 · Gateways, tools & screens", "s": "open"}, "113": {"t": "Several reception desks behind a load-balancing gate", "m": "v1.0 · Production-grade", "s": "open"}, "114": {"t": "Environments: live-sim, dev and cert", "m": "v1.0 · Production-grade", "s": "open"}, "115": {"t": "Deployment process: tags, approval and maintenance windows", "m": "v1.0 · Production-grade", "s": "open"}, "116": {"t": "Status monitor page", "m": "v1.0 · Production-grade", "s": "open"}, "117": {"t": "Central log search", "m": "v1.0 · Production-grade", "s": "open"}, "118": {"t": "Shared service skeleton for every service", "m": "v1.0 · Production-grade", "s": "open"}, "119": {"t": "Architecture coverage: every reference box built", "m": "v1.0 · Production-grade", "s": "open"}, "120": {"t": "UI: Time & Sales window", "m": "v0.3 · Real market", "s": "open"}, "121": {"t": "UI: fill alerts and order-confirmation setting", "m": "v0.4 · Books", "s": "open"}}, "boxes": [{"id": "ticket", "col": "A", "row": 1, "name": "Order ticket & list", "desc": "type orders, see them", "build": [42, 47], "design": [], "explain": "Where the trader types an order and watches its state: working, filled, rejected.", "ext": []}, {"id": "ladder", "col": "A", "row": 2, "name": "Price ladder", "desc": "click a price to trade", "build": [51, 103], "design": [], "explain": "The depth ladder. One click on a price sends an order. Later it shows your place in the queue.", "ext": []}, {"id": "tns", "col": "A", "row": 3, "name": "Time & Sales", "desc": "every trade, live", "build": [120], "design": [], "explain": "The tape: every trade with time, price, quantity and contract.", "ext": []}, {"id": "posui", "col": "A", "row": 4, "name": "Positions & P&L", "desc": "risk view, fill alerts", "build": [57, 121], "design": [], "explain": "Live positions and profit per contract, plus fill alerts and the order-confirmation setting.", "ext": []}, {"id": "algoui", "col": "A", "row": 5, "name": "Algo control", "desc": "start and stop robots", "build": [63], "design": [], "explain": "The screen where the trader configures, starts and stops algos and spreads.", "ext": []}, {"id": "screens", "col": "A", "row": 6, "name": "Audit & workspace", "desc": "hedge manager, layouts", "build": [110, 111], "design": [], "explain": "Order history screen, hedge manager and the multi-window workspace that reopens as you left it.", "ext": []}, {"id": "appserver", "col": "B", "row": 1, "name": "Reception desk", "desc": "App Server: login, routing", "build": [41, 95, 74], "design": [31], "explain": "Every screen talks only to this. It checks who you are, what you may do, and sends each order to the right site's guard.", "ext": []}, {"id": "broadcaster", "col": "B", "row": 2, "name": "Live broadcaster", "desc": "pushes updates to screens", "build": [97], "design": [], "explain": "Streams prices, orders, fills and positions to every open screen.", "ext": []}, {"id": "settings", "col": "B", "row": 3, "name": "Settings service", "desc": "saved layouts, preferences", "build": [98], "design": [], "explain": "Stores each user's settings and layouts so any screen can load them.", "ext": []}, {"id": "admin", "col": "B", "row": 4, "name": "Admin panel", "desc": "users, limits, permissions", "build": [96, 94], "design": [], "explain": "Where an admin creates users and accounts and sets risk limits, without code.", "ext": []}, {"id": "poscopy", "col": "B", "row": 5, "name": "Positions check", "desc": "compare with drop copy", "build": [55], "design": [], "explain": "Compares positions from our own orders with the exchange's drop copy, and flags any difference.", "ext": []}, {"id": "gate", "col": "B", "row": 6, "name": "Office gate", "desc": "load balancer", "build": [113], "design": [], "explain": "Spreads users across several reception desks so one crash doesn't stop trading.", "ext": []}, {"id": "guard", "col": "C1", "row": 1, "name": "Guard (ROM)", "desc": "risk checks, order state", "build": [40, 44, 45, 46, 56, 78, 79, 80, 81, 82, 83], "design": [16, 21, 22, 26, 29], "explain": "The safety officer. Every order passes its checks. It tracks each order's life, survives restarts and can stop everything.", "ext": []}, {"id": "runner", "col": "C2", "row": 1, "name": "Runner (SOR)", "desc": "talks to the exchange", "build": [39, 75, 76, 77, 84], "design": [16], "explain": "Turns our neutral order into the exchange's own message and back. Owns sessions, throttling and disconnect handling.", "ext": []}, {"id": "spreadprice", "col": "C1", "row": 2, "name": "Spread pricing", "desc": "synthetic spread prices", "build": [61], "design": [], "explain": "Builds a ladder for any spread, fly or condor from its legs' books.", "ext": []}, {"id": "newsroom", "col": "C2", "row": 2, "name": "Newsroom (MDS)", "desc": "builds books from the feed", "build": [50, 100, 101, 87], "design": [15], "explain": "Listens to the exchange's price feed, keeps a copy of every book, recovers from gaps and publishes updates.", "ext": []}, {"id": "algo", "col": "C1", "row": 3, "name": "Algo server", "desc": "runs the robots", "build": [59, 60], "design": [], "explain": "Runs algos next to the exchange, so they react in microseconds. Their orders still go through the guard.", "ext": []}, {"id": "spreader", "col": "C2", "row": 3, "name": "Spreader", "desc": "quotes a leg, hedges rest", "build": [62, 109], "design": [], "explain": "Works the quoting leg of a structure and hedges the other legs the moment it fills.", "ext": []}, {"id": "scripted", "col": "C1", "row": 4, "name": "Scripted strategies", "desc": "sandbox and upload tool", "build": [107, 108], "design": [], "explain": "Traders' own small strategy scripts, run safely in a sandbox.", "ext": []}, {"id": "sdk", "col": "C2", "row": 4, "name": "Client SDK app", "desc": "an outside algo app", "build": [106], "design": [], "explain": "A library so an outside program can trade through Laddrix like a screen does.", "ext": []}, {"id": "practice", "col": "C1", "row": 5, "name": "Practice mode", "desc": "simulated runner", "build": [102], "design": [], "explain": "A runner that fills orders in a simulator instead of the exchange, for safe practice.", "ext": []}, {"id": "gateways", "col": "C2", "row": 5, "name": "FIX & broker", "desc": "FIX gateway, mock broker", "build": [104, 105], "design": [], "explain": "Lets outside systems send FIX orders in, and routes some orders through a mock broker.", "ext": []}, {"id": "mockcme", "col": "D", "row": 1, "name": "MockCME", "desc": "its own repo, E1–E4", "build": [], "design": [14, 15, 16, 18], "explain": "Our own exchange, built in its own repo (ayushsharma05/MockCME) like a real outside exchange. It keeps order books, matches by price and time, takes orders over iLink-lite, broadcasts prices over MDP-lite and replays real COMEX data.", "ext": [{"label": "E1", "rel": 1, "title": "E1 · Matching core (MockCME #4–#13)", "url": "https://github.com/ayushsharma05/MockCME/milestone/2"}, {"label": "E2", "rel": 1, "title": "E2 · Order entry (MockCME #14–#19)", "url": "https://github.com/ayushsharma05/MockCME/milestone/3"}, {"label": "E3", "rel": 3, "title": "E3 · Market data (MockCME #20–#24)", "url": "https://github.com/ayushsharma05/MockCME/milestone/4"}, {"label": "E4", "rel": 3, "title": "E4 · Real data replay and fill model (MockCME #25–#29)", "url": "https://github.com/ayushsharma05/MockCME/milestone/5"}]}, {"id": "mockcme2", "col": "D", "row": 2, "name": "Second exchange", "desc": "a second site", "build": [], "design": [], "explain": "A second mock exchange at another site, so routing and multi-site risk are real.", "ext": [{"label": "E8", "rel": 6, "title": "E8 · Second venue (MockCME #40)", "url": "https://github.com/ayushsharma05/MockCME/milestone/9"}]}, {"id": "refdata", "col": "O", "row": 1, "name": "Reference data", "desc": "instruments and spreads", "build": [86], "design": [17, 19, 21], "explain": "The one list of products, contracts, tick sizes and spread legs every service reads.", "ext": []}, {"id": "pnl", "col": "O", "row": 1, "name": "Positions & P&L", "desc": "fills to net position to P&L", "build": [54, 89], "design": [], "explain": "Turns fills into net positions and P&L as a stream.", "ext": []}, {"id": "firmbook", "col": "O", "row": 1, "name": "Firm order book", "desc": "copy and query API", "build": [91], "design": [], "explain": "A copy of every order in the firm that support and risk can search.", "ext": []}, {"id": "dropcopy", "col": "O", "row": 1, "name": "Drop copy readers", "desc": "every fill, a second time", "build": [90], "design": [], "explain": "Reads the exchange's copy of every fill, independent of the trading path.", "ext": []}, {"id": "eventlog", "col": "O", "row": 2, "name": "Event log", "desc": "careful lane, never loses", "build": [88], "design": [26], "explain": "An append-only record of every event, for audit and replay.", "ext": []}, {"id": "compliance", "col": "O", "row": 2, "name": "Compliance alerts", "desc": "spots rule breaks", "build": [92], "design": [], "explain": "Watches orders and fills and raises alerts when a rule is broken.", "ext": []}, {"id": "eod", "col": "O", "row": 2, "name": "End-of-day jobs", "desc": "settle, keep GTC orders", "build": [93], "design": [], "explain": "Settlement prices, end-of-day P&L, removing Day orders and carrying GTC orders.", "ext": []}, {"id": "shared", "col": "P", "row": 1, "name": "Shared code", "desc": "messages, service skeleton", "build": [36, 118], "design": [24, 25, 28], "explain": "The message classes and the service template every service is built from.", "ext": []}, {"id": "monitor", "col": "P", "row": 1, "name": "Monitoring", "desc": "logs, metrics, dashboards", "build": [65, 66, 67, 116, 117], "design": [], "explain": "Logs, health checks, metrics, Grafana dashboards, log search and a status page.", "ext": []}, {"id": "deploy", "col": "P", "row": 1, "name": "Deploy & environments", "desc": "two sites, fake distance", "build": [68, 114, 115], "design": [], "explain": "Docker Compose sites with simulated distance, the environments and the release process.", "ext": []}, {"id": "drills", "col": "P", "row": 1, "name": "Drills & runbooks", "desc": "break it on purpose", "build": [69, 70], "design": [], "explain": "Failure drills and the step-by-step runbooks for fixing each failure.", "ext": []}], "containerDesign": {"trader": [27]}, "whole": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 20, 23, 30, 32, 33, 35], "releases": [43, 48, 53, 58, 64, 85, 99, 112, 71, 119], "cmeNext": ["1", "Clone MockCME, set up the venv and run the tests"]};
+const REPO = 'https://github.com/ayushsharma05/MockTrade/issues/';
+const RELS = ['v0.1','v0.2','v0.3','v0.4','v0.5','v0.6','v0.7','v0.8','v1.0'];
+const RELNAMES = ['Design only (before any code)'];
+const ISS = DATA.issues;
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const relIdx = n => { const m = ISS[n].m; if (m.startsWith('Phase')) return 0; return RELS.indexOf(m.split(' ')[0]) + 1; };
+const msKey = n => { const m = ISS[n].m; if (m.startsWith('Phase')) return parseInt(m.split(' ')[1], 10); return 10 + relIdx(n); };
+const isDone = n => ISS[n].s === 'closed';
+for (const r of RELS) { const any = Object.values(ISS).find(i => i.m.startsWith(r + ' ')); RELNAMES.push(any ? any.m : r); }
+
+const allNums = Object.keys(ISS).map(Number);
+const openSorted = allNums.filter(n => !isDone(n)).sort((a, b) => msKey(a) - msKey(b) || a - b);
+const NOW = openSorted[0];
+const NEXT = openSorted.slice(1, 4);
+const boxesOf = n => DATA.boxes.filter(b => b.build.includes(n) || b.design.includes(n));
+
+/* ---------- layout ---------- */
+const COLX = { A: 36, B: 276, C1: 516, C2: 726, D: 976 };
+const COLW = { A: 184, B: 184, C1: 194, C2: 194, D: 184 };
+const CW = 40, CH = 20, CG = 4;
+const perRow = w => Math.max(1, Math.floor((w - 20 + CG) / (CW + CG)));
+const chipsOf = b => b.design.map(n => ({ n, design: true })).concat(b.build.map(n => ({ n, design: false }))).concat((b.ext || []).map(e => ({ ext: e })));
+const boxH = (b, w) => 50 + Math.max(1, Math.ceil(chipsOf(b).length / perRow(w))) * (CH + 4) + 10;
+const G = {};
+const top0 = 20;
+let y = top0 + 64;
+for (let r = 1; r <= 6; r++) {
+  const inRow = DATA.boxes.filter(b => COLX[b.col] !== undefined && b.row === r);
+  const h = Math.max(...inRow.map(b => boxH(b, COLW[b.col])));
+  inRow.forEach(b => G[b.id] = { x: COLX[b.col], y, w: COLW[b.col], h });
+  y += h + 14;
+}
+const gridBottom = y - 14;
+const zoneH = gridBottom + 16 - top0;
+function band(code, topY) {
+  const W = 272;
+  let yy = topY + 64;
+  for (let r = 1; r <= 2; r++) {
+    const inRow = DATA.boxes.filter(b => b.col === code && b.row === r);
+    if (!inRow.length) continue;
+    const h = Math.max(...inRow.map(b => boxH(b, W)));
+    inRow.forEach((b, i) => G[b.id] = { x: 36 + i * (W + 12), y: yy, w: W, h });
+    yy += h + 14;
+  }
+  return yy - 14 + 16;
+}
+const officeTop = gridBottom + 16 + 28;
+const officeBottom = band('O', officeTop);
+const opsTop = officeBottom + 28;
+const opsBottom = band('P', opsTop);
+const H = opsBottom + 20;
+
+/* ---------- draw ---------- */
+const svg = document.getElementById('map');
+svg.setAttribute('viewBox', `0 0 1196 ${H}`);
+let s = `<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker></defs>`;
+const zones = [
+  ['Trader screen', 'Jaipur · in the browser', 20, 216, top0, zoneH, 'trader'],
+  ['Front end', 'London · the hub', 260, 216, top0, zoneH, 'hub'],
+  ['Exchange site', 'Aurora · next to the exchange, one per site', 500, 436, top0, zoneH, 'site'],
+  ['Exchanges', 'our own mock exchanges', 960, 216, top0, zoneH, 'exch'],
+  ['Accounts office', 'central · after the trade, the careful lane', 20, 1156, officeTop, officeBottom - officeTop, 'office'],
+  ['Building and operations', 'every service, every site', 20, 1156, opsTop, opsBottom - opsTop, 'ops'],
+];
+for (const [t, sub, x, w, zy, zh, key] of zones) {
+  s += `<g class="zone"><rect x="${x}" y="${zy}" width="${w}" height="${zh}" rx="10"/><text class="zt" x="${x + 16}" y="${zy + 26}">${esc(t)}</text><text class="zs" x="${x + 16}" y="${zy + 44}">${esc(sub)}</text>`;
+  const cd = DATA.containerDesign[key] || [];
+  cd.forEach((n, i) => { s += chipSvg(n, true, x + w - 16 - (cd.length - i) * (CW + CG) + CG, zy + 14); });
+  s += `</g>`;
+}
+/* wires */
+const g = id => { const b = G[id]; return { ...b, cx: b.x + b.w / 2, cy: b.y + b.h / 2, r: b.x + b.w, bot: b.y + b.h }; };
+let w = '<g class="wire">';
+const lane1 = ['ticket', 'appserver', 'guard', 'runner', 'mockcme'];
+for (let i = 0; i < lane1.length - 1; i++) {
+  const a = g(lane1[i]), b = g(lane1[i + 1]);
+  w += `<path d="M${a.r} ${a.cy - 7}H${b.x}" marker-end="url(#arrow)"/><path d="M${b.x} ${a.cy + 7}H${a.r}" marker-end="url(#arrow)"/>`;
+  if (i === 0 || i === 3) {
+    const mx = (a.r + b.x) / 2;
+    w += `<text x="${mx}" y="${a.cy - 13}" text-anchor="middle">order</text><text x="${mx}" y="${a.cy + 22}" text-anchor="middle">${i === 0 ? 'update' : 'receipt'}</text>`;
+  }
+}
+const mc = g('mockcme'), nr = g('newsroom'), sp = g('spreadprice'), bc = g('broadcaster'), ld = g('ladder'), al = g('algo'), gd = g('guard'), dc = g('dropcopy');
+w += `<path d="M${mc.x} ${mc.bot - 16}H948V${nr.cy}H${nr.r}" marker-end="url(#arrow)"/>`;
+w += `<path d="M${nr.x} ${nr.cy}H${sp.r}" marker-end="url(#arrow)"/>`;
+w += `<path d="M${sp.x} ${sp.cy}H${bc.r}" marker-end="url(#arrow)"/>`;
+w += `<path d="M${bc.x} ${bc.cy}H${ld.r}" marker-end="url(#arrow)"/>`;
+w += `<text x="${(bc.x + ld.r) / 2}" y="${bc.cy - 7}" text-anchor="middle">prices</text>`;
+w += `<text x="${(sp.x + bc.r) / 2}" y="${sp.cy - 7}" text-anchor="middle">prices</text>`;
+w += `<path d="M${al.x} ${al.cy}H507V${gd.bot - 16}H${gd.x}" marker-end="url(#arrow)"/>`;
+w += `<path d="M${mc.r} ${mc.bot - 16}H1168V${dc.y - 18}H${dc.cx}V${dc.y}" marker-end="url(#arrow)"/>`;
+w += `<text x="${dc.cx + 10}" y="${dc.y - 24}">drop copy of every fill</text>`;
+w += '</g>';
+s += w;
+
+function extChipSvg(e, x, yy) {
+  const tip = `Built in the MockCME repo: ${e.title}`;
+  return `<g class="chip ext" data-rel="${e.rel}"><title>${esc(tip)}</title><rect x="${x}" y="${yy}" width="${CW}" height="${CH}" rx="4" style="fill:var(--r${e.rel})"/><text x="${x + CW / 2}" y="${yy + 14}" style="fill:var(${e.rel <= 4 ? '--chip-ink-light' : '--chip-ink-dark'})">${e.label}↗</text></g>`;
+}
+function chipSvg(n, design, x, yy) {
+  const ri = relIdx(n);
+  const cls = ['chip', design ? 'design' : 'build', isDone(n) ? 'done' : '', n === NOW ? 'isnow' : ''].join(' ');
+  const fill = design || isDone(n) ? '' : `style="fill:var(--r${ri})"`;
+  const ink = design || isDone(n) ? '' : `style="fill:var(${ri <= 4 ? '--chip-ink-light' : '--chip-ink-dark'})"`;
+  const label = (isDone(n) ? '✓' : '#') + n;
+  const tip = `#${n} ${ISS[n].t} · ${ISS[n].m} · ${isDone(n) ? 'done' : 'open'}`;
+  return `<g class="${cls}" data-issue="${n}" data-rel="${ri}" tabindex="0" role="button" aria-label="${esc(tip)}"><title>${esc(tip)}</title><rect x="${x}" y="${yy}" width="${CW}" height="${CH}" rx="4" ${fill}/><text x="${x + CW / 2}" y="${yy + 14}" ${ink}>${label}</text></g>`;
+}
+for (const b of DATA.boxes) {
+  const p = G[b.id];
+  const chips = chipsOf(b), pr = perRow(p.w);
+  const all = b.build.concat(b.design);
+  const frac = all.length ? all.filter(isDone).length / all.length : 0;
+  s += `<g class="bx" id="bx-${b.id}" data-box="${b.id}" tabindex="0" role="button" aria-label="${esc(b.name)}"><rect class="card" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="8"/>`;
+  s += `<text class="bn" x="${p.x + 10}" y="${p.y + 21}">${esc(b.name)}</text><text class="bd" x="${p.x + 10}" y="${p.y + 37}">${esc(b.desc)}</text>`;
+  chips.forEach((c, i) => { const cx = p.x + 10 + (i % pr) * (CW + CG), cy = p.y + 48 + Math.floor(i / pr) * (CH + 4); s += c.ext ? extChipSvg(c.ext, cx, cy) : chipSvg(c.n, c.design, cx, cy); });
+  s += `<rect class="prog-bg" x="${p.x + 10}" y="${p.y + p.h - 7}" width="${p.w - 20}" height="3" rx="1.5"/><rect class="prog" x="${p.x + 10}" y="${p.y + p.h - 7}" width="${(p.w - 20) * frac}" height="3" rx="1.5"/>`;
+  s += `</g>`;
+}
+svg.innerHTML = s;
+
+/* ---------- html pills ---------- */
+function pill(n, design) {
+  const ri = relIdx(n);
+  const done = isDone(n);
+  const style = design || done ? '' : `style="background:var(--r${ri});color:var(${ri <= 4 ? '--chip-ink-light' : '--chip-ink-dark'})"`;
+  return `<button class="pill ${design ? 'design' : ''} ${done ? 'done' : ''} ${n === NOW ? 'isnow' : ''}" data-issue="${n}" ${style} title="${esc(ISS[n].t)}">${done ? '✓' : '#'}${n}</button>`;
+}
+document.getElementById('wholepills').innerHTML = DATA.whole.map(n => pill(n, true)).join('');
+document.getElementById('relpills').innerHTML = DATA.releases.map(n => pill(n, false)).join('');
+
+const doneCount = allNums.filter(isDone).length;
+document.getElementById('donecount').textContent = doneCount;
+document.getElementById('total').textContent = allNums.length;
+document.getElementById('donebar').style.width = (100 * doneCount / allNums.length).toFixed(1) + '%';
+
+const boxNames = n => boxesOf(n).map(b => b.name);
+function nowBar() {
+  const where = boxNames(NOW);
+  document.getElementById('nowbar').innerHTML =
+    `<span class="tag">You are here</span><span class="what"><button data-issue="${NOW}">#${NOW} ${esc(ISS[NOW].t)}</button></span>` +
+    `<span class="next">${where.length ? 'Shapes: ' + esc(where.join(', ')) : 'Whole-system work'} · Up next: ${NEXT.map(n => `<button data-issue="${n}">#${n}</button>`).join(', ')}</span>` +
+    `<span class="next">Building now in MockCME: <a href="https://github.com/ayushsharma05/MockCME/issues/${DATA.cmeNext[0]}" target="_blank" rel="noopener" style="color:inherit">#${DATA.cmeNext[0]} ${esc(DATA.cmeNext[1])}</a></span>`;
+}
+nowBar();
+boxesOf(NOW).forEach(b => document.getElementById('bx-' + b.id).classList.add('now'));
+
+/* ---------- panel ---------- */
+const panel = document.getElementById('panel');
+function li(n) {
+  return `<li>${pill(n, relIdx(n) === 0)}<div><a href="${REPO}${n}" target="_blank" rel="noopener">${esc(ISS[n].t)}</a><div class="meta">${esc(ISS[n].m)} · ${isDone(n) ? 'done' : 'open'}${n === NOW ? ' · <b style="color:var(--accent)">you are here</b>' : ''}</div></div></li>`;
+}
+function showIntro() {
+  panel.innerHTML = `<h2>How to use this map</h2>
+  <p>Read it left to right like an order's journey: the trader's screen in Jaipur, the London hub, the exchange site in Aurora, and our own mock exchanges.</p>
+  <p>Below the main sites, the accounts office works after the trade, and the bottom band is what every service needs to run.</p>
+  <h3>Right now</h3><ul class="il">${li(NOW)}</ul>
+  <p style="margin-top:8px">This is design work, so it has a dashed outline. It shapes the boxes outlined in orange.</p>
+  <h3>Up next</h3><ul class="il">${NEXT.map(li).join('')}</ul>
+  <h3>Tip</h3><p>Drag the release slider to see which boxes exist after each version. Boxes with dashed borders aren't built yet at that point.</p>`;
+}
+function showBox(id) {
+  const b = DATA.boxes.find(x => x.id === id);
+  const all = b.design.concat(b.build);
+  panel.innerHTML = `<h2>${esc(b.name)}</h2><p>${esc(b.explain)}</p><p class="meta" style="color:var(--muted);font-size:13px">${all.filter(isDone).length} of ${all.length} issues done</p>` +
+    (b.design.length ? `<h3>Design it first</h3><ul class="il">${b.design.map(li).join('')}</ul>` : '') +
+    (b.build.length ? `<h3>Program it</h3><ul class="il">${b.build.slice().sort((x, y) => relIdx(x) - relIdx(y) || x - y).map(li).join('')}</ul>` : '') +
+    ((b.ext || []).length ? `<h3>Built in the MockCME repo</h3><ul class="il">${b.ext.map(e => `<li><span class="pill" style="background:var(--r${e.rel});color:var(${e.rel <= 4 ? '--chip-ink-light' : '--chip-ink-dark'});cursor:default">${e.label}↗</span><div><a href="${e.url}" target="_blank" rel="noopener">${esc(e.title)}</a><div class="meta">needed by Laddrix ${RELS[e.rel - 1]}</div></div></li>`).join('')}</ul>` : '');
+}
+function showIssue(n) {
+  const bs = boxesOf(n);
+  panel.innerHTML = `<h2>#${n}</h2><ul class="il">${li(n)}</ul>` +
+    `<h3>${relIdx(n) === 0 ? 'Shapes these boxes' : 'Programs these boxes'}</h3>` +
+    (bs.length ? `<div class="boxbtns">${bs.map(b => `<button data-box="${b.id}">${esc(b.name)}</button>`).join('')}</div>` : `<p>The whole system, not one box.</p>`);
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('hit', +c.dataset.issue === n));
+}
+function select(id) {
+  document.querySelectorAll('.bx').forEach(x => x.classList.toggle('sel', x.dataset.box === id));
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('hit'));
+}
+function revealPanel() { if (window.innerWidth < 1280) panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+document.addEventListener('click', e => {
+  const iss = e.target.closest('[data-issue]');
+  if (iss) { e.preventDefault(); select(null); showIssue(+iss.dataset.issue); revealPanel(); return; }
+  const bx = e.target.closest('[data-box]');
+  if (bx) { select(bx.dataset.box); showBox(bx.dataset.box); revealPanel(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const t = e.target.closest('.chip, .bx');
+  if (t) { e.preventDefault(); t.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
+});
+
+/* ---------- release slider ---------- */
+const rel = document.getElementById('rel');
+function applyRel() {
+  const L = +rel.value;
+  document.getElementById('relname').textContent = L === 9 ? 'v1.0 · everything' : RELNAMES[L];
+  document.querySelectorAll('#map .chip').forEach(c => c.classList.toggle('later', +c.dataset.rel > L));
+  for (const b of DATA.boxes) {
+    const exists = b.build.some(n => relIdx(n) <= L && relIdx(n) >= 1) || (b.ext || []).some(e => e.rel <= L);
+    document.getElementById('bx-' + b.id).classList.toggle('notyet', !exists);
+  }
+}
+rel.addEventListener('input', applyRel);
+applyRel();
+showIntro();
+</script>

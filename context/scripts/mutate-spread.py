@@ -1,5 +1,5 @@
 import subprocess, pathlib
-S="src/mocktrade/algos/spreader.py"; E="src/mocktrade/algos/engine.py"
+S="src/laddrix/algos/spreader.py"; E="src/laddrix/algos/engine.py"
 M=[
  (S,"price = (math.floor(raw / tick) if buying else math.ceil(raw / tick)) * tick","price = round(raw / tick) * tick","rounding never worse than the level"),
  (S,"hedge_level = b.best_bid if buying else b.best_ask","hedge_level = b.best_ask if buying else b.best_bid","quote against the hedge side"),

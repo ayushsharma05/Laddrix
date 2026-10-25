@@ -2,7 +2,7 @@
 
 SEBI wants API orders to come from a static IP registered with the broker. Whether many
 traders may share the server's one IP, or each needs their own, is for Zerodha to confirm
-(#278). MockTrade is ready for both: a setting per account, not a code change.
+(#278). Laddrix is ready for both: a setting per account, not a code change.
 
     KITE_EGRESS_<ACCOUNT> unset or "direct" ─► out from the server's static IP (shared)
     KITE_EGRESS_<ACCOUNT>=http://user:pw@host:port ─► out through that proxy (its own IP)
@@ -13,9 +13,9 @@ import asyncio
 
 import pytest
 
-from mocktrade.broker.kite.http import KiteHttp, http_for
-from mocktrade.config import ConfigError, KiteSettings
-from mocktrade.domain.accounts import BrokerAccount
+from laddrix.broker.kite.http import KiteHttp, http_for
+from laddrix.config import ConfigError, KiteSettings
+from laddrix.domain.accounts import BrokerAccount
 
 
 class Proxy:
@@ -75,7 +75,7 @@ def test_an_account_without_one_goes_out_directly():
 def test_the_setting_per_account_with_a_default_and_direct():
     from test_serve import env
 
-    from mocktrade.tools.serve import ServeSettings
+    from laddrix.tools.serve import ServeSettings
 
     a = BrokerAccount("acc-a", "kite", "AB1", "ayush")
     b = BrokerAccount("acc-b", "kite", "CD2", "riya")
@@ -98,10 +98,10 @@ def test_the_setting_per_account_with_a_default_and_direct():
 async def test_the_live_wiring_and_the_daily_login_use_each_accounts_way_out(tmp_path):
     from test_kite_live import AYUSH, OTHER, FakeTicker
 
-    from mocktrade.broker.kite.daily_login import KiteDailyLogin
-    from mocktrade.broker.kite.live import KiteLive
-    from mocktrade.marketdata.service import MarketData
-    from mocktrade.refdata.store import InstrumentStore
+    from laddrix.broker.kite.daily_login import KiteDailyLogin
+    from laddrix.broker.kite.live import KiteLive
+    from laddrix.marketdata.service import MarketData
+    from laddrix.refdata.store import InstrumentStore
 
     made = []
 

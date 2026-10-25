@@ -6,12 +6,12 @@ the tests must notice. Restores each file in `finally`; a hang counts as caught.
 from the repo root."""
 import subprocess
 
-A = "src/mocktrade/algos/autospreader.py"
-E = "src/mocktrade/algos/engine.py"
-M = "src/mocktrade/spreads/model.py"
-S = "src/mocktrade/spreads/store.py"
-P = "src/mocktrade/server/routes/spreads.py"
-F = "src/mocktrade/server/formats.py"
+A = "src/laddrix/algos/autospreader.py"
+E = "src/laddrix/algos/engine.py"
+M = "src/laddrix/spreads/model.py"
+S = "src/laddrix/spreads/store.py"
+P = "src/laddrix/server/routes/spreads.py"
+F = "src/laddrix/server/formats.py"
 AM = "ui/src/widgets/ase/model.ts"
 AW = "ui/src/widgets/ase/Autospreader.tsx"
 AG = "ui/src/widgets/algos/AlgoManager.tsx"

@@ -15,10 +15,10 @@ from dataclasses import dataclass
 import pytest
 from test_autospreader import AYUSH, NOV, OCT, W
 
-from mocktrade.algos.autospreader import AutoSpreader
-from mocktrade.algos.engine import AlgoState
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
-from mocktrade.spreads.model import SpreadLeg
+from laddrix.algos.autospreader import AutoSpreader
+from laddrix.algos.engine import AlgoState
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
+from laddrix.spreads.model import SpreadLeg
 
 
 @pytest.fixture
@@ -159,14 +159,14 @@ async def test_both_legs_quoting_on_the_paper_broker(nifty_fut):
 
     from test_autospreader import quote
 
-    from mocktrade.algos.autospreader import algo_type
-    from mocktrade.algos.builtin import BUILTIN
-    from mocktrade.broker.paper import PaperBroker
-    from mocktrade.domain.accounts import BrokerAccount
-    from mocktrade.orders.model import ClientIds
-    from mocktrade.platform import Platform
-    from mocktrade.risk.kill_switch import KillSwitch
-    from mocktrade.risk.limits import RiskLimits
+    from laddrix.algos.autospreader import algo_type
+    from laddrix.algos.builtin import BUILTIN
+    from laddrix.broker.paper import PaperBroker
+    from laddrix.domain.accounts import BrokerAccount
+    from laddrix.orders.model import ClientIds
+    from laddrix.platform import Platform
+    from laddrix.risk.kill_switch import KillSwitch
+    from laddrix.risk.limits import RiskLimits
 
     w = W(nifty_fut)
     md, store = w.md, w.store
@@ -204,7 +204,7 @@ async def test_both_legs_quoting_on_the_paper_broker(nifty_fut):
 
 
 def test_an_orders_role_is_kept_with_it_and_absent_in_older_records():
-    from mocktrade.orders.codec import request_from_dict, request_to_dict
+    from laddrix.orders.codec import request_from_dict, request_to_dict
 
     r = OrderRequest("MT1", "acc-1", "ayush", OCT, Side.BUY, 75, OrderType.LIMIT, Product.NRML,
                      price_paise=2501000, parent_id="A1-1", algo_role="hedge")  # fmt: skip

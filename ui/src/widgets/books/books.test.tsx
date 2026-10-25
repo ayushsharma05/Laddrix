@@ -185,7 +185,7 @@ describe("Positions", () => {
     const { app, socket } = setup((x) => <Positions {...x} />, {});
     act(() => app.store.applyPositions("acc-a", { ...SNAP, positions: [p("NFO:NIFTY26OCTFUT", 75), { ...p("NFO:NIFTY26OCTFUT", -75), product: "MIS" }] }));
     act(() =>
-      socket().receive({ type: "position_alert", account_id: "acc-a", state: "raised", instrument_id: "NFO:NIFTY26OCTFUT", product: "NRML", ours: 75, broker: 150, message: "MockTrade shows +75, the broker shows +150" }),
+      socket().receive({ type: "position_alert", account_id: "acc-a", state: "raised", instrument_id: "NFO:NIFTY26OCTFUT", product: "NRML", ours: 75, broker: 150, message: "Laddrix shows +75, the broker shows +150" }),
     );
     const nrml = rows("Positions").find((r) => r.textContent!.includes("NRML"))!;
     const mis = rows("Positions").find((r) => r.textContent!.includes("MIS"))!;

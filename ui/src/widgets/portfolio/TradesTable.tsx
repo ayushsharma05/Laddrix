@@ -1,5 +1,5 @@
 // The tradebook (the order book's Trades tab): every fill at the exchange today, newest first,
-// from the broker. Trades from orders placed outside MockTrade (Kite web, the phone app) say so.
+// from the broker. Trades from orders placed outside Laddrix (Kite web, the phone app) say so.
 
 import { useMemo } from "react";
 import type { Trade } from "../../api/types";
@@ -51,7 +51,7 @@ export function TradesTable({
             <span className="num">{qty(t.qty)}</span>
             <span className="num">{price(t.price_paise)}</span>
             <span className="num">{price(t.value_paise)}</span>
-            <span className={t.client_order_id ? "" : "dim"}>{t.client_order_id || "outside MockTrade"}</span>
+            <span className={t.client_order_id ? "" : "dim"}>{t.client_order_id || "outside Laddrix"}</span>
           </div>
         ))}
       </div>

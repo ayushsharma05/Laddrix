@@ -7,8 +7,8 @@ from fractions import Fraction
 
 import pytest
 
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import (
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import (
     OrderRequest,
     OrderStatus,
     OrderType,
@@ -16,13 +16,13 @@ from mocktrade.domain.orders import (
     Product,
     Side,
 )
-from mocktrade.domain.ticks import Tick
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds
-from mocktrade.positions.book import PositionBook
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.risk.loss_watch import AUTO, DailyLossWatch
+from laddrix.domain.ticks import Tick
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds
+from laddrix.positions.book import PositionBook
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.loss_watch import AUTO, DailyLossWatch
 
 FUT = "NFO:NIFTY26OCTFUT"
 REL = "NSE:RELIANCE"
@@ -218,7 +218,7 @@ async def test_a_replayed_fill_never_counts_twice(wired, book):
 
 
 def test_other_accounts_and_other_events_are_ignored(book):
-    from mocktrade.orders.model import EventKind, Fill, OrderEvent
+    from laddrix.orders.model import EventKind, Fill, OrderEvent
 
     book.on_order_event(OrderEvent(EventKind.SENT, T0, "acc-1", "X", None))
     book.on_order_event(
@@ -353,10 +353,10 @@ async def test_loss_watch_fires_at_exactly_the_limit(wired):
 async def test_platform_marks_held_positions_from_live_prices(nifty_fut):
     import asyncio
 
-    from mocktrade.domain.accounts import BrokerAccount
-    from mocktrade.marketdata.service import MarketData
-    from mocktrade.platform import Platform
-    from mocktrade.risk.kill_switch import KillSwitch
+    from laddrix.domain.accounts import BrokerAccount
+    from laddrix.marketdata.service import MarketData
+    from laddrix.platform import Platform
+    from laddrix.risk.kill_switch import KillSwitch
 
     store = InstrumentStore()
     store.add(nifty_fut)

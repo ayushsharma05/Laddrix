@@ -6,24 +6,24 @@ from decimal import Decimal
 
 import pytest
 
-from mocktrade.broker.base import BrokerError
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.orders import (
+from laddrix.broker.base import BrokerError
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.orders import (
     OrderRequest,
     OrderStatus,
     OrderType,
     Product,
     Side,
 )
-from mocktrade.domain.ticks import Tick
-from mocktrade.orders.gate import Gates
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, OrderView, Pending
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.checks import RiskGate
-from mocktrade.risk.kill_switch import KillSwitch, stop_trading
-from mocktrade.risk.limits import RiskLimits
+from laddrix.domain.ticks import Tick
+from laddrix.orders.gate import Gates
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, OrderView, Pending
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.checks import RiskGate
+from laddrix.risk.kill_switch import KillSwitch, stop_trading
+from laddrix.risk.limits import RiskLimits
 
 FUT = "NFO:NIFTY26OCTFUT"
 CALL = "NFO:NIFTY26OCT25000CE"
@@ -482,7 +482,7 @@ async def test_risk_rejection_reaches_the_order_view(world, store):
     ],
 )
 def test_rupees_are_shown_in_lakh_and_crore_grouping(paise, shown):
-    from mocktrade.domain.money import format_rupees
+    from laddrix.domain.money import format_rupees
 
     assert format_rupees(paise) == shown
 

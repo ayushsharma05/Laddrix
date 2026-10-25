@@ -5,9 +5,9 @@ close visible; unreadable data kept aside and shown; auto-close held when the da
 lost; atomic saves); the tests must notice. Restores each file in `finally`. Run alone."""
 import subprocess
 
-M = "src/mocktrade/risk/mtm.py"
-G = "src/mocktrade/ops/guards.py"
-P = "src/mocktrade/platform.py"
+M = "src/laddrix/risk/mtm.py"
+G = "src/laddrix/ops/guards.py"
+P = "src/laddrix/platform.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_mtm_life.py", "tests/test_mtm.py",
          "tests/test_exits.py", "tests/test_server.py"]
 MUTANTS = [

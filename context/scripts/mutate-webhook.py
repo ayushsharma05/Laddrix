@@ -5,8 +5,8 @@ proxy, the in-flight and pending bounds, the operator's bound); the tests must n
 tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-W = "src/mocktrade/alerts/webhook.py"
-N = "src/mocktrade/ops/notify.py"
+W = "src/laddrix/alerts/webhook.py"
+N = "src/laddrix/ops/notify.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_webhook_pinning.py",
          "tests/test_market_alerts.py"]
 MUTANTS = [

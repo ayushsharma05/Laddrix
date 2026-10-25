@@ -4,7 +4,7 @@ risk.
 
 from dataclasses import replace
 
-from mocktrade.domain.accounts import BrokerAccount, Role, User, can_trade, can_view
+from laddrix.domain.accounts import BrokerAccount, Role, User, can_trade, can_view
 
 
 def test_owner_with_trader_role_can_trade(trader, account):

@@ -247,7 +247,7 @@ export function AlgoManager({ params, publish }: WidgetProps<AlgoParams>) {
                   <span>
                     {a.code}
                     {familyOf(specs, a.code) === "protection" && (
-                      <span className="algo-family" title="Held by MockTrade: works while the server runs (a broker GTT survives our outages)">
+                      <span className="algo-family" title="Held by Laddrix: works while the server runs (a broker GTT survives our outages)">
                         held
                       </span>
                     )}

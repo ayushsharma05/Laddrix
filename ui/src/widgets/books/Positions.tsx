@@ -1,4 +1,4 @@
-// Positions: net quantity and P&L per contract, live, with a total row and whether MockTrade's
+// Positions: net quantity and P&L per contract, live, with a total row and whether Laddrix's
 // positions match the broker's (canvas board 2, docs/design/ui.md §4).
 //
 //   ✓ = broker 2m                       Day gross +₹14,812.50 · charges ₹66.44 · net +₹14,746.06

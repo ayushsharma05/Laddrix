@@ -10,11 +10,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from mocktrade.domain.accounts import BrokerAccount, Role
-from mocktrade.research.backtest import BacktestError, CandleStore
-from mocktrade.server.app import ServerSettings, create_app
-from mocktrade.server.security import SecretBox
-from mocktrade.server.users import UserStore
+from laddrix.domain.accounts import BrokerAccount, Role
+from laddrix.research.backtest import BacktestError, CandleStore
+from laddrix.server.app import ServerSettings, create_app
+from laddrix.server.security import SecretBox
+from laddrix.server.users import UserStore
 
 IST = ZoneInfo("Asia/Kolkata")
 DAY = date(2026, 10, 16)

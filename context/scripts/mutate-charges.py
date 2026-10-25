@@ -4,8 +4,8 @@ Run alone (two runs at once overwrite each other's files).
 The FILL-only filter in service.py is not listed: recomputing on other events changes nothing
 (an unchanged bill is never pushed), so no test can tell; it only saves work."""
 import subprocess
-M_, S = "src/mocktrade/charges/model.py", "src/mocktrade/charges/schedules.py"
-V = "src/mocktrade/charges/service.py"
+M_, S = "src/laddrix/charges/model.py", "src/laddrix/charges/schedules.py"
+V = "src/laddrix/charges/service.py"
 M = [
  (M_, "        return Segment.DELIVERY if product is Product.CNC else Segment.INTRADAY", "        return Segment.INTRADAY"),
  (M_, "                brokerage = min(brokerage, Fraction(rates.brokerage_cap_paise))", "                pass"),

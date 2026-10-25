@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 DOC = Path("docs/guide/reading-order.md")
-PARTS = {"Part A": ("src/mocktrade/", lambda f: f.endswith(".py") and not f.endswith("__init__.py")),
+PARTS = {"Part A": ("src/laddrix/", lambda f: f.endswith(".py") and not f.endswith("__init__.py")),
          "Part B": ("ui/src/", lambda f: re.search(r"\.(ts|tsx)$", f) and ".test." not in f
                     and "/test/" not in f and not f.endswith("testdata.ts"))}  # fmt: skip
 ENTRY = re.compile(r"^\d+[a-z]?\. \[ \] `([^`]+)` — ?(.*)$")

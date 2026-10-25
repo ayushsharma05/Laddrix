@@ -1,6 +1,6 @@
 # Glossary
 
-Every term a trader or a developer meets in MockTrade, in plain words. Code names are in `code` font; where a term has one home in the code, it is named.
+Every term a trader or a developer meets in Laddrix, in plain words. Code names are in `code` font; where a term has one home in the code, it is named.
 
 ## The market
 
@@ -18,7 +18,7 @@ Every term a trader or a developer meets in MockTrade, in plain words. Code name
 | **Expiry** | The last day a future or option exists. |
 | **Lot, lot size** | Futures and options trade in whole lots, for example 75 for NIFTY. Shares have a lot of 1. An order of 50 when the lot is 75 is refused. |
 | **Tick, tick size** | The smallest price step, for example ₹0.10 (10 paise). A price off the tick grid is refused. |
-| **Paise** | One hundredth of a rupee. Every price and amount in MockTrade is a whole number of paise, never a decimal, so sums are exact (`domain/money.py`). |
+| **Paise** | One hundredth of a rupee. Every price and amount in Laddrix is a whole number of paise, never a decimal, so sums are exact (`domain/money.py`). |
 | **LTP** | Last traded price. |
 | **LTQ** | Last traded quantity. |
 | **Bid, ask** | The best price someone will buy at (bid) and sell at (ask). |
@@ -27,7 +27,7 @@ Every term a trader or a developer meets in MockTrade, in plain words. Code name
 | **OI (open interest)** | How many futures or options contracts are open. |
 | **VAP (volume at price)** | How much traded at each price today; a column on the ladder. |
 | **Tick (price message)** | One price update from the feed (`domain/ticks.py`). The word also means the price step above; the context tells which. |
-| **Holiday** | A weekday the exchange is closed. Listed in `MOCKTRADE_HOLIDAYS`. |
+| **Holiday** | A weekday the exchange is closed. Listed in `LADDRIX_HOLIDAYS`. |
 
 ## Orders
 
@@ -36,7 +36,7 @@ Every term a trader or a developer meets in MockTrade, in plain words. Code name
 | **Order** | A request to buy or sell. What was asked is the `OrderRequest`; what is known about it now is the `OrderView`. |
 | **Client order id** | Our id for an order. It is also sent to the broker as the order's tag, so an update can be matched even before the broker's own id arrives. |
 | **Side** | BUY or SELL. |
-| **Market order** | Trade now at the best price available. MockTrade always sends **market protection** with it. |
+| **Market order** | Trade now at the best price available. Laddrix always sends **market protection** with it. |
 | **Limit order (LMT)** | Trade only at this price or better. It **rests** until it fills or is cancelled. |
 | **SL (stop-loss limit)** | Waits until the price reaches the **trigger**, then works as a limit order. |
 | **SL-M (stop-loss market)** | Waits for the trigger, then works as a protected market order. |
@@ -54,7 +54,7 @@ Every term a trader or a developer meets in MockTrade, in plain words. Code name
 | **Order spec** | What the server says an instrument allows: its order types, products, tick, lot and their rules. The screens draw the ticket from it and hard-code no market rules (`domain/order_spec.py`). |
 | **GTT (good till triggered)** | An order the broker holds for up to a year. When the price reaches the trigger it places a limit order. **Single** has one trigger; **two-leg (OCO)** has a target and a stop. |
 | **Basket** | Several orders sent together, for example the legs of an options strategy. |
-| **OPS** | Orders per second. SEBI and Kite cap it; MockTrade's **throttle** keeps under 8/s, 350/min and 4,500/day. |
+| **OPS** | Orders per second. SEBI and Kite cap it; Laddrix's **throttle** keeps under 8/s, 350/min and 4,500/day. |
 | **Static IP** | Kite takes orders only from a registered IP address (SEBI rule), so live orders go from the server, never a laptop. |
 
 ## Positions and money
@@ -66,7 +66,7 @@ Every term a trader or a developer meets in MockTrade, in plain words. Code name
 | **Average price** | What the open position cost per unit, kept exactly as a fraction. |
 | **P&L** | Profit and loss. **Realised**: on what has been closed. **Unrealised**: on what is still open, at the last price. |
 | **MTM (mark to market)** | Valuing open positions at the current price. **MTM limits** are the trader's own loss or target limits per position or for the whole portfolio; they can close positions automatically (`risk/mtm.py`). |
-| **Square-off** | Closing intraday (MIS) positions before the broker's cut-off. MockTrade warns from 15:00 and can close them all, after asking (`risk/squareoff.py`). |
+| **Square-off** | Closing intraday (MIS) positions before the broker's cut-off. Laddrix warns from 15:00 and can close them all, after asking (`risk/squareoff.py`). |
 | **Margin** | Money the broker blocks while an order or position is open. The ticket shows what an order would block. |
 | **Charges** | Brokerage, taxes and fees on each trade; estimated in the ticket and totalled per day (`charges/`). |
 | **Holdings** | Shares kept from earlier days (delivery). |
@@ -83,7 +83,7 @@ Every term a trader or a developer meets in MockTrade, in plain words. Code name
 | **Daily loss stop** | Engages the kill switch when the day's loss reaches the account's limit. |
 | **Recovery** | After a restart, each account rebuilds its orders and positions from the audit trail and checks them with the broker before taking new orders (`recovery.py`). |
 | **Audit trail** | Every order event, fill, kill switch and admin action, written to `events.db` and never changed. |
-| **Unprotected** | A position whose stop held by MockTrade is no longer running; a red band says so (`ops/protection.py`). |
+| **Unprotected** | A position whose stop held by Laddrix is no longer running; a red band says so (`ops/protection.py`). |
 | **Band** | A strip across the top of every screen for something you must know now: STOP, disconnected, prices old, position differs, ops alerts. |
 | **Ops alert** | A server-side warning (login needed, no prices, disk filling) shown as a band and sent to the phone webhook. |
 
@@ -91,12 +91,12 @@ Every term a trader or a developer meets in MockTrade, in plain words. Code name
 
 | Term | Meaning |
 |---|---|
-| **Algo, parent order** | An order MockTrade works for you over time by sending **child** orders. |
+| **Algo, parent order** | An order Laddrix works for you over time by sending **child** orders. |
 | **Spread, leg** | Several contracts traded as one: each contract is a leg, bought or sold in a fixed ratio (a calendar: buy November, sell December). |
 | **Implied price** | A spread's price worked out from its legs' prices now: what buying (or selling) every leg at once would cost. |
 | **Autospreader** | Trades a spread by quoting one leg and hedging the other legs the moment it fills ([spreads.md](spreads.md)). |
 | **Slicer, TWAP, VWAP, POV, Iceberg, Spreader** | Execution algos: equal slices; even over time; in step with the day's volume; a share of volume; only a small slice showing; two legs at a spread. |
-| **Trailing stop, OCO, Bracket** | Protection algos: a stop that follows the price; a target and a stop; an entry with both. **Held by MockTrade**, so they work only while the server runs. |
+| **Trailing stop, OCO, Bracket** | Protection algos: a stop that follows the price; a target and a stop; an entry with both. **Held by Laddrix**, so they work only while the server runs. |
 | **Algo id (SEBI)** | The exchange-issued id an approved algo must carry. |
 
 ## Platform

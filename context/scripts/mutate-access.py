@@ -4,11 +4,11 @@ child; GTTs that could open are deleted, stop-losses kept; the server's check is
 rule); the tests must notice. Runs the tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-A = "src/mocktrade/risk/access.py"
-E = "src/mocktrade/algos/engine.py"
-G = "src/mocktrade/orders/gtt.py"
-P = "src/mocktrade/platform.py"
-V = "src/mocktrade/tools/serve.py"
+A = "src/laddrix/risk/access.py"
+E = "src/laddrix/algos/engine.py"
+G = "src/laddrix/orders/gtt.py"
+P = "src/laddrix/platform.py"
+V = "src/laddrix/tools/serve.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_access_recheck.py", "tests/test_gtt_stop.py"]
 MUTANTS = [
  (A, "        if request.reduce_only or request.forced_close:\n            return None", "        if False:\n            return None"),

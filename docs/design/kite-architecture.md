@@ -1,18 +1,18 @@
-# MockTrade on Kite Connect: architecture
+# Laddrix on Kite Connect: architecture
 
-**Status:** accepted (14 Oct 2026), **extended the same day to multi-user and broker-agnostic** (§0). Replaces the COMEX/MockCME plan for MockTrade. MockCME is paused, not deleted.
+**Status:** accepted (14 Oct 2026), **extended the same day to multi-user and broker-agnostic** (§0). Replaces the COMEX/MockCME plan for Laddrix. MockCME is paused, not deleted.
 **Facts checked on:** 14 Oct 2026 (sources at the end). Kite's limits change, so re-check them before going live.
 
-MockTrade is a personal, professional-style trading platform for NSE and BSE. It has a price ladder, an order blotter, positions and P&L, an audit trail, and parent/child algo order management. It connects to the real market through Zerodha's **Kite Connect** API. A **paper broker** fills orders against live Kite prices, so everything can be tested without real money.
+Laddrix is a personal, professional-style trading platform for NSE and BSE. It has a price ladder, an order blotter, positions and P&L, an audit trail, and parent/child algo order management. It connects to the real market through Zerodha's **Kite Connect** API. A **paper broker** fills orders against live Kite prices, so everything can be tested without real money.
 
 ---
 
 
 ## 0. Multi-user and broker-agnostic (decided 14 Oct 2026)
 
-MockTrade is a **multi-user platform**. Each user logs in with their own credentials and 2FA, and links **their own broker account** through the broker's own login page. The **only** limits the platform has are the broker's and the exchange's. **Zerodha is one adapter, not the foundation:** other brokers, or direct exchange access later, plug in behind the same interfaces.
+Laddrix is a **multi-user platform**. Each user logs in with their own credentials and 2FA, and links **their own broker account** through the broker's own login page. The **only** limits the platform has are the broker's and the exchange's. **Zerodha is one adapter, not the foundation:** other brokers, or direct exchange access later, plug in behind the same interfaces.
 
-![MockTrade one chart](../../context/images/mocktrade-one-chart.png)
+![Laddrix one chart](../../context/images/laddrix-one-chart.png)
 
 *The interactive version is `context/one-chart/one-chart.html`: open it in a browser and click any box.*
 
@@ -34,7 +34,7 @@ MockTrade is a **multi-user platform**. Each user logs in with their own credent
 3. **Licensed market data.** Kite data can't be displayed to other users. Shared prices need an exchange-authorised data vendor, which plugs in as another feed handler.
 4. **Research Analyst registration** for any black-box algo (logic not disclosed) offered to others.
 
-Until these are done, MockTrade runs for **you and family accounts** (Zerodha allows family members under one developer profile, each with a separate API key), with each account using its own Kite app and its own feed.
+Until these are done, Laddrix runs for **you and family accounts** (Zerodha allows family members under one developer profile, each with a separate API key), with each account using its own Kite app and its own feed.
 
 Sources for §0: https://kite.trade/forum/discussion/3935/can-multiple-users-use-one-kite-connect-app · https://kite.trade/forum/discussion/15842/how-do-i-provide-access-to-multiple-users-to-kite-connect-api-via-my-app · https://support.zerodha.com/category/trading-and-markets/general-kite/kite-api/articles/can-i-use-historical-and-live-data-taken-from-kite-connect-api-on-other-platforms · https://www.quantinsti.com/articles/algorithmic-trading-india/ · https://inthemoneybyzerodha.substack.com/p/sebi-algo-trading-changes-april-2026
 
@@ -90,7 +90,7 @@ These numbers decide the whole design. Each one came from Kite's docs or Zerodha
 **Honest consequences:**
 - This isn't co-located, microsecond trading. Kite adds network and broker time we can't control. Our job is to add **almost nothing** on top and to **never break a rule**.
 - The ladder shows 5 levels updated about once a second, and the UI says so.
-- Using it for other people's accounts would make us an "algo provider" needing exchange registration. MockTrade stays personal.
+- Using it for other people's accounts would make us an "algo provider" needing exchange registration. Laddrix stays personal.
 
 ---
 
@@ -133,9 +133,9 @@ Read it as two lanes:
 
 Everything runs in **one Python process** at first, called a "modular monolith": one program, but with separate modules that only talk through clear interfaces. It's the simplest thing that meets the numbers (see §6), and each module can become its own process later without being rewritten.
 
-### How the reference platform maps to MockTrade
+### How the reference platform maps to Laddrix
 
-| Professional platform part | MockTrade module |
+| Professional platform part | Laddrix module |
 | --- | --- |
 | Screens: ladder, order book, positions, audit | `ui/` (React) |
 | Hub / app server: logins, routing screens to services | `server` |
@@ -267,7 +267,7 @@ Switching between real and paper is **one setting**. The rest of the program can
 ### Screens: widgets first, desktop app later
 
 ```
-┌──────────────────────── MockTrade workspace ────────────────────────┐
+┌──────────────────────── Laddrix workspace ────────────────────────┐
 │ ┌── Ladder: NIFTY FUT ─┐ ┌── Order ticket ──┐ ┌── Positions ───────┐ │
 │ │ bid │ price │ ask    │ │ BUY / SELL       │ │ symbol  qty  P&L   │ │
 │ │     │ 25012 │ 150    │ │ qty  price       │ │ ...                │ │
@@ -300,7 +300,7 @@ Switching between real and paper is **one setting**. The rest of the program can
 flowchart LR
     Phone["Phone / laptop browser"] -- "HTTPS 443" --> Caddy
     subgraph VM["AWS Lightsail, Mumbai · 2 GB · static IP"]
-        Caddy["Caddy<br/>TLS"] --> App["MockTrade app<br/>(Docker)"]
+        Caddy["Caddy<br/>TLS"] --> App["Laddrix app<br/>(Docker)"]
         App --- DB[("SQLite file<br/>on disk + daily backup")]
     end
     App -- "orders from the registered static IP" --> Kite["Kite Connect"]
@@ -312,7 +312,7 @@ flowchart LR
 - **Monthly cost:** about $12 server + ₹500 Kite data.
 - **Daily routine:**
   1. 08:30: the instrument list loads automatically.
-  2. 09:00: you open MockTrade on your phone and tap **Log in with Kite** (the manual Zerodha login + 2FA), which gives a new token.
+  2. 09:00: you open Laddrix on your phone and tap **Log in with Kite** (the manual Zerodha login + 2FA), which gives a new token.
   3. 09:15: the market opens.
   4. Next 06:00: the token expires.
 - **Safety:** only ports 443 (and 22 for SSH with keys) are open. Secrets live in an `.env` file on the server, never in git.
@@ -331,7 +331,7 @@ flowchart LR
 ## 8. Code layout
 
 ```
-src/mocktrade/
+src/laddrix/
   domain/        types: Instrument, OrderRequest, Order, Tick, Fill, events (money in paise)
   refdata/       instrument list loader
   marketdata/    decoder, WebSocket client, latest state, conflation
@@ -379,5 +379,5 @@ tests/           one test file per module
   keeps it, so nothing takes over from a server that could wake up and send.
 - **Shutdown** stops the loops, flushes the audit trail, closes the brokers and only then lets
   go of the lock.
-- This fences **one machine**, which is how MockTrade is deployed: one server, behind the
+- This fences **one machine**, which is how Laddrix is deployed: one server, behind the
   static IP the broker accepts orders from.

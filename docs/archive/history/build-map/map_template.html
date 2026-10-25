@@ -1,4 +1,4 @@
-<title>MockTrade Build Map</title>
+<title>Laddrix Build Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -105,7 +105,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, .chip:focus-visible,
 <div class="wrap">
   <header>
     <div>
-      <h1>MockTrade Build Map</h1>
+      <h1>Laddrix Build Map</h1>
       <p class="lede">The whole architecture in one flow. Each box shows the issues that design it (dashed outline) and the issues where you program it (filled, coloured by release). Tap any box or number.</p>
     </div>
     <div class="stat"><b id="donecount">0</b> of <span id="total">0</span> issues done<div class="bar"><i id="donebar" style="width:0"></i></div></div>
@@ -128,7 +128,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, .chip:focus-visible,
   </div>
 
   <div class="main">
-    <div class="mapbox"><svg id="map" role="img" aria-label="MockTrade architecture with the issues for each box"></svg></div>
+    <div class="mapbox"><svg id="map" role="img" aria-label="Laddrix architecture with the issues for each box"></svg></div>
     <aside id="panel" aria-live="polite"></aside>
   </div>
 
@@ -313,7 +313,7 @@ function showBox(id) {
   panel.innerHTML = `<h2>${esc(b.name)}</h2><p>${esc(b.explain)}</p><p class="meta" style="color:var(--muted);font-size:13px">${all.filter(isDone).length} of ${all.length} issues done</p>` +
     (b.design.length ? `<h3>Design it first</h3><ul class="il">${b.design.map(li).join('')}</ul>` : '') +
     (b.build.length ? `<h3>Program it</h3><ul class="il">${b.build.slice().sort((x, y) => relIdx(x) - relIdx(y) || x - y).map(li).join('')}</ul>` : '') +
-    ((b.ext || []).length ? `<h3>Built in the MockCME repo</h3><ul class="il">${b.ext.map(e => `<li><span class="pill" style="background:var(--r${e.rel});color:var(${e.rel <= 4 ? '--chip-ink-light' : '--chip-ink-dark'});cursor:default">${e.label}↗</span><div><a href="${e.url}" target="_blank" rel="noopener">${esc(e.title)}</a><div class="meta">needed by MockTrade ${RELS[e.rel - 1]}</div></div></li>`).join('')}</ul>` : '');
+    ((b.ext || []).length ? `<h3>Built in the MockCME repo</h3><ul class="il">${b.ext.map(e => `<li><span class="pill" style="background:var(--r${e.rel});color:var(${e.rel <= 4 ? '--chip-ink-light' : '--chip-ink-dark'});cursor:default">${e.label}↗</span><div><a href="${e.url}" target="_blank" rel="noopener">${esc(e.title)}</a><div class="meta">needed by Laddrix ${RELS[e.rel - 1]}</div></div></li>`).join('')}</ul>` : '');
 }
 function showIssue(n) {
   const bs = boxesOf(n);

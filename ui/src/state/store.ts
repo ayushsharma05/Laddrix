@@ -468,7 +468,7 @@ export function describeOrderEvent(
     case "CANCELLED_LOCALLY":
       return { level: "WARN", text: `${what} cancelled here: ${reason || "never reached the broker"}` };
     case "EXTERNAL":
-      return { level: "INFO", text: `${what}: changed outside MockTrade${reason ? ` (${reason})` : ""}` };
+      return { level: "INFO", text: `${what}: changed outside Laddrix${reason ? ` (${reason})` : ""}` };
     case "UPDATED":
       if (order?.status === "CANCELLED") return { level: "INFO", text: `${what} cancelled` };
       if (order?.status === "REJECTED") {

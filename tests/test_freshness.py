@@ -12,19 +12,19 @@ import pytest
 from test_protect import FUT, tick
 from test_spreader import NOV, OCT, quote
 
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.algos.engine import AlgoEngine
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
-from mocktrade.marketdata.service import MarketData
-from mocktrade.ops.alerts import Alerts
-from mocktrade.ops.checks import PriceOverload
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.checks import RiskGate
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.risk.limits import RiskLimits
+from laddrix.algos.builtin import BUILTIN
+from laddrix.algos.engine import AlgoEngine
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import OrderRequest, OrderType, Product, Side
+from laddrix.marketdata.service import MarketData
+from laddrix.ops.alerts import Alerts
+from laddrix.ops.checks import PriceOverload
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.checks import RiskGate
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.limits import RiskLimits
 
 T0 = datetime(2026, 10, 23, 4, 0, tzinfo=UTC)
 
@@ -155,8 +155,8 @@ async def test_closing_on_a_stale_price_still_goes(gate):
 
 
 async def test_growing_an_order_on_a_stale_price_is_refused(gate):
-    from mocktrade.domain.orders import OrderStatus
-    from mocktrade.orders.model import OrderView, Pending
+    from laddrix.domain.orders import OrderStatus
+    from laddrix.orders.model import OrderView, Pending
 
     gate.md.on_tick(tick(2501000))
     gate.mono.t += 120
@@ -195,8 +195,8 @@ async def test_a_spread_waits_when_its_leg_prices_are_far_apart_in_time(nifty_fu
 
 
 async def test_a_resting_paper_order_fills_on_a_dip_that_retraces_before_it_reads(nifty_fut):
-    from mocktrade.broker.paper import PaperBroker
-    from mocktrade.domain.orders import OrderStatus
+    from laddrix.broker.paper import PaperBroker
+    from laddrix.domain.orders import OrderStatus
 
     store = InstrumentStore()
     store.add(nifty_fut)

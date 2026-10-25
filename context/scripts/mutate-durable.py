@@ -4,9 +4,9 @@ cancels; a change is written with the larger size; bounded memory; the platform 
 the tests must notice. Restores each file in `finally`. Run alone."""
 import subprocess
 
-M = "src/mocktrade/orders/manager.py"
-E = "src/mocktrade/store/events.py"
-P = "src/mocktrade/platform.py"
+M = "src/laddrix/orders/manager.py"
+E = "src/laddrix/store/events.py"
+P = "src/laddrix/platform.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_durable_orders.py",
          "tests/test_order_manager.py", "tests/test_event_log.py"]
 MUTANTS = [

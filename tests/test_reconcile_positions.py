@@ -5,12 +5,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.broker.base import BrokerError, BrokerPosition
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import Product, Side
-from mocktrade.positions.book import PositionBook
-from mocktrade.positions.reconcile import PositionReconciler
-from mocktrade.store.events import EventLog
+from laddrix.broker.base import BrokerError, BrokerPosition
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import Product, Side
+from laddrix.positions.book import PositionBook
+from laddrix.positions.reconcile import PositionReconciler
+from laddrix.store.events import EventLog
 
 FUT = "NFO:NIFTY26OCTFUT"
 REL = "NSE:RELIANCE"
@@ -69,8 +69,8 @@ async def test_a_missing_fill_shows_up_as_an_alert(rec, book, broker, clock):
     (alert,) = second.alerts
     assert (alert.ours, alert.broker, alert.since) == (75, 150, T0)
     assert alert.message == (
-        "NFO:NIFTY26OCTFUT: MockTrade shows +75, the broker shows +150 "
-        "(a missed fill, or a trade made outside MockTrade)"
+        "NFO:NIFTY26OCTFUT: Laddrix shows +75, the broker shows +150 "
+        "(a missed fill, or a trade made outside Laddrix)"
     )
     assert rec.alerts() == [alert]
 
@@ -83,7 +83,7 @@ async def test_a_fill_still_on_its_way_is_not_an_alert(rec, book, broker):
     assert result.ok and result.alerts == () and result.suspected == ()
 
 
-async def test_trades_made_outside_mocktrade_are_flagged(rec, broker):
+async def test_trades_made_outside_laddrix_are_flagged(rec, broker):
     kite_has(broker, rel=10)  # bought in the broker's own app
     await rec.check()
     (alert,) = (await rec.check()).alerts
@@ -215,7 +215,7 @@ async def test_a_difference_in_one_product_is_named_with_it(rec, book, broker, c
     clock.now += timedelta(seconds=10)
     (alert,) = (await rec.check()).alerts
     assert (alert.key, alert.ours, alert.broker) == ((FUT, Product.MIS), -75, -150)
-    assert alert.message.startswith(f"{FUT} MIS: MockTrade shows -75, the broker shows -150")
+    assert alert.message.startswith(f"{FUT} MIS: Laddrix shows -75, the broker shows -150")
     # the net across products would have hidden it in the other direction too:
     broker.broker_positions = rows((FUT, Product.NRML, 0), (FUT, Product.MIS, 0))
     book_net = sum(book.qty_by_product().values())
@@ -239,9 +239,9 @@ async def test_a_row_without_its_product_is_compared_on_the_net(rec, book, broke
 
 
 async def test_the_paper_broker_lists_one_row_per_product():
-    from mocktrade.broker.paper import PaperBroker
-    from mocktrade.marketdata.service import MarketData
-    from mocktrade.refdata.store import InstrumentStore
+    from laddrix.broker.paper import PaperBroker
+    from laddrix.marketdata.service import MarketData
+    from laddrix.refdata.store import InstrumentStore
 
     paper = PaperBroker(MarketData(), InstrumentStore())
     paper._book.apply_fill(FUT, Product.NRML, Side.BUY, 75, 2501000)

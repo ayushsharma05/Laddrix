@@ -4,10 +4,10 @@ what it leaves to orders already closing; stop algos capping their exit); the te
 notice. Restores each file in `finally`. Run alone."""
 import subprocess
 
-C = "src/mocktrade/risk/checks.py"
-D = "src/mocktrade/risk/closing.py"
-E = "src/mocktrade/algos/engine.py"
-P = "src/mocktrade/algos/protect.py"
+C = "src/laddrix/risk/checks.py"
+D = "src/laddrix/risk/closing.py"
+E = "src/laddrix/algos/engine.py"
+P = "src/laddrix/algos/protect.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_exits.py", "tests/test_mtm.py",
          "tests/test_protect.py", "tests/test_risk_checks.py", "tests/test_algo_engine.py"]
 MUTANTS = [

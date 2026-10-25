@@ -1,5 +1,5 @@
 import subprocess
-F = "src/mocktrade/broker/kite/live.py"
+F = "src/laddrix/broker/kite/live.py"
 M = [
     ("        if tokens:\n            asyncio.ensure_future(self._subscribe(link, tokens))", "        pass"),
     ("                    asyncio.ensure_future(self._take_prices(other))", "                    pass"),

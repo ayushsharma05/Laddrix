@@ -87,9 +87,9 @@ describe("states in words", () => {
 
 describe("the authenticator link", () => {
   it("gives the key for typing in by hand, grouped in fours", () => {
-    expect(totpParts("otpauth://totp/MockTrade:meera?secret=JBSWY3DPEHPK3PXPABCD&issuer=MockTrade")).toEqual({ account: "meera", issuer: "MockTrade", secret: "JBSW Y3DP EHPK 3PXP ABCD" });
+    expect(totpParts("otpauth://totp/Laddrix:meera?secret=JBSWY3DPEHPK3PXPABCD&issuer=Laddrix")).toEqual({ account: "meera", issuer: "Laddrix", secret: "JBSW Y3DP EHPK 3PXP ABCD" });
     expect(totpParts("https://evil.example/?secret=X")).toBeNull();
     expect(totpParts("not a link")).toBeNull();
-    expect(totpParts("otpauth://totp/MockTrade:x")).toBeNull(); // no secret
+    expect(totpParts("otpauth://totp/Laddrix:x")).toBeNull(); // no secret
   });
 });

@@ -1,8 +1,8 @@
 {
-  "name": "mocktrade-desktop",
+  "name": "laddrix-desktop",
   "private": true,
   "version": "1.0.0-rc.1",
-  "description": "MockTrade desktop app: the same screens in real windows that pop out onto any monitor",
+  "description": "Laddrix desktop app: the same screens in real windows that pop out onto any monitor",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",

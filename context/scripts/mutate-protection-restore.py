@@ -4,7 +4,7 @@ it could duplicate an exit; sized to what is open; a bracket as an OCO at its le
 tests must notice. Restores each file in `finally`. Run alone."""
 import subprocess
 
-G = "src/mocktrade/ops/protection.py"
+G = "src/laddrix/ops/protection.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_protection_restore.py",
          "tests/test_protection_guard.py", "tests/test_protect.py"]
 MUTANTS = [

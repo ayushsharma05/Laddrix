@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# One-time hardening and set-up of a fresh Ubuntu 24.04 server for MockTrade
+# One-time hardening and set-up of a fresh Ubuntu 24.04 server for Laddrix
 # (AWS Lightsail, Mumbai). Safe to run again: every step checks before it changes anything.
 #
-#   git clone https://github.com/ayushsharma05/MockTrade.git /opt/mocktrade
-#   sudo /opt/mocktrade/deploy/server-setup.sh
+#   git clone https://github.com/ayushsharma05/MockTrade.git /opt/laddrix
+#   sudo /opt/laddrix/deploy/server-setup.sh
 #
 # What it does (docs/runbooks/server.md explains each step):
 #   1. security updates installed now and automatically from then on
@@ -56,7 +56,7 @@ systemctl enable --now fail2ban
 step "4. ssh"
 KEYS="$(getent passwd "$ADMIN_USER" | cut -d: -f6)/.ssh/authorized_keys"
 if [[ -s "$KEYS" ]]; then
-  cat >/etc/ssh/sshd_config.d/90-mocktrade.conf <<'EOF'
+  cat >/etc/ssh/sshd_config.d/90-laddrix.conf <<'EOF'
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no
@@ -83,14 +83,14 @@ fi
 swapon --show
 
 step "7. daily backup"
-install -d -m 700 /var/backups/mocktrade
-cat >/etc/cron.d/mocktrade-backup <<EOF
-# MockTrade: back up the data (databases, rules, reports, alerts, candles, backtests; never secrets) after market close (16:15 UTC = 21:45 India), Mon-Fri,
-# then copy the backup out of the container to /var/backups/mocktrade on this server.
+install -d -m 700 /var/backups/laddrix
+cat >/etc/cron.d/laddrix-backup <<EOF
+# Laddrix: back up the data (databases, rules, reports, alerts, candles, backtests; never secrets) after market close (16:15 UTC = 21:45 India), Mon-Fri,
+# then copy the backup out of the container to /var/backups/laddrix on this server.
 SHELL=/bin/bash
-15 16 * * 1-5 root { cd $REPO_DIR && docker compose -f deploy/compose.yaml exec -T app python -m mocktrade.tools.backup --to /data/backups --keep 14 && docker compose -f deploy/compose.yaml cp app:/data/backups/. /var/backups/mocktrade/ && find /var/backups/mocktrade -mindepth 1 -maxdepth 1 -type d -mtime +30 -exec rm -rf {} +; } >>/var/log/mocktrade-backup.log 2>&1
+15 16 * * 1-5 root { cd $REPO_DIR && docker compose -f deploy/compose.yaml exec -T app python -m laddrix.tools.backup --to /data/backups --keep 14 && docker compose -f deploy/compose.yaml cp app:/data/backups/. /var/backups/laddrix/ && find /var/backups/laddrix -mindepth 1 -maxdepth 1 -type d -mtime +30 -exec rm -rf {} +; } >>/var/log/laddrix-backup.log 2>&1
 EOF
-chmod 644 /etc/cron.d/mocktrade-backup
+chmod 644 /etc/cron.d/laddrix-backup
 
 step "done"
 echo "Next: deploy/.env, then 'docker compose -f deploy/compose.yaml up -d --build' (docs/runbooks/server.md)."

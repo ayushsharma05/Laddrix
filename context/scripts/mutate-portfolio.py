@@ -4,9 +4,9 @@ that hangs the tests counts as caught. Run alone (two runs at once overwrite eac
 Last run: 25/27; the two survivors behave the same as the original (an option at qty 0 has no
 margin either way; a reducing case never beats the position as it is inside max())."""
 import subprocess
-F, P, R = "src/mocktrade/broker/paper_funds.py", "src/mocktrade/broker/paper.py", "src/mocktrade/recovery.py"
-S, K = "src/mocktrade/portfolio/service.py", "src/mocktrade/broker/kite/portfolio.py"
-D = "src/mocktrade/domain/portfolio.py"
+F, P, R = "src/laddrix/broker/paper_funds.py", "src/laddrix/broker/paper.py", "src/laddrix/recovery.py"
+S, K = "src/laddrix/portfolio/service.py", "src/laddrix/broker/kite/portfolio.py"
+D = "src/laddrix/domain/portfolio.py"
 M = [
  (F, "                return DELIVERY, Fraction(qty * price)", "                return DELIVERY, Fraction(abs(qty) * price)"),
  (F, "            return MIS, size * price * self.mis_equity_pct / 100", "            return MIS, size * price"),

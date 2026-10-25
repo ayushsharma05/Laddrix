@@ -21,13 +21,13 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from mocktrade.charges.model import ScheduleCharges
-from mocktrade.charges.schedules import KITE_STANDARD
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.research.backtest import BacktestSpec, InProcess, RecordedDay, Worker
-from mocktrade.research.ticks import FileTickStore
+from laddrix.charges.model import ScheduleCharges
+from laddrix.charges.schedules import KITE_STANDARD
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.refdata.store import InstrumentStore
+from laddrix.research.backtest import BacktestSpec, InProcess, RecordedDay, Worker
+from laddrix.research.ticks import FileTickStore
 
 IST = ZoneInfo("Asia/Kolkata")
 DAY = date(2026, 10, 16)
@@ -101,8 +101,8 @@ async def main(n: int) -> None:
         same = result["loop"]["totals"] == result["worker"]["totals"]
         print(f"same result both ways: {same}")
 
-        from mocktrade.reports.daily import build_day
-        from mocktrade.store.events import EventLog
+        from laddrix.reports.daily import build_day
+        from laddrix.store.events import EventLog
 
         log = EventLog(root / "a" / f"{DAY.isoformat()}.db")
 

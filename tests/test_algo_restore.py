@@ -13,23 +13,23 @@ import asyncio
 from dataclasses import replace
 from datetime import date
 
-from mocktrade.algos.autospreader import algo_type
-from mocktrade.algos.builtin import BUILTIN
-from mocktrade.algos.engine import AlgoState
-from mocktrade.broker.base import BrokerPosition
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.accounts import BrokerAccount, User
-from mocktrade.domain.orders import OrderStatus, OrderUpdate, Product, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.orders.model import ClientIds
-from mocktrade.platform import Platform
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.kill_switch import KillSwitch
-from mocktrade.risk.limits import RiskLimits
-from mocktrade.spreads.model import SpreadLeg
-from mocktrade.spreads.store import SpreadBook
-from mocktrade.store.events import EventLog
+from laddrix.algos.autospreader import algo_type
+from laddrix.algos.builtin import BUILTIN
+from laddrix.algos.engine import AlgoState
+from laddrix.broker.base import BrokerPosition
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.accounts import BrokerAccount, User
+from laddrix.domain.orders import OrderStatus, OrderUpdate, Product, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.orders.model import ClientIds
+from laddrix.platform import Platform
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.kill_switch import KillSwitch
+from laddrix.risk.limits import RiskLimits
+from laddrix.spreads.model import SpreadLeg
+from laddrix.spreads.store import SpreadBook
+from laddrix.store.events import EventLog
 
 OCT, NOV = "NFO:NIFTY26OCTFUT", "NFO:NIFTY26NOVFUT"
 ACCOUNT = BrokerAccount("acc", "fake", "F1", "ayush")
@@ -321,8 +321,8 @@ def test_the_engine_refuses_to_restore_what_cant_be(nifty_fut):
 
     import pytest
 
-    from mocktrade.algos.engine import AlgoEngine, AlgoError, AlgoRecord
-    from mocktrade.orders.manager import OrderManager
+    from laddrix.algos.engine import AlgoEngine, AlgoError, AlgoRecord
+    from laddrix.orders.manager import OrderManager
 
     store = InstrumentStore()
     store.add(nifty_fut)

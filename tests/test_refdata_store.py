@@ -2,7 +2,7 @@
 
 import pytest
 
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.refdata.store import InstrumentStore
 
 
 def test_mapping_requires_a_known_instrument():

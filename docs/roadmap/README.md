@@ -6,7 +6,7 @@ done. This folder holds the thinking behind them.
 | Where | What |
 | --- | --- |
 | [Open feature issues](https://github.com/ayushsharma05/MockTrade/issues) | Every planned feature. Titles starting "Later:" are the researched expansion; "Post-v1" are the professional-trading features; "Decision:" need a choice before work starts |
-| [feature-research-2026-10-16.md](feature-research-2026-10-16.md) | The research behind the "Later:" issues: which feature families exist, what MockTrade already has, the dependencies, and the limits of the evidence |
+| [feature-research-2026-10-16.md](feature-research-2026-10-16.md) | The research behind the "Later:" issues: which feature families exist, what Laddrix already has, the dependencies, and the limits of the evidence |
 | [../design/product-vision.md](../design/product-vision.md) | The feature catalogue and principles every feature must keep (replaceable parts; the backend provides, the frontend displays; no vendor named or copied) |
 
 **Order of work:**

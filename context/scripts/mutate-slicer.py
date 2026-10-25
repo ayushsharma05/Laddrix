@@ -1,5 +1,5 @@
 import subprocess, pathlib
-S="src/mocktrade/algos/slicer.py"
+S="src/laddrix/algos/slicer.py"
 M=[
  (S,"MODIFY_BUDGET = 24","MODIFY_BUDGET = 25","24 modifications, not 25"),
  (S,"qty = min(planned * lot, ctx.remaining())","qty = ctx.remaining()","never one big order"),

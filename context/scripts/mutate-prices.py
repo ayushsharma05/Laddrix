@@ -5,16 +5,16 @@ movers, volume at price, charts and price alerts on the asker's own subscription
 through the asker's own login); the tests must notice. Runs the tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-S = "src/mocktrade/marketdata/sources.py"
-P = "src/mocktrade/platform.py"
-K = "src/mocktrade/broker/kite/live.py"
-V = "src/mocktrade/tools/serve.py"
-H = "src/mocktrade/server/stream.py"
+S = "src/laddrix/marketdata/sources.py"
+P = "src/laddrix/platform.py"
+K = "src/laddrix/broker/kite/live.py"
+V = "src/laddrix/tools/serve.py"
+H = "src/laddrix/server/stream.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_price_sources.py"]
-C = "src/mocktrade/server/context.py"
-ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
-E = "src/mocktrade/alerts/engine.py"
-L = "src/mocktrade/alerts/service.py"
+C = "src/laddrix/server/context.py"
+ROUTES_MARKET = "src/laddrix/server/routes/market.py"
+E = "src/laddrix/alerts/engine.py"
+L = "src/laddrix/alerts/service.py"
 MUTANTS = [
  (C, "        found = self.platform.prices.for_user(user, self.users.accounts())\n        return self.markets.of(found if found is not None else self.no_prices)", "        return self.markets.of(self.platform.market_data)"),
  (ROUTES_MARKET, "        tick = market(user).prices.latest(instrument_id)  # the asker's own price (#395)", "        tick = platform.market_data.latest(instrument_id)"),

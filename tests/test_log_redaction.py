@@ -16,14 +16,14 @@ from test_market_alerts import sender_with
 from test_server import PASSWORD, World
 from test_users import kite_app, session_server
 
-from mocktrade import logsafe
-from mocktrade.broker.kite.daily_login import KiteDailyLogin
-from mocktrade.broker.kite.session import KiteSession
-from mocktrade.config import KiteSettings
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.logsafe import HIDDEN, Redact, redact
-from mocktrade.ops.alerts import Alert
-from mocktrade.ops.notify import WebhookNotifier
+from laddrix import logsafe
+from laddrix.broker.kite.daily_login import KiteDailyLogin
+from laddrix.broker.kite.session import KiteSession
+from laddrix.config import KiteSettings
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.logsafe import HIDDEN, Redact, redact
+from laddrix.ops.alerts import Alert
+from laddrix.ops.notify import WebhookNotifier
 
 HOOK = "https://hooks.example.com/services/T0001/B0002/x8KqSecretPathPart9z"
 
@@ -89,7 +89,7 @@ async def test_the_flows_that_touch_secrets_log_none_of_them(tmp_path, nifty_fut
     account = BrokerAccount("acc-1", "kite", "AB1234", "ayush")
     await login.complete(account, "request-token-77abc")
     secrets += ["request-token-77abc", "tok-123", "secret1"]
-    logging.getLogger("mocktrade.test").info("objects: %r %r", KiteSettings("k", "secret1", None),
+    logging.getLogger("laddrix.test").info("objects: %r %r", KiteSettings("k", "secret1", None),
                                              KiteSession("AB1234", "tok-123"))  # fmt: skip
 
     # webhooks: the address and the signing key are secret; failures are logged
@@ -114,7 +114,7 @@ async def test_the_flows_that_touch_secrets_log_none_of_them(tmp_path, nifty_fut
         assert secret not in text, f"a secret reached the logs: {secret[:4]}…"
     # the filter is a safety net: our own code never needed it
     caught = [r.getMessage() for r in caplog.records
-              if r.name.startswith("mocktrade") and HIDDEN in r.getMessage()]  # fmt: skip
+              if r.name.startswith("laddrix") and HIDDEN in r.getMessage()]  # fmt: skip
     assert caught == []
 
 
@@ -128,7 +128,7 @@ def test_redaction_of_each_kind():
         ),
         "Authorization: token key1:acc-tok-9": ("acc-tok-9",),
         "sealed gAAAAABmZ8Xq0123456789abcdefghijklmnop end": ("gAAAAABmZ8Xq0123456789",),
-        "otpauth://totp/MockTrade:ayush?secret=JBSWY3DPEHPK3PXP": ("JBSWY3DPEHPK3PXP",),
+        "otpauth://totp/Laddrix:ayush?secret=JBSWY3DPEHPK3PXP": ("JBSWY3DPEHPK3PXP",),
         f"POST {HOOK} failed": ("x8KqSecretPathPart9z", "/services/"),
     }
     for line, hidden in cases.items():
@@ -173,7 +173,7 @@ def test_install_covers_the_web_server_and_quiets_url_loggers():
 
 
 def test_objects_holding_secrets_dont_print_them(tmp_path):
-    from mocktrade.tools.serve import ServeSettings
+    from laddrix.tools.serve import ServeSettings
 
     shown = repr(KiteSettings("key1", "api-secret-1", tmp_path, "http://u:proxypass@h:3128"))
     shown += repr(KiteSession("AB1234", "access-tok-1"))

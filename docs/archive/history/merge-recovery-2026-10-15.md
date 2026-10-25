@@ -22,7 +22,7 @@ No force push, history reset, deletion of source branches or code revert is need
 
 | PR | Work | Original target |
 |---|---|---|
-| #157 | Design: MockTrade on Kite Connect (architecture, limits, adapter, deployment) | `main` |
+| #157 | Design: Laddrix on Kite Connect (architecture, limits, adapter, deployment) | `main` |
 | #171 | K5.4: the ladder, click to trade on 5-level depth with PIQ and VAP | `main` |
 | #172 | K5.5: order book, positions, audit trail and messages | `k5-4-ladder` |
 | #175 | Order ticket, and the order spec: the backend describes what can be ordered | `k5-5-screens` |
@@ -33,7 +33,7 @@ No force push, history reset, deletion of source branches or code revert is need
 | #181 | K6.3: spreader, two-leg spreads with immediate hedging within a pay-up | `k6-2-slicer` |
 | #182 | K6.4: algo manager screen | `k6-3-spreader` |
 | #184 | K7.1: server entry point, Docker image, Compose with Caddy | `k6-4-algo-screen` |
-| #185 | K7.1b: live Kite in the server (MOCKTRADE_PRICES=kite) | `k7-1-docker` |
+| #185 | K7.1b: live Kite in the server (LADDRIX_PRICES=kite) | `k7-1-docker` |
 | #186 | K7.2: server set-up script, safe backups and the server runbook | `k7-1b-live-kite` |
 | #187 | K7.3: measure latency and load; make the tick path 3x faster | `k7-2-server` |
 | #188 | K7.4: daily scheduler, operational alerts and runbooks | `k7-3-metrics` |

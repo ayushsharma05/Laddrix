@@ -6,13 +6,13 @@ from datetime import date, timedelta
 
 import pytest
 
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
-from mocktrade.orders.gate import Gates
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.risk.throttle import DEFAULT_RULES, Kind, OrderThrottle, RateRule, Usage
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.orders.gate import Gates
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds
+from laddrix.refdata.store import InstrumentStore
+from laddrix.risk.throttle import DEFAULT_RULES, Kind, OrderThrottle, RateRule, Usage
 
 MANUAL = OrderRequest(
     client_order_id="M1",

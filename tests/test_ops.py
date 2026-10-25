@@ -7,13 +7,13 @@ from pathlib import Path
 import httpx
 import pytest
 
-from mocktrade.domain.accounts import BrokerAccount
-from mocktrade.domain.ticks import Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.ops.alerts import Alert, Alerts
-from mocktrade.ops.checks import PRICES_SILENT_S, Checks
-from mocktrade.ops.notify import WebhookNotifier
-from mocktrade.ops.scheduler import IST, Scheduler, parse_holidays
+from laddrix.domain.accounts import BrokerAccount
+from laddrix.domain.ticks import Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.ops.alerts import Alert, Alerts
+from laddrix.ops.checks import PRICES_SILENT_S, Checks
+from laddrix.ops.notify import WebhookNotifier
+from laddrix.ops.scheduler import IST, Scheduler, parse_holidays
 
 WED = date(2026, 10, 14)  # a Wednesday
 
@@ -210,8 +210,8 @@ async def test_the_webhook_gets_warnings_and_their_all_clear_but_not_info():
     alerts.clear("prices", "prices are flowing again")
     await notifier.aclose()
     assert posted == [
-        {"text": "🔴 MockTrade: No prices", "level": "ERROR", "key": "prices"},
-        {"text": "🟢 MockTrade: prices are flowing again", "level": "OK", "key": "prices"},
+        {"text": "🔴 Laddrix: No prices", "level": "ERROR", "key": "prices"},
+        {"text": "🟢 Laddrix: prices are flowing again", "level": "OK", "key": "prices"},
     ]
 
 

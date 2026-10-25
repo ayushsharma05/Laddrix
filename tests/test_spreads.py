@@ -8,11 +8,11 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from mocktrade.domain.accounts import User
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.marketdata.service import MarketData
-from mocktrade.spreads.model import (
+from laddrix.domain.accounts import User
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.marketdata.service import MarketData
+from laddrix.spreads.model import (
     MAX_SPREADS_PER_USER,
     SpreadDef,
     SpreadLeg,
@@ -22,8 +22,8 @@ from mocktrade.spreads.model import (
     spread_tick,
     spread_to_dict,
 )
-from mocktrade.spreads.pricer import SpreadPricer
-from mocktrade.spreads.store import SpreadBook, SpreadError
+from laddrix.spreads.pricer import SpreadPricer
+from laddrix.spreads.store import SpreadBook, SpreadError
 
 NOV, DEC, JAN = "NFO:NIFTY26NOVFUT", "NFO:NIFTY26DECFUT", "NFO:NIFTY27JANFUT"
 SBIN, BANK = "NSE:SBIN", "NFO:BANKNIFTY26NOVFUT"

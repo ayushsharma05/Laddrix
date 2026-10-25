@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Deploy a tagged version of MockTrade on the server (V1.6, #289; docs/runbooks/release.md).
-# Run it FROM THE RELEASE being deployed, inside the server's checkout (/opt/mocktrade): the
+# Deploy a tagged version of Laddrix on the server (V1.6, #289; docs/runbooks/release.md).
+# Run it FROM THE RELEASE being deployed, inside the server's checkout (/opt/laddrix): the
 # running version may be older than this script.
 #
 #   git fetch --tags && git show v1.0.0:deploy/deploy.sh >/tmp/deploy.sh
@@ -10,16 +10,16 @@
 # 1. the tag exists and the checkout has no local changes
 # 2. not in market hours (09:00-15:45 India time on trading days), unless --emergency
 # 3. a backup of all state, taken now (the way back if the new version changes data)
-# 4. the running image is kept as mocktrade:previous, and the way back is written down
+# 4. the running image is kept as laddrix:previous, and the way back is written down
 # 5. check out the tag, build it (stamped with its commit), start it
 # 6. healthy, and /api/health says the tag's version; otherwise roll back at once
 #
 # Settings (for rehearsals): COMPOSE (default deploy/compose.yaml), ENV_FILE (deploy/.env),
-# DEPLOY_LOG (default /var/log/mocktrade-deploy.log), SERVICES (default "app caddy").
+# DEPLOY_LOG (default /var/log/laddrix-deploy.log), SERVICES (default "app caddy").
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"  # the server's checkout (run from inside it)
 COMPOSE=${COMPOSE:-deploy/compose.yaml}
-DEPLOY_LOG=${DEPLOY_LOG:-/var/log/mocktrade-deploy.log}
+DEPLOY_LOG=${DEPLOY_LOG:-/var/log/laddrix-deploy.log}
 SERVICES=${SERVICES:-app caddy}
 dc() { docker compose -f "$COMPOSE" "$@"; }
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" | tee -a "$DEPLOY_LOG"; }
@@ -41,8 +41,8 @@ fi
 
 # 2. the market-hours window: the release's own rule, run on this server
 ENV_FILE=${ENV_FILE:-deploy/.env}
-holidays=$(sed -n 's/^MOCKTRADE_HOLIDAYS=//p' "$ENV_FILE" 2>/dev/null | tail -1)
-if ! git show "$tag:deploy/window.sh" | MOCKTRADE_HOLIDAYS="$holidays" bash -s; then
+holidays=$(sed -n 's/^LADDRIX_HOLIDAYS=//p' "$ENV_FILE" 2>/dev/null | tail -1)
+if ! git show "$tag:deploy/window.sh" | LADDRIX_HOLIDAYS="$holidays" bash -s; then
   if [ -z "$emergency" ]; then
     echo "refused: deploy outside market hours, or pass --emergency \"reason\"" >&2
     exit 3
@@ -51,18 +51,18 @@ if ! git show "$tag:deploy/window.sh" | MOCKTRADE_HOLIDAYS="$holidays" bash -s; 
 fi
 
 # 3. a backup now, inside the running app
-backup=$(dc exec -T app python -m mocktrade.tools.backup --to /data/backups --keep 14 | sed -n 's/^backup OK: \([^ ]*\).*/\1/p')
+backup=$(dc exec -T app python -m laddrix.tools.backup --to /data/backups --keep 14 | sed -n 's/^backup OK: \([^ ]*\).*/\1/p')
 [ -n "$backup" ] || { echo "the backup failed: not deploying" >&2; exit 4; }
 
 # 4. the way back
 previous=$(git rev-parse HEAD)
-docker image tag mocktrade:latest mocktrade:previous
+docker image tag laddrix:latest laddrix:previous
 printf 'ref=%s\nbackup=%s\ntag=%s\n' "$previous" "$backup" "$tag" >deploy/.previous
 log "deploy $tag by $who: from $(git describe --tags --always "$previous"), backup $backup"
 
 # 5. the new version
 git -c advice.detachedHead=false checkout --quiet "$tag"
-dc build --build-arg MOCKTRADE_BUILD="$(git rev-parse --short HEAD)" app
+dc build --build-arg LADDRIX_BUILD="$(git rev-parse --short HEAD)" app
 # shellcheck disable=SC2086  # SERVICES is a list
 dc up -d $SERVICES
 

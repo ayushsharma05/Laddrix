@@ -12,12 +12,12 @@ from datetime import timedelta
 import pytest
 from test_autospreader import AYUSH, NOV, OCT, W, quote
 
-from mocktrade.algos.engine import AlgoError, AlgoState
-from mocktrade.broker.rules import protected_limit
-from mocktrade.domain.orders import OrderStatus, OrderUpdate, Side
-from mocktrade.domain.ticks import Tick
-from mocktrade.server.formats import algo_to_dict
-from mocktrade.spreads.model import (
+from laddrix.algos.engine import AlgoError, AlgoState
+from laddrix.broker.rules import protected_limit
+from laddrix.domain.orders import OrderStatus, OrderUpdate, Side
+from laddrix.domain.ticks import Tick
+from laddrix.server.formats import algo_to_dict
+from laddrix.spreads.model import (
     Controls,
     SpreadLeg,
     controls_from_dict,

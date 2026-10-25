@@ -5,7 +5,7 @@ exception.
 import httpx
 import pytest
 
-from mocktrade.broker.kite.http import KiteAuthError, KiteError, KiteHttp, KiteRateLimited
+from laddrix.broker.kite.http import KiteAuthError, KiteError, KiteHttp, KiteRateLimited
 
 
 def client(handler, token="tok") -> KiteHttp:

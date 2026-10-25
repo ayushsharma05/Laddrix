@@ -1,8 +1,8 @@
 # Patching dependencies (#365)
 
-MockTrade is built from other people's code: Python packages for the server, npm packages for
+Laddrix is built from other people's code: Python packages for the server, npm packages for
 the screens and the desktop app, the Python and Node base images, and GitHub's CI actions. A
-flaw in any of them is a flaw in MockTrade. This page says who fixes what, and by when.
+flaw in any of them is a flaw in Laddrix. This page says who fixes what, and by when.
 
 ## What watches for flaws
 

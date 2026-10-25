@@ -2,7 +2,7 @@
 // ways, snapping (Alt: none), the page keeps it all after a reload, and switching a page
 // between free windows and docked tiles keeps its widgets.
 //
-//   python3 -m mocktrade.tools.demo --port 8000 --ui ui/dist      (first-run layout: free)
+//   python3 -m laddrix.tools.demo --port 8000 --ui ui/dist      (first-run layout: free)
 //   node context/scripts/e2e-free-canvas.cjs <folder for screenshots>
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execFileSync } = require('child_process');
@@ -27,7 +27,7 @@ const check = (name, ok, detail = '') => {
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  const code = execFileSync('python3', ['-m', 'mocktrade.tools.demo', '--code']).toString().trim();
+  const code = execFileSync('python3', ['-m', 'laddrix.tools.demo', '--code']).toString().trim();
   await page.getByLabel('Authenticator code').fill(code);
   await page.keyboard.press('Enter');
   await page.locator('.frame .ladder .price.last').first().waitFor({ timeout: 20000 });

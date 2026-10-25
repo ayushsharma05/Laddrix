@@ -11,15 +11,15 @@ from fractions import Fraction
 
 import pytest
 
-from mocktrade.charges.model import ExecutedOrder, ScheduleCharges, Segment, segment_of
-from mocktrade.charges.schedules import (
+from laddrix.charges.model import ExecutedOrder, ScheduleCharges, Segment, segment_of
+from laddrix.charges.schedules import (
     KITE_STANDARD,
     load_schedule,
     schedule_from_dict,
     schedule_to_dict,
 )
-from mocktrade.domain.instruments import Exchange, Instrument, InstrumentKind
-from mocktrade.domain.orders import Product, Side
+from laddrix.domain.instruments import Exchange, Instrument, InstrumentKind
+from laddrix.domain.orders import Product, Side
 
 CE = Instrument(Exchange.NFO, "NIFTY26OCT25000CE", InstrumentKind.CALL, 5, 75,
                 date(2026, 10, 27), 2500000, "NIFTY")  # fmt: skip
@@ -205,7 +205,7 @@ def test_only_todays_orders_and_estimates_need_a_quantity_and_a_price():
     from datetime import UTC, datetime, timedelta
     from types import SimpleNamespace as NS
 
-    from mocktrade.charges.service import ChargesError, ChargesService
+    from laddrix.charges.service import ChargesError, ChargesService
 
     now = datetime(2026, 10, 15, 6, 0, tzinfo=UTC)  # 11:30 in India
 

@@ -1,11 +1,11 @@
-# MockTrade UI
+# Laddrix UI
 
 The trading terminal: React + TypeScript (Vite); each workspace page is free windows (our canvas) or docked tiles (dockview). Design: `../docs/design/ui.md`;
 stream contract: `../docs/design/stream.md`.
 
 ```bash
 npm ci
-npm run dev        # http://localhost:5173 (start the server: python -m mocktrade.tools.demo --origin http://localhost:5173)
+npm run dev        # http://localhost:5173 (start the server: python -m laddrix.tools.demo --origin http://localhost:5173)
 npm test           # unit tests (Vitest + Testing Library)
 npm run lint       # ESLint: TypeScript and React's hooks rules (eslint.config.js)
 npm run build      # production build in dist/ (served by the Python server)

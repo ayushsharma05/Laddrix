@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from mocktrade.domain.money import to_paise, to_rupees
+from laddrix.domain.money import to_paise, to_rupees
 
 
 def test_rupees_to_paise():

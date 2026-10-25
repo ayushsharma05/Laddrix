@@ -112,7 +112,7 @@ describe("algo grid", () => {
     expect(familyOf(specs, "TRAILING_STOP")).toBe("protection");
     expect(familyOf(specs, "ASE")).toBe("spread"); // known (its running algos show), never offered in the form
     expect(familyOf(null, "TRAILING_STOP")).toBeUndefined();
-    expect(familyLabel("protection")).toBe("Protection: held by MockTrade");
+    expect(familyLabel("protection")).toBe("Protection: held by Laddrix");
     expect(familyLabel("hedging")).toBe("Hedging");
   });
 });

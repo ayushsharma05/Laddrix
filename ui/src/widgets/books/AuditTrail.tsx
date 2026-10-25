@@ -136,7 +136,7 @@ function AccountAudit({ params, setParams, publish, accountId }: WidgetProps<Aud
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `mocktrade-audit-${accountId}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `laddrix-audit-${accountId}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };

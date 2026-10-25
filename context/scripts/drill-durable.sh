@@ -4,15 +4,15 @@
 # order is still known (with its doubt) and the next order gets a new id, never the same one.
 set -u
 OUT=${OUT:-$(mktemp -d)}
-stop() { pkill -9 -f "^python3? -m mocktrade[.]tools[.]demo" 2>/dev/null; sleep 1; }
-start() { python3 -m mocktrade.tools.demo > "$OUT/demo-$1.log" 2>&1 & }
+stop() { pkill -9 -f "^python3? -m laddrix[.]tools[.]demo" 2>/dev/null; sleep 1; }
+start() { python3 -m laddrix.tools.demo > "$OUT/demo-$1.log" 2>&1 & }
 up() { timeout 60 bash -c 'until curl -s localhost:8000/api/health >/dev/null; do sleep 0.5; done'; }
 stop; rm -rf data/demo
 start 1; up
 cat > "$OUT/c.py" <<'PY'
 import subprocess, sys, time, httpx
 time.sleep(31 - time.time() % 30) if sys.argv[1] != "1" else None
-code = subprocess.run(["python3", "-m", "mocktrade.tools.demo", "--code"], capture_output=True, text=True).stdout.strip()
+code = subprocess.run(["python3", "-m", "laddrix.tools.demo", "--code"], capture_output=True, text=True).stdout.strip()
 c = httpx.Client(base_url="http://127.0.0.1:8000", headers={"origin": "http://localhost:8000"})
 assert c.post("/api/session", json={"username": "demo", "password": "demo-password-123", "code": code}).status_code == 200
 A = "/api/accounts/acc-paper"

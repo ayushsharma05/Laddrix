@@ -5,15 +5,15 @@ setting, the demo's sample, the ticket); the tests must notice. Restores each fi
 `finally`; a hang counts as caught. Run alone from the repo root."""
 import subprocess
 
-FR = "src/mocktrade/refdata/freeze.py"
-ST = "src/mocktrade/refdata/store.py"
-IN = "src/mocktrade/domain/instruments.py"
-OR = "src/mocktrade/domain/orders.py"
-RG = "src/mocktrade/risk/checks.py"
-CL = "src/mocktrade/risk/closing.py"
-SP = "src/mocktrade/domain/order_spec.py"
-SERVER_FORMATS = "src/mocktrade/server/formats.py"
-SV = "src/mocktrade/tools/serve.py"
+FR = "src/laddrix/refdata/freeze.py"
+ST = "src/laddrix/refdata/store.py"
+IN = "src/laddrix/domain/instruments.py"
+OR = "src/laddrix/domain/orders.py"
+RG = "src/laddrix/risk/checks.py"
+CL = "src/laddrix/risk/closing.py"
+SP = "src/laddrix/domain/order_spec.py"
+SERVER_FORMATS = "src/laddrix/server/formats.py"
+SV = "src/laddrix/tools/serve.py"
 TM = "ui/src/widgets/ticket/model.ts"
 TT = "ui/src/widgets/ticket/Ticket.tsx"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_freeze.py", "tests/test_serve.py",
@@ -42,7 +42,7 @@ MUTANTS = [
  (CL, "        piece = min(piece, freeze)", "        pass", PY),
  (SP, "        freeze_qty=instrument.max_order_qty,", "        freeze_qty=instrument.freeze_qty,", PY),
  (SERVER_FORMATS, "        \"freeze_qty\": i.freeze_qty,\n", "", PY),
- (SV, "                problems.append(f\"MOCKTRADE_FREEZE_FILE can't be read: {exc.strerror or exc}\")", "                pass", PY),
+ (SV, "                problems.append(f\"LADDRIX_FREEZE_FILE can't be read: {exc.strerror or exc}\")", "                pass", PY),
  (SV, "            freeze_file=Path(freeze_text) if freeze_text else None,", "            freeze_file=None,", PY),
  # the ticket
  (TM, "  if (most && t.lots * spec.lot_size > most) {", "  if (most && t.lots * spec.lot_size > most + spec.lot_size) {", UI),

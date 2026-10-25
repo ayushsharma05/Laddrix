@@ -19,13 +19,13 @@ PARAM = re.compile(r"\{(\w+)(?::\w+)?\}")
 def app(tmp_path):
     from test_serve import env
 
-    from mocktrade.tools.serve import ServeSettings, build
+    from laddrix.tools.serve import ServeSettings, build
 
     ui, data = tmp_path / "ui", tmp_path / "data"
     ui.mkdir()
-    (ui / "index.html").write_text("<html>MockTrade</html>")
+    (ui / "index.html").write_text("<html>Laddrix</html>")
     data.mkdir()
-    built = build(ServeSettings.from_env(env(MOCKTRADE_DATA=str(data), MOCKTRADE_UI=str(ui))))
+    built = build(ServeSettings.from_env(env(LADDRIX_DATA=str(data), LADDRIX_UI=str(ui))))
     yield built.app
     if getattr(built, "fence", None) is not None:
         built.fence.release()

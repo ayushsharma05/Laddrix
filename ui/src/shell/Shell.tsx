@@ -1,6 +1,6 @@
 // The terminal around the widgets:
 //
-//   menu bar     MockTrade · account ▾                        user · Sessions · Log out
+//   menu bar     Laddrix · account ▾                        user · Sessions · Log out
 //   toolbar      Widgets ▾ · Search (/) ······ lights · rate · Day P&L · Layouts ▾ · clock · Save · Lock · STOP
 //   env strip    PAPER · orders fill against live prices, nothing goes to the exchange
 //   bands        (only when needed)
@@ -162,7 +162,10 @@ function MenuBar() {
   const [sessions, setSessions] = useState(false);
   return (
     <nav className="menubar" aria-label="Menu">
-      <span className="brand">MockTrade</span>
+      <span className="brand">
+        <img className="brand-mark" src="favicon.svg" alt="" />
+        Laddrix
+      </span>
       <label className="account-pick">
         <span className="dim">Account</span>
         <select value={accountId ?? ""} onChange={(e) => store.selectAccount(e.target.value)} aria-label="Account for new orders">
@@ -206,7 +209,7 @@ function StatusLights() {
   const sent = store.sentLastMinute();
   return (
     <span className="lights">
-      <Light state={server} label="Server" title={`Connection to MockTrade: ${status}`} />
+      <Light state={server} label="Server" title={`Connection to Laddrix: ${status}`} />
       <Light
         state={prices}
         label="Prices"

@@ -405,7 +405,7 @@ export class WorkspaceController {
     }
     const opened = await api.addPopoutGroup(panel, { popoutUrl: POPOUT_URL, position: popoutBox(panel) });
     if (!opened) {
-      this.opts.notify("WARN", "The window was blocked: allow pop-ups for MockTrade to pop widgets out");
+      this.opts.notify("WARN", "The window was blocked: allow pop-ups for Laddrix to pop widgets out");
       return false;
     }
     this.changed();
@@ -497,7 +497,7 @@ export class WorkspaceController {
     if (this.popouts.has(id)) return true;
     const opened = (this.opts.openWindow ?? openPopout)(POPOUT_URL, popoutBoxFor(win, this.viewport()));
     if (!opened) {
-      this.opts.notify("WARN", "The window was blocked: allow pop-ups for MockTrade to pop widgets out");
+      this.opts.notify("WARN", "The window was blocked: allow pop-ups for Laddrix to pop widgets out");
       return false;
     }
     this.popouts.set(id, opened);

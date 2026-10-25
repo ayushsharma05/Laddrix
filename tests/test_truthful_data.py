@@ -15,14 +15,14 @@ from datetime import UTC, date, datetime
 
 from test_recovery import FUT, Server, request
 
-from mocktrade.broker.base import BrokerPosition
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import OrderStatus, OrderUpdate
-from mocktrade.domain.ticks import Tick
-from mocktrade.marketdata.movers import Movers
-from mocktrade.marketdata.prints import TimeAndSales
-from mocktrade.reports.daily import build_day, report_to_dict
-from mocktrade.research.backtest import CANDLE_NOTE, BacktestSpec, Run
+from laddrix.broker.base import BrokerPosition
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import OrderStatus, OrderUpdate
+from laddrix.domain.ticks import Tick
+from laddrix.marketdata.movers import Movers
+from laddrix.marketdata.prints import TimeAndSales
+from laddrix.reports.daily import build_day, report_to_dict
+from laddrix.research.backtest import CANDLE_NOTE, BacktestSpec, Run
 
 
 def test_each_server_run_numbers_its_tape_under_its_own_epoch():
@@ -38,7 +38,7 @@ async def test_the_api_says_what_is_estimated_and_which_run_it_is(tmp_path, nift
     from test_server import ORIGIN
     from test_server import World as ServerWorld
 
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.server.app import ServerSettings, create_app
 
     w = ServerWorld(tmp_path, nifty_fut)
     w.app = create_app(w.platform, w.users, ServerSettings(origin=ORIGIN))
@@ -68,8 +68,8 @@ async def test_a_report_says_how_fresh_its_marks_are(tmp_path, nifty_fut):
     from test_reports import MODEL, fill
     from test_reports import instruments as lookup
 
-    from mocktrade.domain.orders import Side
-    from mocktrade.store.events import EventLog
+    from laddrix.domain.orders import Side
+    from laddrix.store.events import EventLog
 
     log = EventLog(tmp_path / "events.db")
     log.start()

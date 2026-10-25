@@ -10,14 +10,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mocktrade.broker.base import BrokerError
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.broker.kite.orders import to_update
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
-from mocktrade.orders.gate import Gates
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, EventKind, OrderError, Pending
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.broker.base import BrokerError
+from laddrix.broker.fake import FakeBroker
+from laddrix.broker.kite.orders import to_update
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
+from laddrix.orders.gate import Gates
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, EventKind, OrderError, Pending
+from laddrix.refdata.store import InstrumentStore
 
 S = OrderStatus
 FUT = "NFO:NIFTY26OCTFUT"
@@ -349,8 +349,8 @@ async def test_no_wait_no_second_look():
 
 
 def test_the_real_risk_checks_are_looked_at_again_and_the_throttle_never_is():
-    from mocktrade.risk.checks import RiskGate
-    from mocktrade.risk.throttle import OrderThrottle
+    from laddrix.risk.checks import RiskGate
+    from laddrix.risk.throttle import OrderThrottle
 
     assert RiskGate.recheck_after_wait is True
     assert getattr(OrderThrottle, "recheck_after_wait", False) is False  # it is what waits

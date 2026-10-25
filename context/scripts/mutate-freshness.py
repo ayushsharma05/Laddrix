@@ -4,14 +4,14 @@ needs a fresh price per instrument for orders that add risk, closing goes; sprea
 skew); the tests must notice. Restores each file in `finally`. Run alone."""
 import subprocess
 
-S = "src/mocktrade/marketdata/service.py"
-C = "src/mocktrade/risk/checks.py"
-E = "src/mocktrade/algos/engine.py"
-R = "src/mocktrade/algos/spreader.py"
-O = "src/mocktrade/ops/checks.py"
+S = "src/laddrix/marketdata/service.py"
+C = "src/laddrix/risk/checks.py"
+E = "src/laddrix/algos/engine.py"
+R = "src/laddrix/algos/spreader.py"
+O = "src/laddrix/ops/checks.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_freshness.py",
          "tests/test_market_data.py", "tests/test_spreader.py", "tests/test_risk_checks.py", "tests/test_paper_broker.py"]
-P = "src/mocktrade/broker/paper.py"
+P = "src/laddrix/broker/paper.py"
 MUTANTS = [
  (P, "market_data.subscribe(every_tick=True)", "market_data.subscribe()"),
  (E, "market_data.subscribe(every_tick=True)", "market_data.subscribe()"),

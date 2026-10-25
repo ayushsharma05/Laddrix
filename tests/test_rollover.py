@@ -10,7 +10,7 @@ import pytest
 from test_mtm import Clock, move
 from test_portfolio import FUT, Paper
 
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, Product, Side
 
 S = OrderStatus
 
@@ -111,7 +111,7 @@ def test_a_holiday_morning_does_not_roll():
     """The rollover is a daily job: the scheduler runs those on trading days only."""
     from datetime import date
 
-    from mocktrade.ops.scheduler import Scheduler
+    from laddrix.ops.scheduler import Scheduler
 
     s = Scheduler(holidays=frozenset({date(2026, 11, 10)}))
     assert not s.is_trading_day(date(2026, 11, 10)) and not s.is_trading_day(date(2026, 10, 18))

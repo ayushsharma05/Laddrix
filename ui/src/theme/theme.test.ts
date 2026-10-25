@@ -6,7 +6,7 @@ const PATH = "/api/me/settings/theme";
 /** A computer whose light/dark setting the test controls, with its own <html> and storage. */
 function fakeEnv(light = false, stored: string | null = null) {
   const root = document.createElement("html");
-  const data = new Map<string, string>(stored === null ? [] : [["mocktrade.theme", stored]]);
+  const data = new Map<string, string>(stored === null ? [] : [["laddrix.theme", stored]]);
   let listener: (() => void) | null = null;
   const storage = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) } as unknown as Storage;
   const env: ThemeEnv = {
@@ -50,7 +50,7 @@ describe("theme", () => {
     await theme.load();
     expect(theme.getChoice()).toBe("cb");
     expect(root.dataset.theme).toBe("cb");
-    expect(data.get("mocktrade.theme")).toBe("cb");
+    expect(data.get("laddrix.theme")).toBe("cb");
   });
 
   it("nothing (or nonsense) saved on the server: follow the computer", async () => {
@@ -92,7 +92,7 @@ describe("theme", () => {
     await expect(theme.choose("cb")).rejects.toThrow();
     expect(theme.getChoice()).toBe("dark");
     expect(root.dataset.theme).toBe("dark");
-    expect(data.get("mocktrade.theme")).toBe("dark");
+    expect(data.get("laddrix.theme")).toBe("dark");
   });
 
   it("blocked browser storage doesn't stop the theme", async () => {

@@ -161,7 +161,7 @@ add("Shared service skeleton for every service", "v10", ["type:build", "comp:com
  "Move every service onto one skeleton: config load, lifecycle, one business thread fed by a queue from the I/O side, health, logging.",
  "The common foundation every backend program in the reference is built on.", ["Shared foundation (common libs)"], STD, ["#65", "#66"])
 
-COVERAGE = """Every box of the reference one-chart architecture, mapped to the issue(s) that build its MockTrade version. This issue stays open until every line is ticked; then MockTrade has the full architecture in mock form.
+COVERAGE = """Every box of the reference one-chart architecture, mapped to the issue(s) that build its Laddrix version. This issue stays open until every line is ticked; then Laddrix has the full architecture in mock form.
 
 ### Trader side
 - [ ] Widgets: order ticket, order list — #42, #47

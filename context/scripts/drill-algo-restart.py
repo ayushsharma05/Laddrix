@@ -6,7 +6,7 @@
        closed (paper orders don't survive a restart) and nothing was sent by itself;
     4. resume: it quotes again; stop: it ends.
 
-The demo must be running (python -m mocktrade.tools.demo --port 8000 --ui ui/dist); this
+The demo must be running (python -m laddrix.tools.demo --port 8000 --ui ui/dist); this
 script kills and restarts it. Each sign-in waits for a new 30 s authenticator window.
 
     python3 context/scripts/drill-algo-restart.py
@@ -30,7 +30,7 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 
 def demo_pids() -> list[int]:
-    target = b"mocktrade.tools." + b"demo"
+    target = b"laddrix.tools." + b"demo"
     found = []
     for pid in os.listdir("/proc"):
         if not pid.isdigit() or int(pid) == os.getpid():
@@ -50,7 +50,7 @@ async def sign_in(last: list[int]) -> httpx.AsyncClient:
         await asyncio.sleep(1)
         window = int(time.time() // 30)
     last[:] = [window]
-    code = subprocess.check_output(["python3", "-m", "mocktrade.tools.demo", "--code"]).decode().strip()
+    code = subprocess.check_output(["python3", "-m", "laddrix.tools.demo", "--code"]).decode().strip()
     c = httpx.AsyncClient(base_url=BASE, headers={"origin": BASE}, timeout=30)
     r = await c.post("/api/session", json={"username": "demo", "password": "demo-password-123", "code": code})
     r.raise_for_status()
@@ -87,7 +87,7 @@ async def main() -> None:
     for pid in demo_pids():
         os.kill(pid, signal.SIGKILL)  # a crash
     await asyncio.sleep(1)
-    subprocess.Popen(["python3", "-m", "mocktrade.tools.demo", "--port", "8000", "--ui", "ui/dist"],
+    subprocess.Popen(["python3", "-m", "laddrix.tools.demo", "--port", "8000", "--ui", "ui/dist"],
                      stdout=open("/tmp/claude-0/demo.log", "a"), stderr=subprocess.STDOUT, start_new_session=True)
 
     async def up():

@@ -54,7 +54,7 @@ as if live, which is good for testing ideas.
 
 ```
  live:    Kite ──────────────► MarketData
- demo:    simulator ─────────► MarketData     (the rest of MockTrade can't tell the difference)
+ demo:    simulator ─────────► MarketData     (the rest of Laddrix can't tell the difference)
  replay:  recorded ticks ────► MarketData
 ```
 

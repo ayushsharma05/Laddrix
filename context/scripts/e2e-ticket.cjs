@@ -12,7 +12,7 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await page.goto('http://localhost:8000/');
   await page.getByLabel('Username').fill('demo');
   await page.getByLabel('Password').fill('demo-password-123');
-  await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
+  await page.getByLabel('Authenticator code').fill(execSync('python3 -m laddrix.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
   await page.locator('.ladder').first().waitFor({ timeout: 20000 });
   // start from the default workspace (it has a ticket): forget any saved layout, then reload

@@ -1,5 +1,5 @@
 [project]
-name = "mocktrade"
+name = "laddrix"
 version = "1.0.0rc1"
 description = "A multi-user, broker-agnostic trading platform for NSE/BSE (first broker: Zerodha Kite Connect)."
 requires-python = ">=3.12"
@@ -36,7 +36,7 @@ select = ["E", "F", "I", "B", "UP"]
 # Types checked on the whole server (#440): CI fails on any error. Every function body is
 # checked, annotated or not; a "# type: ignore" must name its error code.
 python_version = "3.12"
-files = ["src/mocktrade"]
+files = ["src/laddrix"]
 check_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true

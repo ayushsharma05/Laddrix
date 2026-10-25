@@ -6,10 +6,10 @@ held for life and freed on close after the audit trail); the tests must notice. 
 tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
-S = "src/mocktrade/ops/supervisor.py"
-F = "src/mocktrade/ops/fence.py"
-P = "src/mocktrade/platform.py"
-V = "src/mocktrade/tools/serve.py"
+S = "src/laddrix/ops/supervisor.py"
+F = "src/laddrix/ops/fence.py"
+P = "src/laddrix/platform.py"
+V = "src/laddrix/tools/serve.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_supervisor.py"]
 MUTANTS = [
  (S, "                await self._sleep(wait)\n                self._alert(f\"loop:{name}\", \"OK\", f\"{name} restarted\", account_id)\n                continue", "                return"),

@@ -9,14 +9,14 @@ from datetime import UTC, datetime
 
 import pytest
 
-from mocktrade.broker.fake import FakeBroker
-from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
-from mocktrade.domain.portfolio import Trade
-from mocktrade.orders.manager import OrderManager
-from mocktrade.orders.model import ClientIds, EventKind
-from mocktrade.orders.trade_check import TradeCheck, TradeGap, ledger
-from mocktrade.positions.book import PositionBook
-from mocktrade.refdata.store import InstrumentStore
+from laddrix.broker.fake import FakeBroker
+from laddrix.domain.orders import OrderRequest, OrderStatus, OrderType, OrderUpdate, Product, Side
+from laddrix.domain.portfolio import Trade
+from laddrix.orders.manager import OrderManager
+from laddrix.orders.model import ClientIds, EventKind
+from laddrix.orders.trade_check import TradeCheck, TradeGap, ledger
+from laddrix.positions.book import PositionBook
+from laddrix.refdata.store import InstrumentStore
 
 S = OrderStatus
 FUT = "NFO:NIFTY26OCTFUT"
@@ -117,9 +117,9 @@ async def test_paper_trades_agree_with_paper_orders(nifty_fut):
 
 
 async def test_charges_follow_the_corrected_value(world, nifty_fut):
-    from mocktrade.charges.model import ScheduleCharges
-    from mocktrade.charges.schedules import KITE_STANDARD
-    from mocktrade.charges.service import ChargesService
+    from laddrix.charges.model import ScheduleCharges
+    from laddrix.charges.schedules import KITE_STANDARD
+    from laddrix.charges.service import ChargesService
 
     om, _, _, _, check = world
     charges = ChargesService("acc-1", ScheduleCharges(KITE_STANDARD), om, lambda _i: nifty_fut,
@@ -134,7 +134,7 @@ async def test_charges_follow_the_corrected_value(world, nifty_fut):
 async def test_charges_are_worked_out_on_the_exact_value(world, nifty_fut):
     from fractions import Fraction
 
-    from mocktrade.charges.model import executed
+    from laddrix.charges.model import executed
 
     om, _, _, _, check = world
     view = await filled(om, 150, 2501003)

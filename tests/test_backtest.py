@@ -18,12 +18,12 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from mocktrade.charges.model import ExecutedOrder, ScheduleCharges
-from mocktrade.charges.schedules import KITE_STANDARD
-from mocktrade.domain.orders import Product, Side
-from mocktrade.domain.ticks import DepthLevel, Tick
-from mocktrade.refdata.store import InstrumentStore
-from mocktrade.research.backtest import (
+from laddrix.charges.model import ExecutedOrder, ScheduleCharges
+from laddrix.charges.schedules import KITE_STANDARD
+from laddrix.domain.orders import Product, Side
+from laddrix.domain.ticks import DepthLevel, Tick
+from laddrix.refdata.store import InstrumentStore
+from laddrix.research.backtest import (
     EPOCH,
     BacktestError,
     Backtests,
@@ -196,7 +196,7 @@ async def test_the_backtest_api(tmp_path, nifty_fut):
     from test_server import ORIGIN
     from test_server import World as ServerWorld
 
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.server.app import ServerSettings, create_app
 
     w = ServerWorld(tmp_path, nifty_fut)
     c = await w.logged_in()
@@ -236,8 +236,8 @@ async def test_the_screens_api_form_and_a_day_as_csv_and_pdf(tmp_path, nifty_fut
     from test_server import ORIGIN
     from test_server import World as ServerWorld
 
-    from mocktrade.research.ticks import FileTickStore
-    from mocktrade.server.app import ServerSettings, create_app
+    from laddrix.research.ticks import FileTickStore
+    from laddrix.server.app import ServerSettings, create_app
 
     w = ServerWorld(tmp_path, nifty_fut)
     fut = nifty_fut.id
@@ -278,7 +278,7 @@ async def test_the_screens_api_form_and_a_day_as_csv_and_pdf(tmp_path, nifty_fut
     assert day["day"] == "2026-10-16" and day["totals"]["trades"] == 2 and day["equity_curve"]
     csv = await c.get(f"{base}/{DAY}?format=csv")
     assert csv.headers["content-type"].startswith("text/csv")
-    assert f'filename="mocktrade-backtest-{run_id}-2026-10-16.csv"' in csv.headers[
+    assert f'filename="laddrix-backtest-{run_id}-2026-10-16.csv"' in csv.headers[
         "content-disposition"]  # fmt: skip
     assert csv.text.startswith("End-of-day report,backtest,2026-10-16,final")
     assert "NIFTY26OCTFUT" in csv.text

@@ -1,6 +1,6 @@
 # Pre-trade margin check (K10.4, #216)
 
-Before an order that adds exposure is sent, MockTrade asks what it would block and compares that
+Before an order that adds exposure is sent, Laddrix asks what it would block and compares that
 with the funds available. If they don't cover it, the order is refused and the message gives both
 numbers. Getting out is never checked.
 

@@ -3,8 +3,8 @@ Restores each file in `finally`; a mutant that hangs the tests counts as caught.
 Run alone (two runs at once overwrite each other's files). Anchor each mutant so its text is
 unique: a shorter line can hide inside a more indented one earlier in the file."""
 import subprocess
-T, S, C = "src/mocktrade/risk/mtm.py", "src/mocktrade/risk/squareoff.py", "src/mocktrade/risk/closing.py"
-G, K = "src/mocktrade/ops/guards.py", "src/mocktrade/risk/checks.py"
+T, S, C = "src/laddrix/risk/mtm.py", "src/laddrix/risk/squareoff.py", "src/laddrix/risk/closing.py"
+G, K = "src/laddrix/ops/guards.py", "src/laddrix/risk/checks.py"
 M = [
  (T, "    if rule.max_loss_paise is not None and pnl <= -rule.max_loss_paise:\n        return (", "    if rule.max_loss_paise is not None and pnl < -rule.max_loss_paise - 1000:\n        return ("),
  (T, "        if value and -pnl * 100 >= rule.max_loss_pct * value:", "        if value and -pnl >= rule.max_loss_pct * value:"),

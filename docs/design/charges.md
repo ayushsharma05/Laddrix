@@ -1,6 +1,6 @@
 # Charges: P&L gross and net (K10.2, #214)
 
-Every trade in India pays more than the price difference. MockTrade works out each charge from the
+Every trade in India pays more than the price difference. Laddrix works out each charge from the
 executed orders, publishes every line, and shows P&L both **gross** (before charges) and **net** (after).
 
 ```
@@ -25,7 +25,7 @@ screens ◄─ GET /api/accounts/{a}/charges, stream {"type": "charges", …} af
 Rates checked on 15 Oct 2026 (`charges/schedules.py`, `KITE_STANDARD`). The STT on F&O
 includes the Budget 2026 rise, in force from 1 April 2026. Sources disagree by a few rupees a
 crore on the exchange and IPFT rates, so check them against the broker's charges page before
-trading real money. A server can load another table from JSON (`MOCKTRADE_CHARGES`) without
+trading real money. A server can load another table from JSON (`LADDRIX_CHARGES`) without
 a code change.
 
 ## Rules (each a real failure)
@@ -46,6 +46,6 @@ a code change.
 
 - STT on options exercised at expiry (0.15% of the intrinsic value from 1 April 2026).
 - Currency and commodity segments.
-- Charges on orders placed outside MockTrade: those are in the broker's tradebook, not in our positions.
+- Charges on orders placed outside Laddrix: those are in the broker's tradebook, not in our positions.
 
 Checks: `tests/test_charges.py` (worked by hand per segment); `context/scripts/mutate-charges.py` (20/20); real browser `context/scripts/e2e-charges.cjs`.
