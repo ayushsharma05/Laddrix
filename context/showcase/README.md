@@ -25,7 +25,9 @@ Each poster is plain HTML that shares `style.css`. To change one, edit its `.htm
 
 ## The video
 
-[video/laddrix-showcase.mp4](video/laddrix-showcase.mp4) is an advert of about two and a half minutes at 1920×1200, about the product only. It has five parts:
+There are two videos, both at 1920×1200 with music:
+- [video/laddrix-showcase.mp4](video/laddrix-showcase.mp4) is about a minute long: the nine posters, the journey timeline among them, then the end card (`make_video.py short`).
+- [video/laddrix-advert.mp4](video/laddrix-advert.mp4) is an advert of about two and a half minutes at 1920×1200, about the product only. It has five parts:
 1. the opening and the logo;
 2. the screens;
 3. under the hood (camera glides across the posters);
@@ -43,5 +45,5 @@ To rebuild everything:
 ```
 python3 -m laddrix.tools.demo --port 8000 --ui ui/dist &    # then wait for it to be ready
 node context/scripts/shoot-showcase.cjs
-node context/showcase/render.cjs && python3 context/showcase/video/make_video.py
+node context/showcase/render.cjs && python3 context/showcase/video/make_video.py && python3 context/showcase/video/make_video.py short
 ```

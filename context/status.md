@@ -77,7 +77,8 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   settings, the screens, docs, posters and the advert. There is a new logo in
   [docs/brand/](../docs/brand/README.md), also shown as the app's icon and in its menu bar. The GitHub
   repository keeps its old address until Ayush renames it.
-- **Pull requests:** the showcase (#455), the backtest-id fix (#458) and the rename (#457).
+- **Showcase (#455) and bug #458:** merged (PRs #456, #459).
+- **Pull requests:** the rename (#457, PR #460).
 
 ## What's next
 

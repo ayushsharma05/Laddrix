@@ -3,7 +3,8 @@
 title cards, with music.
 
     node context/showcase/render.cjs              # the posters first, if they changed
-    python3 context/showcase/video/make_video.py
+    python3 context/showcase/video/make_video.py          # the advert  → laddrix-advert.mp4
+    python3 context/showcase/video/make_video.py short    # one minute  → laddrix-showcase.mp4
 
 1. draws the title cards and the framed screenshots (HTML pages, photographed by Playwright);
 2. films each scene with a slow camera move: a zoom, or a glide from one part of the picture
@@ -28,7 +29,7 @@ HERE = Path(__file__).resolve().parent
 SHOWCASE = HERE.parent
 POSTERS = SHOWCASE.parent / "images" / "showcase"
 SHOTS = SHOWCASE.parent / "images" / "showcase" / "screens"  # context/scripts/shoot-showcase.cjs
-OUT = HERE / "laddrix-showcase.mp4"
+OUT = {"advert": HERE / "laddrix-advert.mp4", "short": HERE / "laddrix-showcase.mp4"}
 FPS = 30
 FADE = 0.8  # seconds each transition takes
 RATE = 44100
@@ -369,19 +370,32 @@ def soundtrack(seconds: float, cuts: list[float], acts: list[tuple[float, int]],
         w.writeframes(stereo.tobytes())
 
 
-def main() -> None:
+# the short one (about a minute): the nine posters, the journey timeline among them, then the
+# end card; each glides in or out, and the music builds as it goes
+SHORT = [
+    Scene(name, 6.0, (*C, 1.0) if i % 2 else (*C, 1.07), (*C, 1.07) if i % 2 else (*C, 1.0), act)
+    for i, (name, act) in enumerate(
+        [("01-hero", 1), ("02-architecture", 2), ("03-order-journey", 2), ("04-price-path", 3),
+         ("05-safety", 3), ("06-journey", 3), ("07-screens", 4), ("08-quality", 4),
+         ("09-algos", 4), ("outro", 5)]
+    )
+]  # fmt: skip
+
+
+def main(kind: str = "advert") -> None:
+    scenes = SCENES if kind == "advert" else SHORT
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        pngs = draw_pages(SCENES, work)
+        pngs = draw_pages(scenes, work)
         clips = []
-        for i, (png, s) in enumerate(zip(pngs, SCENES, strict=True)):
+        for i, (png, s) in enumerate(zip(pngs, scenes, strict=True)):
             c = work / f"clip{i:02}.mp4"
             film(png, s, c)
             clips.append(c)
         video = work / "video.mp4"
-        total, *cuts = join(clips, SCENES, video)
+        total, *cuts = join(clips, scenes, video)
         starts, at = [], 0.0
-        for s in SCENES:
+        for s in scenes:
             starts.append((at, s.act))
             at += s.seconds - FADE
         wav = work / "music.wav"
@@ -405,12 +419,14 @@ def main() -> None:
                 "-shortest",
                 "-movflags",
                 "+faststart",
-                str(OUT),
+                str(OUT[kind]),
             ],
             check=True,
         )
-    print(f"wrote {OUT} ({total:.0f} s, {len(SCENES)} scenes)")
+    print(f"wrote {OUT[kind]} ({total:.0f} s, {len(scenes)} scenes)")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    main(sys.argv[1] if len(sys.argv) > 1 else "advert")  # "advert" or "short"
