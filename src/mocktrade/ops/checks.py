@@ -102,7 +102,8 @@ class Checks:
         if not feed.expected():
             feed.changed_at = now  # no feed expected (e.g. not logged in): not silence
             return
-        if (now - feed.changed_at).total_seconds() >= PRICES_SILENT_S:
+        since = feed.changed_at or now  # set from the start (Checks sets it); never None here
+        if (now - since).total_seconds() >= PRICES_SILENT_S:
             self._alerts.raise_(
                 feed.key,
                 "ERROR",

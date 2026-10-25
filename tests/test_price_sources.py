@@ -64,7 +64,7 @@ async def test_each_account_is_checked_and_marked_on_its_own_prices(nifty_fut):
     prices = PriceSources(shared, per_account=True)
     prices.register("acc-a", a)
     prices.register("acc-b", b)
-    platform = Platform(store, shared, KillSwitch("firm"), prices=prices)
+    platform = Platform(store, shared, KillSwitch("firm"), price_sources=prices)
     runs = {acc: platform.add_account(BrokerAccount(acc, "kite", acc, "u"), FakeBroker(),
                                       ids=ClientIds(acc[-1].upper()))
             for acc in ("acc-a", "acc-b")}  # fmt: skip

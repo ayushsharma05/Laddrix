@@ -81,6 +81,7 @@ python3 -m pytest -q tests/test_orders.py -k cancel   # one file, only tests who
 # style and lint (no output, or "All checks passed", means good)
 ruff check .
 ruff format --check .
+mypy                       # the types: "Success: no issues found" means good
 
 # the screens: about 520 tests, types, and the production build
 cd ui && npm run typecheck && npm test && npm run build && cd ..

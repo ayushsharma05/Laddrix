@@ -164,10 +164,11 @@ class WebhookSender:
             body = json.dumps(payload, separators=(",", ":"), default=str).encode()
             for attempt in range(len(BACKOFF_S) + 1):
                 address = await self._checked_address(urlparse(url).hostname or "")
-                error = await self._post(url, secret, body, address)
-                if error is None:
+                failed = await self._post(url, secret, body, address)
+                if failed is None:
                     error = ""
                     break
+                error = failed
                 if error.startswith("refused") or attempt == len(BACKOFF_S):
                     break
                 await self._sleep(BACKOFF_S[attempt])

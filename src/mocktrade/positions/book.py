@@ -83,13 +83,14 @@ class _Position:
     def avg(self) -> Fraction:
         return self.cost / self.qty if self.qty else Fraction(0)
 
-    def apply(self, side: Side, qty: int, price: int, value: int | None = None) -> None:
+    def apply(self, side: Side, qty: int, paise: int, value: int | None = None) -> None:
         """`value`: the fill's exact value when qty x price isn't it (#275); the price used
         is then value / qty, exactly."""
+        price: int | Fraction = paise
         if value is None:
-            value = qty * price
+            value = qty * paise
         else:
-            price = Fraction(value, qty)  # type: ignore[assignment]
+            price = Fraction(value, qty)
         signed = side.sign * qty
         if side is Side.BUY:
             self.buy_qty += qty
@@ -125,7 +126,7 @@ class PositionBook:
         self._positions: dict[Key, _Position] = {}
         self._ltp: dict[InstrumentId, int] = {}
         self._filled: dict[str, int] = {}  # client order id -> cumulative qty applied
-        self._listeners: list[Callable[[PositionView], None]] = []
+        self._listeners: list[Callable[[PositionView], object]] = []
 
     # --- feeding it --------------------------------------------------------------------------
 
@@ -329,8 +330,9 @@ class PositionBook:
         )
         return _round(total)
 
-    def subscribe(self, listener: Callable[[PositionView], None]) -> Callable[[], None]:
-        """Call `listener` with the position each time it changes (fills and prices)."""
+    def subscribe(self, listener: Callable[[PositionView], object]) -> Callable[[], None]:
+        """Call `listener` with the position each time it changes (fills and prices). What
+        it returns is ignored."""
         self._listeners.append(listener)
 
         def stop() -> None:

@@ -400,7 +400,8 @@ class EventLog:
     ) -> list[StoredEvent]:
         """Events after `after_seq`, oldest first (screens catching up after a reconnect)."""
         if account_id is None:
-            sql, args = "SELECT * FROM events WHERE seq > ? ORDER BY seq LIMIT ?", (after_seq,)
+            sql = "SELECT * FROM events WHERE seq > ? ORDER BY seq LIMIT ?"
+            args: tuple[object, ...] = (after_seq,)
         else:
             sql = "SELECT * FROM events WHERE seq > ? AND account_id = ? ORDER BY seq LIMIT ?"
             args = (after_seq, account_id)

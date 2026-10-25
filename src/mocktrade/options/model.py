@@ -48,17 +48,19 @@ def forward_for(
     rate: float = DEFAULT_RATE,
 ) -> float | None:
     """The forward (paise) for the option's expiry, from the listed futures of its underlying."""
-    same = [f for f in futures if f.underlying == option.underlying and f.expiry is not None]
-    if not same or option.expiry is None:
+    expiry = option.expiry
+    same = [(f, f.expiry) for f in futures
+            if f.underlying == option.underlying and f.expiry is not None]  # fmt: skip
+    if not same or expiry is None:
         return None
     # the same-expiry future if listed (0 days apart), else the nearest one
-    chosen = min(same, key=lambda f: abs((f.expiry - option.expiry).days))
+    chosen, chosen_expiry = min(same, key=lambda pair: abs((pair[1] - expiry).days))
     price = price_of(chosen.id)
     if price is None:
         return None
-    if chosen.expiry == option.expiry:
+    if chosen_expiry == expiry:
         return price
-    gap = time_to_expiry(option.expiry, now) - time_to_expiry(chosen.expiry, now)
+    gap = time_to_expiry(expiry, now) - time_to_expiry(chosen_expiry, now)
     return price * math.exp(rate * gap)
 
 
@@ -96,6 +98,8 @@ def fair_value_paise(
     now: datetime,
     rate: float = DEFAULT_RATE,
 ) -> float:
+    if option.expiry is None or option.strike_paise is None:
+        raise ValueError(f"{option.id} is not an option")
     years = time_to_expiry(option.expiry, now)
     call = option.kind is InstrumentKind.CALL
     return 100 * black76(forward_paise / 100, option.strike_paise / 100, years, rate, sigma, call)

@@ -15,14 +15,18 @@ AUTO_MARKET_PROTECTION_PCT = Decimal("2")  # what "-1 (automatic)" means in pape
 
 
 def protected_limit(
-    instrument: Instrument, side: Side, ltp_paise: int, protection_pct: Decimal
+    instrument: Instrument, side: Side, ltp_paise: int, protection_pct: Decimal | None
 ) -> int:
     """The worst price a protected market order may trade at, on the tick grid.
 
     Buys may pay up to LTP + protection %, rounded down to a tick; sells may receive
-    down to LTP - protection %, rounded up to a tick. -1 means the automatic value.
+    down to LTP - protection %, rounded up to a tick. -1 means the automatic value; so does
+    None (a checked order always carries one: OrderRequest.validate).
     """
-    pct = AUTO_MARKET_PROTECTION_PCT if protection_pct == -1 else protection_pct
+    if protection_pct is None or protection_pct == -1:
+        pct = AUTO_MARKET_PROTECTION_PCT
+    else:
+        pct = protection_pct
     tick = instrument.tick_paise
     if side is Side.BUY:
         raw = Decimal(ltp_paise) * (100 + pct) / 100

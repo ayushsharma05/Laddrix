@@ -57,13 +57,17 @@ class Part:
 
 
 class _Recovering(Protocol):
-    state: str
-    reason: str
-    since: datetime
+    @property
+    def state(self) -> str: ...
+    @property
+    def reason(self) -> str: ...
+    @property
+    def since(self) -> datetime: ...
 
 
 class _Account(Protocol):
-    recovery: _Recovering | None
+    @property
+    def recovery(self) -> _Recovering | None: ...
 
 
 def worst(parts: Iterable[Part]) -> str:

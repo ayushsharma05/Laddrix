@@ -184,6 +184,20 @@ class Leg:
     def units(self) -> int:
         return self.sign * self.lots * self.instrument.lot_size
 
+    @property
+    def expiry(self) -> date:
+        """The option's expiry (a leg is always a listed option: Strategies.legs checks)."""
+        if self.instrument.expiry is None:
+            raise StrategyError(f"{self.instrument.symbol} has no expiry")
+        return self.instrument.expiry
+
+    @property
+    def strike(self) -> float:
+        """The option's strike, in rupees."""
+        if self.instrument.strike_paise is None:
+            raise StrategyError(f"{self.instrument.symbol} has no strike")
+        return self.instrument.strike_paise / 100
+
 
 class Strategies:
     def __init__(self, chains: ChainService, clock=lambda: datetime.now(UTC)) -> None:
@@ -223,7 +237,8 @@ class Strategies:
         now = self._clock()
         for item in raw:
             instrument = self._chains._store.get(str(item.get("instrument_id")))
-            if instrument is None or instrument.kind not in (CE, PE):
+            if (instrument is None or instrument.kind not in (CE, PE)
+                    or instrument.expiry is None or instrument.strike_paise is None):  # fmt: skip
                 raise StrategyError(f"{item.get('instrument_id')} is not a listed option")
             side = item.get("side")
             lots = item.get("lots")
@@ -247,7 +262,7 @@ class Strategies:
         legs = self.legs(raw)
         now = self._clock()
         underlying = legs[0].instrument.underlying or ""
-        horizon = min(leg.instrument.expiry for leg in legs)
+        horizon = min(leg.expiry for leg in legs)
         forward = self._chains.forward(underlying, horizon)
         if forward is None:
             raise StrategyError(f"no price for {underlying}'s future")
@@ -258,7 +273,7 @@ class Strategies:
         # the useful view: about +-2 standard deviations (at least +-2%), always taking in
         # every strike with some room either side
         spread = max(2 * typical_iv * math.sqrt(T_h), 0.02)
-        strikes = [leg.instrument.strike_paise / 100 for leg in legs]
+        strikes = [leg.strike for leg in legs]
         room = 0.25 * (max(strikes) - min(strikes)) + F * 0.005
         lo = min(F * math.exp(-spread), min(strikes) - room)
         hi = max(F * math.exp(spread), max(strikes) + room)
@@ -268,13 +283,11 @@ class Strategies:
 
         def value_at(leg: Leg, s: float, when: datetime) -> float:
             """One unit of the leg, in rupees, if the future is at s at `when`."""
-            k = leg.instrument.strike_paise / 100
+            k = leg.strike
             call = leg.instrument.kind is CE
             T = (
                 max(
-                    (
-                        datetime.combine(leg.instrument.expiry, CLOSE, tzinfo=IST) - when
-                    ).total_seconds(),
+                    (datetime.combine(leg.expiry, CLOSE, tzinfo=IST) - when).total_seconds(),
                     0,
                 )
                 / YEAR_SECONDS
@@ -288,11 +301,11 @@ class Strategies:
         today = [pnl(x, now) for x in xs]
         premium = -sum(leg.units * leg.price_paise / 100 for leg in legs)  # + = credit
         net = {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0}
-        T_now = {leg: time_to_expiry(leg.instrument.expiry, now) for leg in legs}
+        T_now = {leg: time_to_expiry(leg.expiry, now) for leg in legs}
         for leg in legs:
             g = greeks(
                 F,
-                leg.instrument.strike_paise / 100,
+                leg.strike,
                 T_now[leg],
                 rate,
                 leg.iv or typical_iv,
@@ -300,7 +313,7 @@ class Strategies:
             )
             for name in net:
                 net[name] += leg.units * getattr(g, name)
-        same_expiry = all(leg.instrument.expiry == horizon for leg in legs)
+        same_expiry = all(leg.expiry == horizon for leg in legs)
         extremes = _expiry_extremes(legs) if same_expiry else None
         return {
             "underlying": underlying,
@@ -322,7 +335,7 @@ class Strategies:
                     "lot_size": leg.instrument.lot_size,
                     "strike_paise": leg.instrument.strike_paise,
                     "kind": leg.instrument.kind.value,
-                    "expiry": leg.instrument.expiry.isoformat(),
+                    "expiry": leg.expiry.isoformat(),
                     "price_paise": round(leg.price_paise, 2),
                     "iv": round(leg.iv, 6) if leg.iv else None,
                 }
@@ -337,14 +350,14 @@ class Strategies:
 def _expiry_value(legs: list[Leg], s: float) -> float:
     total = 0.0
     for leg in legs:
-        k = leg.instrument.strike_paise / 100
+        k = leg.strike
         intrinsic = max(s - k, 0.0) if leg.instrument.kind is CE else max(k - s, 0.0)
         total += leg.units * (intrinsic - leg.price_paise / 100)
     return total
 
 
 def _kinks(legs: list[Leg]) -> list[float]:
-    return sorted({leg.instrument.strike_paise / 100 for leg in legs})
+    return sorted({leg.strike for leg in legs})
 
 
 def _slope_above(legs: list[Leg]) -> float:

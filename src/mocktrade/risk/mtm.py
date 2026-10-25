@@ -48,7 +48,7 @@ from typing import Any
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.money import format_rupees
 from mocktrade.domain.orders import Product
-from mocktrade.orders.model import Pending
+from mocktrade.orders.model import OrderEvent, Pending
 from mocktrade.positions.book import PositionBook, PositionView
 from mocktrade.recovery import IST
 from mocktrade.risk.closing import ExitDesk, position_of
@@ -209,21 +209,21 @@ class MtmWatch:
                 self._fired[rule.key] = today
                 events.append(self._fire("position", rule.key, f"{rule.key}: {why}",
                                          rule.auto_close, [view]))  # fmt: skip
-        rule = self.portfolio
-        if rule is not None and self._fired.get("portfolio") != today:
+        whole = self.portfolio
+        if whole is not None and self._fired.get("portfolio") != today:
             pnl = self._book.day_pnl_paise()
             why = None
-            if rule.max_loss_paise is not None and pnl <= -rule.max_loss_paise:
-                stop = format_rupees(-rule.max_loss_paise)
+            if whole.max_loss_paise is not None and pnl <= -whole.max_loss_paise:
+                stop = format_rupees(-whole.max_loss_paise)
                 why = f"day P&L {format_rupees(pnl)} reached the stop {stop}"
-            elif rule.target_paise is not None and pnl >= rule.target_paise:
-                target = format_rupees(rule.target_paise)
+            elif whole.target_paise is not None and pnl >= whole.target_paise:
+                target = format_rupees(whole.target_paise)
                 why = f"day P&L {format_rupees(pnl)} reached the target {target}"
             if why:
                 self._fired["portfolio"] = today
                 open_ = [v for v in self._book.positions() if v.qty]
                 events.append(self._fire("portfolio", "portfolio", f"portfolio: {why}",
-                                         rule.auto_close, open_))  # fmt: skip
+                                         whole.auto_close, open_))  # fmt: skip
         return events
 
     async def settle(self) -> None:
@@ -248,11 +248,11 @@ class MtmWatch:
 
     # --- breaches (#263) ------------------------------------------------------------------------
 
-    def on_order_event(self, event: object) -> None:
+    def on_order_event(self, event: OrderEvent) -> None:
         """Order manager listener: a close's order changed (a refusal moves no position)."""
-        order = getattr(event, "order", None)
-        basket = getattr(getattr(order, "request", None), "basket_id", None)
-        if not basket or not basket.startswith("MTM"):
+        order = event.order
+        basket = order.request.basket_id if order is not None else None
+        if order is None or not basket or not basket.startswith("MTM"):
             return
         if self._index is not None and basket in self._index:
             if order.client_order_id not in self._index[basket]:
@@ -441,10 +441,10 @@ class MtmWatch:
                 bad.append(f"{r.get('instrument_id', '?') if isinstance(r, dict) else r}: {exc}")
         if portfolio:
             try:
-                rule = PortfolioRule(**portfolio)
-                if problems := rule_problems(rule):
+                whole = PortfolioRule(**portfolio)
+                if problems := rule_problems(whole):
                     raise ValueError("; ".join(problems))
-                self.portfolio = rule
+                self.portfolio = whole
             except (TypeError, ValueError) as exc:
                 bad.append(f"portfolio: {exc}")
         if bad:

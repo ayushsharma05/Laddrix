@@ -29,6 +29,7 @@ Every state change is audited in the event log and pushed to listeners (the scre
 
 import asyncio
 import contextlib
+import functools
 import logging
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field, replace
@@ -45,6 +46,7 @@ from mocktrade.orders.manager import OrderManager
 from mocktrade.orders.model import EventKind, OrderError, OrderEvent, OrderView, Pending
 
 log = logging.getLogger(__name__)
+ORDERS_PER_SECOND = 8  # the throttle's per-second limit, when an account has no throttle
 
 HEARTBEAT_S = 0.1
 MAX_REJECTS_IN_A_ROW = 3
@@ -136,14 +138,25 @@ class ActionPreview:
 
 
 class Strategy(Protocol):
-    """One running algo's logic. Every method may use `ctx` to look and act."""
+    """One running algo's logic: everything the engine may call. Every method may use `ctx`
+    to look and act. BaseStrategy below gives each a do-nothing default."""
 
+    @property
+    def actions(self) -> tuple["AlgoAction", ...]: ...  # what the trader may ask it to do
     def start(self, ctx: "AlgoContext") -> None: ...
     def on_tick(self, ctx: "AlgoContext", tick: Tick) -> None: ...
     def on_child(self, ctx: "AlgoContext", child: OrderView, event: OrderEvent) -> None: ...
     def on_timer(self, ctx: "AlgoContext", now: datetime) -> None: ...
     def on_pause(self, ctx: "AlgoContext") -> None: ...
     def on_resume(self, ctx: "AlgoContext") -> None: ...
+    def done(self, ctx: "AlgoContext") -> bool: ...
+    def keep_on_stop(self, ctx: "AlgoContext", child: OrderView) -> bool: ...
+    def on_finish(self, ctx: "AlgoContext") -> str | None: ...
+    def on_watch(self, ctx: "AlgoContext", now: datetime) -> None: ...
+    def preview(self, ctx: "AlgoContext", name: str) -> "ActionPreview": ...
+    def act(self, ctx: "AlgoContext", name: str) -> None: ...
+    def snapshot(self) -> dict[str, Any] | None: ...
+    def on_restore(self, ctx: "AlgoContext") -> None: ...
 
 
 class BaseStrategy:
@@ -531,7 +544,7 @@ class AlgoEngine:
         audit: Callable[[AlgoEvent], None] | None = None,
         id_prefix: str = "A",
         position: Callable[[str, Any], int] | None = None,  # (instrument, product) -> qty
-        orders_per_second: Callable[[], int] = lambda: 8,  # the throttle's per-second limit
+        orders_per_second: Callable[[], int] = lambda: ORDERS_PER_SECOND,  # the throttle's
         access: Callable[[str], str | None] = lambda _user_id: None,  # still may trade? (#366)
         # the most one order may carry (instrument, price) -> qty; None: no limit known (#422)
         order_cap: Callable[[str, int | None], int | None] = lambda _i, _p: None,
@@ -638,7 +651,7 @@ class AlgoEngine:
         )
         self._parents[parent.algo_id] = parent
         self.watch([instrument_id])
-        snapshot = getattr(strategy, "snapshot", lambda: None)()
+        snapshot = strategy.snapshot()
         self.changed(parent, "STARTED", f"{side.value} {qty} {instrument_id} {clean}",
                      snapshot=snapshot)  # fmt: skip
         self._call(parent, lambda ctx: parent.strategy.start(ctx))
@@ -686,7 +699,7 @@ class AlgoEngine:
         )
         self._parents[parent.algo_id] = parent
         self.watch([record.instrument_id])
-        self._call(parent, lambda ctx: parent.strategy.on_restore(ctx))  # type: ignore[attr-defined]
+        self._call(parent, lambda ctx: parent.strategy.on_restore(ctx))
         self._pull(parent)  # its quotes; hedges stay
         self.changed(parent, "RESTORED", f"{len(children)} child orders: paused until resumed")
         return self._view(parent)
@@ -720,7 +733,7 @@ class AlgoEngine:
         """What one of the algo's own actions would do now (#425)."""
         p = self._live(algo_id)
         self._offered(p, name)
-        return p.strategy.preview(AlgoContext(self, p), name)  # type: ignore[attr-defined]
+        return p.strategy.preview(AlgoContext(self, p), name)
 
     def act(self, algo_id: str, name: str, expect: list[str]) -> AlgoView:
         """Do one of the algo's own actions, but only if it would still do what the trader
@@ -728,19 +741,19 @@ class AlgoEngine:
         p = self._live(algo_id)
         self._offered(p, name)
         ctx = AlgoContext(self, p)
-        now = p.strategy.preview(ctx, name)  # type: ignore[attr-defined]
+        now = p.strategy.preview(ctx, name)
         if not now.ok:
             raise AlgoError(now.why)
         if list(now.lines) != list(expect):
             raise AlgoError("what it would do has changed since you looked: "
                             + "; ".join(now.lines))  # fmt: skip
         self.changed(p, "ACTION", f"{now.label}: " + "; ".join(now.lines))
-        self._call(p, lambda c: p.strategy.act(c, name))  # type: ignore[attr-defined]
+        self._call(p, lambda c: p.strategy.act(c, name))
         return self._view(p)
 
     @staticmethod
     def _offered(p: _Parent, name: str) -> None:
-        if name not in {a.name for a in getattr(p.strategy, "actions", ())}:
+        if name not in {a.name for a in p.strategy.actions}:
             raise AlgoError(f"{p.code} has no action {name!r}")
 
     def stop(self, algo_id: str, reason: str = "stopped by the trader") -> AlgoView:
@@ -781,7 +794,7 @@ class AlgoEngine:
             if o.request.parent_id is not None and o.request.parent_id not in self._parents
         ]
         for client_order_id in orphans:
-            await self.quiet(lambda cid=client_order_id: self.manager.cancel(cid))
+            await self.quiet(functools.partial(self.manager.cancel, client_order_id))
         return orphans
 
     # --- running ------------------------------------------------------------------------------
@@ -805,17 +818,15 @@ class AlgoEngine:
     def on_tick(self, tick: Tick) -> None:
         for p in list(self._parents.values()):
             if p.state is AlgoState.WORKING and tick.instrument_id in p.instruments:
-                self._call(p, lambda ctx, t=tick, s=p.strategy: s.on_tick(ctx, t))
+                self._call(p, p.strategy.on_tick, tick)
 
     def heartbeat(self) -> None:
         now = self.clock()
         for p in list(self._parents.values()):
             if p.state is AlgoState.WORKING:
-                self._call(p, lambda ctx, s=p.strategy: s.on_timer(ctx, now))
+                self._call(p, p.strategy.on_timer, now)
             elif p.state in (AlgoState.PAUSED, AlgoState.STOPPING):
-                watch = getattr(p.strategy, "on_watch", None)
-                if watch is not None:
-                    self._call(p, lambda ctx, w=watch: w(ctx, now))
+                self._call(p, p.strategy.on_watch, now)
                 self._maybe_stopped(p)
 
     @property
@@ -898,7 +909,7 @@ class AlgoEngine:
                 continue
             if not self._keeps(p, child):
                 cid = child.client_order_id
-                self.spawn(self.quiet(lambda cid=cid: self.manager.cancel(cid)))
+                self.spawn(self.quiet(functools.partial(self.manager.cancel, cid)))
 
     def _maybe_stopped(self, p: _Parent) -> None:
         """STOPPING ends once no child is working and none is still on its way in."""
@@ -916,10 +927,10 @@ class AlgoEngine:
             p.state = p.final
             self.changed(p, p.state.value, p.reason)
 
-    def _call(self, p: _Parent, fn: Callable[[AlgoContext], None]) -> None:
-        """Run strategy code; if it raises, fail that algo only."""
+    def _call(self, p: _Parent, fn: Callable[..., object], *args: Any) -> None:
+        """Run strategy code, `fn(ctx, *args)`, now; if it raises, fail that algo only."""
         try:
-            fn(AlgoContext(self, p))
+            fn(AlgoContext(self, p), *args)
         except Exception as exc:
             log.exception("algo %s failed", p.algo_id)
             self.stop_parent(p, f"the algo's own code failed: {exc!r}", final=AlgoState.FAILED)
@@ -974,11 +985,8 @@ class AlgoEngine:
         self.changed(p, "UPDATED", event.kind.value)
 
     def _is_done(self, p: _Parent) -> bool:
-        done = getattr(p.strategy, "done", None)
-        if done is None:  # a strategy without BaseStrategy's defaults
-            return self._main_filled(p) >= p.qty
         try:
-            return bool(done(AlgoContext(self, p)))
+            return bool(p.strategy.done(AlgoContext(self, p)))
         except Exception as exc:
             log.exception("algo %s done() failed", p.algo_id)
             self.stop_parent(p, f"the algo's own code failed: {exc!r}", final=AlgoState.FAILED)
@@ -1011,5 +1019,5 @@ class AlgoEngine:
             created_at=p.created_at,
             updated_at=p.updated_at,
             product=p.product,
-            actions=tuple(getattr(p.strategy, "actions", ())),
+            actions=tuple(p.strategy.actions),
         )

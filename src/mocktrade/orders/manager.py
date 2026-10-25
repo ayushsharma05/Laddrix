@@ -445,7 +445,7 @@ class OrderManager:
             order.pending = Pending.CANCEL  # sent as soon as the broker's id arrives
             self._touch(order)
             return order.view()
-        await self._send_cancel(order)
+        await self._send_cancel(order, order.broker_order_id)
         return order.view()
 
     async def cancel_all(self) -> list[tuple[str, str]]:
@@ -460,18 +460,20 @@ class OrderManager:
         return failures
 
     async def _send_cancel_if_requested(self, order: _Order) -> None:
-        if order.cancel_requested and not order.cancel_sent and not order.status.is_final:
+        broker_id = order.broker_order_id
+        if (order.cancel_requested and not order.cancel_sent and not order.status.is_final
+                and broker_id is not None):  # fmt: skip
             try:
-                await self._send_cancel(order)
+                await self._send_cancel(order, broker_id)
             except OrderError as exc:
                 log.warning("deferred cancel of %s failed: %s", order.request.client_order_id, exc)
 
-    async def _send_cancel(self, order: _Order) -> None:
+    async def _send_cancel(self, order: _Order, broker_order_id: str) -> None:
         order.pending = Pending.CANCEL
         order.cancel_sent = True
         started = time.perf_counter_ns()
         try:
-            await self._broker.cancel(order.broker_order_id)
+            await self._broker.cancel(broker_order_id)
             self._timed("cancel", started)
         except BrokerError as exc:  # a clear refusal (e.g. already filled): nothing changed
             if not order.status.is_final:

@@ -9,7 +9,7 @@ import logging
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from fractions import Fraction
-from typing import Any
+from typing import Any, TypedDict, overload
 
 from mocktrade.domain.money import PAISE_PER_RUPEE
 from mocktrade.domain.orders import OrderRequest, OrderStatus, OrderUpdate
@@ -39,8 +39,12 @@ STATUS_MAP: dict[str, OrderStatus] = {
 }
 
 
+@overload
+def to_kite_rupees(paise: int) -> str: ...
+@overload
+def to_kite_rupees(paise: None) -> None: ...
 def to_kite_rupees(paise: int | None) -> str | None:
-    """250110 -> "2501.10" (exact; never a float)."""
+    """250110 -> "2501.10" (exact; never a float). None stays None."""
     if paise is None:
         return None
     return f"{Decimal(paise) / PAISE_PER_RUPEE:.2f}"
@@ -142,7 +146,13 @@ def to_update(order: dict[str, Any]) -> OrderUpdate:
     )
 
 
-def _terms(order: dict[str, Any]) -> dict[str, int | None]:
+class _Terms(TypedDict):
+    qty: int | None
+    price_paise: int | None
+    trigger_paise: int | None
+
+
+def _terms(order: dict[str, Any]) -> _Terms:
     """The order's terms as Kite has them now (they settle a change with no answer, #260).
     A price or trigger of 0 means none (a market order); a missing field says nothing."""
     qty = order.get("quantity")

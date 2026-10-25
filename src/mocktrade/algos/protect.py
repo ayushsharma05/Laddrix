@@ -25,7 +25,7 @@ limit and says so).
 
 from datetime import datetime
 
-from mocktrade.algos.engine import AlgoContext, BaseStrategy
+from mocktrade.algos.engine import AlgoContext, AlgoError, BaseStrategy
 from mocktrade.algos.execution import lots_text
 from mocktrade.algos.spec import AlgoSpec, ParamKind, ParamSpec
 from mocktrade.domain.orders import OrderType, Side
@@ -162,7 +162,12 @@ class TrailingStop(_Stop):
             self._exit(ctx)  # a refused exit goes again (three refusals fail the algo)
 
     def _level(self, ctx: AlgoContext, price: int) -> int:
-        distance = self.points if self.points is not None else price * self.pct / 100
+        if self.points is not None:
+            distance: float = self.points
+        elif self.pct is not None:
+            distance = price * self.pct / 100
+        else:  # the constructor refuses a stop with neither
+            raise AlgoError("a trailing stop needs trail_paise or trail_pct")
         tick = ctx.instrument().tick_paise
         if ctx.side is Side.SELL:  # below the price, on the tick grid, never closer
             return int((price - distance) // tick * tick)
@@ -362,10 +367,10 @@ class Bracket(_Stop):
                 ctx.cancel(c.client_order_id)
         if others or exits or self.exit_sending:
             return
-        qty = open_qty > 0 and self.capped(ctx, open_qty, exit_side)
-        if qty and self.send_exit(ctx, qty, exit_side, check_remaining=False):
-            self.exit_sending += qty
-            ctx.say(f"stop touched: exiting {qty} {self.exit_words(ctx, exit_side)}")
+        closing = self.capped(ctx, open_qty, exit_side) if open_qty > 0 else None
+        if closing and self.send_exit(ctx, closing, exit_side, check_remaining=False):
+            self.exit_sending += closing
+            ctx.say(f"stop touched: exiting {closing} {self.exit_words(ctx, exit_side)}")
 
     def _set_levels(self, ctx: AlgoContext) -> None:
         price = ctx.average_price()

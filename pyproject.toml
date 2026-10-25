@@ -31,3 +31,13 @@ extend-exclude = ["docs/archive", "context/scripts"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+# Types checked on the whole server (#440): CI fails on any error. Every function body is
+# checked, annotated or not; a "# type: ignore" must name its error code.
+python_version = "3.12"
+files = ["src/mocktrade"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+enable_error_code = ["ignore-without-code"]

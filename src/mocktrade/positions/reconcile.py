@@ -57,6 +57,7 @@ def differences(
 ) -> dict[Key, tuple[int, int]]:
     """Where our positions and the broker's differ: (ours, broker) per instrument and product,
     or per instrument (product None) where the broker didn't say a row's product."""
+    mine: dict[Key, int] = {k: q for k, q in ours.items()}  # the broker's key shape
     broker: dict[Key, int] = {}
     unsure: set[InstrumentId] = set()
     for p in theirs:
@@ -72,7 +73,7 @@ def differences(
             out[(instrument_id, None)] = (a, b)
     keys = {k for k in ours if k[0] not in unsure} | {k for k in broker if k[0] not in unsure}
     for key in keys:
-        a, b = ours.get(key, 0), broker.get(key, 0)  # type: ignore[arg-type]
+        a, b = mine.get(key, 0), broker.get(key, 0)
         if a != b:
             out[key] = (a, b)
     return out

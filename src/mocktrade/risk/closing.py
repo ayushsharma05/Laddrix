@@ -25,6 +25,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
+from typing import Protocol
 
 from mocktrade.domain.instruments import Instrument
 from mocktrade.domain.orders import OrderRequest, OrderType, Product, Side
@@ -64,6 +65,12 @@ async def close_position(
         sent.append(await orders.submit(request))
         left -= size
     return sent
+
+
+class StopsAlgos(Protocol):
+    """The algo engine, as an exit sees it: it stops the algos working a position (#261)."""
+
+    def stop_on(self, instrument_id: str, product: Product, reason: str) -> list[str]: ...
 
 
 @dataclass
@@ -123,7 +130,7 @@ class ExitDesk:
         orders,  # OrderManager
         position: Callable[[str, Product], int],  # (instrument, product) -> qty, + long
         *,
-        algos: Callable[[], object | None] = lambda: None,  # the AlgoEngine, once built
+        algos: Callable[[], StopsAlgos | None] = lambda: None,  # the AlgoEngine, once built
         settle_s: float = SETTLE_S,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:

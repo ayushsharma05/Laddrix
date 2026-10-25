@@ -56,7 +56,8 @@ class Snapshot:
 
 
 def snapshot_to_dict(account_id: str, s: Snapshot) -> dict[str, Any]:
-    convert = {"funds": funds_to_dict, "holdings": holding_to_dict, "trades": trade_to_dict}
+    convert: dict[str, Callable[[Any], dict[str, Any]]] = {
+        "funds": funds_to_dict, "holdings": holding_to_dict, "trades": trade_to_dict}  # fmt: skip
     return {
         "account_id": account_id,
         "kind": s.kind,

@@ -36,6 +36,7 @@ test-screens:
 lint:
 	ruff check .
 	ruff format --check .
+	$(PYTHON) -m mypy
 	cd ui && npm run typecheck
 	cd ui/desktop && npm run typecheck
 

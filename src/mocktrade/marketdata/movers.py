@@ -57,7 +57,7 @@ class Movers:
         if not 1 <= limit <= MAX_LIMIT:
             raise MoversError(f"limit must be 1–{MAX_LIMIT}")
         today = self._clock().astimezone(IST).date()
-        rows = []
+        rows: list[dict[str, Any]] = []
         exchanges: set[str] = set()
         kinds: set[str] = set()
         for t in self._latest():

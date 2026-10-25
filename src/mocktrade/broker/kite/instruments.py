@@ -63,9 +63,10 @@ def _parse_row(row: dict[str, str]) -> tuple[Instrument, str] | None:
     if row["segment"] == "INDICES":
         kind = InstrumentKind.INDEX
     else:
-        kind = _KINDS.get(row["instrument_type"])
-        if kind is None:
+        known = _KINDS.get(row["instrument_type"])
+        if known is None:
             return None
+        kind = known
     tick_paise = to_paise(row["tick_size"] or "0")
     lot_size = int(row["lot_size"] or "0")
     if kind is InstrumentKind.INDEX:  # indices have no tick or lot in the dump

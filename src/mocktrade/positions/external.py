@@ -25,7 +25,7 @@ from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from mocktrade.broker.base import Broker
+from mocktrade.broker.base import BrokerWithTrades
 from mocktrade.domain.orders import Product
 from mocktrade.domain.portfolio import Trade
 from mocktrade.positions.book import PositionBook
@@ -87,7 +87,7 @@ class ExternalTrades:
         self,
         account_id: str,
         book: PositionBook,
-        broker: Broker,
+        broker: BrokerWithTrades,
         *,
         note: Callable[[str, str, dict], None],  # the audit trail
         adopted_ids: Callable[[], set[str]],  # trade ids already adopted (the audit trail)

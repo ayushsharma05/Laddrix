@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 WAIT_S = 0.5  # how long run_due waits for the jobs it started before going on
 
 IST = ZoneInfo("Asia/Kolkata")
-Job = Callable[[], Awaitable[None] | None]
+Job = Callable[[], object]  # what it returns is ignored; a coroutine is awaited first
 
 
 def parse_hhmm(text: str) -> time:

@@ -124,7 +124,7 @@ class Metrics:
         self._counters.clear()
 
     def snapshot(self) -> dict[str, Any]:
-        gauges = {}
+        gauges: dict[str, float | None] = {}
         for name, read in sorted(self._gauges.items()):
             try:
                 gauges[name] = read()

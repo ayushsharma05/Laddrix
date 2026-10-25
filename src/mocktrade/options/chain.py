@@ -124,7 +124,7 @@ class ChainService:
         series = self._series(underlying, expiry)
         forward = self.forward(underlying, expiry)
         atm = _nearest(series.strikes, forward) if forward else None
-        rows = []
+        rows: list[dict[str, Any]] = []
         for strike in self._window(series, atm, around):
             rows.append(
                 {

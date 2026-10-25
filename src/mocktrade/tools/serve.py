@@ -57,6 +57,7 @@ silently traded on something else.
 import argparse
 import asyncio
 import contextlib
+import functools
 import logging
 import os
 import signal
@@ -76,6 +77,7 @@ from mocktrade.algos.autospreader import SPEC as ASE
 from mocktrade.algos.autospreader import algo_type as ase_type
 from mocktrade.algos.builtin import BUILTIN
 from mocktrade.algos.engine import parse_algo_ids, with_exchange_ids
+from mocktrade.broker.base import Broker
 from mocktrade.broker.kite.http import BASE_URL
 from mocktrade.broker.kite.instruments import BROKER as KITE
 from mocktrade.broker.kite.live import LIVE, KiteLive
@@ -84,7 +86,7 @@ from mocktrade.broker.paper import PaperBroker
 from mocktrade.charges.model import ScheduleCharges
 from mocktrade.charges.schedules import load_schedule
 from mocktrade.charts.candles import CandleBuilder
-from mocktrade.charts.history import KiteHistory, RecordedHistory
+from mocktrade.charts.history import CandleHistory, KiteHistory, RecordedHistory
 from mocktrade.charts.service import Charts
 from mocktrade.config import ConfigError, KiteSettings, environment
 from mocktrade.domain.accounts import BrokerAccount
@@ -370,7 +372,7 @@ def build(settings: ServeSettings) -> Assembly:
     events.start()
     # each Kite account trades on its own subscription's prices, never another's (#395)
     prices = PriceSources(md, per_account=kite is not None)
-    platform = Platform(instruments, md, KillSwitch("firm"), events, prices=prices)
+    platform = Platform(instruments, md, KillSwitch("firm"), events, price_sources=prices)
     platform.access = trading_rights(users)  # re-checked at each order, algo child, GTT (#366)
     # each user's spreads (#414): the screens price them, the ASE algo trades them (#415)
     spreads = SpreadBook.at(
@@ -401,14 +403,16 @@ def build(settings: ServeSettings) -> Assembly:
                     return ("a paper account on a Kite server fills against its owner's own "
                             "Kite prices: add their Kite account first")  # fmt: skip
                 prices.borrow(account.id, source)
-            broker = PaperBroker(
+            paper = PaperBroker(
                 prices.of(account.id), instruments, name="paper",
                 starting_paise=settings.paper_funds_paise,
             )  # fmt: skip
-            broker.start()
-            brokers.append(broker)
+            paper.start()
+            brokers.append(paper)
+            broker: Broker = paper
         elif account.broker == "kite" and kite is not None and account.id in kite_ready:
-            broker = kite_brokers.pop(account.id, None) or kite.add_account(account)
+            made = kite_brokers.pop(account.id, None)  # made early for its prices (below)
+            broker = made if made is not None else kite.add_account(account)
             prices.register(account.id, kite.prices_of(account.id))  # its own prices
         elif account.broker == "kite" and kite is not None:
             return "a Kite account starts after a restart (its app key in the settings first)"
@@ -426,7 +430,9 @@ def build(settings: ServeSettings) -> Assembly:
         return None
 
     kite_ready = {a.id for a in accounts if a.broker == "kite"}  # their apps were checked above
-    kite_brokers = {}  # every Kite account's own prices exist before a paper account needs them
+    kite_brokers: dict[
+        str, Broker
+    ] = {}  # every Kite account's own prices exist before a paper account needs them
     if kite is not None:
         for account in accounts:
             if account.id in kite_ready:
@@ -461,13 +467,14 @@ def build(settings: ServeSettings) -> Assembly:
     for account_id in running:
         gate = platform.accounts[account_id].recovery
         if gate is not None:
-            gate.subscribe(
-                lambda state, reason, a=account_id: _recovery_alert(alerts, a, state, reason)
-            )
+            gate.subscribe(functools.partial(_recovery_alert, alerts, account_id))
     # each Kite subscription is its own feed (#395): recorded, and checked for silence, alone
     own_feeds = [a for a in accounts if prices.has_own(a.id)]
-    feeds = [PriceFeed(prices.of(a.id), a.id, lambda a=a: kite.status(a) == LIVE)
-             for a in own_feeds]  # fmt: skip
+
+    def is_live(account: BrokerAccount) -> bool:  # its Kite login is live: prices expected
+        return kite is not None and kite.status(account) == LIVE
+
+    feeds = [PriceFeed(prices.of(a.id), a.id, functools.partial(is_live, a)) for a in own_feeds]
     checks = Checks(
         alerts,
         md,
@@ -533,6 +540,7 @@ def build(settings: ServeSettings) -> Assembly:
     # charts: live candles from every tick; history from Kite (or the recordings on paper)
     builder = CandleBuilder()
     md.tap(builder.on_tick)
+    history: CandleHistory | None
     if kite is not None:
         history = KiteHistory(kite, lambda i: instruments.to_broker(KITE, i))
         history_name = "Kite historical data"
