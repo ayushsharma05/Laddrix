@@ -6,7 +6,7 @@ import subprocess
 
 A = "src/mocktrade/ops/alerts.py"
 S = "src/mocktrade/server/stream.py"
-P = "src/mocktrade/server/app.py"
+ROUTES_RESEARCH = "src/mocktrade/server/routes/research.py"
 B = "src/mocktrade/research/backtest.py"
 G = "src/mocktrade/ops/guards.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_ownership.py", "tests/test_stream.py",
@@ -25,11 +25,11 @@ MUTANTS = [
  (S, "            if _may_see(connection, alert):\n                connection.put(message)", "            if True:\n                connection.put(message)"),
  (A, "False, self._clock(), old.account_id", "False, self._clock(), None"),
  (B, "        return admin or self.owner == user_id", "        return True"),
- (P, "            run = runs.start(spec, candles=body.candles, owner=user.id)", "            run = runs.start(spec, candles=body.candles)"),
- (P, "        if run is None or not run.may_see(user.id, user.has_role(Role.ADMIN)):", "        if run is None:"),
- (P, "        own_run(run_id, user)\n", "\n"),
- (P, "                if r.may_see(user.id, admin)]  # fmt: skip", "                ]  # fmt: skip"),
- (P, "        if not user.has_role(Role.ADMIN):  # a shared dataset", "        if False:  # a shared dataset"),
+ (ROUTES_RESEARCH, "            run = runs.start(spec, candles=body.candles, owner=user.id)", "            run = runs.start(spec, candles=body.candles)"),
+ (ROUTES_RESEARCH, "        if run is None or not run.may_see(user.id, admin_of(user, run.owner)):", "        if run is None:"),
+ (ROUTES_RESEARCH, "        own_run(run_id, user)\n", "\n"),
+ (ROUTES_RESEARCH, "                if r.may_see(user.id, admin and admin_of(user, r.owner))]  # fmt: skip", "                ]  # fmt: skip"),
+ (ROUTES_RESEARCH, "        if not user.has_role(Role.ADMIN):  # the firm's dataset", "        if False:  # the firm's dataset"),
 ]
 if subprocess.run(TESTS, capture_output=True, timeout=300).returncode != 0:
     raise SystemExit("the tests fail (or a test file is missing) before any mutation: fix that first")

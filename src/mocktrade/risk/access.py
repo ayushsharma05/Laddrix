@@ -1,6 +1,6 @@
 """Who may still trade, checked when an order actually goes, not only when it was asked (#366).
 
-A request is checked at the door (server/app.py). But some actions happen later, for the
+A request is checked at the door (server/context.py). But some actions happen later, for the
 user who started them: an algo's child orders, a GTT the broker fires, a basket's legs. If an
 admin removes a trader from an account, turns the account off or disables the user in the
 meantime, those must stop adding risk at once:

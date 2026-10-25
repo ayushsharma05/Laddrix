@@ -16,7 +16,7 @@ The same trip in words, with the file at each stop:
 ```
  ① you click BUY on the ladder           ui/src/widgets/ladder/
  ② the screen sends a request            ui/src/api/rest.ts        POST /api/accounts/acc-paper/orders
- ③ the waiter checks who you are         src/mocktrade/server/app.py   place()
+ ③ the waiter checks who you are         src/mocktrade/server/routes/trading.py   place()
  ④ the note becomes an OrderRequest      src/mocktrade/domain/orders.py
  ⑤ the kitchen manager takes it          src/mocktrade/orders/manager.py  OrderManager.submit()
  ⑥ the safety inspector checks it        src/mocktrade/risk/checks.py (+ margin, throttle)

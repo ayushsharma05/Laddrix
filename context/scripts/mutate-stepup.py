@@ -6,7 +6,8 @@ import subprocess
 
 U = "src/mocktrade/server/users.py"
 A = "src/mocktrade/server/admin.py"
-P = "src/mocktrade/server/app.py"
+ROUTES_RISK = "src/mocktrade/server/routes/risk.py"
+ROUTES_SESSION = "src/mocktrade/server/routes/session.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_step_up.py"]
 MUTANTS = [
  (U, "        return self._clock() - datetime.fromisoformat(row[\"stepped_up_at\"]) <= STEP_UP_FOR", "        return True"),
@@ -16,8 +17,8 @@ MUTANTS = [
  (U, "            return db.execute(\"DELETE FROM sessions WHERE user_id = ? AND token_hash LIKE ?\",", "            return db.execute(\"DELETE FROM sessions WHERE ? IS NOT NULL AND token_hash LIKE ?\","),
  (U, "        if len(session_id) != SESSION_ID or not all(c in \"0123456789abcdef\" for c in session_id):", "        if False:"),
  (U, "                 \"current\": r[\"token_hash\"] == mine}", "                 \"current\": False}"),
- (P, "                                    stepped_up=True)  # it just checked the code  # fmt: skip", "                                    stepped_up=False)"),
- (P, "        require_step_up(request, \"resume the whole firm\")", "        pass"),
+ (ROUTES_SESSION, "                                    stepped_up=True)  # it just checked the code  # fmt: skip", "                                    stepped_up=False)"),
+ (ROUTES_RISK, "        require_step_up(request, \"resume the whole firm\")", "        pass"),
  (A, "        step_up(request, \"add a user\")", "        pass"),
  (A, "            step_up(request, \"change roles or turn a user on\")", "            pass"),
  (A, "        step_up(request, \"reset a password\")", "        pass"),

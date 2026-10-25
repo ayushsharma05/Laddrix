@@ -6,7 +6,7 @@ notice. Runs the tests unmutated first. Restores each file. Run alone."""
 import subprocess
 
 S = "src/mocktrade/risk/surveillance.py"
-A = "src/mocktrade/server/app.py"
+ROUTES_RISK = "src/mocktrade/server/routes/risk.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_surveillance.py"]
 MUTANTS = [
  (S, "            if buy is None or sell is None or buy >= sell:", "            if True:"),
@@ -19,7 +19,7 @@ MUTANTS = [
  (S, "        if last is not None and (every is None or now - last < every):", "        if False:"),
  (S, "        if len(note.strip()) < 5:", "        if False:"),
  (S, "        if alert.acked_by:\n", "        if False:\n"),
- (A, "        runtime(account_id, user)\n        _risk_only(user)", "        runtime(account_id, user)"),
+ (ROUTES_RISK, "        runtime(account_id, user)\n        _risk_only(user)", "        runtime(account_id, user)"),
 ]
 if subprocess.run(TESTS, capture_output=True, timeout=300).returncode != 0:
     raise SystemExit("the tests fail (or a test file is missing) before any mutation: fix that first")

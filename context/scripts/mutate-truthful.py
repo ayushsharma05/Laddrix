@@ -6,7 +6,7 @@ alone."""
 import subprocess
 
 P = "src/mocktrade/marketdata/prints.py"
-A = "src/mocktrade/server/app.py"
+ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
 M = "src/mocktrade/marketdata/movers.py"
 D = "src/mocktrade/reports/daily.py"
 B = "src/mocktrade/research/backtest.py"
@@ -14,8 +14,8 @@ O = "src/mocktrade/orders/manager.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_truthful_data.py"]
 MUTANTS = [
  (P, "        self.epoch = secrets.token_hex(4)", "        self.epoch = \"same-run\""),
- (A, "                \"epoch\": mine.prints.epoch,", ""),
- (A, "the time is \"\n                            \"the snapshot's last trade,", "\"\n                            \""),
+ (ROUTES_MARKET, "                \"epoch\": mine.prints.epoch,", ""),
+ (ROUTES_MARKET, "the time is \"\n                            \"the snapshot's last trade,", "\"\n                            \""),
  (M, "            \"universe\": f\"ranked among the {len(rows)} contracts", "            \"universe\": f\"ranked among the contracts"),
  (D, "            marked_at[p.instrument_id] = tick.received_at", "            marked_at[p.instrument_id] = None"),
  (D, "    marked = [p.mark_at for p in r.positions if p.mark_at is not None and p.closing_qty]", "    marked = []"),

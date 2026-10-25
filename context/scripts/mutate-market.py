@@ -8,7 +8,7 @@ PR = "src/mocktrade/marketdata/prints.py"
 MV = "src/mocktrade/marketdata/movers.py"
 SI = "src/mocktrade/marketdata/simulator.py"
 SV = "src/mocktrade/marketdata/service.py"
-AP = "src/mocktrade/server/app.py"
+ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
 MM = "ui/src/widgets/market/model.ts"
 TS = "ui/src/widgets/market/TimeAndSales.tsx"
 MO = "ui/src/widgets/market/Movers.tsx"
@@ -38,8 +38,8 @@ MUTANTS = [
  (MV, "        if not 1 <= limit <= MAX_LIMIT:", "        if not 1 <= limit:"),
  (SI, "                    walk.anchor = walk.ltp = walk.open = priced", "                    walk.ltp = priced"),
  (SV, "        return bool(self._watchers.get(instrument_id))", "        return True"),
- (AP, "        rows = prints.recent(instrument_id, after=max(0, after),", "        rows = prints.recent(instrument_id, after=0,"),
- (AP, "        except MoversError as exc:\n            raise HTTPException(422, str(exc)) from None", "        except MoversError as exc:\n            return {\"detail\": str(exc)}"),
+ (ROUTES_MARKET, "        rows = mine.prints.recent(instrument_id, after=max(0, after),", "        rows = mine.prints.recent(instrument_id, after=0,"),
+ (ROUTES_MARKET, "        except MoversError as exc:\n            raise HTTPException(422, str(exc)) from None", "        except MoversError as exc:\n            return {\"detail\": str(exc)}"),
  (MM, "  const most = Math.max(1, ...tick.bids.map((l) => l[1]), ...tick.asks.map((l) => l[1]));", "  const most = Math.max(1, ...tick.bids.map((l) => l[1]));"),
  (MM, "  const b = tick.buy_qty ?? bidTotal;", "  const b = bidTotal;"),
  (MM, "ticks: Math.round((offer.price - best.price) / tickPaise) }", "ticks: offer.price - best.price }"),

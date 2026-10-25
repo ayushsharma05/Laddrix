@@ -10,6 +10,7 @@ import subprocess
 L = "src/mocktrade/ops/logs.py"
 S = "src/mocktrade/ops/status.py"
 A = "src/mocktrade/server/app.py"
+ROUTES_OPS = "src/mocktrade/server/routes/ops.py"
 O = "src/mocktrade/orders/manager.py"
 M = "src/mocktrade/metrics.py"
 V = "src/mocktrade/tools/serve.py"
@@ -34,12 +35,12 @@ MUTANTS = [
  (S, "        if seen is None or seen[0] != state:", "        if True:", PY),
  (S, "        while True:\n            self.parts()\n", "        while True:\n", PY),
  (S, "            if not any(_family(a) == family for a in active):", "            if True:", PY),
- (A, "        if ok:\n            return {\"ready\": True}", "        if True:\n            return {\"ready\": True}", PY),
- (A, "        parts = [p for p in every if p.account_id is None or in_workspace(user, p.account_id)]", "        parts = every", PY),
- (A, "        if not _risk_or_admin(user):\n            raise HTTPException(403, \"the status page is for admin and risk users\")", "        if False:\n            raise HTTPException(403, \"the status page is for admin and risk users\")", PY),
- (A, "        return bool(token) and hmac.compare_digest(given.encode(), f\"Bearer {token}\".encode())", "        return hmac.compare_digest(given.encode(), f\"Bearer {token}\".encode())", PY),
- (A, "        return bool(token) and hmac.compare_digest(given.encode(), f\"Bearer {token}\".encode())", "        return bool(token) and given.startswith(\"Bearer \")", PY),
- (A, "        if not (format == \"prometheus\" and scraper(request)):", "        if not scraper(request):", PY),
+ (ROUTES_OPS, "        if ok:\n            return {\"ready\": True}", "        if True:\n            return {\"ready\": True}", PY),
+ (ROUTES_OPS, "        parts = [p for p in every if p.account_id is None or in_workspace(user, p.account_id)]", "        parts = every", PY),
+ (ROUTES_OPS, '        if not risk_or_admin(user):\n            raise HTTPException(403, "the status page is for admin and risk users")', '        if False:\n            raise HTTPException(403, "the status page is for admin and risk users")', PY),
+ (ROUTES_OPS, "        return bool(token) and hmac.compare_digest(given.encode(), f\"Bearer {token}\".encode())", "        return hmac.compare_digest(given.encode(), f\"Bearer {token}\".encode())", PY),
+ (ROUTES_OPS, "        return bool(token) and hmac.compare_digest(given.encode(), f\"Bearer {token}\".encode())", "        return bool(token) and given.startswith(\"Bearer \")", PY),
+ (ROUTES_OPS, "        if not (format == \"prometheus\" and scraper(request)):", "        if not scraper(request):", PY),
  (A, "        response.headers[\"X-Request-ID\"] = request_id", "        pass", PY),
  (A, "            METRICS.inc(f\"http_responses{{status={response.status_code // 100}xx}}\")", "            pass", PY),
  (O, "            logs.note(client_order_id=request.client_order_id)  # this order's lines from here", "            pass", PY),

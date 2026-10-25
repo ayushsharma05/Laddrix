@@ -7,7 +7,7 @@ import subprocess
 
 X = "src/mocktrade/positions/external.py"
 R = "src/mocktrade/recovery.py"
-A = "src/mocktrade/server/app.py"
+ROUTES_RISK = "src/mocktrade/server/routes/risk.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_external.py"]
 MUTANTS = [
  (X, "        if (t.instrument_id, t.product) == (instrument_id, product) and not t.client_order_id:", "        if (t.instrument_id, t.product) == (instrument_id, product):"),
@@ -18,7 +18,7 @@ MUTANTS = [
  (X, "            self._book.apply_fill(t.instrument_id, t.product, t.side, t.qty, t.price_paise)", "            self._book.apply_fill(t.instrument_id, t.product, t.side, t.qty, 2501000)"),
  (X, "            self._mine.add(t.trade_id)", "            pass"),
  (R, "        if e.ts >= since:\n            x = e.extra\n            book.apply_fill", "        if False:\n            x = e.extra\n            book.apply_fill"),
- (A, "        if not _risk_or_admin(user):\n            raise HTTPException(403, \"only risk or an admin can resolve", "        if False:\n            raise HTTPException(403, \"only risk or an admin can resolve"),
+ (ROUTES_RISK, '        if not risk_or_admin(user):\n            raise HTTPException(403, "only risk or an admin can resolve', '        if False:\n            raise HTTPException(403, "only risk or an admin can resolve'),
 ]
 if subprocess.run(TESTS, capture_output=True, timeout=300).returncode != 0:
     raise SystemExit("the tests fail (or a test file is missing) before any mutation: fix that first")

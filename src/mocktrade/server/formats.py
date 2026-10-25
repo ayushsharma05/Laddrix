@@ -1,11 +1,18 @@
-"""How positions and algos look in JSON: shared by the API and the stream so they never differ."""
+"""How positions, algos, instruments and audit events look in JSON: shared by the API and the
+stream so they never differ."""
 
+from collections.abc import Callable
 from decimal import Decimal
 from fractions import Fraction
 from typing import Any
 
 from mocktrade.algos.engine import AlgoView
+from mocktrade.domain.instruments import Instrument
+from mocktrade.orders.codec import fill_to_dict, view_to_dict
 from mocktrade.positions.book import PositionView
+from mocktrade.refdata.expiry import Expiries, expiry_to_dict
+from mocktrade.spreads.model import SpreadDef, leg_to_dict, spread_tick
+from mocktrade.store.events import StoredEvent
 
 
 def position_to_dict(p: PositionView) -> dict[str, Any]:
@@ -56,4 +63,57 @@ def algo_to_dict(a: AlgoView) -> dict[str, Any]:
         "created_at": a.created_at.isoformat(),
         "updated_at": a.updated_at.isoformat(),
         "actions": [{"name": x.name, "label": x.label, "help": x.help} for x in a.actions],
+    }
+
+
+def instrument_to_dict(i: Instrument, expiries: Expiries | None = None) -> dict[str, Any]:
+    """An instrument as JSON; with `expiries`, its expiry facts now as well (#290)."""
+    return {
+        "id": i.id,
+        "exchange": i.exchange.value,
+        "symbol": i.symbol,
+        "kind": i.kind.value,
+        "tick_paise": i.tick_paise,
+        "lot_size": i.lot_size,
+        "expiry": i.expiry.isoformat() if i.expiry else None,
+        "strike_paise": i.strike_paise,
+        "underlying": i.underlying,
+        "tradable": i.tradable,
+        "freeze_qty": i.freeze_qty,
+        "expiry_info": expiry_to_dict(expiries.info(i)) if expiries else None,
+    }
+
+
+def spread_instrument_to_dict(
+    s: SpreadDef, lookup: Callable[[str], Instrument | None]
+) -> dict[str, Any]:
+    """A spread as an instrument, for the screens: one spread lot is one "lot" (#414)."""
+    return {
+        "id": s.instrument_id,
+        "exchange": "SPREAD",
+        "symbol": s.name,
+        "kind": "SPREAD",
+        "tick_paise": spread_tick(s.legs, lookup),
+        "lot_size": 1,
+        "expiry": None,
+        "strike_paise": None,
+        "underlying": None,
+        "tradable": True,  # a spread ladder's click starts the ASE algo (#416)
+        "freeze_qty": None,  # each leg has its own; the ASE splits within them (#424)
+        "expiry_info": None,
+        "spread": {"spread_id": s.spread_id, "legs": [leg_to_dict(x) for x in s.legs]},
+    }
+
+
+def event_to_dict(e: StoredEvent) -> dict[str, Any]:
+    return {
+        "seq": e.seq,
+        "ts": e.ts.isoformat(),
+        "account_id": e.account_id,
+        "kind": e.kind,
+        "client_order_id": e.client_order_id,
+        "detail": e.detail,
+        "order": view_to_dict(e.order) if e.order else None,
+        "fill": fill_to_dict(e.fill) if e.fill else None,
+        "extra": e.extra,
     }

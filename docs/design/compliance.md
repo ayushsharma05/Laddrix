@@ -1,6 +1,6 @@
 # Compliance: surveillance alerts, the auditor's export, the exchange algo id
 
-Issue #291. Code: `risk/surveillance.py`; endpoints in `server/app.py`.
+Issue #291. Code: `risk/surveillance.py`; endpoints in `server/routes/risk.py`.
 
 ## The rules this is built on (checked 23 Oct 2026, re-check before going live)
 

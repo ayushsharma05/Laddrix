@@ -10,7 +10,7 @@ CK = "src/mocktrade/risk/checks.py"
 PF = "src/mocktrade/platform.py"
 US = "src/mocktrade/server/users.py"
 AD = "src/mocktrade/server/admin.py"
-AP = "src/mocktrade/server/app.py"
+SERVER_CONTEXT = "src/mocktrade/server/context.py"
 DA = "src/mocktrade/domain/accounts.py"
 SR = "src/mocktrade/server/stream.py"
 CMD = ["python3", "-m", "pytest", "-q", "-x", "tests/test_admin.py", "tests/test_server.py",
@@ -55,8 +55,8 @@ MUTANTS = [
  (AD, "        if starter is None or body.broker not in starter.brokers:", "        if starter is None:"),
  (AD, "        if unknown:\n            raise HTTPException(422, f\"no such user", "        if False:\n            raise HTTPException(422, f\"no such user"),
  (AD, "        if why:\n            starter.not_running[account.id] = why", "        if False:\n            starter.not_running[account.id] = why"),
- (AP, "        if user.must_change_password and request.url.path not in PASSWORD_FIRST:", "        if False:"),
- (AP, "        if trade and not can_manage(user, account):", "        if trade and not can_view(user, account):"),
+ (SERVER_CONTEXT, "        if user.must_change_password and request.url.path not in PASSWORD_FIRST:", "        if False:"),
+ (SERVER_CONTEXT, "        if trade and not can_manage(user, account):", "        if trade and not can_view(user, account):"),
  (DA, "    return user.id == account.owner_user_id or user.id in account.traders\n\n\ndef can_view", "    return True\n\n\ndef can_view"),
  (SR, "        if user is None or user.must_change_password:  # a reset password: change it first", "        if user is None:"),
 ]

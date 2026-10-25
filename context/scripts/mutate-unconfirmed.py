@@ -7,7 +7,7 @@ import subprocess
 M = "src/mocktrade/orders/manager.py"
 K = "src/mocktrade/broker/kite/orders.py"
 R = "src/mocktrade/recovery.py"
-A = "src/mocktrade/server/app.py"
+ROUTES_TRADING = "src/mocktrade/server/routes/trading.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_unconfirmed.py",
          "tests/test_order_manager.py", "tests/test_kite_orders.py", "tests/test_kite_broker.py",
          "tests/test_event_log.py", "tests/test_recovery.py", "tests/test_server.py"]
@@ -25,7 +25,7 @@ MUTANTS = [
  (M, '        said = f" ({update.reason})" if update.reason else ""', '        said = ""'),
  (K, "            status=S.PENDING,\n            filled_qty=int(order.get(\"filled_quantity\") or 0),", "            status=S.OPEN,\n            filled_qty=int(order.get(\"filled_quantity\") or 0),"),
  (R, "    orders.follow_unconfirmed()  # the manager asks the broker again, by itself", "    pass"),
- (A, "        if not body.confirm:\n            raise HTTPException(422, \"check the broker's own", "        if False:\n            raise HTTPException(422, \"check the broker's own"),
+ (ROUTES_TRADING, "        if not body.confirm:\n            raise HTTPException(422, \"check the broker's own", "        if False:\n            raise HTTPException(422, \"check the broker's own"),
 ]
 caught = 0
 for f, a, b in MUTANTS:

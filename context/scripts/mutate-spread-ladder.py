@@ -10,7 +10,7 @@ M = "ui/src/widgets/ladder/model.ts"
 L = "ui/src/widgets/ladder/Ladder.tsx"
 A = "ui/src/widgets/ase/Autospreader.tsx"
 S = "src/mocktrade/algos/autospreader.py"
-P = "src/mocktrade/server/app.py"
+SERVER_FORMATS = "src/mocktrade/server/formats.py"
 UI = (["npx", "vitest", "run", "src/widgets/ladder", "src/widgets/ase"], "ui")
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_autospreader.py", "tests/test_spread_api.py"], ".")
 MUTANTS = [
@@ -35,7 +35,7 @@ MUTANTS = [
  (A, '            onLadder={(s) => open("ladder", { instrumentId: s.instrument_id, link: "none" })}', '            onLadder={() => undefined}', UI),
  (S, '            lots=self._lots(ctx),', '            lots=ctx.qty,', PY),
  (S, '            lots_done=math.floor(self._lots_done(ctx)),', '            lots_done=0,', PY),
- (P, '        "tradable": True,  # a spread ladder', '        "tradable": False,  # a spread ladder', PY),
+ (SERVER_FORMATS, '        "tradable": True,  # a spread ladder', '        "tradable": False,  # a spread ladder', PY),
 ]
 for cmd, cwd in (PY, UI):
     if subprocess.run(cmd, capture_output=True, timeout=600, cwd=cwd).returncode != 0:

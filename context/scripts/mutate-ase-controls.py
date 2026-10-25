@@ -10,7 +10,7 @@ A = "src/mocktrade/algos/autospreader.py"
 E = "src/mocktrade/algos/engine.py"
 M = "src/mocktrade/spreads/model.py"
 S = "src/mocktrade/spreads/store.py"
-P = "src/mocktrade/server/app.py"
+P = "src/mocktrade/server/routes/spreads.py"
 F = "src/mocktrade/server/formats.py"
 AM = "ui/src/widgets/ase/model.ts"
 AW = "ui/src/widgets/ase/Autospreader.tsx"
@@ -51,7 +51,7 @@ MUTANTS = [
  # the definition and the API
  (M, "    controls, problems = controls_from_dict(d.get(\"controls\"))", "    controls, problems = Controls(), []", PY),
  (S, "                           old.created_at, self._clock(), controls or old.controls)  # fmt: skip", "                           old.created_at, self._clock(), controls or Controls())  # fmt: skip", PY),
- (P, "            raise HTTPException(422, \"; \".join(problems))", "            return None", PY),
+ (P, "        if problems:\n            raise HTTPException(422, \"; \".join(problems))", "        if False:\n            raise HTTPException(422, \"; \".join(problems))", PY),
  # the screens
  (AM, "  if (typeof typed === \"string\") return typed;", "  if (typed) return String(typed);", UI),
  (AM, "    if (!parsed.ok) problems.push(parsed.problem);", "    if (!parsed.ok) controls[p.name] = null;", UI),

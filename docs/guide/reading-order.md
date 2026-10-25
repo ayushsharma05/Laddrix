@@ -45,10 +45,10 @@ Tip: tick each file off as you read it. A file that feels hard: read its test fi
 **If you're short on time, read just these 12 first** (they explain 80% of the system):
 `domain/money.py` → `domain/orders.py` → `broker/base.py` → `broker/paper.py` →
 `orders/manager.py` → `positions/book.py` → `risk/checks.py` → `risk/kill_switch.py` →
-`store/events.py` → `platform.py` → `server/app.py` (search for `def place`) →
+`store/events.py` → `platform.py` → `server/routes/trading.py` (search for `def place`) →
 `ui/src/state/store.ts`
 
-## Part A · The server (Python), 134 files
+## Part A · The server (Python), 144 files
 
 **domain/**
 
@@ -132,129 +132,145 @@ Tip: tick each file off as you read it. A file that feels hard: read its test fi
 
 52. [ ] `src/mocktrade/server/security.py` — Security building blocks: passwords, 2FA codes, session tokens, secrets at rest.
 53. [ ] `src/mocktrade/server/users.py` — Users, broker accounts and login sessions, in a small SQLite file.
-54. [ ] `src/mocktrade/server/formats.py` — How positions and algos look in JSON: shared by the API and the stream so they never differ.
+54. [ ] `src/mocktrade/server/formats.py` — How positions, algos, instruments and audit events look in JSON: shared by the API and the stream so they never differ.
 55. [ ] `src/mocktrade/server/stream.py` — The live stream to the browser: one WebSocket per tab.
-56. [ ] `src/mocktrade/server/app.py` — The HTTP API: login, accounts, orders, positions, kill switches, audit history.
-57. [ ] `src/mocktrade/server/admin.py` — The admin API (K13.1): users, roles, broker accounts and each account's risk limits, without code or a terminal.
+56. [ ] `src/mocktrade/server/context.py` — What every part of the HTTP API shares: the server's settings, its services, and the checks each request goes through (who is asking, which account, which firm).
+57. [ ] `src/mocktrade/server/bodies.py` — The HTTP API's request bodies: unknown fields are refused, so nobody can smuggle in a user or account id; who is asking always comes from the session.
+58. [ ] `src/mocktrade/server/admin.py` — The admin API (K13.1): users, roles, broker accounts and each account's risk limits, without code or a terminal.
+
+**server/routes/**
+
+59. [ ] `src/mocktrade/server/routes/session.py` — Logging in and out, the user's own password, step-up, sessions, layouts and settings, and the broker's own daily login (Kite's).
+60. [ ] `src/mocktrade/server/routes/ops.py` — Health, readiness, the status page, metrics, operations and a replay's controls (#287).
+61. [ ] `src/mocktrade/server/routes/market.py` — Prices and what is drawn from them: instruments, options, charts, market alerts, movers.
+62. [ ] `src/mocktrade/server/routes/trading.py` — Trading one account: orders, baskets, GTTs, algos, charges and margin.
+63. [ ] `src/mocktrade/server/routes/portfolio.py` — What an account holds and made: positions, end-of-day reports, P&L history, and the broker's funds, holdings and tradebook (read-only).
+64. [ ] `src/mocktrade/server/routes/risk.py` — Risk on an account and the firm: MTM limits, square-off, lost stops, flatten, the kill switches, surveillance, the auditor's export and trades made outside MockTrade.
+65. [ ] `src/mocktrade/server/routes/spreads.py` — Spreads (#414) and structure positions (#428): each user's multi-leg definitions, trading them with the Autospreader, and grouping an account's fills into structures.
+66. [ ] `src/mocktrade/server/routes/research.py` — Research (K11): recorded days of ticks, backtests over them, imported candles.
+
+**server/**
+
+67. [ ] `src/mocktrade/server/app.py` — The HTTP API: login, accounts, orders, positions, kill switches, audit history.
 
 **algos/**
 
-58. [ ] `src/mocktrade/algos/spec.py` — What an algo needs from the trader: the algo spec the screens are built from.
-59. [ ] `src/mocktrade/algos/engine.py` — The algo engine: parent orders worked by strategies through child orders.
-60. [ ] `src/mocktrade/algos/builtin.py` — The algos MockTrade ships with.
-61. [ ] `src/mocktrade/algos/execution.py` — What execution algos share: where to price a child, and keeping children at that price.
-62. [ ] `src/mocktrade/algos/slicer.py` — The slicer: a big order sent as small limit orders over time (time-sliced execution).
-63. [ ] `src/mocktrade/algos/iceberg.py` — The iceberg: a big order shown a little at a time, at the trader's limit price.
-64. [ ] `src/mocktrade/algos/pov.py` — POV (percentage of volume): trade a set share of what the market trades, until done.
-65. [ ] `src/mocktrade/algos/protect.py` — Protection held by MockTrade: trailing stop, OCO exit and bracket.
-66. [ ] `src/mocktrade/algos/schedule.py` — TWAP and VWAP: an order worked to a schedule over a time window.
-67. [ ] `src/mocktrade/algos/spreader.py` — The spreader: trade a two-leg spread (e.g.
-68. [ ] `src/mocktrade/algos/autospreader.py` — The Autospreader algo (ASE, #415): trade a multi-leg spread at a spread price.
+68. [ ] `src/mocktrade/algos/spec.py` — What an algo needs from the trader: the algo spec the screens are built from.
+69. [ ] `src/mocktrade/algos/engine.py` — The algo engine: parent orders worked by strategies through child orders.
+70. [ ] `src/mocktrade/algos/builtin.py` — The algos MockTrade ships with.
+71. [ ] `src/mocktrade/algos/execution.py` — What execution algos share: where to price a child, and keeping children at that price.
+72. [ ] `src/mocktrade/algos/slicer.py` — The slicer: a big order sent as small limit orders over time (time-sliced execution).
+73. [ ] `src/mocktrade/algos/iceberg.py` — The iceberg: a big order shown a little at a time, at the trader's limit price.
+74. [ ] `src/mocktrade/algos/pov.py` — POV (percentage of volume): trade a set share of what the market trades, until done.
+75. [ ] `src/mocktrade/algos/protect.py` — Protection held by MockTrade: trailing stop, OCO exit and bracket.
+76. [ ] `src/mocktrade/algos/schedule.py` — TWAP and VWAP: an order worked to a schedule over a time window.
+77. [ ] `src/mocktrade/algos/spreader.py` — The spreader: trade a two-leg spread (e.g.
+78. [ ] `src/mocktrade/algos/autospreader.py` — The Autospreader algo (ASE, #415): trade a multi-leg spread at a spread price.
 
 **ops/**
 
-69. [ ] `src/mocktrade/ops/alerts.py` — Operational alerts: one place, each told once, to every place that should hear it.
-70. [ ] `src/mocktrade/ops/scheduler.py` — Run jobs at India times on trading days.
-71. [ ] `src/mocktrade/ops/checks.py` — The checks the scheduler runs, each raising or clearing one alert.
-72. [ ] `src/mocktrade/ops/guards.py` — On every screen (the alert band): MTM limits reached, and MIS positions before the cut-off.
-73. [ ] `src/mocktrade/ops/notify.py` — Send alerts off the machine: a JSON POST to a webhook (Slack, Google Chat, ntfy, or any service that relays to a phone).
-74. [ ] `src/mocktrade/ops/protection.py` — On every screen (the alert band): positions that had protection and have lost it (V1.2, #328).
-75. [ ] `src/mocktrade/ops/fence.py` — One trading server per data folder (#273): a second one can't trade the same accounts.
-76. [ ] `src/mocktrade/ops/logs.py` — Logs as JSON lines, each carrying the ids that tie it to a request and an order (#287).
-77. [ ] `src/mocktrade/ops/status.py` — One status for the whole server (#287): each part's state, why, and since when.
-78. [ ] `src/mocktrade/ops/supervisor.py` — Critical background loops, watched (#273): a living web server isn't a healthy trading one.
+79. [ ] `src/mocktrade/ops/alerts.py` — Operational alerts: one place, each told once, to every place that should hear it.
+80. [ ] `src/mocktrade/ops/scheduler.py` — Run jobs at India times on trading days.
+81. [ ] `src/mocktrade/ops/checks.py` — The checks the scheduler runs, each raising or clearing one alert.
+82. [ ] `src/mocktrade/ops/guards.py` — On every screen (the alert band): MTM limits reached, and MIS positions before the cut-off.
+83. [ ] `src/mocktrade/ops/notify.py` — Send alerts off the machine: a JSON POST to a webhook (Slack, Google Chat, ntfy, or any service that relays to a phone).
+84. [ ] `src/mocktrade/ops/protection.py` — On every screen (the alert band): positions that had protection and have lost it (V1.2, #328).
+85. [ ] `src/mocktrade/ops/fence.py` — One trading server per data folder (#273): a second one can't trade the same accounts.
+86. [ ] `src/mocktrade/ops/logs.py` — Logs as JSON lines, each carrying the ids that tie it to a request and an order (#287).
+87. [ ] `src/mocktrade/ops/status.py` — One status for the whole server (#287): each part's state, why, and since when.
+88. [ ] `src/mocktrade/ops/supervisor.py` — Critical background loops, watched (#273): a living web server isn't a healthy trading one.
 
 **charges/**
 
-79. [ ] `src/mocktrade/charges/model.py` — What a trade costs beyond the price: brokerage and the taxes and fees on Indian trades.
-80. [ ] `src/mocktrade/charges/schedules.py` — Charge schedules: rates as data, with the date they were checked.
-81. [ ] `src/mocktrade/charges/service.py` — One account's charges for the day, and estimates for orders not yet sent.
+89. [ ] `src/mocktrade/charges/model.py` — What a trade costs beyond the price: brokerage and the taxes and fees on Indian trades.
+90. [ ] `src/mocktrade/charges/schedules.py` — Charge schedules: rates as data, with the date they were checked.
+91. [ ] `src/mocktrade/charges/service.py` — One account's charges for the day, and estimates for orders not yet sent.
 
 **charts/**
 
-82. [ ] `src/mocktrade/charts/candles.py` — Candles (OHLCV): built live from ticks, one level only (1 minute), added up for the rest.
-83. [ ] `src/mocktrade/charts/history.py` — Past candles: where a chart's history comes from (replaceable).
-84. [ ] `src/mocktrade/charts/service.py` — Charts: candles for a screen (history joined to live) and the account's trades as marks.
+92. [ ] `src/mocktrade/charts/candles.py` — Candles (OHLCV): built live from ticks, one level only (1 minute), added up for the rest.
+93. [ ] `src/mocktrade/charts/history.py` — Past candles: where a chart's history comes from (replaceable).
+94. [ ] `src/mocktrade/charts/service.py` — Charts: candles for a screen (history joined to live) and the account's trades as marks.
 
 **alerts/**
 
-85. [ ] `src/mocktrade/alerts/engine.py` — Market alerts: price, % move, day volume, open interest and spread, checked on every tick.
-86. [ ] `src/mocktrade/alerts/service.py` — Market alerts for the server: the engine, kept per user, told to the screens, the audit trail and (when the user asked for it) their webhook.
-87. [ ] `src/mocktrade/alerts/store.py` — Alerts kept across restarts: one JSON file per user (their alerts and their webhook).
-88. [ ] `src/mocktrade/alerts/webhook.py` — Alerts sent to a user's webhook: signed, retried, never on the trading loop's time.
+95. [ ] `src/mocktrade/alerts/engine.py` — Market alerts: price, % move, day volume, open interest and spread, checked on every tick.
+96. [ ] `src/mocktrade/alerts/service.py` — Market alerts for the server: the engine, kept per user, told to the screens, the audit trail and (when the user asked for it) their webhook.
+97. [ ] `src/mocktrade/alerts/store.py` — Alerts kept across restarts: one JSON file per user (their alerts and their webhook).
+98. [ ] `src/mocktrade/alerts/webhook.py` — Alerts sent to a user's webhook: signed, retried, never on the trading loop's time.
 
 **spreads/**
 
-89. [ ] `src/mocktrade/spreads/model.py` — A multi-leg spread and its live implied price (#414, part of #250).
-90. [ ] `src/mocktrade/spreads/store.py` — Each user's spread definitions, kept across restarts (#414).
-91. [ ] `src/mocktrade/spreads/pricer.py` — Live implied spread prices, as ticks of "SPREAD:<id>" (#414).
+99. [ ] `src/mocktrade/spreads/model.py` — A multi-leg spread and its live implied price (#414, part of #250).
+100. [ ] `src/mocktrade/spreads/store.py` — Each user's spread definitions, kept across restarts (#414).
+101. [ ] `src/mocktrade/spreads/pricer.py` — Live implied spread prices, as ticks of "SPREAD:<id>" (#414).
 
 **structures/**
 
-92. [ ] `src/mocktrade/structures/book.py` — Structure positions (#428, part of #250): spreads held, their P&L, and what is left over.
+102. [ ] `src/mocktrade/structures/book.py` — Structure positions (#428, part of #250): spreads held, their P&L, and what is left over.
 
 **options/**
 
-93. [ ] `src/mocktrade/options/chain.py` — The option chain: every strike of one underlying and expiry, priced and with Greeks.
-94. [ ] `src/mocktrade/options/model.py` — From instruments and live prices to the numbers pricing needs.
-95. [ ] `src/mocktrade/options/pricing.py` — Black-76: European options priced off the future, with implied volatility and Greeks.
-96. [ ] `src/mocktrade/options/strategy.py` — Option strategies: templates, legs at live prices, and what the position does.
+103. [ ] `src/mocktrade/options/chain.py` — The option chain: every strike of one underlying and expiry, priced and with Greeks.
+104. [ ] `src/mocktrade/options/model.py` — From instruments and live prices to the numbers pricing needs.
+105. [ ] `src/mocktrade/options/pricing.py` — Black-76: European options priced off the future, with implied volatility and Greeks.
+106. [ ] `src/mocktrade/options/strategy.py` — Option strategies: templates, legs at live prices, and what the position does.
 
 **portfolio/**
 
-97. [ ] `src/mocktrade/portfolio/service.py` — What an account holds and owns, kept fresh from its broker: funds, holdings, trades.
+107. [ ] `src/mocktrade/portfolio/service.py` — What an account holds and owns, kept fresh from its broker: funds, holdings, trades.
 
 **reports/**
 
-98. [ ] `src/mocktrade/reports/daily.py` — The end-of-day report for one account, built from the audit trail (the source of truth).
-99. [ ] `src/mocktrade/reports/export.py` — A day's report as a download: CSV (for a spreadsheet) or PDF (to read and keep).
-100. [ ] `src/mocktrade/reports/history.py` — P&L over many days, from kept end-of-day reports: by day, by instrument, by strategy.
-101. [ ] `src/mocktrade/reports/pdf.py` — A small PDF writer for text reports: monospaced lines on A4 pages, no dependency.
-102. [ ] `src/mocktrade/reports/service.py` — Reports for the screens: a day's report (kept after the close, or a live preview), P&L history, and the 16:00 job that keeps each account's report.
-103. [ ] `src/mocktrade/reports/store.py` — Kept reports: one JSON file per account and day, written after the close.
+108. [ ] `src/mocktrade/reports/daily.py` — The end-of-day report for one account, built from the audit trail (the source of truth).
+109. [ ] `src/mocktrade/reports/export.py` — A day's report as a download: CSV (for a spreadsheet) or PDF (to read and keep).
+110. [ ] `src/mocktrade/reports/history.py` — P&L over many days, from kept end-of-day reports: by day, by instrument, by strategy.
+111. [ ] `src/mocktrade/reports/pdf.py` — A small PDF writer for text reports: monospaced lines on A4 pages, no dependency.
+112. [ ] `src/mocktrade/reports/service.py` — Reports for the screens: a day's report (kept after the close, or a live preview), P&L history, and the 16:00 job that keeps each account's report.
+113. [ ] `src/mocktrade/reports/store.py` — Kept reports: one JSON file per account and day, written after the close.
 
 **research/**
 
-104. [ ] `src/mocktrade/research/backtest.py` — Backtests: an algo over recorded days, with the same engine, paper broker and risk checks as live trading, so a backtest can't be kinder than the market was.
-105. [ ] `src/mocktrade/research/replay.py` — Replay a recorded day (K11.1) into MarketData, so paper trading runs on a real past day.
-106. [ ] `src/mocktrade/research/ticks.py` — Recorded ticks: every tick MockTrade receives, kept for replay (K11.2) and backtests (K11.3).
+114. [ ] `src/mocktrade/research/backtest.py` — Backtests: an algo over recorded days, with the same engine, paper broker and risk checks as live trading, so a backtest can't be kinder than the market was.
+115. [ ] `src/mocktrade/research/replay.py` — Replay a recorded day (K11.1) into MarketData, so paper trading runs on a real past day.
+116. [ ] `src/mocktrade/research/ticks.py` — Recorded ticks: every tick MockTrade receives, kept for replay (K11.2) and backtests (K11.3).
 
 **broker/kite/**
 
-107. [ ] `src/mocktrade/broker/kite/broker.py` — KiteBroker: real orders through Kite Connect, behind the same Broker interface.
-108. [ ] `src/mocktrade/broker/kite/daily_login.py` — Kite's daily login, started from the web page instead of the terminal.
-109. [ ] `src/mocktrade/broker/kite/decoder.py` — Decode Kite's binary WebSocket frames into ticks keyed by Kite's instrument token.
-110. [ ] `src/mocktrade/broker/kite/encode.py` — Build Kite binary frames (big-endian, paise), exactly as Kite sends them.
-111. [ ] `src/mocktrade/broker/kite/feed.py` — Glue between Kite's ticker and MockTrade: Kite tokens in, our ticks out.
-112. [ ] `src/mocktrade/broker/kite/gtt.py` — Kite's GTT API (/gtt/triggers) in MockTrade's terms.
-113. [ ] `src/mocktrade/broker/kite/http.py` — A small async client for Kite Connect's REST API (v3).
-114. [ ] `src/mocktrade/broker/kite/instruments.py` — Load Kite's daily instrument dump (CSV) into the instrument master.
-115. [ ] `src/mocktrade/broker/kite/live.py` — Live Kite inside the server: each kite account's connection, from start-up to 6 AM.
-116. [ ] `src/mocktrade/broker/kite/orders.py` — Translating orders between MockTrade and Kite (pure functions, no network).
-117. [ ] `src/mocktrade/broker/kite/portfolio.py` — Kite's holdings, margins and tradebook in MockTrade's terms.
-118. [ ] `src/mocktrade/broker/kite/session.py` — Kite login: turn the account holder's manual login into an access token.
-119. [ ] `src/mocktrade/broker/kite/ticker.py` — Kite's live WebSocket: prices (binary) and order updates (JSON text), kept alive forever.
-120. [ ] `src/mocktrade/broker/kite/token_store.py` — Keep today's Kite access token in a private local file between commands.
+117. [ ] `src/mocktrade/broker/kite/broker.py` — KiteBroker: real orders through Kite Connect, behind the same Broker interface.
+118. [ ] `src/mocktrade/broker/kite/daily_login.py` — Kite's daily login, started from the web page instead of the terminal.
+119. [ ] `src/mocktrade/broker/kite/decoder.py` — Decode Kite's binary WebSocket frames into ticks keyed by Kite's instrument token.
+120. [ ] `src/mocktrade/broker/kite/encode.py` — Build Kite binary frames (big-endian, paise), exactly as Kite sends them.
+121. [ ] `src/mocktrade/broker/kite/feed.py` — Glue between Kite's ticker and MockTrade: Kite tokens in, our ticks out.
+122. [ ] `src/mocktrade/broker/kite/gtt.py` — Kite's GTT API (/gtt/triggers) in MockTrade's terms.
+123. [ ] `src/mocktrade/broker/kite/http.py` — A small async client for Kite Connect's REST API (v3).
+124. [ ] `src/mocktrade/broker/kite/instruments.py` — Load Kite's daily instrument dump (CSV) into the instrument master.
+125. [ ] `src/mocktrade/broker/kite/live.py` — Live Kite inside the server: each kite account's connection, from start-up to 6 AM.
+126. [ ] `src/mocktrade/broker/kite/orders.py` — Translating orders between MockTrade and Kite (pure functions, no network).
+127. [ ] `src/mocktrade/broker/kite/portfolio.py` — Kite's holdings, margins and tradebook in MockTrade's terms.
+128. [ ] `src/mocktrade/broker/kite/session.py` — Kite login: turn the account holder's manual login into an access token.
+129. [ ] `src/mocktrade/broker/kite/ticker.py` — Kite's live WebSocket: prices (binary) and order updates (JSON text), kept alive forever.
+130. [ ] `src/mocktrade/broker/kite/token_store.py` — Keep today's Kite access token in a private local file between commands.
 
 **tools/**
 
-121. [ ] `src/mocktrade/tools/demo.py` — Run the whole platform locally with simulated prices and paper trading: no Kite needed.
-122. [ ] `src/mocktrade/tools/serve.py` — Run MockTrade as a server: the entry point the Docker image starts.
-123. [ ] `src/mocktrade/tools/amo_check.py` — Go-live check: place ONE after-market order (AMO) through Kite, then cancel it.
-124. [ ] `src/mocktrade/tools/backup.py` — Back up everything a restored MockTrade server needs, safely while the server runs (V1.3).
-125. [ ] `src/mocktrade/tools/loadtest.py` — Load test: the real server in its own process, fed by a fake Kite, read by screen-like clients.
-126. [ ] `src/mocktrade/tools/login.py` — Log in to Kite from the terminal: python -m mocktrade.tools.login
-127. [ ] `src/mocktrade/tools/restore.py` — Restore a backup into a data folder (V1.3).
-128. [ ] `src/mocktrade/tools/users.py` — Manage MockTrade users and accounts from the server's terminal.
-129. [ ] `src/mocktrade/tools/watch.py` — Watch a live ladder in the terminal: python -m mocktrade.tools.watch NFO:NIFTY26OCTFUT
-130. [ ] `src/mocktrade/tools/audit.py` — Check that the audit trail is whole (#367).
+131. [ ] `src/mocktrade/tools/demo.py` — Run the whole platform locally with simulated prices and paper trading: no Kite needed.
+132. [ ] `src/mocktrade/tools/serve.py` — Run MockTrade as a server: the entry point the Docker image starts.
+133. [ ] `src/mocktrade/tools/amo_check.py` — Go-live check: place ONE after-market order (AMO) through Kite, then cancel it.
+134. [ ] `src/mocktrade/tools/backup.py` — Back up everything a restored MockTrade server needs, safely while the server runs (V1.3).
+135. [ ] `src/mocktrade/tools/loadtest.py` — Load test: the real server in its own process, fed by a fake Kite, read by screen-like clients.
+136. [ ] `src/mocktrade/tools/login.py` — Log in to Kite from the terminal: python -m mocktrade.tools.login
+137. [ ] `src/mocktrade/tools/restore.py` — Restore a backup into a data folder (V1.3).
+138. [ ] `src/mocktrade/tools/users.py` — Manage MockTrade users and accounts from the server's terminal.
+139. [ ] `src/mocktrade/tools/watch.py` — Watch a live ladder in the terminal: python -m mocktrade.tools.watch NFO:NIFTY26OCTFUT
+140. [ ] `src/mocktrade/tools/audit.py` — Check that the audit trail is whole (#367).
 
 **(top level)/**
 
-131. [ ] `src/mocktrade/config.py` — Settings read from the environment (and an optional .env file for local use).
-132. [ ] `src/mocktrade/metrics.py` — Measurements: how long each step takes, as histograms, so speed is a number, not a guess.
-133. [ ] `src/mocktrade/version.py` — MockTrade's version (V1.6, #289): one place, shown by /api/health and on the screens.
-134. [ ] `src/mocktrade/logsafe.py` — Logs never hold a secret (#367).
+141. [ ] `src/mocktrade/config.py` — Settings read from the environment (and an optional .env file for local use).
+142. [ ] `src/mocktrade/metrics.py` — Measurements: how long each step takes, as histograms, so speed is a number, not a guess.
+143. [ ] `src/mocktrade/version.py` — MockTrade's version (V1.6, #289): one place, shown by /api/health and on the screens.
+144. [ ] `src/mocktrade/logsafe.py` — Logs never hold a secret (#367).
 
 ## Part B · The screens (TypeScript/React), 92 files
 

@@ -11,6 +11,8 @@ S = "src/mocktrade/spreads/store.py"
 P = "src/mocktrade/spreads/pricer.py"
 D = "src/mocktrade/marketdata/service.py"
 A = "src/mocktrade/server/app.py"
+ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
+ROUTES_SPREADS = "src/mocktrade/server/routes/spreads.py"
 W = "src/mocktrade/server/stream.py"
 U = "src/mocktrade/tools/users.py"
 F = "ui/src/widgets/ase/model.ts"
@@ -59,10 +61,10 @@ MUTANTS = [
  (P, "        if old is not None:\n            old.close()", "        if False:\n            old.close()", PY),
  (D, "        for subscription in self._watchers.get(tick.instrument_id, ()):\n            subscription._offer(tick)\n\n    def tap", "\n    def tap", PY),
  # the server
- (A, "        if instrument is None and (spread := book.visible(user, instrument_id)) is not None:", "        if instrument is None and (spread := book.of_instrument(instrument_id)) is not None:", PY),
+ (ROUTES_MARKET, "        if instrument is None and (spread := book.visible(user, instrument_id)) is not None:", "        if instrument is None and (spread := book.of_instrument(instrument_id)) is not None:", PY),
  (A, "        spread_visible=lambda user, i: book.visible(user, i) is not None,", "        spread_visible=lambda user, i: book.of_instrument(i) is not None,", PY),
- (A, "        await book.save(user.id)\n        return _spread_out(made)", "        return _spread_out(made)", PY),
- (A, "            raise HTTPException(404 if exc.missing else 422, str(exc)) from None", "            raise HTTPException(422, str(exc)) from None", PY),
+ (ROUTES_SPREADS, "        await book.save(user.id)\n        return _spread_out(made)", "        return _spread_out(made)", PY),
+ (ROUTES_SPREADS, "            raise HTTPException(404 if exc.missing else 422, str(exc)) from None", "            raise HTTPException(422, str(exc)) from None", PY),
  (W, "                 or self._spread_visible(connection.user, i)]  # fmt: skip", "                 ]  # fmt: skip", PY),
  (U, "            spreads.unlink()", "", PY),
  # the form

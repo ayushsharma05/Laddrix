@@ -25,7 +25,7 @@ in the order you'd write them, each step small enough to type, run and test your
 | 8 | `risk/kill_switch.py`, `store/events.py` | STOP and the ledger |
 | 9 | `broker/paper.py`, `broker/rules.py`, `broker/paper_funds.py` | a paper broker filling against prices |
 | 10 | `platform.py` (`add_account`) | everything wired for one account |
-| 11 | `server/security.py`, `server/users.py`, `server/app.py` (login, place, orders), `server/stream.py` | a web API and live stream |
+| 11 | `server/security.py`, `server/users.py`, `server/context.py`, `server/routes/` (login, place, orders), `server/app.py`, `server/stream.py` | a web API and live stream |
 | 12 | `tools/demo.py` | the demo you can run |
 | 13 | `ui/src/api/`, `ui/src/state/store.ts`, `ui/src/shell/`, one widget (the order book) | screens that show orders |
 | 14 | the ladder, the ticket | trading from the screen |

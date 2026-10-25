@@ -12,7 +12,7 @@ The easiest way to see the whole system is as a restaurant.
  ┌─────────────────────── THE RESTAURANT (the MockTrade server) ───────────────────────┐
  │                                                                                      │
  │  DINING ROOM            WAITER               KITCHEN MANAGER        SAFETY INSPECTOR │
- │  (the screens in   ◄──► (server/app.py:  ──► (orders/manager.py:  ──► (risk/: checks │
+ │  (the screens in   ◄──► (server/routes: ──► (orders/manager.py:  ──► (risk/: checks │
  │   your browser)         takes orders,        tracks every order      every order    │
  │                         brings news)         from start to end)      before it goes)│
  │                                                    │                                 │

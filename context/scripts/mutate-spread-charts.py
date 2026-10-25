@@ -7,7 +7,7 @@ file in `finally`; a hang counts as caught. Run alone from the repo root."""
 import subprocess
 
 C = "src/mocktrade/charts/service.py"
-S = "src/mocktrade/server/app.py"
+ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
 T = "src/mocktrade/server/stream.py"
 CH = "ui/src/widgets/chart/Chart.tsx"
 AW = "ui/src/widgets/ase/Autospreader.tsx"
@@ -24,7 +24,7 @@ MUTANTS = [
  (C, "        \"live_from\": None if None in lives else max(lives),", "        \"live_from\": max((x for x in lives if x), default=None),", PY),
  (C, "    return combine([(leg.multiplier, charts.forming(leg.instrument_id, code))", "    return combine([(1, charts.forming(leg.instrument_id, code))", PY),
  (C, "    per_leg = await asyncio.gather(\n        *(charts.candles(leg.instrument_id, code, start, end) for leg in spread.legs)\n    )", "    per_leg = [await charts.candles(leg.instrument_id, code, start, end) for leg in spread.legs]", PY),
- (S, "                spread = book.visible(user, instrument_id)\n                if spread is None:", "                spread = book.of_instrument(instrument_id)\n                if spread is None:", PY),
+ (ROUTES_MARKET, "                spread = book.visible(user, instrument_id)\n                if spread is None:", "                spread = book.of_instrument(instrument_id)\n                if spread is None:", PY),
  (T, "        spread = self._spread_of(connection.user, instrument_id)\n", "        spread = None\n", PY),
  (CH, "            spread mark, not traded prices{answer.gaps ? ` · ${answer.gaps} gaps` : \"\"}", "            spread mark, not traded prices", UI),
  (CH, "    if (name && params.label !== name) setParams({ label: name });", "    if (name && params.label === undefined) setParams({ label: name });", UI),

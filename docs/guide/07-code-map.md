@@ -163,7 +163,7 @@ class OrderManager:                      # a "class" is a blueprint for a thing 
 | `research/` | Recording ticks, replaying a day, backtests on recorded days. |
 | `ops/` | Alerts (the bands), the scheduler (jobs at India times), operational checks, the day guards, lost stops, sending alerts off the machine; the supervisor that restarts failed loops, one server per data folder (`fence.py`), the status of every part (`status.py`) and JSON logs (`logs.py`). |
 | `store/events.py` | The ledger: every event into SQLite (`events.db`), written in the background so trading never waits for the disk. |
-| `server/` | `app.py` the API, `stream.py` the live line, `security.py` passwords and codes, `users.py` the users database, `admin.py` the admin API, `formats.py` shared JSON shapes. |
+| `server/` | `app.py` puts the API together from `routes/` (one file per area: `session`, `ops`, `market`, `trading`, `portfolio`, `risk`, `spreads`, `research`), `context.py` the checks every route shares (who is asking, which account, which firm), `bodies.py` the request bodies, `stream.py` the live line, `security.py` passwords and codes, `users.py` the users database, `admin.py` the admin API, `formats.py` shared JSON shapes. |
 | `tools/` | Programs you run: `serve` (real), `demo`, `users` (add users), `backup`, `restore`, `login` (Kite), `watch` (a terminal ladder), `amo_check` (one go-live test order), `loadtest`, `audit` (read and check the audit trail). |
 
 ## 7.3 The screens: `ui/src/`
