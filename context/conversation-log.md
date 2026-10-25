@@ -808,3 +808,17 @@ Core #240 and hardening #257 remain first, with security #279, data rights #278 
     - **Two older flaky tests** (an Autospreader subscription, a ticket summary) failed once under the full parallel run: they checked at once for something that arrives a moment later; they now wait for it. The mutation check from #448 flagged six mutants on lines changed here (rewritten).
     - **Checks:** lint clean with the full set; 534 screen tests; mutation `mutate-compiler.py` 22/22; browser checks on a fresh demo for every widget changed: free-canvas 16/16, context-menu 14/14, structures 6/6, step-up 7/7, spread-chart 4/4, ase-controls 8/8, and chain, strategy, GTT, reports, flatten, MTM, market, chart, ticket and algos run through.
   - #450 merged as PR #453. With it the repo review (#438) is done and closed: setup (#439), types (#440), routes (#441), screens lint (#442), checks that still check (#448), the React Compiler rules (#450). What it leaves: every check a contributor runs is in CI and `make lint` and a test keeps it there; mutation scripts can't go stale silently; the browser scripts run on today's screens; mypy and ESLint (full hooks set) clean; the API split by area. Next: the feature issues (`context/status.md`, "What's next").
+
+## 25 Oct 2026: a showcase of what we built (#455)
+Ayush is pausing until Thursday because his weekly limit is nearly used up. He asked for impressive pictures of everything built so far, saved in the repo and remembered. Claude drew nine posters as HTML pages in `context/showcase/`, rendered at 2x to PNGs in `context/images/showcase/` by `render.cjs`:
+1. the numbers;
+2. the architecture;
+3. one order's journey;
+4. the price path;
+5. the safety rings;
+6. the timeline;
+7. the screens;
+8. the quality machine;
+9. the algos.
+
+`context/showcase/README.md` is the gallery. Every claim was checked against the code. For example, the price band is a typo guard, not the exchange circuit, and square-off is an assistant, not automatic. Each picture was looked at and fixed where text overlapped. The session's shell was unavailable for a while (a server-side permission check failing), so part of the work was pushed through GitHub directly.
