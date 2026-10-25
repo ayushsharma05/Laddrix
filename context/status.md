@@ -1,6 +1,6 @@
 # Laddrix status
 
-As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full history up to
+As of 25 Oct 2026 (India time). GitHub issues are the source of truth. The full history up to
 23 Oct (every milestone's PRs and checks) is kept in
 [docs/archive/history/status-to-2026-10-23.md](../docs/archive/history/status-to-2026-10-23.md).
 
@@ -81,8 +81,8 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
 - **Rename (#457):** merged (PR #460), with two videos in `context/showcase/video/`: a
   one-minute showcase and a two-minute advert.
 - **Feature tour video (#461):** `context/showcase/video/laddrix-features.mp4`, 3½ minutes, 8
-  chapters; in its own PR.
-- **Pull requests:** the rename (PR #460, Ayush merges it) and the feature tour (#461).
+  chapters: merged (PR #462).
+- **Pull requests:** none open.
 
 ## What's next
 
