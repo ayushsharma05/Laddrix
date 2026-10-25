@@ -5,7 +5,7 @@ Every anchor is checked to be unique first."""
 import subprocess
 
 BT = "src/mocktrade/research/backtest.py"
-AP = "src/mocktrade/server/app.py"
+ROUTES_RESEARCH = "src/mocktrade/server/routes/research.py"
 US = "src/mocktrade/server/users.py"
 CMD = ["python3", "-m", "pytest", "-q", "-x", "tests/test_safe_storage.py", "tests/test_backtest.py",
        "tests/test_users.py"]
@@ -21,8 +21,8 @@ MUTANTS = [
  (BT, "        os.replace(part, target)  # whole or nothing: a reader never sees half a day", "        target.write_text(part.read_text())"),
  (BT, "        return sorted((p.stem for p in folder.glob(\"*.json\") if _DAY_FILE.match(p.stem)),", "        return sorted((p.stem for p in folder.glob(\"*.json\")),"),
  (BT, "        folder = self._folder(instrument_id)\n        problems = []", "        folder = self.root / instrument_id.replace(\":\", \"_\")\n        problems = []"),
- (AP, "        if platform.instruments.get(body.instrument_id) is None:\n            raise HTTPException(422, f\"unknown instrument", "        if False:\n            raise HTTPException(422, f\"unknown instrument"),
- (AP, "        audit(\"CANDLES_IMPORTED\"", "        (lambda *a: None)(\"CANDLES_IMPORTED\""),
+ (ROUTES_RESEARCH, "        if platform.instruments.get(body.instrument_id) is None:\n            raise HTTPException(422, f\"unknown instrument", "        if False:\n            raise HTTPException(422, f\"unknown instrument"),
+ (ROUTES_RESEARCH, "        audit(\"CANDLES_IMPORTED\"", "        (lambda *a: None)(\"CANDLES_IMPORTED\""),
  (US, "        if not account.id.isascii() or not account.id.replace(\"-\", \"\").isalnum():", "        if False:"),
 ]
 caught = 0

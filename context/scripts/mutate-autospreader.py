@@ -6,7 +6,7 @@ Restores each file in `finally`; a hang counts as caught. Run alone from the rep
 import subprocess
 
 A = "src/mocktrade/algos/autospreader.py"
-P = "src/mocktrade/server/app.py"
+ROUTES_SPREADS = "src/mocktrade/server/routes/spreads.py"
 F = "ui/src/widgets/algos/model.ts"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_autospreader.py", "tests/test_spread_api.py",
        "tests/test_ase_controls.py"], ".")
@@ -47,9 +47,9 @@ MUTANTS = [
  (A, "            traded_spread_paise=traded if complete else None,", "            traded_spread_paise=traded,", PY),
  (A, "            unhedged=sum(short.values()),", "            unhedged=len(short),", PY),
  # the route
- (P, "        buys_q = (q.ratio > 0) == (body.side is Side.BUY)", "        buys_q = body.side is Side.BUY", PY),
- (P, "                qty=body.lots * abs(q.ratio) * instrument.lot_size,", "                qty=body.lots * instrument.lot_size,", PY),
- (P, "        spread = book.visible(user, PREFIX + spread_id)", "        spread = book.of_instrument(PREFIX + spread_id)", PY),
+ (ROUTES_SPREADS, "        buys_q = (q.ratio > 0) == (body.side is Side.BUY)", "        buys_q = body.side is Side.BUY", PY),
+ (ROUTES_SPREADS, "                qty=body.lots * abs(q.ratio) * instrument.lot_size,", "                qty=body.lots * instrument.lot_size,", PY),
+ (ROUTES_SPREADS, "        spread = book.visible(user, PREFIX + spread_id)", "        spread = book.of_instrument(PREFIX + spread_id)", PY),
  # the algo screen
  (F, "  return specs.filter((s) => !STARTED_ELSEWHERE.has(s.family ?? \"execution\"));", "  return specs;", UI),
 ]

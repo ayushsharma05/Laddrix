@@ -8,7 +8,7 @@ import subprocess
 E = "src/mocktrade/algos/engine.py"
 T = "src/mocktrade/risk/throttle.py"
 V = "src/mocktrade/tools/serve.py"
-A = "src/mocktrade/server/app.py"
+ROUTES_TRADING = "src/mocktrade/server/routes/trading.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_algo_id.py", "tests/test_kite_orders.py"]
 MUTANTS = [
  (E, "        if not kind.exchange_algo_id and self._ops() > OPS_WITHOUT_ALGO_ID:", "        if False:"),
@@ -18,7 +18,7 @@ MUTANTS = [
  (E, "        ids[code.strip().upper()] = value.strip()", "        ids[code.strip()] = value.strip()"),
  (T, "        self.per_second = min((r.limit for r in rules if r.window_s == 1.0), default=0)", "        self.per_second = 8"),
  (V, "        if unknown:\n", "        if False:\n"),
- (A, "             \"exchange_algo_note\": algo_id_note(t)}", "             }"),
+ (ROUTES_TRADING, "             \"exchange_algo_note\": algo_id_note(t)}", "             }"),
 ]
 if subprocess.run(TESTS, capture_output=True, timeout=300).returncode != 0:
     raise SystemExit("the tests fail (or a test file is missing) before any mutation: fix that first")

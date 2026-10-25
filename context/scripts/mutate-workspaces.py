@@ -7,15 +7,18 @@ import subprocess
 D = "src/mocktrade/domain/accounts.py"
 U = "src/mocktrade/server/users.py"
 P = "src/mocktrade/platform.py"
-A = "src/mocktrade/server/app.py"
+C = "src/mocktrade/server/context.py"
+ROUTES_OPS = "src/mocktrade/server/routes/ops.py"
+ROUTES_RISK = "src/mocktrade/server/routes/risk.py"
+ROUTES_SESSION = "src/mocktrade/server/routes/session.py"
 M = "src/mocktrade/server/admin.py"
 S = "src/mocktrade/server/stream.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_workspaces.py"]
 MUTANTS = [
  (S, "            message[\"scope\"] = \"firm\"  # to its own people it is simply their firm's STOP\n", ""),
- (A, "                if in_workspace(user, a.account_id)]  # fmt: skip", "                ]  # fmt: skip"),
- (A, "        if found is None or not in_workspace(user, found.account_id):", "        if found is None:"),
- (A, "                if a.account_id is None or a.account_id in mine\n", ""),
+ (ROUTES_RISK, "                if in_workspace(user, a.account_id)]  # fmt: skip", "                ]  # fmt: skip"),
+ (ROUTES_RISK, "        if found is None or not in_workspace(user, found.account_id):", "        if found is None:"),
+ (ROUTES_OPS, "                if a.account_id is None or a.account_id in mine\n", ""),
  (D, "    return user.workspace == account.workspace", "    return True"),
  (D, "    if not user.active or not same_workspace(user, account):", "    if not user.active:"),
  (D, "    if not same_workspace(user, account):\n        return False\n    if not (user.has_role(Role.TRADER) and account.active):", "    if not (user.has_role(Role.TRADER) and account.active):"),
@@ -24,11 +27,11 @@ MUTANTS = [
  (U, "                        workspace,\n                    ),", "                        \"main\",\n                    ),"),
  (P, "        firm = self.firm_switch_of(account.workspace)  # its own firm's STOP, no other (#368)", "        firm = self.firm_switch"),
  (P, "        if workspace == MAIN:\n            return self.firm_switch", "        if True:\n            return self.firm_switch"),
- (A, "        runs = [r for r in platform.accounts.values() if r.account.workspace == user.workspace]", "        runs = list(platform.accounts.values())"),
- (A, "        firm = platform.firm_switch_of(user.workspace)\n", "        firm = platform.firm_switch\n"),
- (A, "        platform.firm_switch_of(user.workspace).reset(by=user.id)", "        platform.firm_switch.reset(by=user.id)"),
- (A, "        \"firm_stopped\": platform.firm_switch_of(user.workspace).engaged,", "        \"firm_stopped\": platform.firm_switch.engaged,"),
- (A, "        if len(users.workspaces()) > 1:", "        if False:"),
+ (ROUTES_RISK, "        runs = [r for r in platform.accounts.values() if r.account.workspace == user.workspace]", "        runs = list(platform.accounts.values())"),
+ (ROUTES_RISK, "        firm = platform.firm_switch_of(user.workspace)\n", "        firm = platform.firm_switch\n"),
+ (ROUTES_RISK, "        platform.firm_switch_of(user.workspace).reset(by=user.id)", "        platform.firm_switch.reset(by=user.id)"),
+ (ROUTES_SESSION, "        \"firm_stopped\": platform.firm_switch_of(user.workspace).engaged,", "        \"firm_stopped\": platform.firm_switch.engaged,"),
+ (C, "        if len(self.users.workspaces()) > 1:", "        if False:"),
  (M, "        return [e for e in users.users() if e[\"user\"].workspace == user.workspace]", "        return users.users()"),
  (M, "        if account is None or account.workspace != user.workspace:  # another firm's: none", "        if account is None:"),
  (M, "        return {\"accounts\": [account_dict(a) for a in users.accounts()\n                             if a.workspace == user.workspace],", "        return {\"accounts\": [account_dict(a) for a in users.accounts()],"),

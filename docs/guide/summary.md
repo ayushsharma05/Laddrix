@@ -64,7 +64,7 @@ The screens talk to the server in two ways:
      │  ◄───────  position +75, P&L ₹0      │
 ```
 
-**Logging in** (`server/app.py`, `server/security.py`):
+**Logging in** (`server/routes/session.py`, `server/security.py`):
 
 ```
 username + password + 6-digit code from your authenticator app
@@ -109,7 +109,7 @@ often with a small drawing.
 | `research/` | Recording ticks, replaying a recorded day, backtests. | `replay.py` |
 | `ops/` | Running it: operational alerts (the bands), the scheduler, day guards, the lost-stop guard. | `alerts.py`, `protection.py` |
 | `store/` | The audit log: every order event and note goes into `events.db` (SQLite), written in the background. | `events.py` |
-| `server/` | The web layer: login (password + authenticator code), the REST API, the stream, admin. | `app.py` (long: use search) |
+| `server/` | The web layer: login (password + authenticator code), the REST API, the stream, admin. | `routes/trading.py` (orders), `context.py` (the checks) |
 | `tools/` | Command-line programs: `serve`, `demo`, `users`, `backup`, `restore`, `loadtest`. | `demo.py` |
 | `platform.py` | **Wires everything together** for each account: broker, order manager, risk, positions, algos and the rest. | the `add_account` method |
 | `recovery.py` | After a restart: rebuild orders and positions before trading may start again. | the top comment |
@@ -123,9 +123,9 @@ You click **Buy 75 NIFTY** on the ladder.
 ```
 screen  ui/src/widgets/ladder → api/rest.ts  POST /api/accounts/acc-paper/orders
           │
-server  server/app.py  place(): who are you? may you trade this account?
-          │            builds an OrderRequest (domain/orders.py); the user comes from the
-          │            session, never from the request body
+server  server/routes/trading.py  place(): who are you? may you trade this account?
+          │                       builds an OrderRequest (domain/orders.py); the user
+          │                       comes from the session, never from the request body
           ▼
         orders/manager.py  OrderManager.submit
           │  1. gives it an id (MT1…) and records SUBMITTED (audit log)

@@ -11,7 +11,7 @@ C = "src/mocktrade/charts/candles.py"
 S = "src/mocktrade/charts/service.py"
 H = "src/mocktrade/charts/history.py"
 W = "src/mocktrade/server/stream.py"
-A = "src/mocktrade/server/app.py"
+ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
 CMD = ["python3", "-m", "pytest", "-q", "-x", "tests/test_charts.py", "tests/test_kite_live.py"]
 MUTANTS = [
  (C, "    n = (local - opens) // timedelta(seconds=interval.seconds)", "    n = int((local - opens).total_seconds() / interval.seconds)"),
@@ -35,8 +35,8 @@ MUTANTS = [
  (H, "            if tick.exchange_time is None and tick.received_at is None:", "            if False:"),
  (W, "                await asyncio.sleep(self.candle_interval_s)\n                await watch.wait()", "                await watch.wait()"),
  (W, "        if len(connection.charts) >= MAX_CHARTS:", "        if False:"),
- (A, "        return at if at.tzinfo else at.replace(tzinfo=IST)  # a time without a zone is India's", "        return at"),
- (A, "        runtime(account_id, user)\n        service = chart_service()\n        last =", "        service = chart_service()\n        last ="),
+ (ROUTES_MARKET, "        return at if at.tzinfo else at.replace(tzinfo=IST)  # a time without a zone is India's", "        return at"),
+ (ROUTES_MARKET, "        runtime(account_id, user)\n        service = chart_service(user)\n", "        service = chart_service(user)\n"),
 ]
 caught = 0
 for f, a, b in MUTANTS:

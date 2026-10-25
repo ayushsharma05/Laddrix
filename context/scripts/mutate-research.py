@@ -6,7 +6,7 @@ unique: a shorter line can hide inside a more indented one earlier in the file."
 import subprocess
 
 B = "src/mocktrade/research/backtest.py"
-A = "src/mocktrade/server/app.py"
+A = "src/mocktrade/server/routes/research.py"
 M = "ui/src/widgets/research/model.ts"
 W = "ui/src/widgets/research/Backtests.tsx"
 R = "ui/src/widgets/research/Recordings.tsx"
@@ -20,9 +20,8 @@ MUTANTS = [
  (B, '        if run.result is None:\n            raise LookupError', '        if False:\n            raise LookupError', PY),
  (B, '        "days": [x.isoformat() for x in reversed(ticks_days)],  # newest first', '        "days": [x.isoformat() for x in ticks_days],  # newest first', PY),
  (B, '        return sorted((p.stem for p in folder.glob("*.json")), reverse=True)', '        return sorted(p.stem for p in folder.glob("*.json"))', PY),
- (A, '        if candles is not None and instrument_id:\n            out["candle_days"]', '        if candles is not None:\n            out["candle_days"]', PY),
- (A, '        if format == "csv":\n            return Response(report_csv(data), media_type="text/csv; charset=utf-8",\n                            headers=disposition)  # fmt: skip\n        return Response(report_pdf(data), media_type="application/pdf", headers=disposition)\n\n    @app.get("/api/research/backtests/{run_id}")',
-     '        if format == "csv":\n            return Response(report_pdf(data), media_type="text/csv; charset=utf-8",\n                            headers=disposition)  # fmt: skip\n        return Response(report_pdf(data), media_type="application/pdf", headers=disposition)\n\n    @app.get("/api/research/backtests/{run_id}")', PY),
+ (A, '        if own is not None and instrument_id:\n            out["candle_days"]', '        if own is not None:\n            out["candle_days"]', PY),
+ (A, '        if format == "csv":\n            return Response(await asyncio.to_thread(report_csv, data),', '        if format == "csv":\n            return Response(await asyncio.to_thread(report_pdf, data),', PY),
  # the screens' model
  (M, '  while (v >= 1024 && u < units.length - 1) {', '  while (v >= 1024) {', UI),
  (M, '  const days = [...t.days].sort(); // a run goes through its days in order', '  const days = [...t.days];', UI),

@@ -57,10 +57,13 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   2. The repo review, #438, in four parts, one PR each:
      - #439 setup (accurate facts, project files, a contributor guide, one guide, the reading
        order kept complete by a test): merged (PR #443, merged by Ayush);
-     - #440 types (mypy clean, in CI): in its PR;
-     - #441 routes (`server/app.py` split by area);
+     - #440 types (mypy clean, in CI): merged (PR #447);
+     - #441 routes (`server/app.py` split by area: `server/routes/`, `context.py`, `bodies.py`;
+       [context/images/server-api-layout.png](images/server-api-layout.png)): in its PR;
      - #442 screens lint (ESLint with the React hooks rules).
-- **Pull requests:** the #440 PR.
+- **Next in the review:** #442 screens lint, then #448 (every mutant applies, every browser
+  script runs on the free pages).
+- **Pull requests:** the #441 PR (#449). Dependabot's updates #444-#446 merged green.
 
 ## What's next
 

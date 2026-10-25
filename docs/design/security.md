@@ -47,7 +47,7 @@ Zerodha's answer (#278).
 - **Actors:** anonymous Internet users; logged-in users acting maliciously; stolen sessions; an
   over-privileged admin; a compromised dependency or update; the operator's own mistakes.
 
-## 3. Permission matrix (code: `domain/accounts.py`, checks in `server/app.py`)
+## 3. Permission matrix (code: `domain/accounts.py`, checks in `server/context.py` and `server/routes/`)
 
 | Action | trader (own / delegated accounts) | risk | admin |
 | --- | --- | --- | --- |
@@ -70,7 +70,7 @@ the control.
 | 1 | Stolen session places orders | Sessions: httponly + SameSite=Strict + Secure cookie, 2 h idle / 12 h max, ended on logout, password change and disable; Origin checked on changes and on the stream | `test_server.py` (cookie, expiry, Origin). **A stolen session can't loosen limits, add traders, reset logins or resume the firm** without a fresh authenticator code (5 min; wrong codes lock the user and end all their sessions); everyone sees and ends their own sessions (#363): `test_step_up.py` |
 | 2 | Brute force or credential stuffing | argon2id; TOTP mandatory for everyone; 5 failures → 15 min lock; per-address limit | `test_server.py` (lockout, same answer for any wrong part) |
 | 3 | Another user's account read or traded | default-deny per account, also on the stream; a missing account is the same answer as no access (404) | `test_server.py`, `test_ownership.py` (#270) |
-| 4 | Broker login callback replayed or swapped | `state` single-use, bound to the session's user + account, 10 min; the Zerodha user id must match the account | `app.py /kite/callback`, `daily_login.py` |
+| 4 | Broker login callback replayed or swapped | `state` single-use, bound to the session's user + account, 10 min; the Zerodha user id must match the account | `routes/session.py /kite/callback`, `daily_login.py` |
 | 5 | Order replayed with changed details | **Fixed here:** an order id reused for a different order is refused (409), never answered with the old one; an identical retry never places twice | `test_order_manager.py` |
 | 6 | Risk limit raced, or action after permission removed | risk gate + throttle per account; durable orders (#265). **Rights re-checked when the action happens (#366):** every new order or change asks the user store again; a running algo stops before its next child; a GTT that could open is deleted, a stop-loss kept; closes and cancels always go | `test_access_recheck.py` (incl. 10 orders at once vs the position and open-order limits) |
 | 7 | Secrets leaked via the screens, git or HTTP paths | screens and desktop sources scanned; `.env`, keys, tokens and databases never tracked; probes of 24 private paths (incl. path tricks) never serve a planted secret | `test_security_surface.py` (**new**), #269 |

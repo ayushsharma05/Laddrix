@@ -1,0 +1,17 @@
+flowchart LR
+    REQ["a request from the screens"] --> GUARD["app.py guard<br/>same site? JSON?<br/>security headers"]
+    GUARD --> ROUTES
+    subgraph ROUTES ["server/routes/, in order"]
+        direction TB
+        OPS["ops.py<br/>health, status, metrics"] --> SES["session.py<br/>login, me, layouts"]
+        SES --> MKT["market.py<br/>instruments, charts, alerts"]
+        MKT --> RES["research.py<br/>recordings, backtests"]
+        RES --> TRD["trading.py<br/>orders, GTT, algos"]
+        TRD --> SPR["spreads.py<br/>spreads, structures"]
+        SPR --> RSK["risk.py<br/>MTM, STOP, surveillance"]
+        RSK --> PTF["portfolio.py<br/>positions, reports"]
+    end
+    ROUTES --> ADM["admin.py<br/>users, accounts, limits"]
+    ADM --> UI["the built screens<br/>(last: never shadow the API)"]
+    CTX["context.py<br/>who is asking? which account?<br/>which firm?"] -.every route asks.-> ROUTES
+    CTX -.-> ADM

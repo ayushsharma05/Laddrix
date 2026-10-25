@@ -7,7 +7,8 @@ import subprocess
 
 B = "src/mocktrade/research/backtest.py"
 R = "src/mocktrade/reports/service.py"
-A = "src/mocktrade/server/app.py"
+ROUTES_PORTFOLIO = "src/mocktrade/server/routes/portfolio.py"
+ROUTES_RESEARCH = "src/mocktrade/server/routes/research.py"
 S = "src/mocktrade/ops/scheduler.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_workload.py"]
 MUTANTS = [
@@ -24,9 +25,9 @@ MUTANTS = [
  (B, "            run.state, run.error = \"cancelled\", \"cancelled\"", "            run.state, run.error = \"failed\", \"cancelled\""),
  (B, "        task.cancel()\n        await asyncio.wait({task}, timeout=5)", "        task.cancel()"),
  (B, "        for process in list((pool._processes or {}).values()):\n            process.kill()", "        for process in []:\n            process.kill()"),
- (A, "        except BacktestBusy as exc:  # a bounded queue (#274): later, not never\n            raise HTTPException(429", "        except BacktestBusy as exc:  # a bounded queue (#274): later, not never\n            raise HTTPException(422"),
- (A, "        if not await backtest_runs().cancel(run_id):", "        if not await backtest_runs().cancel(run_id) and False:"),
- (A, "            data = await asyncio.to_thread(day_reports.day, account_id, when)", "            data = day_reports.day(account_id, when)"),
+ (ROUTES_RESEARCH, "        except BacktestBusy as exc:  # a bounded queue (#274): later, not never\n            raise HTTPException(429", "        except BacktestBusy as exc:  # a bounded queue (#274): later, not never\n            raise HTTPException(422"),
+ (ROUTES_RESEARCH, "        if not await backtest_runs().cancel(run_id):", "        if not await backtest_runs().cancel(run_id) and False:"),
+ (ROUTES_PORTFOLIO, "            data = await asyncio.to_thread(day_reports.day, account_id, when)", "            data = day_reports.day(account_id, when)"),
  (R, "                report = await asyncio.to_thread(self._build, account_id, day, prices=True,\n                                                 final=True)  # fmt: skip", "                report = self._build(account_id, day, prices=True, final=True)"),
  (S, "        if busy is not None and not busy.done():", "        if False:"),
  (S, "        if started:\n            await asyncio.wait(started, timeout=WAIT_S)", "        for t in started:\n            await t"),

@@ -12,7 +12,7 @@ OR = "src/mocktrade/domain/orders.py"
 RG = "src/mocktrade/risk/checks.py"
 CL = "src/mocktrade/risk/closing.py"
 SP = "src/mocktrade/domain/order_spec.py"
-AP = "src/mocktrade/server/app.py"
+SERVER_FORMATS = "src/mocktrade/server/formats.py"
 SV = "src/mocktrade/tools/serve.py"
 TM = "ui/src/widgets/ticket/model.ts"
 TT = "ui/src/widgets/ticket/Ticket.tsx"
@@ -41,7 +41,7 @@ MUTANTS = [
  (RG, "        return qty if freeze is None else min(qty, freeze)", "        return qty", PY),
  (CL, "        piece = min(piece, freeze)", "        pass", PY),
  (SP, "        freeze_qty=instrument.max_order_qty,", "        freeze_qty=instrument.freeze_qty,", PY),
- (AP, "        \"freeze_qty\": i.freeze_qty,\n", "", PY),
+ (SERVER_FORMATS, "        \"freeze_qty\": i.freeze_qty,\n", "", PY),
  (SV, "                problems.append(f\"MOCKTRADE_FREEZE_FILE can't be read: {exc.strerror or exc}\")", "                pass", PY),
  (SV, "            freeze_file=Path(freeze_text) if freeze_text else None,", "            freeze_file=None,", PY),
  # the ticket

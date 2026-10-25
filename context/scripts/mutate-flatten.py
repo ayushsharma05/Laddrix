@@ -10,7 +10,7 @@ D = "src/mocktrade/risk/closing.py"
 M = "src/mocktrade/orders/manager.py"
 F = "src/mocktrade/risk/flatten.py"
 P = "src/mocktrade/platform.py"
-A = "src/mocktrade/server/app.py"
+ROUTES_RISK = "src/mocktrade/server/routes/risk.py"
 O = "src/mocktrade/orders/codec.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_flatten.py", "tests/test_exits.py",
          "tests/test_server.py", "tests/test_unconfirmed.py", "tests/test_risk_checks.py",
@@ -33,8 +33,8 @@ MUTANTS = [
  (F, "            self.last = result", "            pass"),
  (P, "            if m.instrument_id == instrument_id and m.product in (None, product):", "            if False:"),
  (P, "            if i == instrument_id and p in (None, product):", "            if False:"),
- (A, "        if not body.confirm:\n            raise HTTPException(422, \"flatten needs", "        if False:\n            raise HTTPException(422, \"flatten needs"),
- (A, "        reports = _stop_reports([running], before, failures, user.id, body.reason)", "        reports = []"),
+ (ROUTES_RISK, "        if not body.confirm:\n            raise HTTPException(422, \"flatten needs", "        if False:\n            raise HTTPException(422, \"flatten needs"),
+ (ROUTES_RISK, "        reports = _stop_reports([running], before, failures, user.id, body.reason)", "        reports = []"),
 ]
 caught = 0
 for f, a, b in MUTANTS:

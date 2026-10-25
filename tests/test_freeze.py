@@ -256,7 +256,7 @@ def test_demo_and_simulated_servers_carry_sample_limits():
 
 
 def test_an_instrument_with_a_freeze_says_it_over_the_api():
-    from mocktrade.server.app import _instrument
+    from mocktrade.server.formats import instrument_to_dict as _instrument
 
     nifty = Instrument(Exchange.NFO, "NIFTY26OCTFUT", InstrumentKind.FUTURE, 10, 75,
                        date(2026, 10, 27), None, "NIFTY", freeze_qty=1800)  # fmt: skip

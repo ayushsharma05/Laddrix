@@ -308,3 +308,28 @@ async def test_server_wide_controls_are_the_operators_once_there_are_two_firms(f
     ayush = await firms.logged_in("ayush")
     r = await ayush.delete("/api/metrics")
     assert r.status_code == 403 and "only its operator" in r.json()["detail"]
+
+
+async def test_an_admin_never_sees_another_firms_backtests(tmp_path, nifty_fut):
+    """An admin sees their own firm's backtests (#270, #368), never another firm's: Acme's
+    admin gets "no backtest", exactly as for one that doesn't exist."""
+    from test_backtest import DAY, MODEL, day_ticks
+
+    from mocktrade.research.backtest import Backtests
+
+    w = TwoFirms(tmp_path, nifty_fut)
+    runs = Backtests(tmp_path / "bt", w.platform.instruments, MODEL,
+                     ticks=lambda d: iter(day_ticks(FUT)) if d == DAY else None)  # fmt: skip
+    w.app = create_app(w.platform, w.users, ServerSettings(origin=ORIGIN), backtests=runs)
+    riya, ayush, ravi = [await w.logged_in(u) for u in ("riya", "ayush", "ravi")]
+    body = {"days": [DAY.isoformat()], "algo": "SLICER", "instrument_id": FUT, "side": "BUY",
+            "qty": 150, "params": {"slices": 2, "interval_s": 60, "mode": "cross"}}  # fmt: skip
+    run = (await riya.post("/api/research/backtests", json=body)).json()["run_id"]
+    await runs.settle()
+    assert (await ayush.get(f"/api/research/backtests/{run}")).status_code == 200  # main's admin
+    assert (await ravi.get("/api/research/backtests")).json() == []  # Acme's admin: not theirs
+    other = await ravi.get(f"/api/research/backtests/{run}")
+    assert other.status_code == 404 and other.json()["detail"] == f"no backtest {run}"
+    for c in (riya, ayush, ravi):
+        await c.aclose()
+    w.log.close()

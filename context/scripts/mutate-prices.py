@@ -11,12 +11,13 @@ K = "src/mocktrade/broker/kite/live.py"
 V = "src/mocktrade/tools/serve.py"
 H = "src/mocktrade/server/stream.py"
 TESTS = ["python3", "-m", "pytest", "-q", "-x", "tests/test_price_sources.py"]
-A = "src/mocktrade/server/app.py"
+C = "src/mocktrade/server/context.py"
+ROUTES_MARKET = "src/mocktrade/server/routes/market.py"
 E = "src/mocktrade/alerts/engine.py"
 L = "src/mocktrade/alerts/service.py"
 MUTANTS = [
- (A, "        found = platform.prices.for_user(user, users.accounts())\n        return markets.of(found if found is not None else no_prices)", "        return markets.of(platform.market_data)"),
- (A, "        tick = market(user).prices.latest(instrument_id)  # the asker's own price (#395)", "        tick = platform.market_data.latest(instrument_id)"),
+ (C, "        found = self.platform.prices.for_user(user, self.users.accounts())\n        return self.markets.of(found if found is not None else self.no_prices)", "        return self.markets.of(self.platform.market_data)"),
+ (ROUTES_MARKET, "        tick = market(user).prices.latest(instrument_id)  # the asker's own price (#395)", "        tick = platform.market_data.latest(instrument_id)"),
  (E, "                continue  # another subscription's price: never this user's alert's", "                pass"),
  (E, "        return source.latest(instrument_id) if source is not None else None", "        return self._latest(instrument_id)"),
  (E, "        return {i for a in self._alerts.values() if self._source_of(a.user_id) is source", "        return {i for a in self._alerts.values() if True"),

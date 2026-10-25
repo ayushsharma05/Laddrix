@@ -7,7 +7,7 @@ import subprocess
 
 B = "src/mocktrade/structures/book.py"
 P = "src/mocktrade/platform.py"
-S = "src/mocktrade/server/app.py"
+ROUTES_SPREADS = "src/mocktrade/server/routes/spreads.py"
 W = "ui/src/widgets/structures/Structures.tsx"
 PY = (["python3", "-m", "pytest", "-q", "-x", "tests/test_structures.py", "tests/test_workspaces.py"], ".")
 UI = (["npx", "vitest", "run", "src/widgets/structures"], "ui")
@@ -35,8 +35,8 @@ MUTANTS = [
  (B, "            elif e.kind == \"STRUCTURE_DELETED\":\n                self._structures.pop(x[\"structure_id\"], None)", "            elif e.kind == \"STRUCTURE_DELETED\":\n                pass", PY),
  (P, "            structures.load(log_.notes(account_id, list(STRUCTURE_NOTES)))", "            pass", PY),
  # routes
- (S, "        spread = book.visible(user, PREFIX + body.spread_id)\n        if spread is None:\n            raise HTTPException(404, f\"no spread {body.spread_id}\")\n        legs", "        spread = book.get(body.spread_id)\n        if spread is None:\n            raise HTTPException(404, f\"no spread {body.spread_id}\")\n        legs", PY),
- (S, "            raise HTTPException(404 if exc.missing else 422, exc.reason) from None\n\n    @app.get(\"/api/accounts/{account_id}/structures\")", "            raise HTTPException(422, exc.reason) from None\n\n    @app.get(\"/api/accounts/{account_id}/structures\")", PY),
+ (ROUTES_SPREADS, "        spread = book.visible(user, PREFIX + body.spread_id)\n        if spread is None:\n            raise HTTPException(404, f\"no spread {body.spread_id}\")\n        legs", "        spread = book.get(body.spread_id)\n        if spread is None:\n            raise HTTPException(404, f\"no spread {body.spread_id}\")\n        legs", PY),
+ (ROUTES_SPREADS, '            raise HTTPException(404 if exc.missing else 422, exc.reason) from None\n\n    @api.get("/api/accounts/{account_id}/structures")', '            raise HTTPException(422, exc.reason) from None\n\n    @api.get("/api/accounts/{account_id}/structures")', PY),
  # the screen
  (W, "                      {qty(a.qty)} {a.instrument_id ? shortName(a.instrument_id) : \"\"}", "                      {a.instrument_id ? shortName(a.instrument_id) : \"\"}", UI),
  (W, "{ to: e.target.value, client_order_id: a.client_order_id, qty: a.qty }", "{ to: e.target.value, client_order_id: a.client_order_id, qty: 0 }", UI),
