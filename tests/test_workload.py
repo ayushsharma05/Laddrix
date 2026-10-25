@@ -306,3 +306,23 @@ def test_the_limits_are_written_down():
     assert backtest.MAX_WAITING == 10 and backtest.MAX_PER_USER == 2
     assert backtest.DAY_TIMEOUT_S == 900 and backtest.WORKER_MEMORY == 2 << 30
     assert date.fromisoformat("2026-10-16") == DAY
+
+
+async def test_two_runs_in_the_same_second_never_share_an_id(
+    nifty_fut, store, tmp_path, monkeypatch
+):
+    """The random part repeats (#458): the second run still gets its own id, and both wait."""
+    picks = iter(["abcd", "abcd", "abcd", "beef"])
+    monkeypatch.setattr(backtest.secrets, "token_hex", lambda _n: next(picks))
+    clock = lambda: T0  # noqa: E731 (both start in the same second)
+    runs = Backtests(tmp_path / "runs", store, MODEL, ticks=lambda _d: None, clock=clock)
+    try:
+        first = runs.start(spec(nifty_fut.id), owner="a")
+        second = runs.start(spec(nifty_fut.id), owner="b")
+        assert first.run_id != second.run_id
+        assert second.run_id.endswith("BEEF")
+        assert {first.run_id, second.run_id} <= set(runs._tasks)
+        for r in (first, second):
+            await runs.cancel(r.run_id)
+    finally:
+        runs.close()

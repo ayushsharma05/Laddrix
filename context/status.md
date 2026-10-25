@@ -66,6 +66,8 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
        browser script runs on the free pages): merged (PR #452);
      - #450 React's compiler-readiness lint rules (49 places, each reworked; two exceptions with
        their reasons; 17 tests for guards that had none): merged (PR #453).
+- **Bug #458** (two backtests started in the same second could share an id; found by CI):
+  fixed in its own PR.
 - **Pull requests:** none open.
 
 ## What's next
