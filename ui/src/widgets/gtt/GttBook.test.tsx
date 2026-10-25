@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { GttSpec, GttView } from "../../api/types";
 import { AppProvider, createApp } from "../../app/context";
-import { fakeRest, fakeStream } from "../../test/fakes";
+import { fakeRest, fakeStream, tick } from "../../test/fakes";
 import { ME } from "../../test/fixtures";
 import { GttBook } from "./GttBook";
 
@@ -100,6 +100,17 @@ describe("GTT book", () => {
       [150, 2526010],
     ]);
     await vi.waitFor(() => expect(app.store.getState().books["acc-a"]!.gtts.G7).toBeTruthy());
+  });
+
+  it("never overwrites a trigger the trader typed when the price moves", async () => {
+    const { socket } = setup();
+    fireEvent.click(screen.getByRole("button", { name: /New GTT/ }));
+    const trigger = (await screen.findByRole("textbox", { name: "GTT trigger" })) as HTMLInputElement;
+    await vi.waitFor(() => expect(trigger.value).not.toBe("")); // filled from the market first
+    fireEvent.change(trigger, { target: { value: "24,700" } });
+    act(() => socket().receive({ type: "ticks", ticks: [tick(FUT, 2503000)] })); // the price moves
+    act(() => socket().receive({ type: "ticks", ticks: [tick(FUT, 2499000)] }));
+    expect(trigger.value).toBe("24,700"); // the trader's, not the market's
   });
 
   it("shows problems in words before anything is sent", async () => {

@@ -26,6 +26,15 @@ export class Rest {
    * sent once more (#363). Without it the 428 is an error like any other. */
   stepUp: StepUp | null = null;
 
+  /** Ask `ask` for step-up codes from now on; the returned function stops it (only if no newer
+   * asker took over meanwhile). */
+  askStepUpWith(ask: StepUp): () => void {
+    this.stepUp = ask;
+    return () => {
+      if (this.stepUp === ask) this.stepUp = null;
+    };
+  }
+
   constructor(private readonly fetcher: Fetch = (i, init) => fetch(i, init)) {}
 
   get<T>(path: string): Promise<T> {

@@ -52,20 +52,20 @@ const errorText = (e: unknown) => (e instanceof ApiError || e instanceof Error ?
 /** The account's algo specs (null while loading), and why not if they can't be had. */
 export function useAlgoSpecs(accountId: string | null): { specs: AlgoSpec[] | null; error: string } {
   const { rest } = useApp();
-  const [state, setState] = useState<{ specs: AlgoSpec[] | null; error: string }>({ specs: null, error: "" });
+  // kept with the account it is for: another account's specs are never shown, not even once
+  const [state, setState] = useState<{ accountId: string; specs: AlgoSpec[] | null; error: string } | null>(null);
   useEffect(() => {
-    setState({ specs: null, error: "" });
     if (!accountId) return;
     let live = true;
     rest
       .get<AlgoSpec[]>(`/api/accounts/${encodeURIComponent(accountId)}/algo-specs`)
-      .then((specs) => live && setState({ specs, error: "" }))
-      .catch((e: unknown) => live && setState({ specs: null, error: errorText(e) }));
+      .then((specs) => live && setState({ accountId, specs, error: "" }))
+      .catch((e: unknown) => live && setState({ accountId, specs: null, error: errorText(e) }));
     return () => {
       live = false;
     };
   }, [rest, accountId]);
-  return state;
+  return state && state.accountId === accountId ? state : { specs: null, error: "" };
 }
 
 export function AlgoManager({ params, publish }: WidgetProps<AlgoParams>) {

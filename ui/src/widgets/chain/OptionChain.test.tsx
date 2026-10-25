@@ -28,12 +28,18 @@ function setup(params: Partial<ChainParams> = {}) {
   stream.start();
   socket().open();
   const props = { params: { link: "pink" as const, strikes: 10, columns: ["oi", "iv", "delta", "ltp"] as ChainParams["columns"], underlying: "NIFTY", ...params }, setParams: vi.fn(), setInstrument: vi.fn(), publish: vi.fn(), open: vi.fn() };
-  render(
+  const view = render(
     <AppProvider app={app}>
       <OptionChain {...props} />
     </AppProvider>,
   );
-  return { ...props, socket, stream };
+  const rerender = (change: Partial<ChainParams>) =>
+    view.rerender(
+      <AppProvider app={app}>
+        <OptionChain {...props} params={{ ...props.params, ...change }} />
+      </AppProvider>,
+    );
+  return { ...props, socket, stream, rerender };
 }
 
 const sent = (socket: () => { sent: unknown[] }) => socket().sent as Record<string, unknown>[];
@@ -86,6 +92,15 @@ describe("Option chain widget", () => {
     expect(setParams).toHaveBeenCalledWith({ strikes: 12 });
     fireEvent.change(screen.getByRole("combobox", { name: "Underlying" }), { target: { value: "BANKNIFTY" } });
     expect(setParams).toHaveBeenCalledWith({ underlying: "BANKNIFTY", expiry: undefined });
+  });
+
+  it("another underlying never offers the previous one's expiry dates while its own load", async () => {
+    const { rerender } = setup();
+    await screen.findByRole("button", { name: "24 Nov" }); // NIFTY's
+    rerender({ underlying: "FINNIFTY" }); // the server doesn't answer for it (404)
+    await act(async () => {});
+    expect(screen.queryByRole("button", { name: "24 Nov" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "27 Oct" })).toBeNull();
   });
 
   it("the column picker changes what's shown", async () => {

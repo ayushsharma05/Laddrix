@@ -40,8 +40,8 @@ export function StrategyBuilder({ params, setParams }: WidgetProps<StrategyParam
   const [templates, setTemplates] = useState<StrategyTemplate[]>([]);
   const [underlyings, setUnderlyings] = useState<string[]>([]);
   const [expiries, setExpiries] = useState<string[]>([]);
-  const [analysis, setAnalysis] = useState<StrategyAnalysis | null>(null);
-  const [problem, setProblem] = useState("");
+  // the server's analysis, kept with the legs it is for (`key` below): other legs show none
+  const [result, setResult] = useState<{ key: string; analysis: StrategyAnalysis | null; problem: string } | null>(null);
   const legs = useMemo(() => params.legs ?? [], [params.legs]);
   const underlying = params.underlying ?? underlyings[0];
   const expiry = params.expiry && expiries.includes(params.expiry) ? params.expiry : expiries[0];
@@ -79,23 +79,18 @@ export function StrategyBuilder({ params, setParams }: WidgetProps<StrategyParam
 
   // the server analyses the legs now, and again every few seconds (live prices)
   const key = JSON.stringify(legs);
+  const mine = result && result.key === key ? result : null;
+  const analysis = mine?.analysis ?? null;
+  const problem = mine?.problem ?? "";
   useEffect(() => {
     const asked = JSON.parse(key) as typeof legs; // the legs as of this key
-    setProblem("");
-    if (!asked.length) {
-      setAnalysis(null);
-      return;
-    }
+    if (!asked.length) return;
     let live = true;
     const ask = () =>
       rest
         .post<StrategyAnalysis>("/api/options/strategy/analyse", { legs: asked })
-        .then((a) => live && setAnalysis(a))
-        .catch((e: unknown) => {
-          if (!live) return;
-          setAnalysis(null);
-          setProblem(errorText(e));
-        });
+        .then((a) => live && setResult({ key, analysis: a, problem: "" }))
+        .catch((e: unknown) => live && setResult({ key, analysis: null, problem: errorText(e) }));
     void ask();
     const timer = setInterval(ask, REFRESH_MS);
     return () => {
@@ -110,11 +105,11 @@ export function StrategyBuilder({ params, setParams }: WidgetProps<StrategyParam
     rest
       .post<StrategyAnalysis>("/api/options/strategy/build", { code: template.code, underlying, expiry, width: params.width ?? 2, lots: params.lots ?? 1 })
       .then((a) => {
-        setAnalysis(a);
-        setProblem("");
-        setParams({ legs: a.legs.map((l) => ({ instrument_id: l.instrument_id, side: l.side, lots: l.lots })), underlying, expiry, template: template.code });
+        const built = a.legs.map((l) => ({ instrument_id: l.instrument_id, side: l.side, lots: l.lots }));
+        setResult({ key: JSON.stringify(built), analysis: a, problem: "" }); // already analysed
+        setParams({ legs: built, underlying, expiry, template: template.code });
       })
-      .catch((e: unknown) => setProblem(errorText(e)));
+      .catch((e: unknown) => setResult({ key, analysis, problem: errorText(e) }));
   };
 
   const drawn = useMemo(() => (analysis ? chart(analysis, BOX) : null), [analysis]);
@@ -264,14 +259,15 @@ function TradePanel({ legs }: { legs: StrategyLegIn[] }) {
   const block = useStore((s) => tradingBlock(s, s.accountId));
   const [product, setProduct] = useState("NRML");
   const [at, setAt] = useState<"touch" | "mid">("touch");
-  const [check, setCheck] = useState<BasketCheck | null>(null);
+  // the check and the note, kept with what they were for (`key`): anything changed, check again
+  const [checked, setChecked] = useState<{ key: string; check: BasketCheck } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState("");
+  const [noted, setNoted] = useState<{ key: string; note: string } | null>(null);
   const key = JSON.stringify([legs, product, at, accountId]);
-  useEffect(() => {
-    setCheck(null); // anything changed: check again before sending
-    setNote("");
-  }, [key]);
+  const check = checked && checked.key === key ? checked.check : null;
+  const note = noted && noted.key === key ? noted.note : "";
+  const setCheck = (c: BasketCheck | null) => setChecked(c ? { key, check: c } : null);
+  const setNote = (text: string) => setNoted({ key, note: text });
 
   const body = () => ({ legs: legs.map((l) => ({ instrument_id: l.instrument_id, side: l.side, lots: l.lots, product, at })) });
   const base = accountId ? `/api/accounts/${encodeURIComponent(accountId)}/baskets` : "";

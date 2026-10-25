@@ -43,7 +43,7 @@ MUTANTS = [
  (L, "    return pick && now - pick.at <= PICK_FRESH_MS ? pick : undefined;", "    return pick;"),
  (S, "      for (const key of this.candles.keys()) {", "      for (const key of [] as string[]) {"),
  (S, "      if (set!.size === 0 && this.candles.get(key) === set) {", "      if (false) {"),
- (P, "    const sub = api.onDidTitleChange((e) => setTitle(e.title));", "    const sub = { dispose() {} };"),
+ (P, '    const sub = api.onDidTitleChange((e) => setSeen({ api, title: e.title }));', '    const sub = { dispose() {} };'),
 ]
 caught = 0
 for f, a, b in MUTANTS:

@@ -41,8 +41,7 @@ function Tape({ params, setParams, instrumentId: id }: WidgetProps<TapeParams> &
   const [estimate, setEstimate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [round, setRound] = useState(0); // each answered poll starts the next one
-  const newest = useRef(0);
-  newest.current = tape[0]?.seq ?? 0;
+  const after = tape[0]?.seq ?? 0; // the newest print held: the next poll asks for what came after
   const epoch = useRef<string | null>(null); // the server's run: its numbering is its own
 
   useEffect(() => {
@@ -50,14 +49,13 @@ function Tape({ params, setParams, instrumentId: id }: WidgetProps<TapeParams> &
     const t = setTimeout(
       () => {
         rest
-          .get<PrintsAnswer>(`/api/instruments/${encodeURIComponent(id)}/prints?after=${newest.current}&limit=300`)
+          .get<PrintsAnswer>(`/api/instruments/${encodeURIComponent(id)}/prints?after=${after}&limit=300`)
           .then((a) => {
             if (!live) return;
             if (epoch.current !== null && a.epoch !== epoch.current) {
               // the server restarted: its numbers began again, so start the tape again (#277)
               epoch.current = a.epoch;
-              newest.current = 0;
-              setTape([]);
+              setTape([]); // (and so the next poll asks from the start)
               return;
             }
             epoch.current = a.epoch;
@@ -74,7 +72,7 @@ function Tape({ params, setParams, instrumentId: id }: WidgetProps<TapeParams> &
       live = false;
       clearTimeout(t);
     };
-  }, [rest, id, round]);
+  }, [rest, id, round, after]); // (a poll's answer moves both at once: one new timer)
 
   const minQty = params.minQty ?? 0;
   const { rows, bought, sold } = filterTape(tape, minQty);

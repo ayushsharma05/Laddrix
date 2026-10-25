@@ -7,7 +7,7 @@
 //   desktop      the page: free windows or docked tiles (#410)
 //   page tabs    Main | + ……………………………… working count · layout saved · version
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useApp, useKeyBindings, useNow, useStore, useThemeChoice } from "../app/context";
 import { ContextMenu, type MenuItem } from "../components/ContextMenu";
@@ -265,7 +265,9 @@ function useRightClickMenu(controller: WorkspaceController, roles: string[], foc
   const theme = useThemeChoice();
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[]; doc: Document } | null>(null);
   const latest = useRef({ theme, roles, focusSearch });
-  latest.current = { theme, roles, focusSearch };
+  useLayoutEffect(() => {
+    latest.current = { theme, roles, focusSearch }; // the newest, for the listener set up once
+  });
 
   const onMenu = useCallback(
     (e: MouseEvent) => {

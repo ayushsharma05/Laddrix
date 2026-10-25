@@ -243,6 +243,14 @@ describe("Audit trail", () => {
     expect(rows("Audit trail")[3]!.textContent).toContain("broker id B1");
   });
 
+  it("another account starts empty: never the previous account's events", async () => {
+    const { app } = audit({ filter: "rejects" });
+    await vi.waitFor(() => expect(rows("Audit trail")).toHaveLength(1)); // acc-a's refused order
+    act(() => app.store.selectAccount("acc-view")); // its own trail isn't in yet (refused here)
+    await act(async () => {});
+    expect(screen.queryByText(/over max order value/)).toBeNull();
+  });
+
   it("filters by type and contract", async () => {
     const { rerender } = audit({ filter: "rejects" });
     await vi.waitFor(() => expect(rows("Audit trail")).toHaveLength(1));

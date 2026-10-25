@@ -87,6 +87,13 @@ export class WorkspaceController {
   canvas: Canvas | null = null;
   /** A window just added: the canvas scrolls to it once. */
   reveal: string | null = null;
+
+  /** The window just added, once: the canvas scrolls to it, then it is forgotten. */
+  takeReveal(): string | null {
+    const id = this.reveal;
+    this.reveal = null;
+    return id;
+  }
   /** The page tab being renamed (a right-click "Rename" starts it), or null. */
   renaming: number | null = null;
   locked = false;

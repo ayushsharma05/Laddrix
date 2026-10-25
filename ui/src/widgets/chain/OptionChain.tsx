@@ -28,15 +28,19 @@ export interface ChainParams extends BaseParams {
 
 type Side = "call" | "put";
 
+const NONE: string[] = []; // one empty list, the same every render
+
 export function OptionChain({ params, setParams, publish, open }: WidgetProps<ChainParams>) {
   const { rest, stream, store } = useApp();
   const [underlyings, setUnderlyings] = useState<string[]>([]);
-  const [expiries, setExpiries] = useState<string[]>([]);
+  // kept with the underlying they are for: another underlying's dates are never offered
+  const [dates, setDates] = useState<{ underlying: string; expiries: string[] } | null>(null);
   const [chain, setChain] = useState<Chain | null>(null);
   const [selected, setSelected] = useState<{ strike: number; side: Side } | null>(null);
   const [picking, setPicking] = useState(false);
   const grid = useRef<HTMLDivElement>(null);
   const underlying = params.underlying ?? underlyings[0];
+  const expiries = dates && dates.underlying === underlying ? dates.expiries : NONE;
   const expiry = params.expiry && expiries.includes(params.expiry) ? params.expiry : expiries[0];
   const strikes = params.strikes ?? 10;
   const columns = useMemo(() => pickColumns(params.columns), [params.columns]);
@@ -53,12 +57,11 @@ export function OptionChain({ params, setParams, publish, open }: WidgetProps<Ch
   }, [rest]);
 
   useEffect(() => {
-    setExpiries([]);
     if (!underlying) return;
     let live = true;
     rest
       .get<string[]>(`/api/options/${encodeURIComponent(underlying)}/expiries`)
-      .then((e) => live && setExpiries(e))
+      .then((e) => live && setDates({ underlying, expiries: e }))
       .catch(() => {});
     return () => {
       live = false;
@@ -66,9 +69,12 @@ export function OptionChain({ params, setParams, publish, open }: WidgetProps<Ch
   }, [rest, underlying]);
 
   useEffect(() => {
-    setChain(null);
     if (!underlying || !expiry) return;
-    return stream.subscribeChain({ underlying, expiry, strikes }, setChain);
+    const stop = stream.subscribeChain({ underlying, expiry, strikes }, setChain);
+    return () => {
+      stop();
+      setChain(null); // the next chain never starts with this one's rows
+    };
   }, [stream, underlying, expiry, strikes]);
 
   const oiMax = useMemo(() => (chain ? maxOi(chain) : { call: 0, put: 0 }), [chain]);

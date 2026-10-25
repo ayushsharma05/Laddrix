@@ -15,7 +15,10 @@ export function SquareOffButton() {
   const openMis = useMemo(() => Object.values(positions ?? {}).filter((p) => p.product === "MIS" && p.qty !== 0).length, [positions]);
   const tick = useNow(30_000); // the minutes left move on their own
   const [status, setStatus] = useState<SquareOffStatus | null>(null);
-  const [armed, setArmed] = useState(false);
+  // a confirmation is for what was shown (derived: another account or other positions disarm it)
+  const [armedFor, setArmedFor] = useState<{ openMis: typeof openMis; accountId: typeof accountId } | null>(null);
+  const armed = armedFor !== null && armedFor.openMis === openMis && armedFor.accountId === accountId;
+  const setArmed = (on: boolean) => setArmedFor(on ? { openMis, accountId } : null);
   const [busy, setBusy] = useState(false);
   const base = accountId ? `/api/accounts/${encodeURIComponent(accountId)}/square-off` : null;
 
@@ -31,7 +34,6 @@ export function SquareOffButton() {
     };
   }, [rest, base, openMis, tick]);
 
-  useEffect(() => setArmed(false), [openMis, accountId]); // a confirmation is for what was shown
 
   const rows = status?.positions ?? [];
   if (!base || !rows.length) return null;

@@ -44,8 +44,7 @@ export function Recordings({ publish }: WidgetProps<BaseParams>) {
   }, [rest, loads]);
 
   useEffect(() => {
-    setDetail(null);
-    if (!open) return;
+    if (!open) return; // (another day's detail is never shown: the rows check its day)
     let live = true;
     rest
       .get<RecordedDayDetail>(`/api/research/recordings/${open}`)

@@ -56,10 +56,13 @@ export function Reports({ params, setParams, publish }: WidgetProps<ReportsParam
   useEffect(() => {
     if (!base || !day || mode !== "day") return;
     let live = true;
-    setError(null);
     rest
       .get<DayReport>(`${base}/reports/${day}`)
-      .then((r) => live && setReport(r))
+      .then((r) => {
+        if (!live) return;
+        setReport(r);
+        setError(null); // an earlier failure is over once an answer comes
+      })
       .catch((e: unknown) => live && setError(e instanceof Error ? e.message : String(e)));
     return () => {
       live = false;
@@ -70,11 +73,14 @@ export function Reports({ params, setParams, publish }: WidgetProps<ReportsParam
   useEffect(() => {
     if (!base || !days || mode !== "history") return;
     let live = true;
-    setError(null);
     const { start, end } = lastDays(days.today);
     rest
       .get<PnlHistory>(`${base}/pnl?by=${by}&start=${start}&end=${end}`)
-      .then((h) => live && setHistory(h))
+      .then((h) => {
+        if (!live) return;
+        setHistory(h);
+        setError(null);
+      })
       .catch((e: unknown) => live && setError(e instanceof Error ? e.message : String(e)));
     return () => {
       live = false;

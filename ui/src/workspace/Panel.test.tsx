@@ -42,4 +42,20 @@ describe("a widget's tab", () => {
     expect(screen.getByText("NIFTY26OCTFUT")).toBeTruthy();
     view.unmount();
   });
+
+  it("given another panel, shows that panel's title, never the last one's", () => {
+    const controller = { changed() {} } as unknown as WorkspaceController;
+    const tab = (api: ReturnType<typeof fakeApi>) => (
+      <ControllerContext.Provider value={controller}>
+        <WidgetTab {...({ api, params: { link: "pink" } } as unknown as IDockviewPanelHeaderProps<BaseParams>)} />
+      </ControllerContext.Provider>
+    );
+    const first = fakeApi("NIFTY26NOVFUT");
+    const view = render(tab(first));
+    act(() => first.setTitle("NIFTY26DECFUT")); // the first panel was renamed
+    view.rerender(tab(fakeApi("RELIANCE")));
+    expect(screen.getByText("RELIANCE")).toBeTruthy();
+    expect(screen.queryByText("NIFTY26DECFUT")).toBeNull();
+    view.unmount();
+  });
 });

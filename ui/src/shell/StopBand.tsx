@@ -41,7 +41,10 @@ export function StopBand({ firm }: { firm: boolean }) {
   const kill = useStore((s) => (s.accountId ? s.books[s.accountId]?.kill : undefined));
   const positions = useStore((s) => (s.accountId ? s.books[s.accountId]?.positions : undefined));
   const [status, setStatus] = useState<FlattenStatus | null>(null);
-  const [armed, setArmed] = useState(false);
+  // a confirmation is only for the positions it was shown with (derived: a change disarms it)
+  const [armedFor, setArmedFor] = useState<{ positions: typeof positions } | null>(null);
+  const armed = armedFor !== null && armedFor.positions === positions;
+  const setArmed = (on: boolean) => setArmedFor(on ? { positions } : null);
   const [busy, setBusy] = useState(false);
   const base = accountId ? `/api/accounts/${encodeURIComponent(accountId)}/flatten` : "";
 
@@ -54,7 +57,6 @@ export function StopBand({ firm }: { firm: boolean }) {
   }, [rest, base]);
 
   useEffect(load, [load, kill?.engaged, positions]);
-  useEffect(() => setArmed(false), [positions]); // a confirmation is only for what was shown
 
   if (!accountId) return null;
   const open = status?.positions ?? [];

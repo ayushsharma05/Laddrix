@@ -47,7 +47,7 @@ MUTANTS = [
  (MM, "[...add, ...tape].slice(0, TAPE_MAX)", "[...add, ...tape]"),
  (MM, "  const rows = minQty > 0 ? tape.filter((p) => p.qty >= minQty) : tape;", "  const rows = minQty > 0 ? tape.filter((p) => p.qty > minQty) : tape;"),
  (MM, "    else if (p.side === \"SELL\") sold += p.qty;", "    else sold += p.qty;"),
- (TS, "after=${newest.current}&limit=300", "after=0&limit=300"),
+ (TS, 'prints?after=${after}&limit=300', 'prints?after=0&limit=300'),
  (MO, "      asked.current === query ? MOVERS_POLL_MS : 0,", "      MOVERS_POLL_MS,"),
  (MO, "  const shown = answer?.by === by ? answer : null;", "  const shown = answer;"),
  (AM, "  if (!spec.repeat.includes(t.repeat)) problems.push", "  if (false) problems.push"),
@@ -56,8 +56,8 @@ MUTANTS = [
  (AM, "  if (a.status.startsWith(\"fired\")) return \"good\";", "  if (a.status.startsWith(\"fired\")) return \"pending\";"),
  (AM, "  const next = at >= 0 ? list.map((x, k) => (k === at ? a : x)) : [...list, a];", "  const next = [...list, a];"),
  (CX, "  return tick && tick.instrument_id === instrumentId ? tick : null;", "  return tick;"),
- (CX, "  if (found && found.id === instrumentId) return found;", "  if (found) return found;"),
- (CX, "  if (found && found.key === key) return found.spec;", "  if (found) return found.spec;"),
+ (CX, '(found && found.id === instrumentId ? found : null);', '(found ? found : null);'),
+ (CX, '(found && found.key === key ? found.spec : null);', '(found ? found.spec : null);'),
  (ST, "        this.addMessage(\"WARN\", m.alert.instrument_id, `Alert: ${m.text}`);", "        // (no message)"),
 ]
 caught = 0

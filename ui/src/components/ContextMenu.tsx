@@ -31,7 +31,9 @@ interface Props {
 export function ContextMenu({ x, y, items, onClose }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
-  close.current = onClose;
+  useLayoutEffect(() => {
+    close.current = onClose; // the newest, for the listeners set up once below
+  });
 
   useEffect(() => {
     const doc = root.current?.ownerDocument ?? document;
@@ -71,6 +73,8 @@ function MenuList({ items, x, y, onClose, onBack }: ListProps) {
   const [open, setOpen] = useState<number | null>(null); // the item whose submenu shows
   const [subAt, setSubAt] = useState({ x: 0, y: 0 });
 
+  const buttons = () => Array.from(list.current?.querySelectorAll<HTMLButtonElement>(":scope > .cm-item:not(:disabled)") ?? []);
+
   // never off screen: flip left or up when there is no room
   useLayoutEffect(() => {
     const el = list.current;
@@ -84,8 +88,6 @@ function MenuList({ items, x, y, onClose, onBack }: ListProps) {
     buttons()[0]?.focus();
     // focus once, when the list appears
   }, [x, y]);
-
-  const buttons = () => Array.from(list.current?.querySelectorAll<HTMLButtonElement>(":scope > .cm-item:not(:disabled)") ?? []);
 
   const openSub = (index: number, button: HTMLElement) => {
     const r = button.getBoundingClientRect();

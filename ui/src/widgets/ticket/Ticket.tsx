@@ -114,10 +114,8 @@ function TicketBody({
   const [note, setNote] = useState<{ level: "INFO" | "WARN"; text: string } | null>(null);
   const backRef = useRef<HTMLButtonElement>(null);
 
-  // start the price at the last price once it's known
-  useEffect(() => {
-    if (priceText === "" && ltp !== null) setPriceText(toText(snap(ltp, tickSize)));
-  }, [ltp, priceText, tickSize]);
+  // start the price at the last price once it's known (while drawing: no frame shows it empty)
+  if (priceText === "" && ltp !== null) setPriceText(toText(snap(ltp, tickSize)));
 
   // a price picked on a linked chart: fill it in (a priced type if this one has no price);
   // a pick made just before this ticket switched to that instrument counts too
