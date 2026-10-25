@@ -7,16 +7,16 @@ B = "src/mocktrade/research/backtest.py"
 M = [
  (B, "        if not state[\"started\"] and now >= start_at:", "        if not state[\"started\"]:"),
  (B, "        while state[\"next_beat\"] <= now:\n            rt.algos.heartbeat()", "        if False:\n            rt.algos.heartbeat()"),
- (B, "            if broker.idle and not rt.algos.busy:\n                return", "            if True:\n                return"),
+ (B, '            if broker.idle and (not rt.algos.busy or asleep["n"]):  # a wait needs the clock\n                return', '            if True:  # a wait needs the clock\n                return'),
  (B, "        path = [o, low, h, c] if c >= o else [o, h, low, c]", "        path = [o, h, low, c]"),
  (B, "                        bids=(DepthLevel(price - t, 10**9, 1),),", "                        bids=(DepthLevel(price, 10**9, 1),),"),
  (B, "        worst = min(worst, equity - peak)", "        worst = min(worst, equity)"),
  (B, "    winning = sum(1 for d in ran if d[\"totals\"][\"net_paise\"] > 0)", "    winning = sum(1 for d in ran if d[\"totals\"][\"gross_paise\"] > 0)"),
  (B, "                if run.state in (\"queued\", \"running\"):  # the server stopped mid-run", "                if False:  # the server stopped mid-run"),
  (B, "            if not (low <= min(o, c) and max(o, c) <= h and low > 0):", "            if False:"),
- (B, "        if candles and self._candles is None:", "        if False:"),
+ (B, '        if candles and self._sources(owner)[1] is None:', '        if False:'),
  (B, "        if state[\"error\"]:\n            raise BacktestError", "        if False:\n            raise BacktestError"),
- (B, "        return iter(candles_to_ticks(instrument, rows)) if rows else None", "        return self._ticks(day)"),
+ (B, '        if run.candles:\n            rows = candles(', '        if False:\n            rows = candles('),
 ]
 caught = 0
 for f, a, b in M:

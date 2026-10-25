@@ -21,7 +21,7 @@ const shots = '/tmp/claude-0';
   await admin.getByLabel('Password').fill('demo-password-123');
   await admin.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await admin.keyboard.press('Enter');
-  await admin.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await admin.locator('section.frame').first().waitFor({ timeout: 20000 });
   const api = (page, m, p, b) => page.evaluate(async ([m, p, b]) => {
     const r = await fetch(p, { method: m, credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: b ? JSON.stringify(b) : undefined });
     return { status: r.status, body: r.status === 204 ? null : await r.json() };

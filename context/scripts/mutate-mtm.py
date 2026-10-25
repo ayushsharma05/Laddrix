@@ -13,7 +13,7 @@ M = [
  (T, "                open_ = [v for v in self._book.positions() if v.qty]", "                open_ = [v for v in self._book.positions() if v.qty][:1]"),
  (T, "        self._fired.pop(rule.key, None)  # a new limit is watched afresh", "        pass"),
  (T, "        self._save()", "        pass"),
- (T, "            if rule.max_loss_paise is not None and pnl <= -rule.max_loss_paise:\n                stop", "            if False:\n                stop"),
+ (T, '    if rule.max_loss_paise is not None and pnl <= -rule.max_loss_paise:\n        return (', '    if False:\n        return ('),
  (T, "        if rule.max_loss_paise is None and rule.max_loss_pct is None:", "        if False:"),
  (S, "            if p.product is not Product.MIS or not p.qty:", "            if not p.qty:"),
  (S, "            \"window_open\": self.warn_from <= now.time() < max(self.cutoffs.values()),", "            \"window_open\": True,"),
@@ -23,7 +23,7 @@ M = [
  (C, "    piece = max(instrument.lot_size, max_lots * instrument.lot_size)", "    piece = abs(qty)"),
  (K, "            if request.basket_id and order.request.basket_id == request.basket_id:\n                continue", "            if False:\n                continue"),
  (G, "            if flat:", "            if False:"),
- (G, "                self._alerts.raise_(key, \"WARN\", text)", "                pass"),
+ (G, '                self._alerts.raise_(key, "WARN", text, account_id=account_id)', '                pass'),
 ]
 caught = 0
 for f, a, b in M:

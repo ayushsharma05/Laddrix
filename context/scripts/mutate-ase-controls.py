@@ -46,7 +46,7 @@ MUTANTS = [
  (E, "        if list(now.lines) != list(expect):", "        if False:", PY),
  (E, "        if not now.ok:\n            raise AlgoError(now.why)", "        if False:\n            raise AlgoError(now.why)", PY),
  (E, "            if p.state is not AlgoState.WORKING and not self._keeps(p, order):", "            if p.state is not AlgoState.WORKING:", PY),
- (E, "            elif p.state in (AlgoState.PAUSED, AlgoState.STOPPING):\n                watch", "            elif p.state is AlgoState.STOPPING:\n                watch", PY),
+ (E, '            elif p.state in (AlgoState.PAUSED, AlgoState.STOPPING):\n                self._call(p, p.strategy.on_watch, now)', '            elif p.state is AlgoState.STOPPING:\n                self._call(p, p.strategy.on_watch, now)', PY),
  (F, "        \"actions\": [{\"name\": x.name, \"label\": x.label, \"help\": x.help} for x in a.actions],\n", "", PY),
  # the definition and the API
  (M, "    controls, problems = controls_from_dict(d.get(\"controls\"))", "    controls, problems = Controls(), []", PY),

@@ -5,6 +5,7 @@
 // a Movers click switches the linked ticket, which must start at the new contract's price.
 // Run with the demo up and ui/dist rebuilt.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { openWidget } = require('./e2e-lib.cjs');
 const { execSync } = require('child_process');
 const flat = (s) => s.replace(/\s+/g, ' ').trim();
 (async () => {
@@ -17,7 +18,7 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   const api = (m, p, b) => page.evaluate(async ([m, p, b]) => {
     const r = await fetch(p, { method: m, credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: b ? JSON.stringify(b) : undefined });
     return r.status === 204 ? null : r.json();
@@ -86,8 +87,17 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await alerts.getByRole('button', { name: 'New' }).click();
   const form = page.getByRole('form', { name: 'New alert' });
   await form.waitFor({ timeout: 5000 });
-  const ltp = (await api('GET', '/api/instruments/NFO:NIFTY26OCTFUT')).ltp_paise;
-  const level = ((ltp + 20) / 100).toFixed(2);
+  // the level: half a tick past the latest price, the way the price went over the last 10 s.
+  // The demo's prices are the same walk every run and drift for minutes at a time, so a fixed
+  // "a tick above" can stay uncrossed; following the drift crosses within seconds
+  const seen = [];
+  for (let i = 0; i < 10; i++) {
+    seen.push((await api('GET', '/api/instruments/NFO:NIFTY26OCTFUT')).ltp_paise);
+    await page.waitForTimeout(1000);
+  }
+  const falling = seen.at(-1) < seen[0];
+  const level = ((seen.at(-1) + (falling ? -5 : 5)) / 100).toFixed(2);
+  await form.getByRole('combobox', { name: 'Alert kind' }).selectOption({ label: falling ? 'Price crosses below' : 'Price crosses above' });
   if (await form.getByLabel('Alert contract').count()) {
     await form.getByLabel('Alert contract').fill('NIFTY26OCT');
     await page.getByRole('option', { name: /NIFTY26OCTFUT/ }).first().click();
@@ -98,11 +108,11 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   const list = page.getByRole('grid', { name: 'Alerts' });
   await list.getByRole('row').first().waitFor({ timeout: 5000 });
   console.log('made:', flat(await list.getByRole('row').first().textContent()));
-  await page.waitForFunction(() => /fired/.test(document.querySelector('[aria-label="Alerts"] [role=row]')?.textContent || ''), null, { timeout: 90000 });
+  await page.waitForFunction(() => /fired/.test(document.querySelector('[role=grid][aria-label="Alerts"] [role=row]')?.textContent || ''), null, { timeout: 180000 });
   console.log('fired:', flat(await list.getByRole('row').first().textContent()));
-  await page.locator('.dv-tab', { hasText: 'Messages' }).click();
+  await openWidget(page, 'Messages');
   console.log('message:', flat(await page.getByText(/^Alert: /).first().textContent()));
-  await page.locator('.dv-tab', { hasText: 'Alerts' }).click();
+  await openWidget(page, 'Alerts');
   await list.getByRole('row').first().getByRole('button', { name: 'On' }).click();
   await page.waitForTimeout(500);
   console.log('on again:', flat(await list.getByRole('row').first().textContent()));

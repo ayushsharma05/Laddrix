@@ -17,7 +17,7 @@ MUTANTS = [
  (U, "            return db.execute(\"DELETE FROM sessions WHERE user_id = ?\", (user_id,)).rowcount", "            return db.execute(\"DELETE FROM sessions\").rowcount"),
  (U, "                bad.append(row[\"id\"])", "                pass"),
  (T, "    if new == env.get(\"MOCKTRADE_SECRET_KEY\"):", "    if False:"),
- (T, "        fence.acquire()", "        pass"),
+ (T, '    fence = DataFence(store.path.parent)  # the server holds this while it runs (#273)\n    try:\n        fence.acquire()', '    fence = DataFence(store.path.parent)  # the server holds this while it runs (#273)\n    try:\n        pass'),
  (T, "    if check:\n", "    if False:\n"),
  (T, "    if bad := store.check_key():", "    if False:"),
  (S, "            if not due and digest in self._live_sessions():", "            if not due:"),

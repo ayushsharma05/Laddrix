@@ -15,7 +15,7 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   await page.evaluate(async () => {
     await fetch('/api/layouts/current', { method: 'DELETE', credentials: 'same-origin' });
   });
@@ -72,8 +72,8 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   const ticketPrice = await page.locator('input[name="price"]').first().inputValue();
   console.log('ticket price:', ticketPrice, '| same:', ticketPrice === picked);
 
-  // tabs follow the instrument (the pink ticket and ladder switched with the chart's pick)
-  console.log('tabs:', (await page.locator('.dv-tab .tab-title').allTextContents()).filter((t) => /NIFTY|Ticket/.test(t)).join(' | '));
+  // window titles follow the instrument (the pink ticket and ladder switched with the chart's pick)
+  console.log('titles:', (await page.locator('section.frame').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).filter((t) => /NIFTY|Ticket/.test(t)).join(' | '));
 
   // the 1m interval: zoom and pan (in the small panel, where zooming in hides candles)
   await chart.getByRole('group', { name: 'Interval' }).getByRole('button', { name: '1m' }).click();

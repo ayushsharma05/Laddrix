@@ -30,7 +30,7 @@ MUTANTS = [
  (P, "            settled = self._settle_expired(account_id, runtime, today)\n            carried = runtime.positions.roll()", "            carried = runtime.positions.roll()\n            settled = self._settle_expired(account_id, runtime, today)"),
  (P, "                settle_at_broker(p.instrument_id, p.product, price)", "                pass"),
  (R, "            if e.ts < since:", "            if False:"),
- (R, "            if p.qty and expired(p.instrument_id):", "            if False:"),
+ (R, '            if held.qty and expired(held.instrument_id):', '            if False:'),
  (S, "            if i.symbol.upper().startswith(needle) and (keep is None or keep(i))", "            if i.symbol.upper().startswith(needle)"),
  (O, "                and not self._expiries.expired(i, now)", "                and True"),
 ]

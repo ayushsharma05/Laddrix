@@ -12,7 +12,7 @@ const day = process.argv[2];
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByLabel('Authenticator code').fill(execSync(`python3 -m mocktrade.tools.demo --replay ${day} --code`).toString().trim());
   await page.keyboard.press('Enter');
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   const bar = page.getByRole('region', { name: 'Replay' });
   await bar.waitFor({ timeout: 5000 });
   console.log('bar:', (await bar.textContent()).replace(/\s+/g, ' '));

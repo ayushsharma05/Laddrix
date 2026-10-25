@@ -14,7 +14,7 @@ MUTANTS = [
  (G, 'COVERED_KINDS = ("STARTED", "RESUMED")', 'COVERED_KINDS = ("STARTED",)'),
  (G, "STOPS = (OrderType.SL, OrderType.SL_M)", "STOPS = (OrderType.SL,)"),
  (G, "        if not self._is_protection(account_id, algo.code):\n            return\n", ""),
- (G, "            self._clear(where)  # the flag, and its band if one is showing", "            self._flags.pop(where, None)"),
+ (G, '            self._alerts.clear(key(*where), "protected again, or the position is closed")', '            pass'),
  (G, "        return any(s.code == code and s.family == PROTECTION for s in runtime.algos.specs())", "        return any(s.code == code for s in runtime.algos.specs())"),
  (G, "                and algo.state is AlgoState.WORKING\n", "\n"),
  (G, "                algo.instrument_id == instrument_id\n                and algo.state", "                algo.state"),
@@ -25,16 +25,16 @@ MUTANTS = [
  (G, "                if gtt.request.instrument_id == instrument_id and not gtt.status.is_final:", "                if not gtt.status.is_final:"),
  (G, "                if gtt.request.instrument_id == instrument_id and not gtt.status.is_final:", "                if gtt.request.instrument_id == instrument_id:"),
  (G, "            if runtime.recovery is not None and not runtime.recovery.finished.is_set():\n                continue", "            pass"),
- (G, "            if open_qty == 0 or self._covered(runtime, instrument_id, open_qty):", "            if self._covered(runtime, instrument_id, open_qty):"),
+ (G, '            if open_qty == 0:\n                self._clear(where, "the position is closed")', '            if False:\n                self._clear(where, "the position is closed")'),
  (G, '            side = "long" if open_qty > 0 else "short"', '            side = "long"'),
  (G, '        closing = Side.SELL if open_qty > 0 else Side.BUY', '        closing = Side.SELL'),
- (G, "            if runtime is None:\n                self._clear(where)\n                continue", "            if runtime is None:\n                continue"),
+ (G, '            if runtime is None:\n                self._clear(where, "the account is gone")\n                continue', '            if runtime is None:\n                continue'),
  (G, "                self._watched.add(account_id)\n                runtime.algos.subscribe", "                runtime.algos.subscribe"),
  (G, "    def check(self) -> None:\n        self._watch()\n", "    def check(self) -> None:\n"),
  (G, "            self._alerts.clear(key(*where), \"protected again, or the position is closed\")", "            pass"),
  (G, '            reason = event.detail or algo.reason', '            reason = event.detail'),
  (G, '        self.check()\n\n    def on_algo', '\n    def on_algo'),
- (P, '            lost.append(LostProtection(str(a.get("instrument_id", "")), words))', '            lost.append(LostProtection("", words))'),
+ (P, 'lost.append(LostProtection(str(a.get("instrument_id", "")), words,', 'lost.append(LostProtection("", words,'),
 ]
 caught = 0
 for f, a, b in MUTANTS:

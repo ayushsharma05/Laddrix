@@ -299,7 +299,9 @@ describe("Order ticket", () => {
     const { app, setParams, rerender, calls } = setup({ type: "MKT" });
     await screen.findByLabelText("Price");
     act(() => app.links.pickPrice("pink", ID, 2499987));
-    expect(setParams).toHaveBeenCalledWith({ type: "LIMIT" }); // a market order has no price
+    // a market order has no price; taken at once, or just after if the ticket was still
+    // subscribing (a fresh pick, below): either way, never compared before it lands
+    await vi.waitFor(() => expect(setParams).toHaveBeenCalledWith({ type: "LIMIT" }));
     rerender({ type: "LIMIT" }); // (the workspace saves the change; here by hand)
     await vi.waitFor(() => expect((screen.getByLabelText("Price") as HTMLInputElement).value).toBe("24,999.90"));
     expect(screen.getByText("Price 24,999.90 from the chart: check it, then send")).toBeTruthy();

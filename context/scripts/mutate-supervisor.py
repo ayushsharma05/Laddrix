@@ -19,7 +19,7 @@ MUTANTS = [
  (S, "        return None  # cancelling only ever reduces risk", "        return self._supervisor.paused(self._account_id)"),
  (S, "        if self._beat is None or self._now() - self._beat > STALE_AFTER_S:", "        if self._beat is None:"),
  (F, "            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)", "            pass"),
- (P, "        pause = PauseGate(self.supervisor, account.id)  # a critical loop down (#273)\n        checks = (pause,", "        checks = ("),
+ (P, '        checks = (pause, rights, recovery, risk, margin if margin_check else None, throttle)', '        checks = (rights, recovery, risk, margin if margin_check else None, throttle)'),
  (P, "            keep(f\"{a}: broker updates\", runtime.orders.run, account_id=a),", "            runtime.orders.run(),"),
  (V, "        fence.acquire()  # one trading server per data folder (#273)", "        pass"),
  (V, "        if self.fence is not None:\n            self.fence.release()", "        if False:\n            self.fence.release()"),

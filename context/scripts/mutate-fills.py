@@ -19,7 +19,7 @@ MUTANTS = [
  (M, "            if update.filled_qty == order.filled_qty and terms is None and not corrected:", "            if update.filled_qty == order.filled_qty and terms is None:"),
  (M, "        return Fill(order.request.client_order_id, qty, round(Fraction(new, qty)), False, new)", "        return Fill(order.request.client_order_id, qty, round(Fraction(new, qty)), False)"),
  (M, "        order.filled_value_paise = value\n", "\n"),
- (B, "            price = Fraction(value, qty)  # type: ignore[assignment]", "            pass"),
+ (B, '        else:\n            price = Fraction(value, qty)\n', '        else:\n            pass\n'),
  (B, "            position.cost += side.sign * delta_paise  # still held: its cost moves", "            position.realised -= side.sign * delta_paise"),
  (B, "            position.realised -= side.sign * delta_paise  # closed: the profit moves", "            position.cost += side.sign * delta_paise"),
  (B, "        if event.kind not in (EventKind.FILL, EventKind.CORRECTED):", "        if event.kind is not EventKind.FILL:"),

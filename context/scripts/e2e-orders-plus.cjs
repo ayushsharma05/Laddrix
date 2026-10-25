@@ -2,6 +2,7 @@
 // (drawn from the GTT spec) places an OCO; the ticket's Algo tab starts a trailing stop and
 // its GTT tab places a single GTT; the algo picker is grouped by family.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { openWidget } = require('./e2e-lib.cjs');
 const { execSync } = require('child_process');
 const out = process.argv[2] || '.';
 const flat = (s) => s.replace(/\s+/g, ' ').trim();
@@ -15,16 +16,15 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   await page.evaluate(async () => {
     for (const k of Object.keys(localStorage)) localStorage.removeItem(k);
     await fetch('/api/layouts/current', { method: 'DELETE', credentials: 'same-origin' });
   });
   await page.reload();
-  await page.locator('.dv-tab', { hasText: 'GTT Book' }).waitFor({ timeout: 20000 });
 
   // 1) GTT book: New GTT, OCO, 2 lots
-  await page.locator('.dv-tab', { hasText: 'GTT Book' }).click();
+  await openWidget(page, 'GTT Book');
   const book = page.locator('.gtts');
   await book.getByRole('button', { name: /New GTT/ }).click();
   const form = book.getByRole('form', { name: 'Place a GTT' });
@@ -54,7 +54,7 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await algoForm.getByRole('textbox', { name: 'Trail (points)' }).fill('25');
   await algoForm.locator('.ticket-send').click();
   await page.waitForTimeout(1000);
-  await page.locator('.dv-tab', { hasText: 'Algos' }).click();
+  await openWidget(page, 'Algos');
   console.log('algo row:', flat(await page.getByRole('grid', { name: 'Algos' }).getByRole('row').first().innerText()));
 
   // 3) ticket: GTT tab
@@ -64,7 +64,7 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   console.log('ticket gtt button:', flat(await gttForm.getByRole('button', { name: /Place GTT/ }).innerText()));
   await gttForm.getByRole('button', { name: /Place GTT/ }).click();
   await page.waitForTimeout(800);
-  await page.locator('.dv-tab', { hasText: 'GTT Book' }).click();
+  await openWidget(page, 'GTT Book');
   console.log('gtt rows after ticket:', (await page.getByRole('grid', { name: 'GTTs' }).getByRole('row').allInnerTexts()).map(flat).join(' / '));
   await page.screenshot({ path: `${out}/24-orders-plus.png` });
   console.log('messages:', (await page.evaluate(() => 0)));

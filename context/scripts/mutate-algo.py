@@ -1,14 +1,14 @@
 import subprocess, pathlib
 E="src/mocktrade/algos/engine.py"
 M=[
- (E,"return max(0, self._parent.qty - self.filled(main) - working - sent)","return max(0, self._parent.qty - self.filled(main) - working)","in-flight counts against the parent"),
+ (E,'        return max(0, p.qty - self.filled(p.instrument_id, p.side) - working - sent)','        return max(0, p.qty - self.filled(p.instrument_id, p.side) - working)',"in-flight counts against the parent"),
  (E,"if p.state is not AlgoState.STOPPING or p.in_flight:","if p.state is not AlgoState.STOPPING:","stop waits for in-flight children"),
- (E,"            if p.state is not AlgoState.WORKING:\n                # sent just before","            if False:\n                # sent just before","late child pulled"),
- (E,"if p.state is not AlgoState.WORKING or self.held or qty <= 0:","if p.state is not AlgoState.WORKING or qty <= 0:","unknown outcome holds"),
- (E,"            if p.rejects_in_a_row >= MAX_REJECTS_IN_A_ROW and p.state is AlgoState.WORKING:","            if False:","repeated refusals fail"),
- (E,"            self.stop_parent(p, f\"the algo's own code failed: {exc!r}\", final=AlgoState.FAILED)","            pass","broken strategy fails"),
- (E,"        if event.kind is EventKind.FILL and self._main_filled(p) >= p.qty:","        if False:","done when filled"),
- (E,"            if not child.status.is_final and child.pending is not Pending.CANCEL:","            if False:","pull children"),
+ (E,'            if p.state is not AlgoState.WORKING and not self._keeps(p, order):\n                # sent just before','            if False:\n                # sent just before',"late child pulled"),
+ (E,'        if not hedge and (p.state is not AlgoState.WORKING or self.held):','        if not hedge and p.state is not AlgoState.WORKING:',"unknown outcome holds"),
+ (E,'            if p.rejects_in_a_row >= MAX_REJECTS_IN_A_ROW and not p.gave_up:','            if False:',"repeated refusals fail"),
+ (E,'            log.exception("algo %s failed", p.algo_id)\n            self.stop_parent(p, f"the algo\'s own code failed: {exc!r}", final=AlgoState.FAILED)','            log.exception("algo %s failed", p.algo_id)',"broken strategy fails"),
+ (E,'        if event.kind is EventKind.FILL and self._is_done(p):','        if False:',"done when filled"),
+ (E,'            if child.status.is_final or child.pending is Pending.CANCEL:\n                continue\n            if not self._keeps','            if True:\n                continue\n            if not self._keeps',"pull children"),
  ("src/mocktrade/platform.py","                engine.stop_all(f\"trading stopped: {state.reason}\")","                pass","kill switch stops algos"),
  ("src/mocktrade/risk/throttle.py","return await self._admit(Kind.NEW, waits=request.from_algo)","return await self._admit(Kind.NEW, waits=request.algo_id is not None)","children wait in the throttle"),
  ("src/mocktrade/algos/spec.py","        problems.append(f\"{spec.name} has no setting called {name!r}\")","        pass","unknown settings refused"),

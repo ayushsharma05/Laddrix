@@ -17,7 +17,7 @@ MUTANTS = [
  (C, "            and o.request.product is request.product\n            and o.request.side is request.side\n        )", "            and o.request.side is request.side\n        )"),
  (C, "        if qty > closable - taken:", "        if qty > closable:"),
  (C, "            or (self._reduce_only_problem(new, leaves, others) if grows else None)", "            or None"),
- (D, "basket_id=basket_id, reduce_only=True)", "basket_id=basket_id)"),
+ (D, '                               basket_id=basket_id, reduce_only=True,\n                               forced_close=True)', '                               basket_id=basket_id,\n                               forced_close=True)'),
  (D, "        async with lock:\n            return await self._close(", "        if True:\n            return await self._close("),
  (D, "            result.stopped_algos = engine.stop_on(", "            result.stopped_algos = [] or engine.algos() and []\n            (lambda *a: None)("),
  (D, "            if view.pending is Pending.UNCONFIRMED:\n                continue", "            if False:\n                continue"),

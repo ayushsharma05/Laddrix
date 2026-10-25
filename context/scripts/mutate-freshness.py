@@ -19,7 +19,7 @@ MUTANTS = [
  (S, "                self._queue.popleft()", "                pass"),
  (S, "                self._service.dropped += 1", "                pass"),
  (S, "        if then is not None and tick.exchange_time is not None and tick.exchange_time < then:", "        if False:"),
- (S, "        self._seen_at[tick.instrument_id] = self._clock()", "        pass"),
+ (S, '        self._latest[tick.instrument_id] = tick\n        self._seen_at[tick.instrument_id] = self._clock()\n        self.vap.on_tick(tick)', '        self._latest[tick.instrument_id] = tick\n        self.vap.on_tick(tick)'),
  (C, "        if age is None or age <= self.max_price_age_s:", "        if True:"),
  (C, "        if request.reduce_only or self._closes(request, leaves, others):\n            return None\n        return (f\"the last price", "        if False:\n            return None\n        return (f\"the last price"),
  (C, "            or (self._stale_problem(instrument, new, leaves, others) if grows else None)", "            or None"),

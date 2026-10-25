@@ -13,7 +13,7 @@ MUTANTS = [
  (S, "            if w.account_id != event.account_id and w.user_id != r.user_id:", "            if w.account_id != event.account_id:"),
  (S, "        if not view.is_working:\n            self._working.pop(cid, None)", "        if False:\n            self._working.pop(cid, None)"),
  (S, "        if len(day.sizes) >= lim.large_after:", "        if len(day.sizes) >= 0 and day.sizes:"),
- (S, "            if qty > lim.large_x * usual:", "            if qty > usual:"),
+ (S, '            if qty > lim.large_x * usual and event.order is not None:', '            if qty > usual and event.order is not None:'),
  (S, "        if day.placed >= lim.churn_after and day.churn >= lim.churn_x * day.placed:", "        if day.placed >= lim.churn_after and day.churn >= day.placed:"),
  (S, "        day.recent = [t for t in day.recent if now - t < timedelta(seconds=1)] + [now]", "        day.recent = [*day.recent, now]"),
  (S, "        if last is not None and (every is None or now - last < every):", "        if False:"),

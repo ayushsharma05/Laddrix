@@ -1,6 +1,7 @@
 // Real-browser check of the algo manager against the demo server (paper broker):
 // start a slicer and a spreader from the spec-drawn form, watch them, pause/resume/stop.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { openWidget } = require('./e2e-lib.cjs');
 const { execSync } = require('child_process');
 const out = process.argv[2] || '.';
 const flat = (s) => s.replace(/\s+/g, ' ').trim();
@@ -21,7 +22,7 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   });
   await page.reload();
   await page.locator('.ladder').first().waitFor({ timeout: 20000 });
-  await page.locator('.dv-tab', { hasText: 'Algos' }).click();
+  await openWidget(page, 'Algos');
   const algos = page.locator('.algos');
   await algos.waitFor();
   const grid = () => page.getByRole('grid', { name: 'Algos' }).getByRole('row').allInnerTexts();
@@ -76,7 +77,7 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   }
   await page.screenshot({ path: `${out}/11-algos.png` });
   const msgs = await page.evaluate(() => 0);
-  await page.locator('.dv-tab', { hasText: 'Messages' }).click();
+  await openWidget(page, 'Messages');
   console.log('messages:', (await page.getByRole('grid', { name: 'Messages' }).getByRole('row').allInnerTexts()).slice(0, 6).map(flat).join(' / '));
   console.log('errors:', JSON.stringify(errors), msgs);
   await browser.close();

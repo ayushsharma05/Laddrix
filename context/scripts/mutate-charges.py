@@ -14,7 +14,7 @@ M = [
  (M_, "            \"stamp\": pct(rates.stamp_buy_pct) if buying else Fraction(0),", "            \"stamp\": pct(rates.stamp_buy_pct),"),
  (M_, "        taxable = parts[\"brokerage\"] + parts[\"exchange\"] + parts[\"sebi\"] + parts[\"ipft\"]", "        taxable = parts[\"brokerage\"] + parts[\"exchange\"]"),
  (M_, "        parts[\"gst\"] = taxable * self.schedule.gst_pct / 100", "        parts[\"gst\"] = taxable * self.schedule.gst_pct / 1000"),
- (M_, "                mine[\"dp\"] = Fraction(self._rates(o).dp_paise)", "                mine[\"dp\"] += Fraction(self._rates(o).dp_paise)"),
+ (M_, '                mine["dp"] = Fraction(rates.dp_paise)', '                mine["dp"] += Fraction(rates.dp_paise)'),
  (M_, "VENUE = {\"NSE\": \"NSE\", \"NFO\": \"NSE\", \"BSE\": \"BSE\", \"BFO\": \"BSE\"}", "VENUE = {}"),
  (M_, "            by_position={k: sum(r.values()) for k, r in sorted(rounded.items())},", "            by_position={k: _round(sum(exact[k].values())) for k in sorted(rounded)},"),
  (M_, "    return int(value + Fraction(1, 2)) if value >= 0 else -int(-value + Fraction(1, 2))", "    return int(value)"),

@@ -1,6 +1,7 @@
 // Real-browser check of the K9.1 execution algos against the demo server (paper broker):
 // iceberg, TWAP and POV started from the spec-drawn form, each watched to its end.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { openWidget } = require('./e2e-lib.cjs');
 const { execSync } = require('child_process');
 const out = process.argv[2] || '.';
 const flat = (s) => s.replace(/\s+/g, ' ').trim();
@@ -14,14 +15,13 @@ const flat = (s) => s.replace(/\s+/g, ' ').trim();
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   await page.evaluate(async () => {
     for (const k of Object.keys(localStorage)) localStorage.removeItem(k);
     await fetch('/api/layouts/current', { method: 'DELETE', credentials: 'same-origin' });
   });
   await page.reload();
-  await page.locator('.dv-tab', { hasText: 'Algos' }).waitFor({ timeout: 20000 });
-  await page.locator('.dv-tab', { hasText: 'Algos' }).click();
+  await openWidget(page, 'Algos');
   const algos = page.locator('.algos');
   await algos.waitFor();
   const form = algos.getByRole('form', { name: 'Start an algo' });

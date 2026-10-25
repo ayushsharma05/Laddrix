@@ -24,7 +24,7 @@ MUTANTS = [
  (M, "            if since is not None and update.ts < since:", "            if False:"),
  (M, "        if not current:\n            since =", "        if False:\n            since ="),
  (M, "        return terms if terms != r or doubt else None", "        return terms if terms != r else None"),
- (M, "            if update.filled_qty == order.filled_qty and terms is None:", "            if update.filled_qty == order.filled_qty:"),
+ (M, '            if update.filled_qty == order.filled_qty and terms is None and not corrected:', '            if update.filled_qty == order.filled_qty and not corrected:'),
  (M, "            order.request = terms\n", "\n"),
  (M, "        if order.cancel_requested and not order.cancel_unclear:\n            return order.view()", "        if order.cancel_requested:\n            return order.view()"),
  (M, "            order.cancel_unclear = True\n            order.change_sent_at = self._clock()", "            order.cancel_requested = order.cancel_sent = False\n            order.pending = Pending.NONE\n            order.change_sent_at = self._clock()"),

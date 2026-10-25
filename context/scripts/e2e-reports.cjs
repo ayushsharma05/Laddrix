@@ -3,6 +3,7 @@
 // read back (CSV text, PDF header and page count), and the History tab.
 // Run against a fresh demo (rm -rf data/demo) with ui/dist rebuilt.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { openWidget } = require('./e2e-lib.cjs');
 const { execSync } = require('child_process');
 const fs = require('fs');
 (async () => {
@@ -13,7 +14,7 @@ const fs = require('fs');
   await page.getByLabel('Password').fill('demo-password-123');
   await page.getByLabel('Authenticator code').fill(execSync('python3 -m mocktrade.tools.demo --code').toString().trim());
   await page.keyboard.press('Enter');
-  await page.locator('.dv-tab').first().waitFor({ timeout: 20000 });
+  await page.locator('section.frame').first().waitFor({ timeout: 20000 });
   const api = (m, p, b) => page.evaluate(async ([m, p, b]) => {
     const r = await fetch(p, { method: m, credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: b ? JSON.stringify(b) : undefined });
     return { status: r.status, body: await r.json().catch(() => null) };
@@ -24,7 +25,7 @@ const fs = require('fs');
     console.log(side, o.status);
     await page.waitForTimeout(1200);
   }
-  await page.locator('.dv-tab', { hasText: 'Reports' }).click();
+  await openWidget(page, 'Reports');
   const totals = page.getByLabel('Day totals');
   await totals.waitFor({ timeout: 5000 });
   console.log('state:', await page.locator('.reports .book-bar span[class^="tone-"]').first().textContent());
