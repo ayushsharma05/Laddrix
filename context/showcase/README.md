@@ -22,3 +22,11 @@ node context/showcase/render.cjs 03       # only 03-order-journey
 ```
 
 Each poster is plain HTML that shares `style.css`. To change one, edit its `.html` file and run the command again. The numbers on poster 1 were counted on 25 Oct (lines with `wc -l`, tests by counting `def test_` and `it(`). Re-count them when you refresh it.
+
+## The video
+
+[video/mocktrade-showcase.mp4](video/mocktrade-showcase.mp4) is 51 seconds at 1920×1200. It shows the nine posters with slow zooms and slide transitions, then an end card, over music. The music is computed from sine waves (a chord pad, a bass line, a soft kick), so there is nothing to license. To rebuild it after changing the posters:
+
+```
+node context/showcase/render.cjs && python3 context/showcase/video/make_video.py
+```
