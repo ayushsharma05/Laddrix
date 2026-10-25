@@ -66,10 +66,17 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
        browser script runs on the free pages): merged (PR #452);
      - #450 React's compiler-readiness lint rules (49 places, each reworked; two exceptions with
        their reasons; 17 tests for guards that had none): merged (PR #453).
-- **Pull requests:** none open.
+- **Showcase (#455, 25 Oct):** nine posters of everything built so far (numbers, architecture,
+  order journey, price path, safety, timeline, screens, quality, algos) in
+  [context/showcase/](showcase/README.md). The PNGs in `context/images/showcase/` are still
+  to be drawn with `node context/showcase/render.cjs` (the session's shell was unavailable).
+- **Pull requests:** the showcase PR for #455.
 
 ## What's next
 
+Ayush pauses until Thursday (his weekly limit). Then:
+
+0. Finish #455: draw the PNGs, check them by eye, add the conversation-log entry, merge.
 1. **Ayush's to-do list** (one GitHub issue): the steps only he can do, in order.
 2. **The feature issues**, smallest dependency first:
    - phone screens: #283;

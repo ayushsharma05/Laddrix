@@ -1,0 +1,44 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The algo engine</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  svg#orbit { position: absolute; left: 0; top: 0; width: 1600px; height: 1000px; }
+  .core { position: absolute; left: 650px; top: 470px; width: 300px; height: 300px; margin: -150px 0 0 0; border-radius: 50%;
+          display: grid; place-items: center; text-align: center;
+          background: radial-gradient(circle, rgba(167,139,250,.45), rgba(34,211,238,.12) 60%, transparent 72%); }
+  .core b { font-family: "Inter Display"; font-size: 30px; font-weight: 800; } .core span { display: block; color: var(--dim); font-size: 14px; margin-top: 6px; }
+  .a { position: absolute; width: 250px; padding: 14px 16px; }
+  .a b { font-size: 17px; display: block; } .a span { display: block; font-size: 13px; color: var(--dim); margin-top: 5px; line-height: 1.4; }
+  .a small { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; }
+  .feat { position: absolute; left: 64px; right: 64px; bottom: 68px; display: flex; gap: 12px; justify-content: center; }
+  .feat .tag { font-size: 14px; padding: 7px 14px; }
+</style></head>
+<body>
+<svg id="orbit" viewBox="0 0 1600 1000">
+  <ellipse cx="800" cy="470" rx="560" ry="300" fill="none" stroke="rgba(148,170,220,.22)" stroke-dasharray="4 8"/>
+  <ellipse cx="800" cy="470" rx="380" ry="200" fill="none" stroke="rgba(167,139,250,.25)"/>
+  <g id="spokes" stroke-width="1.5"></g>
+</svg>
+<div class="page">
+  <div class="kicker">Orders that think</div>
+  <h1>One engine, <span class="grad">many algorithms</span></h1>
+</div>
+<div class="core"><div><b class="grad">Algo engine</b><span>runs every algo · survives restarts<br>every child order through the gate</span></div></div>
+
+<div class="a card" style="left:120px;top:250px"><small class="c-cyan">Execution</small><b>Slicer</b><span>a big order cut into pieces over time</span></div>
+<div class="a card" style="left:80px;top:470px"><small class="c-cyan">Execution</small><b>Iceberg</b><span>shows a little, hides the rest</span></div>
+<div class="a card" style="left:140px;top:680px"><small class="c-cyan">Execution</small><b>POV</b><span>keeps to a share of market volume</span></div>
+<div class="a card" style="left:675px;top:190px"><small class="c-blue">Schedule</small><b>TWAP · VWAP</b><span>worked to a schedule over a time window</span></div>
+<div class="a card" style="left:1230px;top:250px"><small class="c-violet">Spreads</small><b>Autospreader</b><span>quotes one leg, hedges the others the moment it fills</span></div>
+<div class="a card" style="left:1270px;top:470px"><small class="c-violet">Spreads</small><b>Spreader</b><span>two legs worked as one price</span></div>
+<div class="a card" style="left:1210px;top:680px"><small class="c-rose">Safety</small><b>Protect</b><span>trailing stop · OCO exit · bracket</span></div>
+
+<div class="feat"><span class="tag">server publishes each algo's settings</span><span class="tag">pause · resume · stop</span><span class="tag">freeze-quantity aware</span><span class="tag">several quoting legs</span><span class="tag">restart recovery</span></div>
+<div class="foot"><span><b>MockTrade</b> · showcase 9 of 9 · algos</span><span>src/mocktrade/algos · ui/src/widgets/algos · ui/src/widgets/ase</span></div>
+<script>
+  const pts = [[245,290],[205,510],[265,720],[800,230],[1355,290],[1395,510],[1335,720]];
+  document.getElementById("spokes").innerHTML = pts.map(([x, y], i) =>
+    `<line x1="800" y1="470" x2="${x}" y2="${y}" stroke="${i < 3 ? "#22d3ee" : i === 3 ? "#60a5fa" : i < 6 ? "#a78bfa" : "#fb7185"}" stroke-opacity=".45"/>` +
+    `<circle cx="${x}" cy="${y}" r="4" fill="#e8eefc"/>`).join("");
+</script>
+</body></html>
