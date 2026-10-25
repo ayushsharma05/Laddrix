@@ -63,7 +63,7 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
      - #442 screens lint (ESLint with the React hooks rules).
 - **Next in the review:** #442 screens lint, then #448 (every mutant applies, every browser
   script runs on the free pages).
-- **Pull requests:** the #441 PR; Dependabot's ruff 0.17.1 (#446, asked to rebase after #447).
+- **Pull requests:** the #441 PR (#449). Dependabot's updates #444-#446 merged green.
 
 ## What's next
 
