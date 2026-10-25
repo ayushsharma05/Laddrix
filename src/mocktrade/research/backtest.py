@@ -475,14 +475,22 @@ class Backtests:
         if sum(r.owner == owner for r in waiting) >= MAX_PER_USER:
             raise BacktestBusy(f"you already have {MAX_PER_USER} backtests waiting or running: "
                                "wait for one, or cancel it")  # fmt: skip
-        run = Run(f"BT{self._clock().strftime('%y%m%d%H%M%S')}{secrets.token_hex(2).upper()}",
-                  spec, candles, created_at=self._clock().isoformat(), owner=owner)  # fmt: skip
+        run_id = self._new_id()
+        run = Run(run_id, spec, candles, created_at=self._clock().isoformat(), owner=owner)
         self._runs[run.run_id] = run
         self._save(run)
         task = asyncio.ensure_future(self._run(run))
         self._tasks[run.run_id] = task
         task.add_done_callback(lambda _t: self._tasks.pop(run.run_id, None))
         return run
+
+    def _new_id(self) -> str:
+        """BT + the time to the second + 4 random hex characters, picked again while taken: ten
+        runs started in the same second must not share one (#458)."""
+        while True:
+            run_id = f"BT{self._clock().strftime('%y%m%d%H%M%S')}{secrets.token_hex(2).upper()}"
+            if run_id not in self._runs:
+                return run_id
 
     async def cancel(self, run_id: str) -> bool:
         """Stop a queued or running run (its worker is killed) and wait until it has; False
