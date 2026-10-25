@@ -51,14 +51,10 @@ class Scene:
 C = (0.5, 0.5)
 SCENES = [
     # 1. the hook
-    Scene("card:|What if one person built a trading platform…|", 3.5, (*C, 1.0), (*C, 1.05), 1),
-    Scene("card:|…in 13 days?|", 3.0, (*C, 1.05), (*C, 1.0), 1),
-    Scene(
-        "card:NSE · BSE · ZERODHA KITE|Live prices. A real broker. Real risk rules.|Not a toy. A professional trading platform.",
-        4.5,
-        act=1,
-    ),
-    Scene("01-hero", 6.0, (0.32, 0.25, 1.35), (*C, 1.0), 1),
+    Scene("card:|Trading, the way professionals do it.|", 3.5, (*C, 1.0), (*C, 1.05), 1),
+    Scene("card:NSE · BSE|Live prices. Instant orders. Real risk control.|", 4.0, act=1),
+    Scene("card:|Introducing|", 2.5, (*C, 1.0), (*C, 1.08), 1),
+    Scene("outro", 5.0, (*C, 1.12), (*C, 1.0), 1),
     # 2. the screens
     Scene("card:PART ONE|Meet the terminal|Everything a trader needs, on one screen.", 3.5, act=2),
     Scene(
@@ -123,7 +119,7 @@ SCENES = [
     ),
     Scene("shot:k13-5-theme-light.png|THEMES|Dark, light, and colour-blind safe", 4.5, act=2),
     # 3. under the hood
-    Scene("card:PART TWO|Under the hood|Built the way professional systems are built.", 3.5, act=3),
+    Scene("card:PART TWO|Under the hood|Engineered like the systems big desks run on.", 3.5, act=3),
     Scene("02-architecture", 5.0, (*C, 1.0), (*C, 1.04), 3),
     Scene("02-architecture", 6.0, (0.38, 0.52, 1.7), (0.38, 0.86, 1.7), 3),
     Scene("03-order-journey", 4.5, (0.5, 0.33, 1.6), (0.5, 0.33, 1.75), 3),
@@ -134,7 +130,7 @@ SCENES = [
     Scene("09-algos", 5.5, (*C, 1.25), (*C, 1.0), 3),
     # 4. running it
     Scene(
-        "card:PART THREE|Ready for the real world|Firms, users, limits, monitoring, deployment.",
+        "card:PART THREE|Run it for a whole firm|Firms, users, limits, monitoring, deployment.",
         3.5,
         act=4,
     ),
@@ -147,15 +143,12 @@ SCENES = [
     Scene("shot:grafana-dashboard.png|MONITORING|Every part measured, live", 4.5, act=4),
     Scene("shot:status-page.png|STATUS|Health at a glance", 4.0, act=4),
     # 5. quality and the finale
+    Scene("card:|Every order checked.|Every price live. Every rule from the server.", 4.0, act=5),
     Scene(
-        "card:PART FOUR|Built like a professional|Every change: an issue, tests, a review, green CI.",
-        3.5,
-        act=4,
+        "card:|Your desk. Your rules.|Paper trade on live prices. Go live on Zerodha Kite.",
+        4.5,
+        act=5,
     ),
-    Scene("08-quality", 5.5, (0.5, 0.4, 1.5), (0.5, 0.75, 1.3), 4),
-    Scene("06-journey", 6.5, (0.25, 0.55, 1.6), (0.78, 0.55, 1.6), 4),
-    Scene("01-hero", 5.5, (0.5, 0.85, 1.6), (*C, 1.0), 5),
-    Scene("card:|143 pull requests. 1,750+ tests. 13 days.|", 3.5, act=5),
     Scene("outro", 6.0, (*C, 1.0), (*C, 1.08), 5),
 ]
 
