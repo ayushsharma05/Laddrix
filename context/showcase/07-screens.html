@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The screens</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .stage { position: absolute; left: 0; right: 0; top: 200px; height: 560px; perspective: 1800px; }
+  .shot { position: absolute; border-radius: 12px; overflow: hidden; border: 1px solid rgba(148,170,220,.35);
+          box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 6px rgba(255,255,255,.03); background: #0b1222; }
+  .shot .bar { height: 22px; background: rgba(255,255,255,.06); display: flex; gap: 6px; align-items: center; padding-left: 10px; }
+  .shot .bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+  .shot .bar em { font-style: normal; font-size: 11px; color: var(--dim); margin-left: 8px; letter-spacing: .06em; }
+  .shot img { display: block; width: 100%; }
+  .label { position: absolute; font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+  .groups { position: absolute; left: 64px; right: 64px; bottom: 70px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .g { padding: 12px 14px; }
+  .g b { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; display: block; }
+  .g span { display: block; font-size: 12.5px; color: var(--dim); margin-top: 6px; line-height: 1.45; }
+</style></head>
+<body><div class="page">
+  <div class="kicker">What a trader sees</div>
+  <h1>27 widgets, <span class="grad">arranged however you like</span></h1>
+</div>
+<div class="stage">
+  <div class="shot" style="left:60px;top:40px;width:520px;transform:rotateY(18deg) rotateZ(-1deg)"><div class="bar"><i></i><i></i><i></i><em>LADDER</em></div><img src="../images/k5-4-ladder.png"></div>
+  <div class="shot" style="left:1020px;top:40px;width:520px;transform:rotateY(-18deg) rotateZ(1deg)"><div class="bar"><i></i><i></i><i></i><em>AUTOSPREADER</em></div><img src="../images/autospreader-live.png"></div>
+  <div class="shot" style="left:120px;top:300px;width:430px;transform:rotateY(14deg)"><div class="bar"><i></i><i></i><i></i><em>OPTION CHAIN</em></div><img src="../images/14-chain.png"></div>
+  <div class="shot" style="left:1050px;top:300px;width:430px;transform:rotateY(-14deg)"><div class="bar"><i></i><i></i><i></i><em>SPREAD CHART</em></div><img src="../images/spread-chart.png"></div>
+  <div class="shot" style="left:440px;top:0;width:720px;z-index:2"><div class="bar"><i style="background:var(--rose)"></i><i style="background:var(--amber)"></i><i style="background:var(--green)"></i><em>MOCKTRADE · TRADING PAGE</em></div><img src="../images/k5-5-screens.png"></div>
+</div>
+<div class="groups">
+  <div class="card g"><b class="c-rose">Trading</b><span>ladder · ticket · order book · positions · square-off · GTT</span></div>
+  <div class="card g"><b class="c-amber">Market</b><span>watch · depth · time &amp; sales · movers · charts</span></div>
+  <div class="card g"><b class="c-violet">Options</b><span>option chain · strategy builder · baskets</span></div>
+  <div class="card g"><b class="c-cyan">Spreads &amp; algos</b><span>autospreader · structures · algo manager</span></div>
+  <div class="card g"><b class="c-green">Portfolio</b><span>holdings · funds · trades · reports · MTM limits</span></div>
+  <div class="card g"><b class="c-blue">Control</b><span>alerts · audit trail · messages · admin · hotkeys</span></div>
+</div>
+<div class="foot"><span><b>MockTrade</b> · showcase 7 of 9 · screens</span><span>free pages · pop-outs · dark, light, colour-blind themes · right-click menus</span></div>
+</body></html>

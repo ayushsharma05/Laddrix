@@ -1,0 +1,69 @@
+/* Shared look for the showcase posters (#455). Each poster is a 1600 x 1000 page that
+   render.cjs photographs at 2x into context/images/showcase/. */
+:root {
+  --bg: #060a14;
+  --ink: #e8eefc;
+  --dim: #8a97b4;
+  --faint: #4a5878;
+  --line: rgba(148, 170, 220, 0.16);
+  --card: rgba(18, 26, 46, 0.72);
+  --cyan: #22d3ee;
+  --violet: #a78bfa;
+  --green: #34d399;
+  --amber: #fbbf24;
+  --rose: #fb7185;
+  --blue: #60a5fa;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1600px; height: 1000px; overflow: hidden; }
+body {
+  background:
+    radial-gradient(900px 600px at 8% -10%, rgba(34, 211, 238, 0.16), transparent 60%),
+    radial-gradient(900px 700px at 105% 110%, rgba(167, 139, 250, 0.18), transparent 60%),
+    radial-gradient(700px 500px at 60% 40%, rgba(52, 211, 153, 0.05), transparent 70%),
+    var(--bg);
+  color: var(--ink);
+  font-family: "Inter", sans-serif;
+  position: relative;
+}
+body::before { /* faint chart-paper grid */
+  content: ""; position: absolute; inset: 0;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse at center, rgba(0,0,0,0.5), transparent 75%);
+  opacity: 0.45;
+}
+.page { position: absolute; inset: 0; padding: 52px 64px; }
+.kicker {
+  font-size: 15px; letter-spacing: 0.28em; text-transform: uppercase; font-weight: 600;
+  color: var(--cyan);
+}
+h1 {
+  font-family: "Inter Display", "Inter", sans-serif; font-weight: 800;
+  font-size: 52px; letter-spacing: -0.02em; line-height: 1.08; margin-top: 8px;
+}
+h1 .grad, .grad {
+  background: linear-gradient(90deg, var(--cyan), var(--violet) 55%, var(--rose));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.sub { color: var(--dim); font-size: 19px; margin-top: 10px; max-width: 1100px; line-height: 1.45; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+}
+.tag {
+  display: inline-block; font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--dim); background: rgba(255,255,255,0.03);
+}
+.foot {
+  position: absolute; left: 64px; right: 64px; bottom: 30px; display: flex; justify-content: space-between;
+  color: var(--faint); font-size: 13px; letter-spacing: 0.06em;
+}
+.foot b { color: var(--dim); font-weight: 600; }
+.mono { font-family: "DejaVu Sans Mono", monospace; }
+.c-cyan { color: var(--cyan); } .c-violet { color: var(--violet); } .c-green { color: var(--green); }
+.c-amber { color: var(--amber); } .c-rose { color: var(--rose); } .c-blue { color: var(--blue); }
+svg text { font-family: "Inter", sans-serif; }

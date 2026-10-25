@@ -1,0 +1,49 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Layers of safety</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  svg#rings { position: absolute; left: 40px; top: 170px; width: 800px; height: 800px; }
+  .list { position: absolute; left: 880px; top: 210px; width: 656px; display: flex; flex-direction: column; gap: 12px; }
+  .item { display: grid; grid-template-columns: 14px 1fr; gap: 16px; padding: 15px 18px; }
+  .item i { width: 14px; border-radius: 4px; }
+  .item b { font-size: 17px; display: block; } .item span { font-size: 13.5px; color: var(--dim); display: block; margin-top: 4px; line-height: 1.4; }
+</style></head>
+<body><div class="page">
+  <div class="kicker">Money is serious</div>
+  <h1>Six rings of protection <span class="grad">around every rupee</span></h1>
+</div>
+<svg id="rings" viewBox="0 0 800 800">
+  <defs>
+    <radialGradient id="core"><stop offset="0" stop-color="#34d399" stop-opacity=".9"/><stop offset="1" stop-color="#34d399" stop-opacity=".15"/></radialGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="10"/></filter>
+    <path id="t6" d="M40,400 a360,360 0 0,1 720,0"/><path id="t5" d="M100,400 a300,300 0 0,1 600,0"/>
+    <path id="t4" d="M160,400 a240,240 0 0,1 480,0"/><path id="t3" d="M220,400 a180,180 0 0,1 360,0"/>
+    <path id="t2" d="M280,400 a120,120 0 0,1 240,0"/>
+  </defs>
+  <circle cx="400" cy="400" r="380" fill="#fbbf24" opacity=".06" stroke="#fbbf24" stroke-opacity=".55" stroke-width="2"/>
+  <circle cx="400" cy="400" r="320" fill="#fb7185" opacity=".07" stroke="#fb7185" stroke-opacity=".55" stroke-width="2"/>
+  <circle cx="400" cy="400" r="260" fill="#a78bfa" opacity=".08" stroke="#a78bfa" stroke-opacity=".6" stroke-width="2"/>
+  <circle cx="400" cy="400" r="200" fill="#60a5fa" opacity=".09" stroke="#60a5fa" stroke-opacity=".6" stroke-width="2"/>
+  <circle cx="400" cy="400" r="140" fill="#22d3ee" opacity=".1" stroke="#22d3ee" stroke-opacity=".7" stroke-width="2"/>
+  <circle cx="400" cy="400" r="100" fill="#34d399" opacity=".5" filter="url(#soft)"/>
+  <circle cx="400" cy="400" r="80" fill="url(#core)" stroke="#34d399" stroke-width="2"/>
+  <g font-size="17" font-weight="700" letter-spacing="3" fill="#e8eefc">
+    <text><textPath href="#t6" startOffset="50%" text-anchor="middle" fill="#fbbf24">EXCHANGE &amp; SEBI RULES</textPath></text>
+    <text><textPath href="#t5" startOffset="50%" text-anchor="middle" fill="#fb7185">SIGN-IN &amp; FIRMS</textPath></text>
+    <text><textPath href="#t4" startOffset="50%" text-anchor="middle" fill="#a78bfa">ORDER GATE</textPath></text>
+    <text><textPath href="#t3" startOffset="50%" text-anchor="middle" fill="#60a5fa">LIVE RISK</textPath></text>
+    <text><textPath href="#t2" startOffset="50%" text-anchor="middle" fill="#22d3ee">AUDIT</textPath></text>
+  </g>
+  <text x="400" y="394" text-anchor="middle" font-size="22" font-weight="800" fill="#060a14">YOUR</text>
+  <text x="400" y="422" text-anchor="middle" font-size="22" font-weight="800" fill="#060a14">MONEY</text>
+</svg>
+<div class="list">
+  <div class="card item"><i style="background:var(--amber)"></i><div><b>Exchange &amp; SEBI rules</b><span>market protection never 0 · orders from a static IP · at most 10 orders a second · freeze quantities</span></div></div>
+  <div class="card item"><i style="background:var(--rose)"></i><div><b>Sign-in &amp; firms</b><span>passwords hashed · sessions you can see and end · step-up for risky actions · each firm sees only its own data</span></div></div>
+  <div class="card item"><i style="background:var(--violet)"></i><div><b>Order gate</b><span>every order checked before a broker sees it: limits, price band, margin, rate</span></div></div>
+  <div class="card item"><i style="background:var(--blue)"></i><div><b>Live risk</b><span>MTM loss watch · kill switch per account or firm · square-off help before the broker closes intraday positions</span></div></div>
+  <div class="card item"><i style="background:var(--cyan)"></i><div><b>Audit</b><span>every order, change, sign-in and admin action recorded, never edited</span></div></div>
+  <div class="card item"><i style="background:var(--green)"></i><div><b>And around the code</b><span>secrets never logged · no live order without a human's go-ahead · supply-chain checks in CI</span></div></div>
+</div>
+<div class="foot"><span><b>MockTrade</b> · showcase 5 of 9 · safety</span><span>risk/ · orders/gate.py · server/session · logsafe.py · docs/design/security.md</span></div>
+</body></html>

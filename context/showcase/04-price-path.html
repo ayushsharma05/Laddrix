@@ -1,0 +1,64 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The price path</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  svg#map { position: absolute; left: 0; top: 0; width: 1600px; height: 1000px; }
+  .node { position: absolute; padding: 14px 16px; width: 230px; }
+  .node b { display: block; font-size: 16px; } .node span { display: block; font-size: 12.5px; color: var(--dim); margin-top: 4px; line-height: 1.35; }
+  .src { left: 64px; width: 250px; }
+  .hub { left: 560px; top: 432px; width: 300px; text-align: center; padding: 22px; border-color: rgba(34,211,238,.6);
+         background: radial-gradient(circle at 50% 0%, rgba(34,211,238,.25), rgba(18,26,46,.9)); box-shadow: 0 0 80px rgba(34,211,238,.25); }
+  .hub b { font-size: 22px; }
+  .out { left: 1000px; width: 270px; }
+  .scr { left: 1336px; top: 380px; width: 200px; height: 260px; text-align: center; padding-top: 52px; border-color: rgba(251,113,133,.5);
+         background: linear-gradient(180deg, rgba(251,113,133,.16), rgba(18,26,46,.85)); }
+  .scr b { font-size: 20px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
+</style></head>
+<body>
+<svg id="map" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
+    <linearGradient id="g2" x1="0" x2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#a78bfa"/></linearGradient>
+    <linearGradient id="g3" x1="0" x2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#fb7185"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="3"/></filter>
+  </defs>
+  <g id="wires" fill="none" stroke-width="2.4"></g>
+</svg>
+<div class="page">
+  <div class="kicker">How a price reaches your eyes</div>
+  <h1>One tick in, <span class="grad">a dozen screens updated</span></h1>
+  <div class="sub">A price arrives from the exchange. The market data service fans it out to everything that cares, and the stream carries it to every open window.</div>
+</div>
+
+<div class="card node src" style="top:290px"><b class="c-amber"><span class="dot" style="background:var(--amber)"></span>Kite WebSocket</b><span>live ticks from NSE &amp; BSE: price, volume, depth</span></div>
+<div class="card node src" style="top:470px"><b class="c-amber"><span class="dot" style="background:var(--amber)"></span>Simulator</b><span>seeded random walk: the same day every run, for demos and tests</span></div>
+<div class="card node src" style="top:650px"><b class="c-amber"><span class="dot" style="background:var(--amber)"></span>Replay</b><span>a recorded market day, played back at any speed</span></div>
+
+<div class="card node hub"><b class="c-cyan">Market data service</b><span style="font-size:14px;margin-top:8px">one place every price passes through · one source switch</span></div>
+
+<div class="card node out" style="top:200px"><b>Ladder &amp; VAP</b><span>prices by row, volume traded at each price</span></div>
+<div class="card node out" style="top:300px"><b>Candles &amp; charts</b><span>1 minute to 1 day, for any instrument or spread</span></div>
+<div class="card node out" style="top:400px"><b>Alerts engine</b><span>price rules fire to the screen and to webhooks</span></div>
+<div class="card node out" style="top:500px"><b>Synthetic spreads</b><span>multi-leg prices built from live legs</span></div>
+<div class="card node out" style="top:600px"><b>MTM &amp; risk</b><span>live P&amp;L, loss watch, kill switch</span></div>
+<div class="card node out" style="top:700px"><b>Movers · depth · time &amp; sales</b><span>what moves, who is in the queue</span></div>
+<div class="card node out" style="top:800px"><b>Recorder</b><span>saves the day for replay and backtests</span></div>
+
+<div class="card node scr"><b class="c-rose">Live stream</b><span style="margin-top:10px">WebSocket to every web window and desktop pop-out</span><span style="margin-top:20px"><span class="tag">web</span> <span class="tag">desktop</span> <span class="tag">pop-outs</span></span></div>
+
+<div class="foot"><span><b>MockTrade</b> · showcase 4 of 9 · price path</span><span>marketdata/ · server/stream.py · alerts/ · charts/</span></div>
+<script>
+  const w = document.getElementById("wires");
+  const curve = (x1, y1, x2, y2, g) => {
+    const mx = (x1 + x2) / 2;
+    const d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+    return `<path d="${d}" stroke="url(#${g})" opacity=".35" stroke-width="7" filter="url(#glow)"/><path d="${d}" stroke="url(#${g})"/>`;
+  };
+  let h = "";
+  for (const y of [328, 508, 688]) h += curve(314, y, 560, 492, "g1");
+  for (let i = 0; i < 7; i++) h += curve(860, 492, 1000, 237 + i * 100, "g2");
+  for (let i = 0; i < 7; i++) h += curve(1270, 237 + i * 100, 1336, 510, "g3");
+  w.innerHTML = h;
+</script>
+</body></html>

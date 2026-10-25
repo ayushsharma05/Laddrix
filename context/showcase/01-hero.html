@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>MockTrade in numbers</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  #candles { position: absolute; left: 0; right: 0; top: 380px; height: 320px; opacity: 0.9; }
+  .brand { font-family: "Inter Display"; font-weight: 900; font-size: 128px; letter-spacing: -0.045em; line-height: 1; margin-top: 18px; }
+  .tagline { font-size: 26px; color: var(--dim); margin-top: 14px; }
+  .tagline b { color: var(--ink); font-weight: 600; }
+  .stats { position: absolute; left: 64px; right: 64px; bottom: 84px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
+  .stat { padding: 22px 22px 20px; }
+  .stat .n { font-family: "Inter Display"; font-weight: 800; font-size: 50px; letter-spacing: -0.03em; line-height: 1; }
+  .stat .l { color: var(--dim); font-size: 15px; margin-top: 10px; line-height: 1.35; }
+  .stat .bar { height: 3px; border-radius: 3px; margin-bottom: 16px; width: 44px; }
+  .chips { margin-top: 26px; display: flex; gap: 10px; flex-wrap: wrap; max-width: 900px; }
+  .chips .tag { font-size: 14px; padding: 6px 13px; }
+  .live { position: absolute; right: 64px; top: 60px; display: flex; align-items: center; gap: 10px; color: var(--green); font-weight: 600; font-size: 15px; letter-spacing: .12em; }
+  .live i { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 6px rgba(52,211,153,.18), 0 0 24px var(--green); }
+</style></head>
+<body>
+<svg id="candles" viewBox="0 0 1600 300" preserveAspectRatio="none"></svg>
+<div class="page">
+  <div class="kicker">13 days · 12 → 25 October 2026</div>
+  <div class="brand"><span class="grad">MockTrade</span></div>
+  <div class="tagline">A professional trading platform for <b>NSE &amp; BSE</b>, built from zero, one issue at a time.</div>
+  <div class="chips">
+    <span class="tag">Live Kite prices</span><span class="tag">Paper broker</span><span class="tag">Price ladder</span>
+    <span class="tag">Options chain</span><span class="tag">Autospreader</span><span class="tag">Algos</span>
+    <span class="tag">Risk &amp; kill switch</span><span class="tag">Charts &amp; alerts</span><span class="tag">Desktop app</span>
+    <span class="tag">Firms &amp; admin</span><span class="tag">Monitoring</span>
+  </div>
+  <div class="live"><i></i>ALL CHECKS GREEN</div>
+
+  <div class="stats">
+    <div class="card stat"><div class="bar" style="background:var(--cyan)"></div><div class="n c-cyan">143</div><div class="l">pull requests merged,<br>each with green CI</div></div>
+    <div class="card stat"><div class="bar" style="background:var(--violet)"></div><div class="n c-violet">84k</div><div class="l">lines written: 31k server,<br>27k screens, 26k tests</div></div>
+    <div class="card stat"><div class="bar" style="background:var(--green)"></div><div class="n c-green">1,750+</div><div class="l">automatic tests:<br>1,237 server · 520+ screens</div></div>
+    <div class="card stat"><div class="bar" style="background:var(--amber)"></div><div class="n c-amber">87</div><div class="l">mutation scripts that break<br>the code on purpose</div></div>
+    <div class="card stat"><div class="bar" style="background:var(--rose)"></div><div class="n c-rose">27</div><div class="l">trading screens, on the web<br>and in a desktop app</div></div>
+  </div>
+</div>
+<div class="foot"><span><b>MockTrade</b> · showcase 1 of 9</span><span>Built by Ayush, with Claude writing the code</span></div>
+<script>
+  // a seeded random walk, drawn as candles: the same picture every render
+  let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const svg = document.getElementById("candles"); let p = 150, out = "";
+  for (let i = 0; i < 80; i++) {
+    const o = p, c = p + (r() - 0.47) * 26, hi = Math.min(o, c) - r() * 12, lo = Math.max(o, c) + r() * 12;
+    const x = 10 + i * 20, up = c < o, col = up ? "#34d399" : "#fb7185";
+    out += `<line x1="${x}" x2="${x}" y1="${hi}" y2="${lo}" stroke="${col}" stroke-width="1.5" opacity=".7"/>`;
+    out += `<rect x="${x - 6}" y="${Math.min(o, c)}" width="12" height="${Math.max(2, Math.abs(c - o))}" rx="2" fill="${col}" opacity=".85"/>`;
+    p = Math.max(40, Math.min(260, c));
+  }
+  svg.innerHTML = `<defs><linearGradient id="fade" x1="0" x2="1"><stop offset="0" stop-color="#060a14" stop-opacity="1"/><stop offset=".35" stop-color="#060a14" stop-opacity="0"/></linearGradient></defs>` + out + `<rect width="1600" height="300" fill="url(#fade)"/>`;
+</script>
+</body></html>

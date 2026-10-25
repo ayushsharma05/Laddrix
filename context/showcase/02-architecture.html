@@ -1,0 +1,98 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>MockTrade architecture</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .stack { position: absolute; left: 64px; width: 1130px; top: 190px; display: flex; flex-direction: column; gap: 14px; }
+  .layer { display: grid; grid-template-columns: 170px 1fr; align-items: stretch; }
+  .layer .name { padding: 14px 0 0 2px; }
+  .layer .name b { display: block; font-size: 17px; }
+  .layer .name span { font-size: 13px; color: var(--dim); }
+  .row { display: flex; gap: 10px; }
+  .box { flex: 1; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,0.025); }
+  .box b { display: block; font-size: 15px; }
+  .box span { display: block; font-size: 12.5px; color: var(--dim); margin-top: 3px; line-height: 1.35; }
+  .accent-cyan { border-color: rgba(34,211,238,.45); background: linear-gradient(180deg, rgba(34,211,238,.13), rgba(34,211,238,.03)); }
+  .accent-violet { border-color: rgba(167,139,250,.45); background: linear-gradient(180deg, rgba(167,139,250,.14), rgba(167,139,250,.03)); }
+  .accent-green { border-color: rgba(52,211,153,.45); background: linear-gradient(180deg, rgba(52,211,153,.13), rgba(52,211,153,.03)); }
+  .accent-amber { border-color: rgba(251,191,36,.45); background: linear-gradient(180deg, rgba(251,191,36,.12), rgba(251,191,36,.03)); }
+  .accent-rose { border-color: rgba(251,113,133,.45); background: linear-gradient(180deg, rgba(251,113,133,.12), rgba(251,113,133,.03)); }
+  .accent-blue { border-color: rgba(96,165,250,.45); background: linear-gradient(180deg, rgba(96,165,250,.13), rgba(96,165,250,.03)); }
+  .flow { height: 20px; margin-left: 170px; display: flex; justify-content: space-around; }
+  .flow i { width: 2px; background: linear-gradient(var(--cyan), transparent); position: relative; }
+  .flow i::after { content: ""; position: absolute; left: -5px; bottom: -2px; border: 6px solid transparent; border-top-color: var(--cyan); }
+  .flow.up i { background: linear-gradient(transparent, var(--violet)); }
+  .flow.up i::after { top: -10px; bottom: auto; border-top-color: transparent; border-bottom-color: var(--violet); }
+  .side { position: absolute; right: 64px; top: 190px; width: 320px; display: flex; flex-direction: column; gap: 14px; }
+  .side .card { padding: 16px 18px; }
+  .side h3 { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); margin-bottom: 10px; }
+  .side li { list-style: none; font-size: 14px; padding: 5px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; }
+  .side li:first-of-type { border-top: 0; }
+  .side li em { font-style: normal; color: var(--dim); font-size: 12.5px; text-align: right; }
+  .iface { font-size: 12px; color: var(--amber); letter-spacing: .08em; margin-left: 170px; margin-top: -6px; }
+</style></head>
+<body><div class="page">
+  <div class="kicker">The whole system on one page</div>
+  <h1>Every part replaceable, <span class="grad">every rule from the server</span></h1>
+  <div class="sub">Prices flow up, orders flow down. The screens hard-code no market rules: the server says what is possible.</div>
+
+  <div class="stack">
+    <div class="layer"><div class="name"><b class="c-rose">Screens</b><span>what you see</span></div>
+      <div class="row">
+        <div class="box accent-rose"><b>Web app</b><span>React · 27 widgets · free pages · right-click menus</span></div>
+        <div class="box accent-rose"><b>Desktop app</b><span>Electron · pop-out windows on many monitors</span></div>
+        <div class="box accent-rose"><b>Themes &amp; keys</b><span>dark · light · colour-blind · own hotkeys</span></div>
+      </div></div>
+    <div class="flow up"><i></i><i></i><i></i><i></i></div>
+    <div class="layer"><div class="name"><b class="c-violet">Server</b><span>one front door</span></div>
+      <div class="row">
+        <div class="box accent-violet"><b>REST API</b><span>8 areas: session · market · trading · spreads · risk · portfolio · research · ops</span></div>
+        <div class="box accent-violet" style="flex:.7"><b>Live stream</b><span>WebSocket: ticks, orders, fills, P&amp;L</span></div>
+        <div class="box accent-violet" style="flex:.7"><b>Sign-in &amp; firms</b><span>sessions · step-up · roles · per-firm data</span></div>
+      </div></div>
+    <div class="flow"><i></i><i></i><i></i><i></i></div>
+    <div class="layer"><div class="name"><b class="c-cyan">Engine</b><span>the trading brain</span></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="row">
+          <div class="box accent-cyan"><b>Orders</b><span>gate · manager · GTT · baskets</span></div>
+          <div class="box accent-cyan"><b>Risk</b><span>margin · MTM · kill switch · square-off</span></div>
+          <div class="box accent-cyan"><b>Algos</b><span>slicer · iceberg · POV · schedule</span></div>
+          <div class="box accent-cyan"><b>Spreads</b><span>autospreader · synthetic prices</span></div>
+        </div>
+        <div class="row">
+          <div class="box accent-cyan"><b>Market data</b><span>ladder · VAP · depth · movers</span></div>
+          <div class="box accent-cyan"><b>Options</b><span>pricing · chain · strategies</span></div>
+          <div class="box accent-cyan"><b>Charts &amp; alerts</b><span>candles · rules · webhooks</span></div>
+          <div class="box accent-cyan"><b>Portfolio</b><span>positions · charges · reports</span></div>
+        </div>
+      </div></div>
+    <div class="flow"><i></i><i></i><i></i><i></i></div>
+    <div class="iface">▼ BROKER INTERFACE · any broker plugs in here</div>
+    <div class="layer"><div class="name"><b class="c-green">Brokers</b><span>swap without code changes</span></div>
+      <div class="row">
+        <div class="box accent-green"><b>Kite Connect</b><span>real orders · live ticks</span></div>
+        <div class="box accent-green"><b>Paper broker</b><span>fills against live Kite prices</span></div>
+        <div class="box accent-green"><b>Simulator &amp; replay</b><span>seeded prices · recorded days</span></div>
+      </div></div>
+    <div class="flow up"><i></i><i></i><i></i><i></i></div>
+    <div class="layer"><div class="name"><b class="c-amber">Market</b><span>the real world</span></div>
+      <div class="row">
+        <div class="box accent-amber"><b>NSE · BSE</b><span>equity · futures · options</span></div>
+        <div class="box accent-amber"><b>REST for orders</b><span>static IP · 10 orders / second</span></div>
+        <div class="box accent-amber"><b>WebSocket for ticks</b><span>thousands of instruments live</span></div>
+      </div></div>
+  </div>
+
+  <div class="side">
+    <div class="card"><h3>Stores</h3><ul>
+      <li>Event store<em>every order, fill, change</em></li><li>Recordings<em>full market days</em></li>
+      <li>Reports &amp; files<em>per firm</em></li></ul></div>
+    <div class="card"><h3>Operations</h3><ul>
+      <li>JSON logs<em>secrets never logged</em></li><li>Metrics<em>Prometheus · Grafana</em></li>
+      <li>Status page<em>health at a glance</em></li><li>Supervisor<em>restarts, fences</em></li></ul></div>
+    <div class="card"><h3>Deploy</h3><ul>
+      <li>Docker image<em>one command</em></li><li>Caddy<em>HTTPS in front</em></li>
+      <li>Smoke &amp; rollback<em>scripts ready</em></li><li>9 runbooks<em>morning → incident</em></li></ul></div>
+  </div>
+</div>
+<div class="foot"><span><b>MockTrade</b> · showcase 2 of 9 · architecture</span><span>src/mocktrade · ui · deploy</span></div>
+</body></html>

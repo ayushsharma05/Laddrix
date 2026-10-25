@@ -66,11 +66,17 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
        browser script runs on the free pages): merged (PR #452);
      - #450 React's compiler-readiness lint rules (49 places, each reworked; two exceptions with
        their reasons; 17 tests for guards that had none): merged (PR #453).
+- **Showcase (#455, 25 Oct):** nine posters of everything built so far (numbers, architecture,
+  order journey, price path, safety, timeline, screens, quality, algos) in
+  [context/showcase/](showcase/README.md), drawn to `context/images/showcase/` by
+  `node context/showcase/render.cjs`.
 - **Bug #458** (two backtests started in the same second could share an id; found by CI):
   fixed in its own PR.
-- **Pull requests:** none open.
+- **Pull requests:** the showcase PR (#455) and the backtest-id fix (#458).
 
 ## What's next
+
+Ayush pauses until Thursday (his weekly limit). Then:
 
 1. **Ayush's to-do list** (one GitHub issue): the steps only he can do, in order.
 2. **The feature issues**, smallest dependency first:

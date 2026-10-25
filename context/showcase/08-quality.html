@@ -1,0 +1,56 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The quality machine</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .pipe { position: absolute; left: 64px; right: 64px; top: 250px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 14px; }
+  .st { padding: 18px 14px; text-align: center; position: relative; }
+  .st .ic { font-size: 30px; }
+  .st b { display: block; font-size: 16px; margin-top: 10px; }
+  .st span { display: block; font-size: 12.5px; color: var(--dim); margin-top: 6px; line-height: 1.4; }
+  .st::after { content: "→"; position: absolute; right: -14px; top: 44%; color: var(--cyan); font-size: 18px; }
+  .st:last-child::after { content: ""; }
+  .mut { position: absolute; left: 64px; width: 860px; top: 520px; padding: 24px 28px; }
+  .mut h3 { font-size: 20px; } .mut p { color: var(--dim); font-size: 14.5px; margin-top: 8px; line-height: 1.5; }
+  .code { margin-top: 14px; font-family: "DejaVu Sans Mono"; font-size: 13.5px; line-height: 1.7; background: rgba(6,10,20,.7); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+  .del { color: var(--rose); } .add { color: var(--green); } .cm { color: var(--faint); }
+  .ci { position: absolute; right: 64px; width: 560px; top: 520px; padding: 24px 28px; }
+  .ci h3 { font-size: 20px; }
+  .job { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .job:first-of-type { border-top: 0; margin-top: 8px; }
+  .job i { font-style: normal; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(52,211,153,.18); color: var(--green); font-weight: 800; font-size: 13px; }
+  .job em { margin-left: auto; font-style: normal; color: var(--dim); font-size: 13px; }
+</style></head>
+<body><div class="page">
+  <div class="kicker">How every change is made</div>
+  <h1>Not just tests: <span class="grad">tests that are tested</span></h1>
+  <div class="sub">143 pull requests went through the same seven steps. Over 1,750 automatic tests guard the code, and 87 mutation scripts prove those tests really catch mistakes.</div>
+</div>
+<div class="pipe">
+  <div class="card st"><div class="ic">📝</div><b>Issue</b><span>what and why, written first</span></div>
+  <div class="card st"><div class="ic">💡</div><b>Brainstorm</b><span>options weighed before code</span></div>
+  <div class="card st"><div class="ic">⌨️</div><b>Code</b><span>small, behind interfaces</span></div>
+  <div class="card st"><div class="ic">🧪</div><b>Tests</b><span>1,237 server · 520+ screens</span></div>
+  <div class="card st"><div class="ic">🧬</div><b>Mutants</b><span>break it on purpose: tests must fail</span></div>
+  <div class="card st"><div class="ic">🌐</div><b>Real browser</b><span>clicked through in Chromium</span></div>
+  <div class="card st"><div class="ic">✅</div><b>PR &amp; CI</b><span>"Closes #N", green, merged</span></div>
+</div>
+<div class="card mut">
+  <h3 class="c-amber">What is a mutation test?</h3>
+  <p>A script changes one line to something wrong, then runs the tests. If the tests still pass, they were not really checking. Every mutant must be caught.</p>
+  <div class="code">
+    <div class="cm"># risk/checks.py · the freeze-quantity rule</div>
+    <div class="del">- return qty if freeze is None else min(qty, freeze)</div>
+    <div class="add">+ return qty</div>
+    <div class="cm"># → the freeze tests fail  <span class="c-green">✓ mutant caught</span></div>
+  </div>
+</div>
+<div class="card ci">
+  <h3 class="c-green">CI on every push</h3>
+  <div class="job"><i>✓</i>test<em>server tests, types, lint</em></div>
+  <div class="job"><i>✓</i>ui<em>screen tests, ESLint, build</em></div>
+  <div class="job"><i>✓</i>desktop<em>the Electron shell</em></div>
+  <div class="job"><i>✓</i>image<em>the Docker image builds</em></div>
+  <div class="job"><i>✓</i>supply-chain<em>locked, audited packages</em></div>
+</div>
+<div class="foot"><span><b>MockTrade</b> · showcase 8 of 9 · quality</span><span>tests/ · ui/src/**/*.test.tsx · context/scripts/mutate-*.py · .github/workflows</span></div>
+</body></html>
