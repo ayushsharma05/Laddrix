@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The journey so far</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .line { position: absolute; left: 64px; right: 64px; top: 560px; height: 4px; border-radius: 4px;
+          background: linear-gradient(90deg, var(--faint), var(--amber) 12%, var(--cyan) 40%, var(--violet) 70%, var(--rose)); box-shadow: 0 0 30px rgba(34,211,238,.4); }
+  .m { position: absolute; width: 172px; }
+  .m .pin { position: absolute; left: 20px; width: 2px; background: var(--line); }
+  .m .dot { position: absolute; left: 13px; top: -8px; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #060a14; }
+  .m .card { padding: 12px 13px; }
+  .m small { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; }
+  .m b { display: block; font-size: 15px; margin-top: 4px; }
+  .m span { display: block; font-size: 12px; color: var(--dim); margin-top: 4px; line-height: 1.35; }
+  .up { top: 300px; } .up .pin { top: 196px; height: 64px; } .up .dot { top: 252px; }
+  .dn { top: 600px; } .dn .pin { top: -40px; height: 40px; } .dn .dot { top: -48px; }
+  .now { position: absolute; right: 40px; top: 532px; width: 60px; height: 60px; border-radius: 50%; background: radial-gradient(var(--rose), transparent 70%); }
+  .next { position: absolute; left: 64px; right: 64px; bottom: 74px; padding: 16px 22px; display: flex; gap: 18px; align-items: center; font-size: 15px; }
+  .next b { color: var(--green); letter-spacing: .14em; font-size: 13px; }
+</style></head>
+<body><div class="page">
+  <div class="kicker">From the first question to a full platform</div>
+  <h1>The journey: <span class="grad">idea → platform</span></h1>
+  <div class="sub">Each step was an issue, a pull request and green CI. Nothing skipped.</div>
+</div>
+<div class="line"></div><div class="now"></div>
+
+<div class="m up" style="left:64px"><div class="card"><small class="c-amber">Start</small><b>Learning</b><span>how a trading platform works; a study of a futures exchange (paused, archived)</span></div><i class="pin"></i><i class="dot" style="background:var(--amber)"></i></div>
+<div class="m dn" style="left:246px"><i class="pin"></i><i class="dot" style="background:var(--amber)"></i><div class="card"><small class="c-amber">14 Oct</small><b>New direction</b><span>NSE &amp; BSE on Kite Connect; Claude writes the code</span></div></div>
+<div class="m up" style="left:428px"><div class="card"><small class="c-cyan">K2 – K4</small><b>The core</b><span>paper broker · orders &amp; risk · positions that reconcile</span></div><i class="pin"></i><i class="dot" style="background:var(--cyan)"></i></div>
+<div class="m dn" style="left:610px"><i class="pin"></i><i class="dot" style="background:var(--cyan)"></i><div class="card"><small class="c-cyan">K5</small><b>Server &amp; screens</b><span>API · live stream · the price ladder · books</span></div></div>
+<div class="m up" style="left:792px"><div class="card"><small class="c-blue">K6 – K7</small><b>Algos &amp; deploy</b><span>slicer · desktop app · Docker · runbooks</span></div><i class="pin"></i><i class="dot" style="background:var(--blue)"></i></div>
+<div class="m dn" style="left:974px"><i class="pin"></i><i class="dot" style="background:var(--violet)"></i><div class="card"><small class="c-violet">K8 – K10</small><b>Options &amp; portfolio</b><span>chain · strategies · GTT · holdings · funds</span></div></div>
+<div class="m up" style="left:1156px"><div class="card"><small class="c-violet">K11 – K13</small><b>Research &amp; firms</b><span>record &amp; replay · charts · alerts · admin · themes</span></div><i class="pin"></i><i class="dot" style="background:var(--violet)"></i></div>
+<div class="m dn" style="left:1338px"><i class="pin"></i><i class="dot" style="background:var(--rose)"></i><div class="card"><small class="c-rose">25 Oct · now</small><b>Spreads, ops, review</b><span>autospreader · monitoring · a full repo review</span></div></div>
+
+<div class="card next"><b>NEXT · FROM THURSDAY</b><span>phone screens (#283) · then the planned feature issues · Ayush's own go-live steps</span></div>
+<div class="foot"><span><b>MockTrade</b> · showcase 6 of 9 · journey</span><span>context/conversation-log.md has every step</span></div>
+</body></html>
