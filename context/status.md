@@ -70,7 +70,9 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   order journey, price path, safety, timeline, screens, quality, algos) in
   [context/showcase/](showcase/README.md), drawn to `context/images/showcase/` by
   `node context/showcase/render.cjs`.
-- **Pull requests:** the showcase PR for #455.
+- **Bug #458** (two backtests started in the same second could share an id; found by CI):
+  fixed in its own PR.
+- **Pull requests:** the showcase PR (#455) and the backtest-id fix (#458).
 
 ## What's next
 

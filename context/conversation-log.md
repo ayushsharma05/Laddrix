@@ -822,3 +822,5 @@ Ayush is pausing until Thursday because his weekly limit is nearly used up. He a
 9. the algos.
 
 `context/showcase/README.md` is the gallery. Every claim was checked against the code. For example, the price band is a typo guard, not the exchange circuit, and square-off is an assistant, not automatic. Each picture was looked at and fixed where text overlapped. The session's shell was unavailable for a while (a server-side permission check failing), so part of the work was pushed through GitHub directly.
+## 25 Oct 2026: bug #458, backtest ids
+CI on the showcase PR failed a backtest test. The cause was real: a backtest id is the time to the second plus 4 random hex characters, so ten runs started in one second can share an id (about once in 1,500 tries). The second run then replaced the first, and the waiting limit counted one fewer. Fix: pick the id again while it is taken. A new test forces a collision; with the fix removed, that test fails.
