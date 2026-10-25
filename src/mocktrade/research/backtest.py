@@ -278,10 +278,12 @@ async def run_day(
         await events.aclose()
 
 
-def _open(source: DayInput, instrument: Instrument) -> Iterator[tuple[int, Tick]]:
+def _open(source: DayInput, instrument: Instrument | None) -> Iterator[tuple[int, Tick]]:
     if isinstance(source, RecordedDay):
         return source.open()
     if isinstance(source, CandleDay):
+        if instrument is None:  # candles become ticks on the instrument's own tick grid
+            raise BacktestError("the instrument isn't in the instrument list: no candle replay")
         return iter(candles_to_ticks(instrument, source.rows))
     return source
 
@@ -479,7 +481,7 @@ class Backtests:
         self._save(run)
         task = asyncio.ensure_future(self._run(run))
         self._tasks[run.run_id] = task
-        task.add_done_callback(lambda _t, r=run.run_id: self._tasks.pop(r, None))
+        task.add_done_callback(lambda _t: self._tasks.pop(run.run_id, None))
         return run
 
     async def cancel(self, run_id: str) -> bool:

@@ -155,8 +155,9 @@ class ScheduleCharges:
                 continue
             key = position_key(o.instrument.id, o.product)
             mine = exact.setdefault(key, {k: Fraction(0) for k, _ in LABELS})
-            if parts.pop("_dp_sale", None):  # set, never added: once a stock a day
-                mine["dp"] = Fraction(self._rates(o).dp_paise)  # type: ignore[union-attr]
+            rates = self._rates(o)  # known when parts are (_parts reads them)
+            if parts.pop("_dp_sale", None) and rates is not None:  # set, never added: once a day
+                mine["dp"] = Fraction(rates.dp_paise)
             for part, amount in parts.items():
                 mine[part] += amount
             turnover += o.value_paise

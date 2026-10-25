@@ -14,13 +14,20 @@ rate limit), then the throttle (which counts what it lets through).
 import asyncio
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from mocktrade.algos.engine import AlgoEngine, AlgoError, AlgoEvent, AlgoRecord, AlgoType
-from mocktrade.broker.base import Broker, GttBook
+from mocktrade.algos.engine import (
+    ORDERS_PER_SECOND,
+    AlgoEngine,
+    AlgoError,
+    AlgoEvent,
+    AlgoRecord,
+    AlgoType,
+)
+from mocktrade.broker.base import Broker, BrokerWithTrades, GttBook
 from mocktrade.broker.rules import order_spec
 from mocktrade.charges.model import ChargesModel, ScheduleCharges
 from mocktrade.charges.schedules import KITE_STANDARD
@@ -154,7 +161,8 @@ class Platform:
     surveillance: Surveillance = field(init=False, repr=False)  # alerts for risk (#291)
     supervisor: Supervisor = field(init=False, repr=False)  # critical loops, watched (#273)
     # where each account's prices come from (#395); default: everyone on `market_data`
-    prices: PriceSources | None = None
+    price_sources: InitVar[PriceSources | None] = None
+    prices: PriceSources = field(init=False, repr=False)  # the sources, always set
     # may this user still trade this account? read at each order (#366); the server sets it
     access: Access = field(default=no_check, repr=False)
     # every other workspace's own "firm" switch (#368): one firm's STOP never touches another
@@ -163,10 +171,9 @@ class Platform:
     _late: set[asyncio.Task] | None = field(default=None, init=False, repr=False)
     _reconcile: bool = field(default=True, init=False, repr=False)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, price_sources: PriceSources | None) -> None:
         self.expiries = Expiries(self.instruments, rules=self.expiry_rules)
-        if self.prices is None:
-            self.prices = PriceSources(self.market_data)
+        self.prices = price_sources if price_sources is not None else PriceSources(self.market_data)
         self.supervisor = Supervisor()
         log_ = self.event_log
         self.surveillance = Surveillance(
@@ -235,12 +242,13 @@ class Platform:
         ]
         if runtime.recovery is not None:
             loops.append(keep(f"{a}: recovery", lambda: self._recover(runtime), account_id=a))
-        if runtime.gtt is not None:
-            loops.append(keep(f"{a}: GTTs", lambda: self._after_recovery(runtime, runtime.gtt.run),
+        gtt, portfolio = runtime.gtt, runtime.portfolio
+        if gtt is not None:
+            loops.append(keep(f"{a}: GTTs", lambda: self._after_recovery(runtime, gtt.run),
                               account_id=a))  # fmt: skip
-        if runtime.portfolio is not None:
+        if portfolio is not None:
             loops.append(keep(f"{a}: funds and holdings",
-                              lambda: self._after_recovery(runtime, runtime.portfolio.run),
+                              lambda: self._after_recovery(runtime, portfolio.run),
                               critical=False, account_id=a))  # fmt: skip
         if self._reconcile:
             loops.append(keep(f"{a}: reconciling positions",
@@ -280,7 +288,9 @@ class Platform:
 
         def settlement(instrument_id: str) -> int | None:
             instrument = self.instruments.get(instrument_id)
-            found = instrument and self.expiries.settlement_price(
+            if instrument is None:
+                return close(instrument_id)
+            found = self.expiries.settlement_price(
                 instrument, lambda i: self.last_price(i, account_id)
             )
             return found if found is not None else close(instrument_id)
@@ -374,6 +384,8 @@ class Platform:
         broker's trade list and the audit trail (who adopted what, and after a restart)."""
         log_ = self.event_log
         if log_ is None or not portfolio.offers("trades"):
+            return None
+        if not isinstance(broker, BrokerWithTrades):  # offers trades: it has them (#355)
             return None
 
         def adopted_ids() -> set[str]:
@@ -613,7 +625,9 @@ class Platform:
             clock=clock,
             audit=audit,
             position=None if book is None else position_of(book),
-            **({"orders_per_second": lambda: throttle.per_second} if throttle else {}),
+            orders_per_second=(lambda: throttle.per_second)
+            if throttle
+            else (lambda: ORDERS_PER_SECOND),
             access=lambda user_id: self.access(user_id, account_id),
             order_cap=order_cap or (lambda _i, _p: None),
         )
@@ -766,13 +780,16 @@ class Platform:
                 def gtt_audit(kind: str, detail: str, extra: dict) -> None:
                     log.record_note(kind, account.id, detail, extra)
 
+            def stopped_by() -> str | None:
+                """Why trading is stopped (the firm's or the account's STOP), or None."""
+                return next((s.state.reason or s.name for s in (firm, switch) if s.engaged), None)
+
             gtt = GttService(
                 account.id, broker, orders, risk, self.instruments.get, md.latest,
                 audit=gtt_audit, clock=clock,
-                stopped=lambda: next((s.state.reason or s.name for s in (firm, switch)
-                                      if s.engaged), None),
+                stopped=stopped_by,
                 position=book.qty,
-                access=lambda user_id, a=account.id: self.access(user_id, a),
+                access=lambda user_id: self.access(user_id, account.id),
             )  # fmt: skip
             sweeps: set[asyncio.Task] = set()
 

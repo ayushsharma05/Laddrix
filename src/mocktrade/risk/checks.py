@@ -122,7 +122,7 @@ class RiskGate:
             for n, request in enumerate(requests, 1):
                 # legs have no order id yet: a stand-in keeps them apart from each other
                 request = replace(request, client_order_id=f"(basket leg {n})")
-                self._working = lambda p=tuple(pending): [*real(), *p]
+                self._working = _with(real, tuple(pending))
                 results.append(await self.admit_new(request))
                 pending.append(_Pending(request, self._clock()))
         finally:
@@ -480,3 +480,8 @@ def _lots(qty: int, instrument: Instrument) -> str:
 
 def _sign(x: int) -> int:
     return (x > 0) - (x < 0)
+
+
+def _with(real, extra: tuple) -> Callable[[], list]:
+    """The working orders as `real()` says, plus `extra` (a basket's earlier legs)."""
+    return lambda: [*real(), *extra]

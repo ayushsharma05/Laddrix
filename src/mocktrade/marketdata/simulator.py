@@ -108,9 +108,10 @@ class MarketSimulator:
             and w.instrument.underlying == option.underlying
             and w.instrument.expiry is not None
         ]
-        if not futures or option.expiry is None:
+        expiry = option.expiry
+        if not futures or expiry is None:
             return None
-        return min(futures, key=lambda w: abs((w.instrument.expiry - option.expiry).days))
+        return min(futures, key=lambda w: abs(((w.instrument.expiry or expiry) - expiry).days))
 
     def _option_price(self, walk: _Walk) -> int | None:
         """Black-76 off the future with a smile, on the tick grid; None without a future."""

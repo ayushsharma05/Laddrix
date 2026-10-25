@@ -15,6 +15,7 @@ same format as the event log (orders/codec.py).
 
 import asyncio
 import csv
+import functools
 import hmac
 import io
 import json
@@ -82,7 +83,7 @@ from mocktrade.research.backtest import (
     form_spec,
 )
 from mocktrade.research.replay import ReplayFeed
-from mocktrade.research.ticks import FileTickStore
+from mocktrade.research.ticks import FileTickStore, TickStore
 from mocktrade.risk.kill_switch import stop_trading
 from mocktrade.risk.mtm import PortfolioRule, PositionRule
 from mocktrade.risk.surveillance import alert_to_dict as surveillance_to_dict
@@ -481,10 +482,12 @@ def create_app(
                     lambda: platform.event_log.problem if platform.event_log else None)  # fmt: skip
     app.state.status = status  # its watch() runs with the server's other jobs
     METRICS.gauge("ready", lambda: 1 if status.ready()[0] else 0)  # the dashboard's top row
+
+    def active_alerts(level: str) -> int:
+        return sum(a.level == level for a in alerts.active()) if alerts else 0
+
     for level in ("WARN", "ERROR"):
-        METRICS.gauge(f"ops_alerts{{level={level}}}",
-                      lambda level=level: sum(a.level == level for a in alerts.active())
-                      if alerts else 0)  # fmt: skip
+        METRICS.gauge(f"ops_alerts{{level={level}}}", functools.partial(active_alerts, level))
     sources = platform.prices.all() or [platform.market_data]  # every subscription's (#396)
     METRICS.gauge("ticks_received", lambda: sum(md.ticks_received for md in sources))
     METRICS.gauge("instruments_watched", lambda: sum(len(md.watched()) for md in sources))
@@ -721,7 +724,7 @@ def create_app(
 
     # --- research: recorded ticks (K11) ---------------------------------------------------------
 
-    def recordings(user: User) -> FileTickStore:
+    def recordings(user: User) -> TickStore:
         """The recorded days of the asker's own subscription (#396); on a simulator or a
         replay, MockTrade's own, everyone's."""
         found = market(user).ticks
@@ -2036,18 +2039,14 @@ def create_app(
         params = request.query_params
         entry = login_states.pop(params.get("state", ""), None)
         user = users.session_user(request.cookies.get(settings.cookie_name))
-        ok = (
-            broker_login is not None
-            and entry is not None
-            and entry[2] >= monotonic()
-            and user is not None
-            and user.id == entry[0]
-            and params.get("status") == "success"
-            and bool(params.get("request_token"))
-        )
-        if not ok:
-            return RedirectResponse("/?broker_login=failed", status_code=303)
-        account = users.get_account(entry[1])
+        failed = RedirectResponse("/?broker_login=failed", status_code=303)
+        if broker_login is None or entry is None or user is None:
+            return failed
+        account = users.get_account(entry[1])  # gone meanwhile (an admin removed it): failed
+        token = params.get("request_token")
+        if (entry[2] < monotonic() or user.id != entry[0] or account is None
+                or params.get("status") != "success" or not token):  # fmt: skip
+            return failed
         try:
             await broker_login.complete(account, params["request_token"])
         except Exception as exc:

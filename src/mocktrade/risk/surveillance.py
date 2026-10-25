@@ -138,9 +138,9 @@ class Surveillance:
             day = a.at.date()
             self._raised[(a.kind, a.account_id, a.instrument_id, day)] = a.at
         for x in acks:
-            a = self._alerts.get(x["alert_id"])
-            if a is not None:
-                self._alerts[a.alert_id] = replace(a, acked_by=x["by"], ack_note=x["note"])
+            seen = self._alerts.get(x["alert_id"])
+            if seen is not None:
+                self._alerts[seen.alert_id] = replace(seen, acked_by=x["by"], ack_note=x["note"])
         numbers = [int(i[1:]) for i in self._alerts if i[1:].isdigit()]
         self._ids = itertools.count(max(numbers, default=0) + 1)
 
@@ -195,8 +195,8 @@ class Surveillance:
         lim = self.limits
         if len(day.sizes) >= lim.large_after:
             usual = median(day.sizes)
-            if qty > lim.large_x * usual:
-                r = event.order.request  # type: ignore[union-attr]
+            if qty > lim.large_x * usual and event.order is not None:
+                r = event.order.request
                 self._raise(LARGE, event.account_id, r.instrument_id,
                             f"unusually large order: {r.side.value} {qty} {r.instrument_id} "
                             f"({event.client_order_id}), {qty / usual:.1f}x this account's "

@@ -90,6 +90,14 @@ class _PaperOrder:
         return self.qty - self.filled
 
     @property
+    def price(self) -> int:
+        """The limit it works at. Known from acceptance on (a stop: once triggered; a market
+        order: once priced); matching only ever reads it then."""
+        if self.limit_paise is None:
+            raise RuntimeError(f"paper order {self.broker_id} has no working price yet")
+        return self.limit_paise
+
+    @property
     def avg_price(self) -> int:
         return self.notional // self.filled if self.filled else 0
 
@@ -98,7 +106,7 @@ class _PaperOrder:
 class _Book:
     """What we've already used of the latest tick, so two orders can't take the same depth."""
 
-    tick: Tick | None = None
+    tick: Tick
     used: dict[tuple[str, int], int] = field(default_factory=dict)  # (side, price) -> qty used
     traded_left: dict[int, int] = field(default_factory=dict)  # price -> volume not yet shared
 
@@ -537,7 +545,7 @@ class PaperBroker:
             if order.queued_on is tick:
                 continue  # this tick happened before we joined the queue
             if self._traded_through(order, tick):
-                self._fill(order, order.leaves, order.limit_paise)
+                self._fill(order, order.leaves, order.price)
             elif self._is_marketable(order, tick):
                 self._take_liquidity(order, book, at_own_price=True)
             else:
@@ -594,12 +602,23 @@ class PaperBroker:
             self._finish(order, OrderStatus.CANCELLED, reason)
 
     def _book_for(self, tick: Tick) -> _Book:
-        """The book for this tick. A tick seen for the first time resets the depth we've
-        used and works out how much traded since the previous tick (volume is cumulative,
-        so skipped ticks don't lose volume)."""
-        book = self._books.setdefault(tick.instrument_id, _Book())
-        if book.tick is tick:
+        """The book for this tick. A tick seen for the first time starts a fresh book (the
+        depth used so far forgotten) and works out how much traded since the previous tick
+        (volume is cumulative, so skipped ticks don't lose volume)."""
+        book = self._books.get(tick.instrument_id)
+        if book is not None and book.tick is tick:
             return book
+        traded = 0
+        if tick.volume is not None:
+            previous = self._last_volume.get(tick.instrument_id)
+            if previous is not None and tick.volume > previous:
+                traded = tick.volume - previous
+            if previous is None or tick.volume > previous:
+                self._last_volume[tick.instrument_id] = tick.volume  # never move backwards
+        book = self._books[tick.instrument_id] = _Book(
+            tick, traded_left={tick.ltp_paise: traded} if traded else {}
+        )
+        return book
         traded = 0
         if tick.volume is not None:
             previous = self._last_volume.get(tick.instrument_id)
@@ -626,11 +645,13 @@ class PaperBroker:
     def _traded_through(self, order: _PaperOrder, tick: Tick) -> bool:
         """Someone traded at a worse price than ours, so our better order must have filled."""
         if order.request.side is Side.BUY:
-            return tick.ltp_paise < order.limit_paise
-        return tick.ltp_paise > order.limit_paise
+            return tick.ltp_paise < order.price
+        return tick.ltp_paise > order.price
 
     def _try_trigger(self, order: _PaperOrder, tick: Tick) -> bool:
         trigger = order.request.trigger_paise
+        if trigger is None:  # only stops wait for a trigger, and a checked stop has one
+            raise RuntimeError(f"paper order {order.broker_id} waits for a trigger it hasn't got")
         hit = (
             tick.ltp_paise >= trigger
             if order.request.side is Side.BUY
@@ -653,9 +674,9 @@ class PaperBroker:
     def _is_marketable(self, order: _PaperOrder, tick: Tick) -> bool:
         if order.request.side is Side.BUY:
             best = tick.best_ask
-            return best is not None and best.price_paise <= order.limit_paise
+            return best is not None and best.price_paise <= order.price
         best = tick.best_bid
-        return best is not None and best.price_paise >= order.limit_paise
+        return best is not None and best.price_paise >= order.price
 
     def _take_liquidity(
         self, order: _PaperOrder, book: _Book, *, at_own_price: bool = False
@@ -670,9 +691,7 @@ class PaperBroker:
             if order.leaves <= 0 or level.qty <= 0:
                 continue
             crosses = (
-                level.price_paise <= order.limit_paise
-                if buying
-                else (level.price_paise >= order.limit_paise)
+                level.price_paise <= order.price if buying else (level.price_paise >= order.price)
             )
             if not crosses:
                 break
@@ -682,13 +701,13 @@ class PaperBroker:
                 continue
             qty = min(available, order.leaves)
             book.used[key] = book.used.get(key, 0) + qty
-            self._fill(order, qty, order.limit_paise if at_own_price else level.price_paise)
+            self._fill(order, qty, order.price if at_own_price else level.price_paise)
         if not order.status.is_final:
             self._join_queue(order, tick)
 
     def _passive_fill(self, order: _PaperOrder, tick: Tick, book: _Book) -> None:
         """Volume traded at our price eats the queue ahead of us first, then fills us."""
-        price = order.limit_paise
+        price = order.price
         if order.queue_ahead == UNKNOWN_QUEUE:
             self._join_queue(order, tick)  # first sight of our level: count from the next tick
             return
@@ -762,7 +781,7 @@ def _queue_at(order: _PaperOrder, tick: Tick) -> int:
     buying = order.request.side is Side.BUY
     levels = tick.bids if buying else tick.asks
     visible = [lvl for lvl in levels if lvl.qty > 0]
-    price = order.limit_paise
+    price = order.price
     for level in visible:
         if level.price_paise == price:
             return level.qty

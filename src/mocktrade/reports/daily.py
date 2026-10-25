@@ -176,8 +176,10 @@ def build_day(
     # carried in: from earlier days' fills, valued at the previous close (else at cost)
     earlier = PositionBook(account_id)
     for e in before:
-        earlier.replay(e.client_order_id, e.order.request, e.order.filled_qty,  # type: ignore[union-attr]
-                       e.fill.qty, e.fill.price_paise, e.fill.value_paise)  # type: ignore[union-attr]  # fmt: skip
+        if e.order is None or e.fill is None:  # a fill event always carries both
+            continue
+        earlier.replay(e.client_order_id, e.order.request, e.order.filled_qty,
+                       e.fill.qty, e.fill.price_paise, e.fill.value_paise)  # fmt: skip
     book = PositionBook(account_id)
     books: dict[str, PositionBook] = {}
     carried: dict[tuple[str, str], tuple[int, int]] = {}

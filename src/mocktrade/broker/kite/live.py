@@ -20,6 +20,7 @@ platform runs them from the first moment and a login only switches them on.
 
 import asyncio
 import contextlib
+import functools
 import logging
 import os
 from collections.abc import Callable
@@ -117,7 +118,7 @@ class KiteLive:
         broker = KiteBroker(http, kite_user_id=account.broker_client_id, account_id=account.id)
         prices = MarketData()
         link = _Link(account, app, http, broker, prices, KiteFeed(self._store, prices))
-        prices.on_demand(lambda instrument_id, link=link: self._on_own_demand(link, instrument_id))
+        prices.on_demand(functools.partial(self._on_own_demand, link))
         self._links[account.id] = link
         return broker
 
@@ -185,10 +186,10 @@ class KiteLive:
             session.access_token,
             lambda ticks, link=link: self._on_ticks(link, ticks),
             link.broker.on_order_message,
-            on_connect=lambda link=link: self._connected(link),
+            on_connect=functools.partial(self._connected, link),
         )
         link.task = asyncio.create_task(link.ticker.run(), name=f"kite-ticker-{account.id}")
-        link.task.add_done_callback(lambda task, link=link: self._ticker_ended(link, task))
+        link.task.add_done_callback(functools.partial(self._ticker_ended, link))
         own = self._tokens(link.prices.watched(), link.feed)  # what its screens already watch
         if own:
             await self._subscribe(link, own)
@@ -285,6 +286,8 @@ class KiteLive:
         return tokens
 
     async def _subscribe(self, link: _Link, tokens: list[int]) -> None:
+        if link.ticker is None:  # not connected yet: it subscribes to what is watched then
+            return
         try:
             await link.ticker.subscribe(tokens, mode="full")
         except ValueError as exc:  # over Kite's per-connection limit

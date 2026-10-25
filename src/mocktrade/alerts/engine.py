@@ -309,7 +309,10 @@ class AlertEngine:
 
     def watched_for(self, source: Any) -> set[InstrumentId]:
         """The instruments the alerts checked on this source need (#395)."""
-        return {i for a in self._alerts.values() if self._source_of(a.user_id) is source
+        source_of = self._source_of
+        if source_of is None:  # one source for everyone: every alert is checked on it
+            return self.watched()
+        return {i for a in self._alerts.values() if source_of(a.user_id) is source
                 for i in a.instruments()}  # fmt: skip
 
     def _latest_of(self, a: "Alert", instrument_id: InstrumentId) -> Tick | None:

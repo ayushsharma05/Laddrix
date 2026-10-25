@@ -28,6 +28,7 @@ sweep deletes them.
 """
 
 import asyncio
+import builtins
 import logging
 from collections.abc import Callable
 from dataclasses import replace
@@ -198,7 +199,7 @@ class GttService:
         held = self._position(view.request.instrument_id, view.request.product)
         return all(_reduces(leg, held) for leg in view.request.legs)
 
-    async def sweep(self) -> "list[str]":  # (`list` here is the method above)
+    async def sweep(self) -> "builtins.list[str]":  # (plain `list` is the method above)
         """While trading is stopped, or once its owner may no longer trade this account (#366):
         delete each active GTT that could open or add a position (see the module notes).
         Returns what it did, in words."""

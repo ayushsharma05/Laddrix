@@ -19,6 +19,7 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: ruff format --check .
+      - run: mypy  # the types (#440): [tool.mypy] in pyproject.toml
       - run: pytest
 
   ui:

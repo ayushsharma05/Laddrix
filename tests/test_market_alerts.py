@@ -190,6 +190,13 @@ def test_only_the_alerts_on_the_ticking_instrument_are_looked_at(w):
     assert w.engine.checked == 6
 
 
+def test_with_one_price_source_every_alert_is_watched_on_it(w):
+    """#440: with no source per user, watched_for() called a missing function."""
+    w.make()
+    w.make(instrument=REL, params={"level_paise": 300000})
+    assert w.engine.watched_for(object()) == w.engine.watched() == {FUT, REL}
+
+
 def test_what_can_be_asked_is_checked_and_said(w):
     def refused(body, match):
         with pytest.raises(AlertError, match=match):

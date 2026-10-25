@@ -6,6 +6,7 @@ trail and (when the user asked for it) their webhook.
                                           ─► their webhook, signed, if the alert says so
 """
 
+import functools
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -169,5 +170,5 @@ def build_market_alerts(
     service = MarketAlerts(engine, AlertStore(folder), WebhookSender(), audit=audit)
     service.start()
     for source in sources:
-        source.tap(lambda tick, s=source: engine.on_tick(tick, s if source_of else None))
+        source.tap(functools.partial(engine.on_tick, source=source if source_of else None))
     return service

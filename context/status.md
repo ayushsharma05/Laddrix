@@ -56,11 +56,11 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
      Grafana dashboard ([docs/runbooks/monitoring.md](../docs/runbooks/monitoring.md)): merged (PR #437).
   2. The repo review, #438, in four parts, one PR each:
      - #439 setup (accurate facts, project files, a contributor guide, one guide, the reading
-       order kept complete by a test): in its PR;
-     - #440 types (mypy clean, in CI): next;
+       order kept complete by a test): merged (PR #443, merged by Ayush);
+     - #440 types (mypy clean, in CI): in its PR;
      - #441 routes (`server/app.py` split by area);
      - #442 screens lint (ESLint with the React hooks rules).
-- **Pull requests:** the #439 PR.
+- **Pull requests:** the #440 PR.
 
 ## What's next
 

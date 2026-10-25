@@ -52,6 +52,9 @@ class NoInstrumentList(LookupError):
 class TickStore(Protocol):
     """Replaceable: files today; a column store or object storage later."""
 
+    @property
+    def keep_days(self) -> int: ...  # how many days are kept (0: recording is off)
+
     def append(self, batch: list[tuple[Tick, datetime]]) -> None: ...
 
     def days(self) -> list[date]: ...

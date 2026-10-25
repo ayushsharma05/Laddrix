@@ -24,7 +24,7 @@ mark-to-market), and only today's fills move today's P&L.
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, time
 from fractions import Fraction
@@ -165,26 +165,30 @@ async def recover(
             if e.ts < since:
                 x = e.extra
                 earlier.settle(x["instrument_id"], Product(x["product"]), int(x["price_paise"]))
-        for p in earlier.positions():  # expired while the server was down: settle them now
-            if p.qty and expired(p.instrument_id):
-                price = settlement(p.instrument_id)
+        for held in earlier.positions():  # expired while the server was down: settle them now
+            if held.qty and expired(held.instrument_id):
+                price = settlement(held.instrument_id)
                 earlier.settle(
-                    p.instrument_id, p.product, round(p.avg_price_paise) if price is None else price
+                    held.instrument_id,
+                    held.product,
+                    round(held.avg_price_paise) if price is None else price,
                 )
                 report.settled += 1
         earlier_pnl = Fraction(earlier.realised_paise())
-        for p in earlier.positions():
-            if not p.qty:
+        for held in earlier.positions():
+            if not held.qty:
                 continue
-            if p.product is Product.CNC and p.qty > 0:  # delivery: a holding from tomorrow on
-                holdings.append(Holding(p.instrument_id, p.qty, round(p.avg_price_paise),
-                                        close_paise=close(p.instrument_id)))  # fmt: skip
+            if held.product is Product.CNC and held.qty > 0:  # delivery: a holding from tomorrow on
+                holdings.append(Holding(held.instrument_id, held.qty, round(held.avg_price_paise),
+                                        close_paise=close(held.instrument_id)))  # fmt: skip
                 report.holdings += 1
                 continue
-            price = close(p.instrument_id) or round(p.avg_price_paise)
-            book.seed(p.instrument_id, p.product, p.qty, price, carried_avg=p.avg_price_paise)
-            carried[(p.instrument_id, p.product)] = (p.qty, price)
-            earlier_pnl += (price - p.avg_price_paise) * p.qty  # settled at the close
+            price = close(held.instrument_id) or round(held.avg_price_paise)
+            book.seed(
+                held.instrument_id, held.product, held.qty, price, carried_avg=held.avg_price_paise
+            )
+            carried[(held.instrument_id, held.product)] = (held.qty, price)
+            earlier_pnl += (price - held.avg_price_paise) * held.qty  # settled at the close
             report.carried += 1
 
     # 2. today's fills, in order, once each
@@ -256,7 +260,7 @@ async def recover(
 
 async def recover_until_done(
     gate: RecoveryGate,
-    attempt: Callable[[], "asyncio.Future[RecoveryReport] | object"],
+    attempt: Callable[[], Awaitable[RecoveryReport]],
     *,
     retry_s: float = 10.0,
     audit: Callable[[str, str], None] | None = None,
@@ -265,7 +269,7 @@ async def recover_until_done(
     shut the gate for good. Returns the report."""
     while True:
         try:
-            report = await attempt()  # type: ignore[misc]
+            report = await attempt()
         except BrokerError as exc:
             gate.set(
                 "recovering",

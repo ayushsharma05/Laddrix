@@ -136,3 +136,9 @@ class Broker(Protocol):
     async def positions(self) -> list[BrokerPosition]:
         """The broker's current view of positions (for reconciliation)."""
         ...
+
+
+@runtime_checkable
+class BrokerWithTrades(Broker, TradesSource, Protocol):
+    """A broker that also reports the day's trades (the paper broker and Kite do): what
+    resolving a trade made outside MockTrade needs (positions/external.py, #355)."""

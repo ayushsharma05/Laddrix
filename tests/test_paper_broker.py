@@ -213,6 +213,12 @@ def test_protected_limit_stays_inside_the_protection(nifty_fut, side, ltp, pct, 
     assert protected_limit(nifty_fut, side, ltp, Decimal(pct)) == expected
 
 
+def test_no_protection_given_means_the_automatic_one(nifty_fut):
+    """#440: a checked market order always carries one; were it missing, the automatic one
+    applies, the same as -1, never a crash."""
+    assert protected_limit(nifty_fut, Side.BUY, 2501000, None) == 2551020
+
+
 async def test_market_buy_fills_within_protection_only(broker, market):
     _, md = market
     far = tick(2501000, asks=[(2501010, 75), (2700000, 75)])

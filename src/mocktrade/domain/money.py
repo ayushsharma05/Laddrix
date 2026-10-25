@@ -41,7 +41,7 @@ def format_rupees(paise: int) -> str:
     digits = str(rupees)
     if len(digits) > 3:
         head, tail = digits[:-3], digits[-3:]
-        groups = []
+        groups: list[str] = []
         while len(head) > 2:
             groups.insert(0, head[-2:])
             head = head[:-2]

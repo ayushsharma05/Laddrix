@@ -191,7 +191,7 @@ async def spread_candles(charts: Charts, spread: Any, code: str, start: datetime
         "instrument_id": spread.instrument_id,
         "interval": per_leg[0]["interval"] if per_leg else code,
         "candles": rows,
-        "live_from": None if None in lives else max(lives),  # live once every leg is
+        "live_from": max(known) if len(known := [x for x in lives if x]) == len(lives) else None,
         "note": "; ".join(notes) or None,
         "kind": "spread mark",
         "approximate_high_low": True,
