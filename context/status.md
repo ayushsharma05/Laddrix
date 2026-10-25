@@ -78,7 +78,9 @@ As of 24 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   [docs/brand/](../docs/brand/README.md), also shown as the app's icon and in its menu bar. The GitHub
   repository keeps its old address until Ayush renames it.
 - **Showcase (#455) and bug #458:** merged (PRs #456, #459).
-- **Pull requests:** the rename (#457, PR #460).
+- **Rename (#457):** merged (PR #460), with two videos in `context/showcase/video/`: a
+  one-minute showcase and a two-minute advert.
+- **Pull requests:** none open.
 
 ## What's next
 
@@ -86,6 +88,7 @@ Ayush pauses until Thursday (his weekly limit). Then:
 
 0. **Ayush:** rename the GitHub repository to `Laddrix` (Settings → General → Repository name), and
    rename any `MOCKTRADE_*` keys in a local `.env` to `LADDRIX_*`.
+0. When usage allows: the long feature-by-feature video (#461).
 
 1. **Ayush's to-do list** (one GitHub issue): the steps only he can do, in order.
 2. **The feature issues**, smallest dependency first:
