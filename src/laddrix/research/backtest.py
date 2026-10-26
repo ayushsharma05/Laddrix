@@ -34,8 +34,8 @@ import logging
 import multiprocessing
 import os
 import re
-import resource
 import secrets
+import sys
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
@@ -306,7 +306,9 @@ class InProcess:
 
 def _cap_memory(limit: int) -> None:
     """In the worker, before any day: an address-space cap, so a runaway day fails alone."""
-    if limit > 0:
+    if limit > 0 and sys.platform != "win32":  # Windows has no such cap: the day runs uncapped
+        import resource
+
         resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
 
 

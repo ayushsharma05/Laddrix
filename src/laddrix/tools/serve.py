@@ -662,6 +662,10 @@ class _Server(uvicorn.Server):
 
     @contextlib.contextmanager
     def capture_signals(self):
+        if sys.platform == "win32":  # no loop signal handlers there: uvicorn's own way (#464)
+            with super().capture_signals():
+                yield
+            return
         loop = asyncio.get_running_loop()
         signals = (signal.SIGINT, signal.SIGTERM)
         for sig in signals:

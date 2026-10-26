@@ -82,7 +82,9 @@ As of 25 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   one-minute showcase and a two-minute advert.
 - **Feature tour video (#461):** `context/showcase/video/laddrix-features.mp4`, 3½ minutes, 8
   chapters: merged (PR #462).
-- **Pull requests:** none open.
+- **Windows without WSL (#464, 26 Oct):** the demo runs in plain PowerShell too (Ayush's work computer
+  allows neither WSL nor Codespaces); steps in `docs/running-locally.md`.
+- **Pull requests:** the Windows fix (#464).
 
 ## What's next
 

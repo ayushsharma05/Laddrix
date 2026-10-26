@@ -20,7 +20,24 @@ a step says `cd` somewhere.
 | git | any | `git --version` |
 | Docker (only for step 5) | any recent | `docker --version` |
 
-On Windows, use WSL (Ubuntu) and run everything inside it; the commands below are the same.
+On Windows, WSL (Ubuntu) is best: run everything inside it, and the commands below are the same.
+
+**Windows without WSL** (for example a work computer where WSL can't be installed): the demo also
+runs in PowerShell (#464). Install Python 3.12+ and Node 22, then:
+
+```powershell
+git clone https://github.com/ayushsharma05/MockTrade.git
+cd MockTrade
+py -m venv .venv
+.venv\Scripts\Activate.ps1          # if PowerShell refuses: Set-ExecutionPolicy -Scope Process Bypass
+pip install -r requirements-dev.txt
+cd ui; npm ci; npm run build; cd ..
+python -m laddrix.tools.demo --ui ui/dist
+```
+
+The authenticator code comes from a second PowerShell window: activate `.venv` again, then run
+`python -m laddrix.tools.demo --code`. `make` isn't available there, and on Windows a backtest runs
+without its memory cap. For a real server, use Linux (`docs/runbooks/server.md`).
 
 ```bash
 git clone https://github.com/ayushsharma05/MockTrade.git

@@ -840,3 +840,11 @@ Links to the GitHub repository keep the old address until Ayush renames it; GitH
 
 ## 25 Oct 2026: the feature tour video (#461)
 Ayush asked for a long video that explains every feature, and said he would merge the rename PR himself. Claude built it cheaply on what already existed: the video script got a `features` mode, and the posters and screenshots were reused. Older screenshots that show features a fresh demo can't (spreads, algos, sessions, firms) have their top menu bar, which still shows the old name, trimmed off while the video is made, so the repo stores no extra pictures. The result is 3½ minutes in 8 chapters, every screen captioned in plain words.
+
+## 26 Oct 2026: running it on Windows without WSL (#464)
+Ayush's company desktop can't install WSL and blocks Codespaces, and he wanted to test the app there. Three parts of the server only worked on Linux and Mac:
+- the data-folder lock (`fcntl`);
+- the backtest memory cap (`resource`);
+- the shutdown signal handling.
+
+Claude made each use a Windows way when it runs on Windows, and kept the Linux way unchanged. On Windows, a backtest has no memory cap. `docs/running-locally.md` now has PowerShell steps; WSL stays the recommended way. CI runs on Linux, so the Windows path is checked by Ayush trying it. The repository was also renamed to Laddrix on GitHub. Claude checked six old branches (all merged or already covered by main); deleting them was blocked by a permission check, so Ayush can delete them on GitHub.
