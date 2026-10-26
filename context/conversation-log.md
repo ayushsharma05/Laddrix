@@ -848,3 +848,12 @@ Ayush's company desktop can't install WSL and blocks Codespaces, and he wanted t
 - the shutdown signal handling.
 
 Claude made each use a Windows way when it runs on Windows, and kept the Linux way unchanged. On Windows, a backtest has no memory cap. `docs/running-locally.md` now has PowerShell steps; WSL stays the recommended way. CI runs on Linux, so the Windows path is checked by Ayush trying it. The repository was also renamed to Laddrix on GitHub. Claude checked six old branches (all merged or already covered by main); deleting them was blocked by a permission check, so Ayush can delete them on GitHub.
+
+
+## 26 Oct 2026: Windows PR CI correction (Codex, #465)
+Ayush requested the minimal correction for the failed CI run. The supervisor mutation script
+still matched the old inline lock call. Updated that one target to `_lock(fd)`; application
+code is unchanged. The 12 mutation-consistency/supervisor tests passed, and a focused mutation
+proved that removing this lock fails the second-server exclusion test. The broader mutation
+script was stopped during an unrelated quarantine mutant; its temporary changes were restored.
+PR #465 stays unmerged for CI and Ayush's Windows demo check.

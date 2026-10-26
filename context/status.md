@@ -84,7 +84,10 @@ As of 25 Oct 2026 (India time). GitHub issues are the source of truth. The full 
   chapters: merged (PR #462).
 - **Windows without WSL (#464, 26 Oct):** the demo runs in plain PowerShell too (Ayush's work computer
   allows neither WSL nor Codespaces); steps in `docs/running-locally.md`.
-- **Pull requests:** the Windows fix (#464).
+- **Pull requests:** Windows support PR #465 (#464), awaiting CI and Ayush's Windows demo test.
+  The stale lock mutation target was updated to `_lock(fd)`; 12 targeted tests passed and
+  removing the lock still fails the second-server exclusion test. No application code changed
+  in this follow-up.
 
 ## What's next
 
