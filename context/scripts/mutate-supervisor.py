@@ -18,7 +18,7 @@ MUTANTS = [
  (S, "        return self._supervisor.paused(self._account_id)\n\n    async def admit_modify", "        return None\n\n    async def admit_modify"),
  (S, "        return None  # cancelling only ever reduces risk", "        return self._supervisor.paused(self._account_id)"),
  (S, "        if self._beat is None or self._now() - self._beat > STALE_AFTER_S:", "        if self._beat is None:"),
- (F, "            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)", "            pass"),
+ (F, "            _lock(fd)", "            pass"),
  (P, '        checks = (pause, rights, recovery, risk, margin if margin_check else None, throttle)', '        checks = (rights, recovery, risk, margin if margin_check else None, throttle)'),
  (P, "            keep(f\"{a}: broker updates\", runtime.orders.run, account_id=a),", "            runtime.orders.run(),"),
  (V, "        fence.acquire()  # one trading server per data folder (#273)", "        pass"),
