@@ -4,7 +4,7 @@
 # requirements.lock.
 -e .
 pytest==9.1.1
-pytest-asyncio==1.4.0
-ruff==0.17.1
+pytest-asyncio==1.4.1
+ruff==0.17.2
 mypy==2.4.0
 kiteconnect==5.2.2  # only as a reference implementation in tests
